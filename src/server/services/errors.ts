@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 
-export type ServiceErrorCode = 'validation' | 'conflict' | 'not_found';
+export type ServiceErrorCode =
+  'validation' | 'conflict' | 'not_found' | 'unauthenticated' | 'rate_limited';
 
 /**
  * An expected failure of a service operation. Its message is safe to show to the user.
@@ -31,6 +32,20 @@ export class ConflictError extends ServiceError {
 export class NotFoundError extends ServiceError {
   constructor(message: string) {
     super('not_found', message);
+  }
+}
+
+/** Missing or invalid credentials or session. */
+export class UnauthenticatedError extends ServiceError {
+  constructor(message: string) {
+    super('unauthenticated', message);
+  }
+}
+
+/** Too many failed attempts: try again later. */
+export class RateLimitedError extends ServiceError {
+  constructor(message: string) {
+    super('rate_limited', message);
   }
 }
 

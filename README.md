@@ -56,6 +56,15 @@ One-time setup:
 3. In the app service's variables, set `DATABASE_URL` to `${{Postgres.DATABASE_URL}}`.
 4. Generate a public domain. Every push to `main` then deploys and migrates.
 
+## Signing in
+
+The app is single-user and reachable on the public internet, so every page and server action needs a session.
+
+- **First run:** open the app and you land on `/setup`. Choose a password (at least 12 characters), scan the QR code with an authenticator app, enter its code, and save the 10 recovery codes shown once. Setup then disables itself for good.
+- **Login:** password plus the authenticator code, or a recovery code instead (each works once). After 5 failed attempts within 15 minutes, logins are refused until the failures are 15 minutes old.
+- **Sessions** end after 30 minutes without a request, or on *Sign out*.
+- **Lost the password or the authenticator?** There is no email reset. Run `pnpm auth:reset` in the app's shell (on Railway: `railway ssh`, then `pnpm auth:reset`). It asks for a new password, prints a new authenticator QR code and secret plus new recovery codes, signs out every session and lifts any login lockout.
+
 ## Layout
 
 ```

@@ -1,4 +1,5 @@
 import 'server-only';
+import { unstable_rethrow } from 'next/navigation';
 import { ServiceError, type ServiceErrorCode } from '@/server/services/errors';
 
 /** What every server action returns: the envelope the UI renders from. */
@@ -13,6 +14,8 @@ export async function runAction<T>(fn: () => Promise<T>): Promise<ActionResult<T
   try {
     return { ok: true, data: await fn() };
   } catch (error: unknown) {
+    // Let Next.js control flow (redirect() to /login when the session has expired) through.
+    unstable_rethrow(error);
     if (error instanceof ServiceError) {
       return { ok: false, error: error.message, code: error.code };
     }
