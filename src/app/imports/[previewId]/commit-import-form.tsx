@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, type ReactNode } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
 import type { ActionResult } from '@/server/actions';
 
@@ -10,6 +10,8 @@ interface CommitImportFormProps {
   newCount: number;
   commit: (previous: ActionResult | null, formData: FormData) => Promise<ActionResult>;
   discard: (previous: ActionResult | null) => Promise<ActionResult>;
+  /** Extra fields submitted with the commit (the near-duplicate choices). */
+  children?: ReactNode;
 }
 
 export function CommitImportForm({
@@ -17,6 +19,7 @@ export function CommitImportForm({
   newCount,
   commit,
   discard,
+  children,
 }: CommitImportFormProps) {
   const [commitState, commitAction, isCommitting] = useActionState(commit, null);
   const [discardState, discardAction, isDiscarding] = useActionState(discard, null);
@@ -27,6 +30,7 @@ export function CommitImportForm({
   return (
     <div className="flex flex-col gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
       <form action={commitAction} className="flex flex-col gap-3">
+        {children}
         {proposedOpening && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="acceptOpeningBalance" defaultChecked />
