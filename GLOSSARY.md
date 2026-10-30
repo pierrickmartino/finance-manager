@@ -1,6 +1,6 @@
 # Finance Manager
 
-A self-hosted, single-user app for tracking personal income and expenses across several banks and currencies. It records and reports; it does not budget.
+A self-hosted, single-user app for tracking household income and expenses across several banks and currencies. It records and reports; it does not budget.
 
 ## Language
 
@@ -11,8 +11,8 @@ The institution holding one or more Accounts (BCGE, UBS, Cler, Crédit Agricole)
 _Avoid_: Provider, institution
 
 **Account**:
-A single ledger at a Bank, with one fixed Currency and a kind (current, savings, card, 3a, loan).
-_Avoid_: Wallet, pocket
+A single ledger at a Bank, with one fixed Currency, an IBAN and a kind (current, savings, 3a, loan). Every Account tracked in the app is the household's own, whoever its holder is; money to or from an untracked account is income or expense.
+_Avoid_: Wallet, pocket, own account
 
 **Currency**:
 The ISO currency in which an Account holds its amounts (CHF, EUR).
