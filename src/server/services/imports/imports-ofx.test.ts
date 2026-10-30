@@ -77,7 +77,6 @@ describe('preview an Import (Crédit Agricole OFX)', () => {
       currency: 'EUR',
       bankReference: '2510030000001',
       fingerprint: '2510030000001',
-      nearDuplicates: [],
       rawDescription: 'PRLV SEPA ÉLECTRICITÉ EXEMPLE DISTRIBUTION ÉCHÉANCE 10/2025 RUM EX000123',
       counterpartyName: 'PRLV SEPA ÉLECTRICITÉ EXEMPLE DI',
       counterpartyIban: null,
