@@ -12,6 +12,10 @@ export const HISTORY_ENTITY_TYPES = [
   'settings',
   'import',
   'transaction',
+  'category_group',
+  'category',
+  'payee',
+  'tag',
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
