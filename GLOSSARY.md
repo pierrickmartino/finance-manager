@@ -39,7 +39,7 @@ _Avoid_: Internal movement
 A suggested, not yet confirmed, pairing of two Transactions as a Transfer.
 
 **Manual transaction**:
-A Transaction entered by hand for an Account that has no usable bank export.
+A Transaction entered by hand, for an Account with no usable bank export or for a period its export doesn't cover.
 
 ### Import
 
@@ -48,7 +48,7 @@ One upload of one bank file into one Account, previewed before it is committed.
 _Avoid_: Sync, upload
 
 **Import format**:
-The one file format (CAMT.053 or a specific bank CSV layout) an Account is imported from.
+The one file format (CAMT.053, OFX, or a specific bank CSV layout) an Account is imported from.
 _Avoid_: File type, parser
 
 **Fingerprint**:

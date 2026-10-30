@@ -18,7 +18,7 @@ Existing tools don't fit: Actual Budget is built around envelope budgeting, whic
 
 A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Railway in the EU) that tracks household income and expenses across all my Accounts and reports on them in CHF. It records and reports; it does not budget.
 
-- I import bank files (BCGE CAMT.053, UBS CSV, Crédit Agricole CSV) into Accounts, each bound to one Import format. Every Import is previewed, deduplicated by Fingerprint, and reconciled against the bank's Statement balance. Cler is entered as Manual transactions, checked against Balance snapshots.
+- I import bank files (BCGE CAMT.053, UBS CSV, Crédit Agricole OFX) into Accounts, each bound to one Import format. Every Import is previewed, deduplicated by Fingerprint, and reconciled against the bank's Statement balance. Cler is entered as Manual transactions, checked against Balance snapshots.
 - Deterministic, ordered Rules set the Payee, Category and Tags on import. I can apply them to existing Transactions with a preview. My manual edits always win.
 - Transfers between my own Accounts are suggested (pre-selected when the counterparty IBAN is one of mine) and confirmed by me. They are excluded from income and expense.
 - Category groups are typed Income, Expense or Capital, so one-off wealth movements don't distort income and expense.
@@ -44,11 +44,11 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 
 9. As the user, I want to create Banks (BCGE, UBS, Cler, Crédit Agricole), so that my Accounts are grouped the way I think about them.
 10. As the user, I want to create an Account with a Bank, name, Currency (CHF or EUR), IBAN and kind (current, savings, 3a, loan), so that every Transaction belongs to a well-defined ledger.
-11. As the user, I want to bind each Account to exactly one Import format (BCGE CAMT.053, UBS CSV, Crédit Agricole CSV, or none for manual Accounts), so that re-imports never create duplicates.
+11. As the user, I want to bind each Account to exactly one Import format (BCGE CAMT.053, UBS CSV, Crédit Agricole OFX, or none for manual Accounts), so that re-imports never create duplicates.
 12. As the user, I want the Import format to become unchangeable once the Account has Transactions, so that I can't accidentally break deduplication.
 13. As the user, I want to record an Account's IBAN, so that Transfers to and from it can be recognised automatically.
 14. As the user, I want joint Accounts (held with my partner) to be treated exactly like any other Account, so that the app tracks household money as a whole.
-15. As the user, I want to enter an opening balance for an Account at its start date, so that its balance history is correct from the beginning.
+15. As the user, I want to enter an opening balance for an Account at its start date — or, for a file with only a closing balance (OFX), have it derived on the first import as closing balance minus the file's Transactions and confirmed by me — so that its balance history is correct from the beginning.
 16. As the user, I want to see every Account's current balance in its own Currency and in CHF, so that I know where my money is.
 17. As the user, I want to close or archive an Account without losing its history, so that old Accounts stay in historical reports.
 
@@ -72,13 +72,13 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 33. As the user, I want to undo a whole Import, which deletes its Transactions and unlinks any Transfers they were part of, so that a wrong file can be cleanly removed.
 34. As the user, I want to delete a single imported Transaction, so that I can remove a bank error without undoing the whole Import.
 35. As the user, I want the bank fields of an imported Transaction (dates, amount, original text) to be read-only, so that the record stays faithful to the bank.
-36. As the user, I want the parser to handle each file's own conventions (encoding, separators, decimal format, French headers, newest-first order), so that I never have to edit a file before importing it.
+36. As the user, I want the parser to handle each file's own conventions (encoding such as Windows-1252, OFX 1.02 SGML without closing tags, separators, decimal format, French headers, newest-first order), so that I never have to edit a file before importing it.
 37. As the user, I want the booking date to be used as the Transaction date in every parser, so that dates are consistent across banks.
 38. As the user, I want the original bank description, counterparty name, counterparty IBAN and payment reference to be kept on each Transaction, so that I can search them and Rules can use them.
 
 ### Manual Accounts (Cler)
 
-39. As the user, I want to enter Manual transactions on an Account that has no export, so that Cler current is tracked.
+39. As the user, I want to enter Manual transactions on any Account, so that Cler current is tracked and Crédit Agricole history older than its online export (before 2025-10) is complete from 2021.
 40. As the user, I want Manual transactions to be fully editable and deletable, so that I can fix typing mistakes.
 41. As the user, I want Rules to run on Manual transactions when I save them, so that they are classified like imported ones.
 42. As the user, I want to record Balance snapshots (date, balance) on any Account, so that manual and loan Accounts can be checked against the bank.
@@ -215,12 +215,12 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 
 ### Modules (deep modules behind the service layer)
 
-- **Import format parsers**: one per Import format (BCGE CAMT.053 v001.04, UBS CSV, Crédit Agricole CSV). Each turns a file into a normalised statement: opening and closing balance (when present), and entries with booking date, value date, signed amount in minor units, currency, bank reference (optional), raw description, counterparty name, counterparty IBAN, payment reference, bundled details, and running balance (when present). Parsers are pure. A registry maps an Import format to its parser.
+- **Import format parsers**: one per Import format (BCGE CAMT.053 v001.04, UBS CSV, Crédit Agricole OFX 1.02). Each turns a file into a normalised statement: opening and closing balance (when present), and entries with booking date, value date, signed amount in minor units, currency, bank reference (optional), raw description, counterparty name, counterparty IBAN, payment reference, bundled details, and running balance (when present). Parsers are pure. A registry maps an Import format to its parser.
   - The BCGE CAMT.053 parser reads `Ntry` elements: `AcctSvcrRef` → bank reference, `BookgDt` → booking date, `CdtDbtInd` → sign, `NtryDtls/TxDtls` → bundled details and counterparty, `Bal` with `OPBD` / `CLBD` → statement balances, and only `Sts = BOOK`.
   - The UBS CSV parser reads the metadata header (IBAN, period, `Solde initial`, `Solde final`, currency) and then the table. It uses `Date de comptabilisation` as the booking date, `Débit` / `Crédit` as the amount, `No de transaction` as the bank reference, and `Solde` as the running balance. `Description1` holds the counterparty name and address, and `Description3` holds the payment reason and counterparty IBAN.
-  - The Crédit Agricole CSV parser waits for a sample file.
+  - The Crédit Agricole OFX parser reads OFX 1.02 SGML (leaf tags unclosed, Windows-1252): `CURDEF` → currency, `STMTTRN` → entries, `FITID` → bank reference, `DTPOSTED` → booking date (no value date), `TRNAMT` → signed amount, `NAME` (truncated to 32 characters) → counterparty name, `MEMO` → raw description, `LEDGERBAL` → closing Statement balance only. `TRNTYPE` is ignored (always `OTHER`). There is no counterparty IBAN, so Transfers involving it are pre-selected only from the other side.
 - **Fingerprinting**: the bank reference when present. Otherwise a hash of Account id, booking date, amount and normalised description, plus an occurrence index among identical hashes in the same file. Unique per Account. (ADR-0003)
-- **Import pipeline**: parse → compute Fingerprints → classify each entry as new, exact duplicate or near-duplicate → reconcile (previous computed balance + new Transactions = closing Statement balance; running balance per row where available) → apply Rules → find Transfer candidates → return a preview. The preview is stored server-side until committed or discarded. Commit writes everything atomically.
+- **Import pipeline**: parse → compute Fingerprints → classify each entry as new, exact duplicate or near-duplicate → reconcile (previous computed balance + new Transactions = closing Statement balance; running balance per row where available; when the format has no opening balance, derive it as closing balance − sum of the file's Transactions — on an Account with no history it is proposed as the opening balance for confirmation, otherwise it is checked against the computed balance) → apply Rules → find Transfer candidates → return a preview. The preview is stored server-side until committed or discarded. Commit writes everything atomically.
 - **Rules engine**: a pure evaluator taking (ordered Rules, Transaction, locked fields) → field assignments plus the matching Rule per field. Text normalisation: lowercase, strip accents, collapse whitespace. Regex is evaluated with a timeout or size guard.
 - **Transfer matcher**: a pure function of (new Transactions, existing Transactions of the other Accounts, Account IBANs, FX lookup) → ranked candidates. A candidate is pre-selected on an IBAN match.
 - **FX module**: the ECB fetcher (through an adapter interface, so tests can stub it), a daily scheduled job, a backfill, and a rate lookup with fallback to the most recent earlier date. CHF to CHF is 1.
@@ -259,7 +259,7 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 
 - **What a good test is:** it exercises behaviour through the application service layer, against a real PostgreSQL database, and asserts on returned results and persisted state. It never asserts on internal calls or private module structure. A test should survive a refactor that keeps behaviour.
 - **Primary seam: the application service layer**, tested with a real, per-run PostgreSQL (container or ephemeral database) with migrations applied. Each test gets a clean schema or transaction.
-  - Parsers are tested **through** "preview an Import", using anonymised fixture files per Import format, one folder per bank. Fixtures must cover: a bundled entry, an entry without a bank reference, a refund, a cross-currency Transfer, a statement boundary, and an overlapping re-import.
+  - Parsers are tested **through** "preview an Import", using anonymised fixture files per Import format, one folder per bank. Fixtures must cover: a bundled entry, an entry without a bank reference, a refund, a cross-currency Transfer, a statement boundary, an overlapping re-import, and (OFX) a closing-balance-only file on a new Account and on an Account with Manual history.
   - Fingerprinting and deduplication: re-importing the same and overlapping files, near-duplicate flagging, identical same-day amounts.
   - Reconciliation: matching and mismatching closing balances; UBS running-balance gaps.
   - Rules: ordering, first-wins per field, Tag accumulation, locked fields, date, amount, text and regex conditions, accent and case insensitivity, apply-to-existing preview vs. commit.
@@ -305,8 +305,8 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
   - A monthly import takes under 10 minutes (Cler entry excluded).
   - One backup restore has been tested.
 - **Sample status:**
-  - UBS CSV and BCGE CAMT.053 (camt.053.001.04) samples exist but contain personal data. They must go through the anonymiser and be reviewed before being committed as fixtures.
-  - The Crédit Agricole CSV sample is still missing, which blocks that parser. Layouts differ between regional banks.
+  - UBS CSV, BCGE CAMT.053 (camt.053.001.04) and Crédit Agricole OFX samples exist but contain personal data. They must go through the anonymiser and be reviewed before being committed as fixtures.
+  - Crédit Agricole exports OFX 1.02 (sample received, contains personal data, anonymise before committing). Online history only reaches back to about 2025-10, so earlier Crédit Agricole movements (about 5 a year) are entered as Manual transactions from 2021-01-01.
   - Cler has no export.
 - **Open questions:**
   - The Cler current start date (2021-01-01 or later).
