@@ -6,14 +6,27 @@ import { getFormatter } from '@/server/formatter';
 import { getAccount } from '@/server/services/accounts';
 import { BundledDetails } from '@/components/bundled-details';
 import { NotFoundError } from '@/server/services/errors';
-import { getImportPreview, type ImportPreview } from '@/server/services/imports';
+import { getImportPreview, type EntryStatus, type ImportPreview } from '@/server/services/imports';
 import { commitImportAction, discardImportAction } from '../actions';
 import { ReconciliationSummary } from '../reconciliation-summary';
 import { CommitImportForm } from './commit-import-form';
+import { NearDuplicates } from './near-duplicates';
 
 export const metadata: Metadata = { title: 'Import preview · Finance Manager' };
 
 const CELL = 'px-3 py-2 text-left align-top';
+
+const STATUS_LABELS: Record<EntryStatus, string> = {
+  new: 'New',
+  duplicate: 'Already imported',
+  near_duplicate: 'Possible duplicate',
+};
+
+const STATUS_CLASSES: Record<EntryStatus, string | undefined> = {
+  new: undefined,
+  duplicate: 'text-zinc-500',
+  near_duplicate: 'bg-amber-50 dark:bg-amber-950',
+};
 
 interface PreviewPageProps {
   params: Promise<{ previewId: string }>;
@@ -70,6 +83,8 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
         <dd>{counts.new}</dd>
         <dt className="text-zinc-500">Already imported (skipped)</dt>
         <dd>{counts.duplicate}</dd>
+        <dt className="text-zinc-500">Possible duplicates</dt>
+        <dd>{counts.nearDuplicate}</dd>
       </dl>
 
       <ReconciliationSummary
@@ -92,10 +107,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {preview.entries.map((entry) => (
-              <tr
-                key={entry.fingerprint}
-                className={entry.status === 'duplicate' ? 'text-zinc-500' : undefined}
-              >
+              <tr key={entry.fingerprint} className={STATUS_CLASSES[entry.status]}>
                 <td className={CELL}>{fmt.date(entry.bookingDate)}</td>
                 <td className={CELL}>
                   {entry.counterpartyName ?? '—'}
@@ -111,7 +123,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
                 </td>
                 <td className={`${CELL} font-mono text-xs`}>{entry.bankReference ?? '—'}</td>
                 <td className={`${CELL} text-right tabular-nums`}>{money(entry.amountMinor)}</td>
-                <td className={CELL}>{entry.status === 'new' ? 'New' : 'Already imported'}</td>
+                <td className={CELL}>{STATUS_LABELS[entry.status]}</td>
               </tr>
             ))}
           </tbody>
@@ -127,7 +139,13 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
         newCount={counts.new}
         commit={commitImportAction.bind(null, preview.id)}
         discard={discardImportAction.bind(null, preview.id, account.id)}
-      />
+      >
+        <NearDuplicates
+          entries={preview.entries.filter((entry) => entry.status === 'near_duplicate')}
+          currency={account.currency}
+          fmt={fmt}
+        />
+      </CommitImportForm>
     </section>
   );
 }

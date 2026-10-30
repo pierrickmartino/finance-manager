@@ -126,7 +126,7 @@ describe('preview an Import (UBS CSV)', () => {
       counterpartyIban: 'CH0300700110000123456',
       paymentReference: 'Salaire octobre 2025',
     });
-    expect(preview.counts).toEqual({ total: 14, new: 14, duplicate: 0 });
+    expect(preview.counts).toEqual({ total: 14, new: 14, duplicate: 0, nearDuplicate: 0 });
   });
 });
 
@@ -225,7 +225,7 @@ describe('deduplicate by Fingerprint (UBS CSV)', () => {
     await importFixture(account, UBS_OCTOBER);
 
     const preview = await previewImport(t.ctx, { accountId: account.id, ...fixture(UBS_OCTOBER) });
-    expect(preview.counts).toEqual({ total: 14, new: 0, duplicate: 14 });
+    expect(preview.counts).toEqual({ total: 14, new: 0, duplicate: 14, nearDuplicate: 0 });
     expect(preview.entries.every((entry) => entry.status === 'duplicate')).toBe(true);
     expect(preview.proposedOpeningBalance).toBeNull();
     expect(preview.reconciliation.status).toBe('ok');
@@ -242,7 +242,7 @@ describe('deduplicate by Fingerprint (UBS CSV)', () => {
 
     const preview = await previewImport(t.ctx, { accountId: account.id, ...fixture(UBS_OVERLAP) });
 
-    expect(preview.counts).toEqual({ total: 12, new: 5, duplicate: 7 });
+    expect(preview.counts).toEqual({ total: 12, new: 5, duplicate: 7, nearDuplicate: 0 });
     expect(preview.entries.filter((e) => e.status === 'new').map((e) => e.bankReference)).toEqual([
       '9930307TI0000115',
       '9930308TI0000116',

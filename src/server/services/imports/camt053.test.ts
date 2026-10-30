@@ -98,7 +98,7 @@ describe('preview an Import (BCGE CAMT.053)', () => {
       paymentReference: null,
       rawDescription: 'Achat Debit Mastercard Boulangerie Exemple Genève',
     });
-    expect(preview.counts).toEqual({ total: 8, new: 8, duplicate: 0 });
+    expect(preview.counts).toEqual({ total: 8, new: 8, duplicate: 0, nearDuplicate: 0 });
   });
 });
 
@@ -179,7 +179,7 @@ describe('Fingerprints (BCGE CAMT.053)', () => {
       accountId: account.id,
       ...fixture(BCGE_CHF_OCTOBER),
     });
-    expect(preview.counts).toEqual({ total: 8, new: 0, duplicate: 8 });
+    expect(preview.counts).toEqual({ total: 8, new: 0, duplicate: 8, nearDuplicate: 0 });
     expect(preview.reconciliation.status).toBe('ok');
 
     const again = await commitImport(t.ctx, { previewId: preview.id });
@@ -215,7 +215,7 @@ describe('reconcile an Import (BCGE CAMT.053)', () => {
       ...fixture(BCGE_CHF_NOVEMBER),
     });
 
-    expect(preview.counts).toEqual({ total: 7, new: 7, duplicate: 0 });
+    expect(preview.counts).toEqual({ total: 7, new: 7, duplicate: 0, nearDuplicate: 0 });
     expect(preview.reconciliation).toEqual({
       status: 'ok',
       opening: { statementMinor: 1690815, computedMinor: 1690815, differenceMinor: 0 },
