@@ -1,5 +1,6 @@
 import { mutate, type ServiceContext } from '../context';
 import { ConflictError, parseInput, ValidationError } from '../errors';
+import { refuseIfRulesUse, retargetRules } from '../rules/references';
 import { recordClassificationChanges } from '../transactions/classification';
 import {
   findPayee,
@@ -68,6 +69,7 @@ export async function mergePayees(
     await recordClassificationChanges(scope, transactionIds, () =>
       tx.query('UPDATE "transaction" SET payee_id = $1 WHERE payee_id = $2', [targetId, sourceId]),
     );
+    await retargetRules(scope, 'payee', sourceId, targetId);
     await tx.query('DELETE FROM payee WHERE id = $1', [sourceId]);
     await history.record('payee', sourceId, { name: source.name }, null);
     await history.summarize(
@@ -86,6 +88,7 @@ export async function deletePayee(ctx: ServiceContext, id: string): Promise<void
         `"${payee.name}" still has ${payee.transactionCount} Transactions: merge it into another Payee instead`,
       );
     }
+    await refuseIfRulesUse(tx, 'payee', id, payee.name);
     await tx.query('DELETE FROM payee WHERE id = $1', [id]);
     await history.record('payee', id, { name: payee.name }, null);
   });

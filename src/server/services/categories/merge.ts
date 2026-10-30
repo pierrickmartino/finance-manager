@@ -1,5 +1,6 @@
 import { mutate, type ServiceContext } from '../context';
 import { ValidationError } from '../errors';
+import { retargetRules } from '../rules/references';
 import { recordClassificationChanges } from '../transactions/classification';
 import { categorySnapshot, findCategory, type Category } from './model';
 
@@ -36,6 +37,7 @@ export async function mergeCategory(
         sourceId,
       ]),
     );
+    await retargetRules(scope, 'category', sourceId, targetId);
     await tx.query('DELETE FROM category WHERE id = $1', [sourceId]);
     await history.record('category', sourceId, categorySnapshot(source), null);
     await history.summarize(

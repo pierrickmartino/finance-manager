@@ -17,6 +17,7 @@ export const HISTORY_ENTITY_TYPES = [
   'category',
   'payee',
   'tag',
+  'rule',
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
@@ -53,6 +54,12 @@ export interface HistoryRecorder {
    * bulk edit). Calling it again replaces the summary.
    */
   summarize(summary: string): Promise<void>;
+  /**
+   * A recorder for the same Batch (same id, timestamp and transaction) that records another
+   * actor. Rules use it: a Rule classifying a Transaction during an Import or a manual save
+   * joins that action's Batch, but its entries name the Rule as their actor.
+   */
+  as(actor: Actor): HistoryRecorder;
 }
 
 interface FieldChange {
@@ -77,8 +84,11 @@ function diff(before: HistorySnapshot | null, after: HistorySnapshot | null): Fi
     .filter((change) => change.before !== change.after);
 }
 
-export function createHistoryRecorder(tx: pg.PoolClient, actor: Actor): HistoryRecorder {
-  const batchId = randomUUID();
+export function createHistoryRecorder(
+  tx: pg.PoolClient,
+  actor: Actor,
+  batchId: string = randomUUID(),
+): HistoryRecorder {
   return {
     batchId,
     async record(entityType, entityId, before, after) {
@@ -109,6 +119,9 @@ export function createHistoryRecorder(tx: pg.PoolClient, actor: Actor): HistoryR
          ON CONFLICT (id) DO UPDATE SET summary = EXCLUDED.summary`,
         [batchId, summary],
       );
+    },
+    as(other) {
+      return createHistoryRecorder(tx, other, batchId);
     },
   };
 }

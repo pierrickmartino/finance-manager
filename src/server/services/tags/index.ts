@@ -1,5 +1,6 @@
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { parseInput, ValidationError } from '../errors';
+import { removeTagFromRules, retargetRules } from '../rules/references';
 import { recordClassificationChanges } from '../transactions/classification';
 import { findTag, insertTag, SELECT_TAG, tagName, uniqueTagName, type Tag } from './model';
 
@@ -73,6 +74,7 @@ export async function mergeTags(
       );
       await scope.tx.query('DELETE FROM transaction_tag WHERE tag_id = $1', [sourceId]);
     });
+    await retargetRules(scope, 'tag', sourceId, targetId);
     await removeTag(scope, source);
     await scope.history.summarize(
       `Merged Tag "${source.name}" into "${target.name}" (${transactionIds.length} Transactions)`,
@@ -89,6 +91,7 @@ export async function deleteTag(ctx: ServiceContext, id: string): Promise<TagCha
     await recordClassificationChanges(scope, transactionIds, () =>
       scope.tx.query('DELETE FROM transaction_tag WHERE tag_id = $1', [id]),
     );
+    await removeTagFromRules(scope, id);
     await removeTag(scope, tag);
     await scope.history.summarize(
       `Deleted Tag "${tag.name}" (${transactionIds.length} Transactions)`,

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { ConflictError, NotFoundError, parseInput, ValidationError } from '../errors';
+import { runRulesOnTransaction } from '../rules/apply';
 import { refuseBankFieldChanges } from './bank-fields';
 import {
   SELECT_TRANSACTION,
@@ -85,14 +86,12 @@ async function lockOpenAccount(db: Queryable, accountId: string): Promise<{ curr
 }
 
 /**
- * Hook: classification Rules run here when a Manual transaction is saved (spec stories 41, 78).
- * It runs inside the save's mutation, so a Rule's changes join the same Batch... but with the
- * Rule as actor, which #17 (Rules) decides how to record. Today there are no Rules: no-op.
+ * Classification Rules run when a Manual transaction is saved (spec 41, 78), inside the save's
+ * mutation: their changes join the save's Batch, each recorded with its Rule as the actor.
+ * Locked fields are left alone.
  */
-async function runRulesOnSave(
-  _scope: MutationScope,
-  transaction: Transaction,
-): Promise<Transaction> {
+async function runRulesOnSave(scope: MutationScope, transaction: Transaction): Promise<Transaction> {
+  await runRulesOnTransaction(scope, transaction);
   return transaction;
 }
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type pg from 'pg';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { ConflictError, isUniqueViolation, parseInput, ValidationError } from '../errors';
+import { refuseIfRulesUse } from '../rules/references';
 import {
   CATEGORY_GROUP_TYPES,
   CATEGORY_ORDER,
@@ -302,6 +303,7 @@ export async function deleteCategory(ctx: ServiceContext, id: string): Promise<v
         `"${category.name}" still has ${category.transactionCount} Transactions: merge it into another Category instead`,
       );
     }
+    await refuseIfRulesUse(tx, 'category', id, category.name);
     await tx.query('DELETE FROM category WHERE id = $1', [id]);
     await history.record('category', id, categorySnapshot(category), null);
   });
