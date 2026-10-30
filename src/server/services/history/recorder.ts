@@ -6,7 +6,13 @@ import type { Actor } from '../context';
  * The kinds of domain entity History knows about. Add yours here when a ticket introduces
  * a new entity (transaction, rule, payee, ...). The value is stored in `history_entry.entity_type`.
  */
-export const HISTORY_ENTITY_TYPES = ['bank', 'account', 'settings'] as const;
+export const HISTORY_ENTITY_TYPES = [
+  'bank',
+  'account',
+  'settings',
+  'import',
+  'transaction',
+] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
 export type JsonValue =

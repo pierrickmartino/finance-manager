@@ -3,9 +3,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
-import { getAccount, type Account } from '@/server/services/accounts';
+import { getAccount, IMPORT_FORMAT_LABELS, type Account } from '@/server/services/accounts';
 import { listBanks } from '@/server/services/banks';
 import { NotFoundError } from '@/server/services/errors';
+import { listImports } from '@/server/services/imports';
+import { previewImportAction } from '../../imports/actions';
+import { ImportFileForm } from '../../imports/import-file-form';
+import { ImportsTable } from '../../imports/imports-table';
 import { AccountForm } from '../account-form';
 import { archiveAccountAction, updateAccountAction } from '../actions';
 import { ArchiveAccountButton } from './archive-account-button';
@@ -28,7 +32,12 @@ async function loadAccount(id: string): Promise<Account> {
 export default async function AccountPage({ params }: AccountPageProps) {
   const { id } = await params;
   const account = await loadAccount(id);
-  const [banks, fmt] = await Promise.all([listBanks(await getServiceContext()), getFormatter()]);
+  const ctx = await getServiceContext();
+  const [banks, imports, fmt] = await Promise.all([
+    listBanks(ctx),
+    listImports(ctx, account.id),
+    getFormatter(),
+  ]);
   const historyHref = `/history?entityType=account&entityId=${encodeURIComponent(account.id)}`;
 
   return (
@@ -49,6 +58,25 @@ export default async function AccountPage({ params }: AccountPageProps) {
           History of this Account
         </Link>
       </div>
+
+      {account.importFormat && !account.archivedAt && (
+        <section aria-labelledby="import-file" className="flex flex-col gap-3">
+          <h2 id="import-file" className="text-lg font-semibold">
+            Import a file
+          </h2>
+          <ImportFileForm
+            formatLabel={IMPORT_FORMAT_LABELS[account.importFormat]}
+            action={previewImportAction.bind(null, account.id)}
+          />
+        </section>
+      )}
+
+      <section aria-labelledby="imports" className="flex flex-col gap-3">
+        <h2 id="imports" className="text-lg font-semibold">
+          Imports
+        </h2>
+        <ImportsTable imports={imports} fmt={fmt} />
+      </section>
 
       <AccountForm
         key={JSON.stringify(account)}

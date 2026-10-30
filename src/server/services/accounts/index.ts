@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
-import { mutate, type ServiceContext } from '../context';
+import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { ConflictError, isUniqueViolation, NotFoundError, parseInput } from '../errors';
 import type { HistorySnapshot } from '../history';
 import {
@@ -38,13 +38,15 @@ export interface Account {
   balanceMinor: number;
 }
 
-// The balance is the opening balance until Transactions exist; the Transactions ticket
-// adds their sum here.
+// The balance in the Account's own Currency: the opening balance plus every Transaction.
+const NATIVE_BALANCE = `a.opening_balance_minor + COALESCE(
+    (SELECT sum(t.amount_minor) FROM "transaction" t WHERE t.account_id = a.id), 0)::bigint`;
+
 const SELECT_ACCOUNT = `
   SELECT a.id, a.bank_id AS "bankId", b.name AS "bankName", a.name, a.currency, a.iban,
          a.kind, a.import_format AS "importFormat",
          a.opening_balance_minor AS "openingBalanceMinor", a.opening_date AS "openingDate",
-         a.archived_at AS "archivedAt", a.opening_balance_minor AS "balanceMinor"
+         a.archived_at AS "archivedAt", ${NATIVE_BALANCE} AS "balanceMinor"
   FROM account a
   JOIN bank b ON b.id = a.bank_id`;
 
@@ -84,15 +86,8 @@ async function requireBankName(db: Queryable, bankId: string): Promise<string> {
   return bank.name;
 }
 
-/**
- * Whether any Transaction belongs to the Account. Until the Transactions ticket creates the
- * `transaction` table there are none; that ticket should drop the table-exists guard.
- */
-async function hasTransactions(db: Queryable, id: string): Promise<boolean> {
-  const table = await db.query<{ exists: boolean }>(
-    `SELECT to_regclass('public.transaction') IS NOT NULL AS "exists"`,
-  );
-  if (!table.rows[0]!.exists) return false;
+/** Whether any Transaction belongs to the Account. */
+export async function hasTransactions(db: Queryable, id: string): Promise<boolean> {
   const result = await db.query<{ exists: boolean }>(
     'SELECT EXISTS (SELECT 1 FROM "transaction" WHERE account_id = $1) AS "exists"',
     [id],
@@ -204,4 +199,22 @@ export async function listAccounts(ctx: ServiceContext): Promise<Account[]> {
      ORDER BY a.archived_at IS NOT NULL, lower(b.name), lower(a.name), a.id`,
   );
   return result.rows;
+}
+
+/**
+ * Sets an Account's opening balance and date inside another mutation (an Import confirming the
+ * opening balance its file proposes), recording the change in that mutation's Batch.
+ */
+export async function setOpeningBalance(
+  { tx, history }: Pick<MutationScope, 'tx' | 'history'>,
+  id: string,
+  opening: { amountMinor: number; date: string },
+): Promise<void> {
+  const before = await findAccount(tx, id, true);
+  await tx.query('UPDATE account SET opening_balance_minor = $1, opening_date = $2 WHERE id = $3', [
+    opening.amountMinor,
+    opening.date,
+    id,
+  ]);
+  await history.record('account', id, snapshot(before), snapshot(await findAccount(tx, id)));
 }
