@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { CATEGORY_GROUP_TYPES } from '../categories/model';
 
 /**
  * The Transaction list's filters (spec story 67). Every filter is optional and blank strings
  * mean "no filter", as an empty GET form submits them. Filters combine with AND.
  *
- * To add a filter (Payee, Category, Tag, Unclassified, Transfer): add its field to
+ * To add a filter (Transfer, #19): add its field to
  * `transactionFilterFields` and one `where(...)` line to `filterConditions`.
  */
 
@@ -49,6 +50,15 @@ const transactionFilterFields = {
       .trim()
       .max(MAX_TEXT_LENGTH, `Search text must be at most ${MAX_TEXT_LENGTH} characters`),
   ),
+  payeeId: optional(z.uuid({ error: 'Unknown Payee' })),
+  categoryId: optional(z.uuid({ error: 'Unknown Category' })),
+  tagId: optional(z.uuid({ error: 'Unknown Tag' })),
+  /** The type of the Category's group: income, expense or capital. */
+  groupType: optional(
+    z.enum(CATEGORY_GROUP_TYPES, { error: 'Category group type must be Income, Expense or Capital' }),
+  ),
+  /** Only Transactions with no Category (and, once #19 exists, not in a Transfer). */
+  unclassified: optional(z.boolean()),
 };
 
 export const transactionQueryInput = z
@@ -108,6 +118,18 @@ export function filterConditions(input: ParsedQuery): SqlCondition {
     (p) => `t.search_text LIKE '%' || normalize_search_text(${p}) || '%'`,
     input.text && escapeLike(input.text),
   );
+  where((p) => `t.payee_id = ${p}::uuid`, input.payeeId);
+  where((p) => `t.category_id = ${p}::uuid`, input.categoryId);
+  where(
+    (p) => `EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id = ${p}::uuid)`,
+    input.tagId,
+  );
+  where(
+    (p) => `EXISTS (SELECT 1 FROM category fc JOIN category_group fg ON fg.id = fc.group_id
+                    WHERE fc.id = t.category_id AND fg.type = ${p})`,
+    input.groupType,
+  );
+  where((p) => `(t.category_id IS NULL) = ${p}`, input.unclassified);
 
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }
