@@ -1,0 +1,3 @@
+# Each Account is bound to one import format
+
+Each Account is bound to exactly one import format (CAMT.053 or one specific bank CSV layout), and that format defines its Fingerprint: the bank reference for CAMT.053, a hash of the normalised fields plus an occurrence index for CSV. Fingerprints from different formats can't be matched reliably, because the same bank writes different references and descriptions into each format, so mixing formats on one Account would silently duplicate Transactions. We considered a fingerprint built only from fields every format shares (date, amount, occurrence index), and rejected it as weaker than one stable format. Once an Account has Transactions, its format can't be changed.

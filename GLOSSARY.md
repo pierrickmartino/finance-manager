@@ -47,8 +47,12 @@ A Transaction entered by hand for an Account that has no usable bank export.
 One upload of one bank file into one Account, previewed before it is committed.
 _Avoid_: Sync, upload
 
+**Import format**:
+The one file format (CAMT.053 or a specific bank CSV layout) an Account is imported from.
+_Avoid_: File type, parser
+
 **Fingerprint**:
-The identity of a Transaction from the bank's point of view, used to recognise it when the same period is imported again.
+The identity of a Transaction from the bank's point of view, defined by its Account's Import format, used to recognise it when the same period is imported again.
 _Avoid_: Hash, dedup key
 
 **Statement balance**:
@@ -82,6 +86,15 @@ _Avoid_: Uncategorised, inbox
 **Rule**:
 An ordered condition-to-action pair that classifies Transactions. For each field, the first matching Rule wins; a manual edit always beats any Rule.
 _Avoid_: Filter, automation
+
+### History
+
+**History entry**:
+An append-only record of one change to domain data: what changed, from what to what, when, and by which actor (manual edit, Rule, Import, system).
+_Avoid_: Log, event
+
+**Batch**:
+The group of History entries produced by one user action, such as a bulk edit, a Payee merge or an "apply to existing".
 
 ### Reporting
 

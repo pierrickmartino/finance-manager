@@ -1,0 +1,3 @@
+# Amounts stored in the Account's Currency only, converted at query time
+
+Each Transaction stores its amount only in its Account's Currency, as integer minor units. Values in the Base currency (CHF) are never stored: reports compute them from the daily FX rate table (ECB reference rates), using the rate on the Transaction's date or the most recent earlier one. This keeps a single source of truth, so a corrected or backfilled rate fixes every report at once. The cost is that every report query has to join against the FX table. Balance Widgets value Accounts at the rate of the date being shown, and the app does no realised or unrealised FX gain accounting.
