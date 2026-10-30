@@ -19,6 +19,16 @@ describe('CAMT.053', () => {
     ]);
   });
 
+  test('reads a pending entry without a booking date', () => {
+    const input = readInput(INPUT)
+      .toString('utf8')
+      .replace(/<BookgDt>\s*<Dt>2025-04-02<\/Dt>\s*<\/BookgDt>/, '<ValDt><Dt>2025-04-03</Dt></ValDt>');
+
+    const statement = readStatement('camt053', Buffer.from(input));
+
+    expect(statement.entries.at(-1)).toEqual({ bookingDate: '', amount: -8000, status: 'PDNG' });
+  });
+
   test('rejects a file that is not well-formed XML', () => {
     const broken = Buffer.from(readInput(INPUT).toString('utf8').replace('</Stmt>', ''));
     expect(() => readStatement('camt053', broken)).toThrow();

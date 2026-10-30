@@ -69,7 +69,8 @@ function readEntry(raw: unknown): StatementEntry {
   const sts = entry.Sts;
   const status = typeof sts === 'object' && sts !== null && 'Cd' in sts ? text((sts as XmlNode).Cd, 'Sts/Cd') : text(sts, 'Sts');
   return {
-    bookingDate: text(node(entry.BookgDt, 'Ntry/BookgDt').Dt, 'Ntry/BookgDt/Dt'),
+    // BookgDt is optional in CAMT.053 (typically absent on pending entries).
+    bookingDate: entry.BookgDt === undefined ? '' : text(node(entry.BookgDt, 'Ntry/BookgDt').Dt, 'Ntry/BookgDt/Dt'),
     amount: signed(entry, 'Ntry'),
     status,
   };
