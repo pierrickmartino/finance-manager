@@ -1,9 +1,16 @@
 import type { ImportFormat } from '../../accounts';
 import { camt053Parser } from './camt053';
 import type { ImportParser } from './types';
+import { ofxParser } from './ofx';
 import { ubsCsvParser } from './ubs-csv';
 
-export type { BundledDetail, ImportParser, ParsedEntry, ParsedStatement } from './types';
+export type {
+  BankAccountId,
+  BundledDetail,
+  ImportParser,
+  ParsedEntry,
+  ParsedStatement,
+} from './types';
 export { UnreadableFileError } from './types';
 
 /**
@@ -13,6 +20,7 @@ export { UnreadableFileError } from './types';
 const PARSERS: Partial<Record<ImportFormat, ImportParser>> = {
   ubs_csv: ubsCsvParser,
   camt053: camt053Parser,
+  ofx: ofxParser,
 };
 
 export function parserFor(format: ImportFormat): ImportParser | null {

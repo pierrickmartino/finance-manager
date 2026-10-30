@@ -58,7 +58,11 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
       </div>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-        <dt className="text-zinc-500">Opening balance</dt>
+        <dt className="text-zinc-500">
+          {preview.isOpeningBalanceDerived
+            ? 'Opening balance (derived from the closing balance)'
+            : 'Opening balance'}
+        </dt>
         <dd className="tabular-nums">{money(statement.openingBalanceMinor)}</dd>
         <dt className="text-zinc-500">Closing balance</dt>
         <dd className="tabular-nums">{money(statement.closingBalanceMinor)}</dd>
@@ -72,6 +76,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
         reconciliation={preview.reconciliation}
         currency={account.currency}
         fmt={fmt}
+        isOpeningBalanceDerived={preview.isOpeningBalanceDerived}
       />
 
       <div className="overflow-x-auto">

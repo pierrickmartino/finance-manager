@@ -5,15 +5,18 @@ interface ReconciliationSummaryProps {
   reconciliation: Reconciliation;
   currency: string;
   fmt: Formatter;
+  /** The file states no opening balance: it was derived from the closing balance (OFX). */
+  isOpeningBalanceDerived?: boolean;
 }
 
 function balanceWarning(
   check: BalanceCheck | null,
   label: string,
   money: (minor: number) => string,
+  fileVerb = 'says',
 ): string | null {
   if (!check || check.differenceMinor === 0) return null;
-  return `${label}: the file says ${money(check.statementMinor)}, the Account would hold ${money(check.computedMinor)} (difference ${money(check.differenceMinor)}).`;
+  return `${label}: the file ${fileVerb} ${money(check.statementMinor)}, the Account would hold ${money(check.computedMinor)} (difference ${money(check.differenceMinor)}).`;
 }
 
 /** The reconciliation result in words: what doesn't add up, and where. */
@@ -21,6 +24,7 @@ export function ReconciliationSummary({
   reconciliation,
   currency,
   fmt,
+  isOpeningBalanceDerived = false,
 }: ReconciliationSummaryProps) {
   const money = (minor: number) => fmt.amount(minor, { currency });
   if (reconciliation.status === 'ok') {
@@ -31,7 +35,14 @@ export function ReconciliationSummary({
     );
   }
   const warnings = [
-    balanceWarning(reconciliation.opening, 'Opening balance', money),
+    isOpeningBalanceDerived
+      ? balanceWarning(
+          reconciliation.opening,
+          'Opening balance (derived from the closing balance)',
+          money,
+          'implies',
+        )
+      : balanceWarning(reconciliation.opening, 'Opening balance', money),
     balanceWarning(reconciliation.closing, 'Closing balance', money),
     ...reconciliation.runningBalanceBreaks.map((gap) => {
       const where = gap.previous

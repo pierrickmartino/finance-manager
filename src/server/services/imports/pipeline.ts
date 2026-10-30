@@ -2,7 +2,13 @@ import type { Queryable } from '@/server/db/client';
 import { IMPORT_FORMAT_LABELS, type ImportFormat } from '../accounts';
 import { ValidationError } from '../errors';
 import { fingerprintEntries } from './fingerprint';
-import { parserFor, UnreadableFileError, type ParsedEntry, type ParsedStatement } from './parsers';
+import {
+  parserFor,
+  UnreadableFileError,
+  type BankAccountId,
+  type ParsedEntry,
+  type ParsedStatement,
+} from './parsers';
 import {
   reconcile,
   statementOpeningMinor,
@@ -36,10 +42,16 @@ export interface PreviewEntry extends ParsedEntry {
 }
 
 export interface PreviewBody {
+  /**
+   * `openingBalanceMinor` is the file's opening balance: the one it states or, for a file with
+   * a closing balance only (OFX), the one derived from it (see `isOpeningBalanceDerived`).
+   */
   statement: Pick<
     ParsedStatement,
     'from' | 'to' | 'currency' | 'openingBalanceMinor' | 'closingBalanceMinor'
   >;
+  /** True when the file states no opening balance and it was computed as closing − entries. */
+  isOpeningBalanceDerived: boolean;
   /** Oldest first. */
   entries: PreviewEntry[];
   counts: { total: number; new: number; duplicate: number };
@@ -71,11 +83,35 @@ export function parseFile(account: ImportAccount, content: Uint8Array): ParsedSt
   }
 }
 
-/** Stage 2: the file must be this Account's statement (IBAN, Currency). */
+/**
+ * Whether a file's bank account identifiers (OFX `BANKID` / `BRANCHID` / `ACCTID`) fit the
+ * IBAN. A French IBAN's BBAN is the bank code, the branch code, the account number and a key,
+ * in that order, so the BBAN must start with the bank and branch codes and then hold the
+ * account number. Identifiers the file leaves out are not checked.
+ */
+function ibanHoldsBankAccount(iban: string, bankAccount: BankAccountId): boolean {
+  const bban = iban.slice(4);
+  const prefix = `${bankAccount.bankId ?? ''}${bankAccount.branchId ?? ''}`;
+  if (!bban.startsWith(prefix)) return false;
+  return !bankAccount.accountId || bban.slice(prefix.length).includes(bankAccount.accountId);
+}
+
+/** Stage 2: the file must be this Account's statement (IBAN or bank identifiers, Currency). */
 export function checkStatementAccount(account: ImportAccount, statement: ParsedStatement): void {
   if (statement.iban && account.iban && statement.iban !== account.iban) {
     throw new ValidationError(
       `This file is for IBAN ${statement.iban}, but this Account's IBAN is ${account.iban}`,
+    );
+  }
+  const { bankAccount } = statement;
+  if (bankAccount && account.iban && !ibanHoldsBankAccount(account.iban, bankAccount)) {
+    const named = [
+      bankAccount.bankId && `bank ${bankAccount.bankId}`,
+      bankAccount.branchId && `branch ${bankAccount.branchId}`,
+      bankAccount.accountId && `account ${bankAccount.accountId}`,
+    ].filter(Boolean);
+    throw new ValidationError(
+      `This file is for ${named.join(', ')}, which is not this Account (IBAN ${account.iban})`,
     );
   }
   if (statement.currency !== account.currency) {
@@ -154,9 +190,10 @@ export async function buildPreview(
   const balances = await loadBalances(db, account.id, statement);
   const opening = statementOpeningMinor(statement);
   const start = periodStart(statement);
-  const { from, to, currency, openingBalanceMinor, closingBalanceMinor } = statement;
+  const { from, to, currency, closingBalanceMinor } = statement;
   return {
-    statement: { from, to, currency, openingBalanceMinor, closingBalanceMinor },
+    statement: { from, to, currency, openingBalanceMinor: opening, closingBalanceMinor },
+    isOpeningBalanceDerived: statement.openingBalanceMinor === null && opening !== null,
     entries,
     counts: {
       total: entries.length,
