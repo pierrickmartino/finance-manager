@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { getAccount } from '@/server/services/accounts';
+import { BundledDetails } from '@/components/bundled-details';
 import { NotFoundError } from '@/server/services/errors';
 import { getImportPreview, type ImportPreview } from '@/server/services/imports';
 import { commitImportAction, discardImportAction } from '../actions';
@@ -57,7 +58,11 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
       </div>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-        <dt className="text-zinc-500">Opening balance</dt>
+        <dt className="text-zinc-500">
+          {preview.isOpeningBalanceDerived
+            ? 'Opening balance (derived from the closing balance)'
+            : 'Opening balance'}
+        </dt>
         <dd className="tabular-nums">{money(statement.openingBalanceMinor)}</dd>
         <dt className="text-zinc-500">Closing balance</dt>
         <dd className="tabular-nums">{money(statement.closingBalanceMinor)}</dd>
@@ -71,6 +76,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
         reconciliation={preview.reconciliation}
         currency={account.currency}
         fmt={fmt}
+        isOpeningBalanceDerived={preview.isOpeningBalanceDerived}
       />
 
       <div className="overflow-x-auto">
@@ -98,6 +104,9 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
                   )}
                   {entry.counterpartyIban && (
                     <div className="font-mono text-xs text-zinc-500">{entry.counterpartyIban}</div>
+                  )}
+                  {entry.bundledDetails && (
+                    <BundledDetails details={entry.bundledDetails} formatAmount={money} />
                   )}
                 </td>
                 <td className={`${CELL} font-mono text-xs`}>{entry.bankReference ?? '—'}</td>
