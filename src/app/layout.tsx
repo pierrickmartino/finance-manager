@@ -15,6 +15,9 @@ export const metadata: Metadata = {
 const NAV_LINKS = [
   { href: '/transactions', label: 'Transactions' },
   { href: '/accounts', label: 'Accounts' },
+  { href: '/categories', label: 'Categories' },
+  { href: '/payees', label: 'Payees' },
+  { href: '/tags', label: 'Tags' },
   { href: '/banks', label: 'Banks' },
   { href: '/history', label: 'History' },
   { href: '/settings', label: 'Settings' },

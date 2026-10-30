@@ -3,6 +3,7 @@
 import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getPublicServiceContext } from '@/server/app-context';
 import { completeSetup } from '@/server/services/auth';
+import { seedStarterCategories } from '@/server/services/categories';
 import { ValidationError } from '@/server/services/errors';
 import { setSessionCookie } from '@/server/session-cookie';
 
@@ -22,6 +23,8 @@ export async function completeSetupAction(
       totpCode: formText(formData, 'totpCode'),
     });
     await setSessionCookie(session.token);
+    // First run: the editable starter Categories (spec 53). Idempotent.
+    await seedStarterCategories(await getPublicServiceContext());
     return recoveryCodes;
   });
 }
