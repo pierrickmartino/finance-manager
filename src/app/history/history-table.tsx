@@ -63,7 +63,18 @@ export function HistoryTable({
               </td>
               <td className={CELL}>
                 {entry.actorType}
-                {entry.actorId && <span className="text-zinc-500"> {entry.actorId}</span>}
+                {entry.actorId &&
+                  (entry.actorType === 'rule' ? (
+                    <Link
+                      href={`/rules/${entry.actorId}`}
+                      className="text-zinc-500 hover:underline"
+                    >
+                      {' '}
+                      {entry.actorId}
+                    </Link>
+                  ) : (
+                    <span className="text-zinc-500"> {entry.actorId}</span>
+                  ))}
               </td>
               <td className={CELL}>
                 <Link

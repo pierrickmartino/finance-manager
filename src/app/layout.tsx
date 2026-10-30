@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { href: '/categories', label: 'Categories' },
   { href: '/payees', label: 'Payees' },
   { href: '/tags', label: 'Tags' },
+  { href: '/rules', label: 'Rules' },
   { href: '/banks', label: 'Banks' },
   { href: '/history', label: 'History' },
   { href: '/settings', label: 'Settings' },

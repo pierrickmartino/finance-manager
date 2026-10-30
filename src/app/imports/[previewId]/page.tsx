@@ -11,6 +11,7 @@ import { commitImportAction, discardImportAction } from '../actions';
 import { ReconciliationSummary } from '../reconciliation-summary';
 import { CommitImportForm } from './commit-import-form';
 import { NearDuplicates } from './near-duplicates';
+import { RuleClassificationCell } from './rule-classification';
 
 export const metadata: Metadata = { title: 'Import preview · Finance Manager' };
 
@@ -103,6 +104,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
               <th className={CELL}>Reference</th>
               <th className={`${CELL} text-right`}>Amount</th>
               <th className={CELL}>Status</th>
+              <th className={CELL}>Classification (Rules)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -124,6 +126,9 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
                 <td className={`${CELL} font-mono text-xs`}>{entry.bankReference ?? '—'}</td>
                 <td className={`${CELL} text-right tabular-nums`}>{money(entry.amountMinor)}</td>
                 <td className={CELL}>{STATUS_LABELS[entry.status]}</td>
+                <td className={CELL}>
+                  <RuleClassificationCell classification={entry.classification} />
+                </td>
               </tr>
             ))}
           </tbody>

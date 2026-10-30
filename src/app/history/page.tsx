@@ -17,7 +17,15 @@ import { HistoryTable } from './history-table';
 
 export const metadata: Metadata = { title: 'History · Finance Manager' };
 
-const FILTER_FIELDS = ['from', 'to', 'entityType', 'entityId', 'actorType', 'batchId'] as const;
+const FILTER_FIELDS = [
+  'from',
+  'to',
+  'entityType',
+  'entityId',
+  'actorType',
+  'actorId',
+  'batchId',
+] as const;
 type FilterValues = Record<(typeof FILTER_FIELDS)[number], string>;
 
 const INPUT =
@@ -80,6 +88,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           value={filter.actorType}
           options={ACTOR_TYPES}
         />
+        {filter.actorId && <input type="hidden" name="actorId" value={filter.actorId} />}
         <FilterInput label="Batch" name="batchId" value={filter.batchId} />
         <button
           type="submit"

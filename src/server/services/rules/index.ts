@@ -16,6 +16,7 @@ import { findRule, loadRules, ruleSnapshot, type Rule } from './model';
 
 export type { Rule } from './model';
 export type { RuleInput } from './input';
+export type { NamedRuleAssignment, RuleClassification } from './apply';
 export type {
   AmountOperator,
   DateOperator,
