@@ -30,10 +30,17 @@ interface HistoryTableProps {
   fmt: Formatter;
   /** Accessible name of the table. */
   label?: string;
+  /** Readable summaries of the Batches that have one, by Batch id. */
+  summaries?: Readonly<Record<string, string>>;
 }
 
 /** History entries, one row per changed field (spec 115, 116). */
-export function HistoryTable({ entries, fmt, label = 'History entries' }: HistoryTableProps) {
+export function HistoryTable({
+  entries,
+  fmt,
+  label = 'History entries',
+  summaries = {},
+}: HistoryTableProps) {
   return (
     <div className="overflow-x-auto">
       <table aria-label={label} className="w-full text-sm">
@@ -78,6 +85,9 @@ export function HistoryTable({ entries, fmt, label = 'History entries' }: Histor
                 >
                   {entry.batchId.slice(0, 8)}
                 </Link>
+                {summaries[entry.batchId] && (
+                  <div className="text-xs text-zinc-500">{summaries[entry.batchId]}</div>
+                )}
               </td>
             </tr>
           ))}

@@ -7,6 +7,7 @@ import { ServiceError } from '@/server/services/errors';
 import {
   ACTOR_TYPES,
   DEFAULT_HISTORY_LIMIT,
+  getBatchSummaries,
   HISTORY_ENTITY_TYPES,
   listHistory,
   type HistoryEntry,
@@ -48,6 +49,9 @@ async function loadHistory(
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   const filter = readFilter(await searchParams);
   const [{ entries, error }, fmt] = await Promise.all([loadHistory(filter), getFormatter()]);
+  const summaries = await getBatchSummaries(await getServiceContext(), [
+    ...new Set(entries.map((entry) => entry.batchId)),
+  ]);
 
   return (
     <section className="flex flex-col gap-6">
@@ -94,7 +98,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
         !error && <p className="text-sm text-zinc-500">No History entries match.</p>
       ) : (
         <div>
-          <HistoryTable entries={entries} fmt={fmt} />
+          <HistoryTable entries={entries} fmt={fmt} summaries={summaries} />
           {entries.length === DEFAULT_HISTORY_LIMIT && (
             <p className="mt-2 text-sm text-zinc-500">
               Showing the newest {DEFAULT_HISTORY_LIMIT} entries. Narrow the filters to see older
