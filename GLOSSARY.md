@@ -67,6 +67,18 @@ The top level of the two-level classification, typed as either Income or Expense
 The second level of classification, belonging to exactly one Category group. Signed amounts net within it, so a refund reduces spending.
 _Avoid_: Subcategory, class
 
+**Payee**:
+The clean, user-managed name of the counterparty of a Transaction, as opposed to the raw bank description.
+_Avoid_: Merchant, beneficiary, counterparty
+
+**Tag**:
+A free label cutting across Categories, many per Transaction, such as "Vacation 2024".
+_Avoid_: Label, project
+
+**Unclassified**:
+The state of a Transaction that is not a Transfer and has no Category yet.
+_Avoid_: Uncategorised, inbox
+
 **Rule**:
 An ordered condition-to-action pair that classifies Transactions. For each field, the first matching Rule wins; a manual edit always beats any Rule.
 _Avoid_: Filter, automation
