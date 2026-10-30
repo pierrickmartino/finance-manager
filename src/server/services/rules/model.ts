@@ -20,9 +20,10 @@ const uuid = z.uuid();
 export async function findRule(db: Queryable, id: string, lock = false): Promise<Rule> {
   const notFound = new NotFoundError('Rule not found');
   if (!uuid.safeParse(id).success) throw notFound;
-  const result = await db.query<Rule>(`${SELECT_RULE} WHERE r.id = $1${lock ? ' FOR UPDATE' : ''}`, [
-    id,
-  ]);
+  const result = await db.query<Rule>(
+    `${SELECT_RULE} WHERE r.id = $1${lock ? ' FOR UPDATE' : ''}`,
+    [id],
+  );
   const rule = result.rows[0];
   if (!rule) throw notFound;
   return rule;

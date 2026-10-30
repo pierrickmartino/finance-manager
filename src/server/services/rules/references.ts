@@ -64,7 +64,12 @@ async function rewriteRules(
       JSON.stringify(actions),
       rule.id,
     ]);
-    await scope.history.record('rule', rule.id, ruleSnapshot(rule), ruleSnapshot({ ...rule, actions }));
+    await scope.history.record(
+      'rule',
+      rule.id,
+      ruleSnapshot(rule),
+      ruleSnapshot({ ...rule, actions }),
+    );
   }
 }
 

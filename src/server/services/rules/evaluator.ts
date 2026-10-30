@@ -222,7 +222,8 @@ function compileCondition(condition: RuleCondition): ConditionTest {
       return ({ accountId }) => ids.has(accountId);
     }
     case 'direction':
-      return ({ amountMinor }) => (condition.direction === 'in' ? amountMinor > 0 : amountMinor < 0);
+      return ({ amountMinor }) =>
+        condition.direction === 'in' ? amountMinor > 0 : amountMinor < 0;
     case 'bookingDate': {
       const { operator, date, toDate } = condition;
       return ({ bookingDate }) => {

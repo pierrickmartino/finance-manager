@@ -141,9 +141,9 @@ describe('rule evaluation: precedence', () => {
     const byPayee = rule([contains('coop', 'payee')], { categoryId: 'groceries' });
 
     expect(evaluate([byPayee]).category).toBeNull();
-    expect(evaluate([byPayee], subject({ payee: { id: 'p', name: 'Coop City' } })).category).toEqual(
-      { id: 'groceries', ruleId: byPayee.id },
-    );
+    expect(
+      evaluate([byPayee], subject({ payee: { id: 'p', name: 'Coop City' } })).category,
+    ).toEqual({ id: 'groceries', ruleId: byPayee.id });
   });
 });
 
@@ -166,8 +166,9 @@ describe('rule evaluation: text conditions', () => {
 
   it('matches the counterparty name', () => {
     expect(matches(contains('genossenschaft', 'counterparty'))).toBe(true);
-    expect(matches(contains('genossenschaft', 'counterparty'), subject({ counterpartyName: null })))
-      .toBe(false);
+    expect(
+      matches(contains('genossenschaft', 'counterparty'), subject({ counterpartyName: null })),
+    ).toBe(false);
   });
 });
 

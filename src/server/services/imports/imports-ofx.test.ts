@@ -85,6 +85,7 @@ describe('preview an Import (Crédit Agricole OFX)', () => {
       runningBalanceMinor: null,
       status: 'new',
       nearDuplicates: [],
+      classification: { payee: null, category: null, tags: [] },
     });
     expect(preview.entries[1]!.rawDescription).toContain('CHÂTEAU');
     expect(preview.entries[5]!.counterpartyName).toBe('COTISATION OFFRE COMPTE À COMPOS');

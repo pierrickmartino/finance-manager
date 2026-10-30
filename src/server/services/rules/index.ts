@@ -73,7 +73,12 @@ export async function createRule(ctx: ServiceContext, input: RuleInput): Promise
     const inserted = await tx.query<{ id: string }>(
       `INSERT INTO rule (name, sort, enabled, conditions, actions)
        VALUES ($1, (SELECT coalesce(max(sort) + 1, 0) FROM rule), $2, $3, $4) RETURNING id`,
-      [values.name, values.enabled, JSON.stringify(values.conditions), JSON.stringify(values.actions)],
+      [
+        values.name,
+        values.enabled,
+        JSON.stringify(values.conditions),
+        JSON.stringify(values.actions),
+      ],
     );
     const created = await findRule(tx, inserted.rows[0]!.id);
     await history.record('rule', created.id, null, ruleSnapshot(created));

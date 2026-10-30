@@ -1,6 +1,13 @@
 import type { Queryable } from '@/server/db/client';
 import { IMPORT_FORMAT_LABELS, type ImportFormat } from '../accounts';
 import { ValidationError } from '../errors';
+import {
+  describeEvaluation,
+  loadRuleEngine,
+  ruleSubject,
+  type RuleClassification,
+} from '../rules/apply';
+import { evaluateRules } from '../rules/evaluator';
 import { SELECT_TRANSACTION, TRANSACTION_ORDER, type Transaction } from '../transactions/model';
 import { fingerprintEntries } from './fingerprint';
 import {
@@ -20,7 +27,7 @@ import {
 /**
  * The import pipeline: parse → check against the Account → Fingerprint → classify →
  * reconcile → preview. Each stage is a function below; `buildPreview` runs them in order.
- * Later stages (Rules #15, Transfer candidates) slot in after `reconcile`.
+ * Rules run on the entries a commit may add (`applyRules`). Transfer candidates slot in last.
  */
 
 /** The Account fields the pipeline needs. */
@@ -44,6 +51,11 @@ export interface PreviewEntry extends ParsedEntry {
   status: EntryStatus;
   /** For a `near_duplicate`: the Account's Transactions it may repeat. Empty otherwise. */
   nearDuplicates: Transaction[];
+  /**
+   * The Payee, Category and Tags the Rules give the entry, and which Rule set each (spec 29).
+   * Committing writes exactly this. Null for a duplicate, which is never added.
+   */
+  classification: RuleClassification | null;
 }
 
 export type NearDuplicateDecision = 'keep' | 'skip';
@@ -204,7 +216,25 @@ async function classifyEntries(
       : candidates.length > 0
         ? 'near_duplicate'
         : 'new';
-    return { ...entry, fingerprint, status, nearDuplicates: candidates };
+    return { ...entry, fingerprint, status, nearDuplicates: candidates, classification: null };
+  });
+}
+
+/**
+ * Stage 5: run the Rules on every entry a commit may add. New entries have no Payee, no locks
+ * and no Transfer yet, so only the bank fields matter.
+ */
+async function applyRules(
+  db: Queryable,
+  account: ImportAccount,
+  entries: readonly PreviewEntry[],
+): Promise<PreviewEntry[]> {
+  const engine = await loadRuleEngine(db);
+  return entries.map((entry) => {
+    if (entry.status === 'duplicate') return entry;
+    const subject = ruleSubject({ ...entry, accountId: account.id }, null, false);
+    const evaluation = evaluateRules(engine.compiled, subject);
+    return { ...entry, classification: describeEvaluation(engine, evaluation) };
   });
 }
 
@@ -248,7 +278,11 @@ export async function buildPreview(
   decisions: NearDuplicateDecisions = {},
 ): Promise<PreviewBody> {
   checkStatementAccount(account, statement);
-  const entries = await classifyEntries(db, account, statement.entries);
+  const entries = await applyRules(
+    db,
+    account,
+    await classifyEntries(db, account, statement.entries),
+  );
   const newEntries = entries.filter((entry) => entry.status === 'new');
   const added = entries.filter((entry) => isAdded(entry, decisions));
   const balances = await loadBalances(db, account.id, statement);

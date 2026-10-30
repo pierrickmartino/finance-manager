@@ -90,7 +90,10 @@ async function lockOpenAccount(db: Queryable, accountId: string): Promise<{ curr
  * mutation: their changes join the save's Batch, each recorded with its Rule as the actor.
  * Locked fields are left alone.
  */
-async function runRulesOnSave(scope: MutationScope, transaction: Transaction): Promise<Transaction> {
+async function runRulesOnSave(
+  scope: MutationScope,
+  transaction: Transaction,
+): Promise<Transaction> {
   await runRulesOnTransaction(scope, transaction);
   return transaction;
 }

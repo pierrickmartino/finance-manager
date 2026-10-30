@@ -2,12 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { createAccount } from '../accounts';
 import { createBank } from '../banks';
-import {
-  createCategory,
-  createCategoryGroup,
-  deleteCategory,
-  mergeCategory,
-} from '../categories';
+import { createCategory, createCategoryGroup, deleteCategory, mergeCategory } from '../categories';
 import { listHistory } from '../history';
 import { createPayee, deletePayee, mergePayees } from '../payees';
 import { createTag, deleteTag, mergeTags } from '../tags';
@@ -108,7 +103,9 @@ describe('manage Rules', () => {
       /text is required/i,
     ],
     [
-      { conditions: [{ type: 'amount', operator: 'between', amountMinor: 500, toAmountMinor: 100 }] },
+      {
+        conditions: [{ type: 'amount', operator: 'between', amountMinor: 500, toAmountMinor: 100 }],
+      },
       /lowest amount first/i,
     ],
     [
@@ -137,12 +134,19 @@ describe('manage Rules', () => {
   it('edits, disables, reorders and deletes Rules', async () => {
     const category = await groceries();
     const first = await createRule(t.ctx, migrosRule({ actions: { categoryId: category.id } }));
-    const second = await createRule(t.ctx, migrosRule({ name: 'Coop', actions: { categoryId: category.id } }));
+    const second = await createRule(
+      t.ctx,
+      migrosRule({ name: 'Coop', actions: { categoryId: category.id } }),
+    );
 
-    const edited = await updateRule(t.ctx, first.id, migrosRule({
-      name: 'Migros stores',
-      actions: { categoryId: category.id },
-    }));
+    const edited = await updateRule(
+      t.ctx,
+      first.id,
+      migrosRule({
+        name: 'Migros stores',
+        actions: { categoryId: category.id },
+      }),
+    );
     expect(edited.name).toBe('Migros stores');
 
     expect((await setRuleEnabled(t.ctx, first.id, false)).enabled).toBe(false);
@@ -218,7 +222,10 @@ describe('Rules follow merged and deleted Payees, Categories and Tags', () => {
   it('drops a merged Tag the Rule already adds under its new name', async () => {
     const oldTag = await createTag(t.ctx, 'food');
     const newTag = await createTag(t.ctx, 'Food & drink');
-    const rule = await createRule(t.ctx, migrosRule({ actions: { tagIds: [oldTag.id, newTag.id] } }));
+    const rule = await createRule(
+      t.ctx,
+      migrosRule({ actions: { tagIds: [oldTag.id, newTag.id] } }),
+    );
 
     await mergeTags(t.ctx, oldTag.id, newTag.id);
 
@@ -228,7 +235,10 @@ describe('Rules follow merged and deleted Payees, Categories and Tags', () => {
   it('takes a deleted Tag off Rules', async () => {
     const tag = await createTag(t.ctx, 'food');
     const payee = await createPayee(t.ctx, 'Migros');
-    const rule = await createRule(t.ctx, migrosRule({ actions: { payeeId: payee.id, tagIds: [tag.id] } }));
+    const rule = await createRule(
+      t.ctx,
+      migrosRule({ actions: { payeeId: payee.id, tagIds: [tag.id] } }),
+    );
 
     await deleteTag(t.ctx, tag.id);
 
@@ -238,7 +248,10 @@ describe('Rules follow merged and deleted Payees, Categories and Tags', () => {
   it('refuses to delete a Payee or Category a Rule sets', async () => {
     const payee = await createPayee(t.ctx, 'Migros');
     const category = await groceries();
-    await createRule(t.ctx, migrosRule({ name: 'Groceries', actions: { payeeId: payee.id, categoryId: category.id } }));
+    await createRule(
+      t.ctx,
+      migrosRule({ name: 'Groceries', actions: { payeeId: payee.id, categoryId: category.id } }),
+    );
 
     await expect(deletePayee(t.ctx, payee.id)).rejects.toThrow(/Rule "Groceries"/);
     await expect(deleteCategory(t.ctx, category.id)).rejects.toThrow(/Rule "Groceries"/);

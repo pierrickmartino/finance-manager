@@ -4,6 +4,7 @@ import type { Queryable } from '@/server/db/client';
 import { getOpeningBalance, setOpeningBalance } from '../accounts';
 import { mutate, type ServiceContext } from '../context';
 import { NotFoundError, parseInput } from '../errors';
+import { applyRuleAssignments } from '../rules/apply';
 import {
   SELECT_TRANSACTION,
   TRANSACTION_ORDER,
@@ -199,14 +200,16 @@ async function insertTransaction(
 
 /**
  * Commits a previewed Import in one database transaction (spec 31): the Import, its new
- * Transactions, and the proposed opening balance when accepted, all in one History Batch whose
- * actor is the Import. The preview is rebuilt first, so Transactions committed since the
+ * Transactions with the classification the Rules gave them in the preview, and the proposed
+ * opening balance when accepted, all in one History Batch. Its actor is the Import, except for
+ * classification changes, whose actor is the Rule that made each. The preview is rebuilt first, so Transactions committed since the
  * preview was made are skipped as duplicates rather than added twice.
  */
 export async function commitImport(ctx: ServiceContext, input: CommitImportInput): Promise<Import> {
   const values = parseInput(commitImportInput, input);
   const importId = randomUUID();
-  return mutate({ ...ctx, actor: { type: 'import', id: importId } }, async ({ tx, history }) => {
+  return mutate({ ...ctx, actor: { type: 'import', id: importId } }, async (scope) => {
+    const { tx, history } = scope;
     const stored = await findPreview(tx, values.previewId, true);
     const account = await findImportAccount(tx, stored.accountId, true);
     const preview = await buildPreview(
@@ -243,6 +246,9 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
     for (const entry of added) {
       const transaction = await insertTransaction(tx, account, importId, entry);
       await history.record('transaction', transaction.id, null, transactionSnapshot(transaction));
+      if (entry.classification) {
+        await applyRuleAssignments(scope, transaction.id, entry.classification);
+      }
     }
     if (preview.proposedOpeningBalance && values.acceptOpeningBalance) {
       const change: OpeningChange = {
