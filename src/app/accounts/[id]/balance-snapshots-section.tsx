@@ -1,9 +1,9 @@
 import type { Formatter } from '@/lib/format';
+import { ConfirmActionButton } from '@/app/imports/confirm-action-button';
 import type { Account } from '@/server/services/accounts';
 import type { SnapshotCheck } from '@/server/services/balance-snapshots';
 import { deleteBalanceSnapshotAction, recordBalanceSnapshotAction } from './actions';
 import { BalanceSnapshotForm } from './balance-snapshot-form';
-import { DeleteButton } from './delete-button';
 
 const CELL = 'px-3 py-2 text-left';
 
@@ -61,10 +61,11 @@ export function BalanceSnapshotsSection({ account, snapshots, fmt }: BalanceSnap
                     {checkLabel(check, fmt, currency)}
                   </td>
                   <td className={CELL}>
-                    <DeleteButton
+                    <ConfirmActionButton
+                      label="Delete"
+                      ariaLabel={`Delete Balance snapshot of ${fmt.date(check.date)}`}
+                      confirmMessage="Delete this Balance snapshot?"
                       action={deleteBalanceSnapshotAction.bind(null, account.id, check.id)}
-                      label={`Delete Balance snapshot of ${fmt.date(check.date)}`}
-                      confirmation="Delete this Balance snapshot?"
                     />
                   </td>
                 </tr>

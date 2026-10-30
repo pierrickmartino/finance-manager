@@ -90,11 +90,10 @@ export async function updateManualTransactionAction(
 export async function deleteManualTransactionAction(
   accountId: string,
   id: string,
-  _previous: ActionResult<null> | null,
-): Promise<ActionResult<null>> {
+  _previous: ActionResult | null,
+): Promise<ActionResult> {
   const result = await runAction(async () => {
     await deleteManualTransaction(await getServiceContext(), id);
-    return null;
   });
   if (!result.ok) return result;
   revalidateAccounts();
@@ -121,11 +120,10 @@ export async function recordBalanceSnapshotAction(
 export async function deleteBalanceSnapshotAction(
   accountId: string,
   id: string,
-  _previous: ActionResult<null> | null,
-): Promise<ActionResult<null>> {
+  _previous: ActionResult | null,
+): Promise<ActionResult> {
   const result = await runAction(async () => {
     await deleteBalanceSnapshot(await getServiceContext(), id);
-    return null;
   });
   if (result.ok) revalidateAccounts();
   return result;

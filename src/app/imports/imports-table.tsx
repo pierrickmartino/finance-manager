@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Formatter } from '@/lib/format';
 import type { Import } from '@/server/services/imports';
 
@@ -28,7 +29,11 @@ export function ImportsTable({ imports, fmt }: ImportsTableProps) {
           {imports.map((row) => (
             <tr key={row.id}>
               <td className={CELL}>{fmt.date(row.importedAt)}</td>
-              <td className={CELL}>{row.fileName}</td>
+              <td className={CELL}>
+                <Link href={`/accounts/${row.accountId}/imports/${row.id}`} className="underline">
+                  {row.fileName}
+                </Link>
+              </td>
               <td className={CELL}>
                 {row.statementFrom && row.statementTo
                   ? `${fmt.date(row.statementFrom)} – ${fmt.date(row.statementTo)}`

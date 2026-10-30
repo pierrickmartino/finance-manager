@@ -85,8 +85,7 @@ export function formatAmount(
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DISPLAY_TIME_ZONE = 'Europe/Zurich';
 
-/** The Swiss calendar day of a moment, as `YYYY-MM-DD`. */
-export function isoDateInZurich(value: Date): string {
+function isoDateInZurich(value: Date): string {
   // en-CA renders dates as YYYY-MM-DD.
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: DISPLAY_TIME_ZONE,

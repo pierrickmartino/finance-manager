@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { ConflictError, NotFoundError, parseInput, ValidationError } from '../errors';
+import { refuseBankFieldChanges } from './bank-fields';
 import {
   SELECT_TRANSACTION,
   TRANSACTION_ORDER,
@@ -123,22 +124,7 @@ export async function createManualTransaction(
   });
 }
 
-/** Locks a Transaction and refuses unless it is a Manual one (imported bank fields are fixed). */
-async function findManualTransaction(
-  db: Queryable,
-  id: string,
-  action: 'edited' | 'deleted',
-): Promise<Transaction> {
-  const transaction = await findTransaction(db, id, true);
-  if (!transaction.isManual) {
-    throw new ValidationError(
-      action === 'edited'
-        ? 'This Transaction was imported: its bank fields cannot be edited'
-        : 'This Transaction was imported: delete it from its Import instead',
-    );
-  }
-  return transaction;
-}
+const NOT_MANUAL = 'This Transaction was imported, not entered by hand';
 
 /** Replaces the typed fields of a Manual transaction. */
 export async function updateManualTransaction(
@@ -149,7 +135,14 @@ export async function updateManualTransaction(
   const values = parseInput(manualTransactionInput, input);
   return mutate(ctx, async (scope) => {
     const { tx, history } = scope;
-    const before = await findManualTransaction(tx, id, 'edited');
+    const before = await findTransaction(tx, id, true);
+    refuseBankFieldChanges(before, {
+      bookingDate: values.bookingDate,
+      amountMinor: values.amountMinor,
+      rawDescription: values.description,
+      counterpartyName: values.counterpartyName,
+    });
+    if (!before.isManual) throw new ValidationError(NOT_MANUAL);
     await lockOpenAccount(tx, before.accountId);
     await tx.query(
       `UPDATE "transaction"
@@ -171,7 +164,10 @@ export async function updateManualTransaction(
 /** Deletes a Manual transaction. Its History stays. */
 export async function deleteManualTransaction(ctx: ServiceContext, id: string): Promise<void> {
   await mutate(ctx, async ({ tx, history }) => {
-    const before = await findManualTransaction(tx, id, 'deleted');
+    const before = await findTransaction(tx, id, true);
+    if (!before.isManual) {
+      throw new ValidationError(`${NOT_MANUAL}: delete it from its Import instead`);
+    }
     await lockOpenAccount(tx, before.accountId);
     await tx.query('DELETE FROM "transaction" WHERE id = $1', [id]);
     await history.record('transaction', id, transactionSnapshot(before), null);

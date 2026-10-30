@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { isoDateInZurich } from '@/lib/format';
+import { swissToday } from '@/server/services/fx/dates';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { getAccount, IMPORT_FORMAT_LABELS, type Account } from '@/server/services/accounts';
@@ -96,7 +96,7 @@ export default async function AccountPage({ params }: AccountPageProps) {
         account={account}
         transactions={manualTransactions}
         fmt={fmt}
-        today={isoDateInZurich(new Date())}
+        today={swissToday()}
       />
 
       <BalanceSnapshotsSection account={account} snapshots={snapshots} fmt={fmt} />

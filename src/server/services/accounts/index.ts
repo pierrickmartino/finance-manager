@@ -216,6 +216,15 @@ export async function listAccounts(ctx: ServiceContext): Promise<Account[]> {
   return result.rows;
 }
 
+/** An Account's opening balance and date, read inside another mutation. */
+export async function getOpeningBalance(
+  db: Queryable,
+  id: string,
+): Promise<{ amountMinor: number; date: string | null }> {
+  const { openingBalanceMinor, openingDate } = await findAccount(db, id);
+  return { amountMinor: openingBalanceMinor, date: openingDate };
+}
+
 /**
  * Sets an Account's opening balance and date inside another mutation (an Import confirming the
  * opening balance its file proposes), recording the change in that mutation's Batch.
@@ -223,7 +232,7 @@ export async function listAccounts(ctx: ServiceContext): Promise<Account[]> {
 export async function setOpeningBalance(
   { tx, history }: Pick<MutationScope, 'tx' | 'history'>,
   id: string,
-  opening: { amountMinor: number; date: string },
+  opening: { amountMinor: number; date: string | null },
 ): Promise<void> {
   const before = await findAccount(tx, id, true);
   await tx.query('UPDATE account SET opening_balance_minor = $1, opening_date = $2 WHERE id = $3', [

@@ -7,6 +7,7 @@ import {
   type Account,
   type AccountInput,
 } from '../accounts';
+import { listAccountBalances } from '../accounts/balances';
 import { createBank } from '../banks';
 import { listHistory } from '../history';
 import { createManualTransaction } from '../transactions/manual';
@@ -135,6 +136,31 @@ describe('a snapshot-only loan Account', () => {
     });
     expect((await listAccounts(t.ctx))[0]).toMatchObject({ balanceMinor: -48000000 });
     expect(await listSnapshotMismatches(t.ctx)).toEqual([]);
+  });
+
+  it('shows, on a past date, the latest snapshot on or before that date', async () => {
+    const loan = await clerAccount({
+      name: 'Cler mortgage',
+      kind: 'loan',
+      openingBalanceMinor: 0,
+      openingDate: null,
+    });
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: loan.id,
+      date: '2024-12-31',
+      balanceMinor: -50000000,
+    });
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: loan.id,
+      date: '2025-12-31',
+      balanceMinor: -48000000,
+    });
+
+    const [midYear] = await listAccountBalances(t.ctx, { date: '2025-06-30' });
+    const [beforeAny] = await listAccountBalances(t.ctx, { date: '2024-06-30' });
+
+    expect(midYear).toMatchObject({ balanceMinor: -50000000, snapshotDate: '2024-12-31' });
+    expect(beforeAny).toMatchObject({ balanceMinor: 0, snapshotDate: null });
   });
 
   it('computes its balance from Transactions as soon as it has one', async () => {

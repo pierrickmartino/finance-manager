@@ -7,7 +7,7 @@ import { getAccount } from '@/server/services/accounts';
 import { NotFoundError } from '@/server/services/errors';
 import { getManualTransaction } from '@/server/services/transactions/manual';
 import { deleteManualTransactionAction, updateManualTransactionAction } from '../../actions';
-import { DeleteButton } from '../../delete-button';
+import { ConfirmActionButton } from '@/app/imports/confirm-action-button';
 import { ManualTransactionForm } from '../../manual-transaction-form';
 
 export const metadata: Metadata = { title: 'Manual transaction · Finance Manager' };
@@ -57,13 +57,12 @@ export default async function ManualTransactionPage({ params }: ManualTransactio
       />
 
       <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
-        <DeleteButton
+        <ConfirmActionButton
+          label="Delete Manual transaction"
+          ariaLabel="Delete this Manual transaction"
+          confirmMessage="Delete this Manual transaction? Its History is kept."
           action={deleteManualTransactionAction.bind(null, account.id, transaction.id)}
-          label="Delete this Manual transaction"
-          confirmation="Delete this Manual transaction? Its History is kept."
-        >
-          Delete Manual transaction
-        </DeleteButton>
+        />
       </div>
     </section>
   );

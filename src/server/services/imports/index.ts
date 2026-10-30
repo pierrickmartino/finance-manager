@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
-import { setOpeningBalance, type ImportFormat } from '../accounts';
+import { getOpeningBalance, setOpeningBalance } from '../accounts';
 import { mutate, type ServiceContext } from '../context';
 import { NotFoundError, parseInput } from '../errors';
-import type { HistorySnapshot } from '../history';
 import {
   SELECT_TRANSACTION,
   TRANSACTION_ORDER,
@@ -16,13 +15,28 @@ import {
   buildPreview,
   parseFile,
   type ImportAccount,
+  type NearDuplicateDecisions,
   type PreviewBody,
   type PreviewEntry,
 } from './pipeline';
-import type { Reconciliation } from './reconcile';
+import {
+  findImport,
+  id,
+  importSnapshot,
+  SELECT_IMPORT,
+  type Import,
+  type OpeningChange,
+} from './model';
 
-export type { EntryStatus, PreviewEntry } from './pipeline';
+export type {
+  EntryStatus,
+  NearDuplicateDecision,
+  NearDuplicateDecisions,
+  PreviewEntry,
+} from './pipeline';
 export type { BalanceCheck, Reconciliation, RunningBalanceBreak } from './reconcile';
+export type { Import } from './model';
+export { deleteImportedTransaction, undoImport } from './undo';
 
 /** Largest bank file accepted, in bytes. Monthly exports are a few tens of kilobytes. */
 export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
@@ -37,24 +51,6 @@ export interface ImportPreview extends PreviewBody {
   fileName: string;
 }
 
-/** A committed Import, as the per-Account Imports list shows it (spec 32). */
-export interface Import {
-  id: string;
-  accountId: string;
-  fileName: string;
-  importFormat: ImportFormat;
-  importedAt: Date;
-  statementFrom: string | null;
-  statementTo: string | null;
-  openingBalanceMinor: number | null;
-  closingBalanceMinor: number | null;
-  addedCount: number;
-  duplicateCount: number;
-  reconciliationStatus: Reconciliation['status'];
-  reconciliation: Reconciliation;
-  undoneAt: Date | null;
-}
-
 export interface PreviewImportInput {
   accountId: string;
   fileName: string;
@@ -65,6 +61,8 @@ export interface CommitImportInput {
   previewId: string;
   /** Use the opening balance the preview proposes (Account with no history). Default true. */
   acceptOpeningBalance?: boolean;
+  /** Keep or skip per near-duplicate, keyed by its Fingerprint. Unlisted ones are skipped. */
+  nearDuplicateDecisions?: NearDuplicateDecisions;
 }
 
 const previewImportInput = z.object({
@@ -86,21 +84,10 @@ const previewImportInput = z.object({
 const commitImportInput = z.object({
   previewId: z.uuid({ error: 'Import preview not found' }),
   acceptOpeningBalance: z.boolean().default(true),
+  nearDuplicateDecisions: z.record(z.string(), z.enum(['keep', 'skip'])).default({}),
 });
 
-const id = z.uuid();
 const PREVIEW_NOT_FOUND = 'This Import preview no longer exists. Upload the file again.';
-
-const SELECT_IMPORT = `
-  SELECT i.id, i.account_id AS "accountId", i.file_name AS "fileName",
-         i.import_format AS "importFormat", i.imported_at AS "importedAt",
-         i.statement_from AS "statementFrom", i.statement_to AS "statementTo",
-         i.opening_balance_minor AS "openingBalanceMinor",
-         i.closing_balance_minor AS "closingBalanceMinor",
-         i.added_count AS "addedCount", i.duplicate_count AS "duplicateCount",
-         i.reconciliation_status AS "reconciliationStatus", i.reconciliation,
-         i.undone_at AS "undoneAt"
-  FROM import i`;
 
 async function findImportAccount(
   db: Queryable,
@@ -177,21 +164,6 @@ export async function discardImport(ctx: ServiceContext, previewId: string): Pro
   await ctx.db.query('DELETE FROM import_preview WHERE id = $1', [previewId]);
 }
 
-function importSnapshot(row: Import): HistorySnapshot {
-  return {
-    accountId: row.accountId,
-    fileName: row.fileName,
-    importFormat: row.importFormat,
-    statementFrom: row.statementFrom,
-    statementTo: row.statementTo,
-    openingBalanceMinor: row.openingBalanceMinor,
-    closingBalanceMinor: row.closingBalanceMinor,
-    addedCount: row.addedCount,
-    duplicateCount: row.duplicateCount,
-    reconciliationStatus: row.reconciliationStatus,
-  };
-}
-
 async function insertTransaction(
   tx: Queryable,
   account: ImportAccount,
@@ -237,8 +209,13 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
   return mutate({ ...ctx, actor: { type: 'import', id: importId } }, async ({ tx, history }) => {
     const stored = await findPreview(tx, values.previewId, true);
     const account = await findImportAccount(tx, stored.accountId, true);
-    const preview = await buildPreview(tx, account, stored.statement);
-    const { statement, reconciliation, counts } = preview;
+    const preview = await buildPreview(
+      tx,
+      account,
+      stored.statement,
+      values.nearDuplicateDecisions,
+    );
+    const { statement, reconciliation, entries, added } = preview;
 
     await tx.query(
       `INSERT INTO import (id, account_id, file_name, import_format, statement_from, statement_to,
@@ -254,8 +231,8 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
         statement.to,
         statement.openingBalanceMinor,
         statement.closingBalanceMinor,
-        counts.new,
-        counts.duplicate,
+        added.length,
+        entries.length - added.length,
         reconciliation.status,
         JSON.stringify(reconciliation),
       ],
@@ -263,24 +240,24 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
     const created = await findImport(tx, importId);
     await history.record('import', importId, null, importSnapshot(created));
 
-    for (const entry of preview.entries.filter((e) => e.status === 'new')) {
+    for (const entry of added) {
       const transaction = await insertTransaction(tx, account, importId, entry);
       await history.record('transaction', transaction.id, null, transactionSnapshot(transaction));
     }
     if (preview.proposedOpeningBalance && values.acceptOpeningBalance) {
-      await setOpeningBalance({ tx, history }, account.id, preview.proposedOpeningBalance);
+      const change: OpeningChange = {
+        before: await getOpeningBalance(tx, account.id),
+        after: preview.proposedOpeningBalance,
+      };
+      await setOpeningBalance({ tx, history }, account.id, change.after);
+      await tx.query('UPDATE import SET opening_change = $2 WHERE id = $1', [
+        importId,
+        JSON.stringify(change),
+      ]);
     }
     await tx.query('DELETE FROM import_preview WHERE id = $1', [stored.id]);
     return created;
   });
-}
-
-async function findImport(db: Queryable, importId: string): Promise<Import> {
-  if (!id.safeParse(importId).success) throw new NotFoundError('Import not found');
-  const result = await db.query<Import>(`${SELECT_IMPORT} WHERE i.id = $1`, [importId]);
-  const found = result.rows[0];
-  if (!found) throw new NotFoundError('Import not found');
-  return found;
 }
 
 export async function getImport(ctx: ServiceContext, importId: string): Promise<Import> {
