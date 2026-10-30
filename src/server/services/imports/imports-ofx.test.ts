@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { createAccount, getAccount, type Account, type AccountInput } from '../accounts';
 import { createBank } from '../banks';
-import { commitImport, listImportTransactions, previewImport, type Import } from '.';
+import { commitImport, listImportTransactions, previewImport, undoImport, type Import } from '.';
 
 const t = setupTestDatabase();
 
@@ -85,6 +85,7 @@ describe('preview an Import (Crédit Agricole OFX)', () => {
       bundledDetails: null,
       runningBalanceMinor: null,
       status: 'new',
+      nearDuplicates: [],
     });
     expect(preview.entries[1]!.rawDescription).toContain('CHÂTEAU');
     expect(preview.entries[5]!.counterpartyName).toBe('COTISATION OFFRE COMPTE À COMPOS');
@@ -266,6 +267,19 @@ describe('derived opening balance (Crédit Agricole OFX)', () => {
       openingBalanceMinor: 98067,
       openingDate: '2025-10-01',
       balanceMinor: 134217,
+    });
+  });
+
+  it('undoing the Import restores the opening balance its derived opening balance replaced', async () => {
+    const account = await caAccount();
+    const before = await getAccount(t.ctx, account.id);
+
+    const committed = await importFixture(account, CA_OCTOBER);
+    await undoImport(t.ctx, committed.id);
+
+    expect(await getAccount(t.ctx, account.id)).toMatchObject({
+      openingBalanceMinor: before.openingBalanceMinor,
+      openingDate: before.openingDate,
     });
   });
 
