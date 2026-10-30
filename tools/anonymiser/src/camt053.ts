@@ -35,6 +35,8 @@ const encodeXml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, 
 
 export function anonymiseCamt053(input: Buffer, faker: Faker): Buffer {
   const xml = input.toString('utf8');
+  // CDATA and comments are not rewritten by the leaf pass, so they could leak: refuse them.
+  if (/<!\[CDATA\[|<!--/.test(xml)) throw new Error('CAMT.053: CDATA sections and comments are not supported');
   const output = xml.replace(LEAF, (whole, qName: string, localName: string, attrs = '', text: string) => {
     if (KEPT_ELEMENTS.has(localName) || text.trim() === '') return whole;
     return `<${qName}${attrs}>${encodeXml(faker.text(decodeXml(text)))}</${qName}>`;

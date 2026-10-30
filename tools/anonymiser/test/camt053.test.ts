@@ -24,6 +24,11 @@ describe('CAMT.053', () => {
     expect(() => readStatement('camt053', broken)).toThrow();
   });
 
+  test('refuses comments and CDATA, which it cannot anonymise', () => {
+    const withComment = Buffer.from(readInput(INPUT).toString('utf8').replace('<Stmt>', '<Stmt><!-- Quillfeather -->'));
+    expect(() => anonymise('camt053', withComment, SEED)).toThrow(/comments/);
+  });
+
   test('keeps amounts, dates and balances, and still reconciles', () => {
     const input = readInput(INPUT);
     const statement = readStatement('camt053', anonymise('camt053', input, SEED));
