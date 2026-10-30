@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.04" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>BCGEMSG20250401000123</MsgId>
+      <CreDtTm>2025-04-01T06:12:45</CreDtTm>
+      <MsgPgntn>
+        <PgNb>1</PgNb>
+        <LastPgInd>true</LastPgInd>
+      </MsgPgntn>
+    </GrpHdr>
+    <Stmt>
+      <Id>STMT20250331BCGE7781</Id>
+      <ElctrncSeqNb>3</ElctrncSeqNb>
+      <CreDtTm>2025-04-01T06:12:45</CreDtTm>
+      <FrToDt>
+        <FrDtTm>2025-03-01T00:00:00</FrDtTm>
+        <ToDtTm>2025-03-31T23:59:59</ToDtTm>
+      </FrToDt>
+      <Acct>
+        <Id>
+          <IBAN>CH9300762011623852957</IBAN>
+        </Id>
+        <Ccy>CHF</Ccy>
+        <Ownr>
+          <Nm>Aurélien Quillfeather &amp; Zénobie Quillfeather</Nm>
+          <PstlAdr>
+            <StrtNm>Avenue Imaginaire</StrtNm>
+            <BldgNb>44</BldgNb>
+            <PstCd>1003</PstCd>
+            <TwnNm>Lausanne</TwnNm>
+            <Ctry>CH</Ctry>
+          </PstlAdr>
+        </Ownr>
+        <Svcr>
+          <FinInstnId>
+            <BICFI>BCGECHGGXXX</BICFI>
+          </FinInstnId>
+        </Svcr>
+      </Acct>
+      <Bal>
+        <Tp>
+          <CdOrPrtry>
+            <Cd>OPBD</Cd>
+          </CdOrPrtry>
+        </Tp>
+        <Amt Ccy="CHF">2500.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt>
+          <Dt>2025-02-28</Dt>
+        </Dt>
+      </Bal>
+      <Bal>
+        <Tp>
+          <CdOrPrtry>
+            <Cd>CLBD</Cd>
+          </CdOrPrtry>
+        </Tp>
+        <Amt Ccy="CHF">6135.55</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt>
+          <Dt>2025-03-31</Dt>
+        </Dt>
+      </Bal>
+      <Ntry>
+        <Amt Ccy="CHF">5000.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt>
+          <Dt>2025-03-05</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2025-03-05</Dt>
+        </ValDt>
+        <AcctSvcrRef>BCGE20250305ZX0001</AcctSvcrRef>
+        <BkTxCd>
+          <Domn>
+            <Cd>PMNT</Cd>
+            <Fmly>
+              <Cd>RCDT</Cd>
+              <SubFmlyCd>SALA</SubFmlyCd>
+            </Fmly>
+          </Domn>
+        </BkTxCd>
+        <NtryDtls>
+          <TxDtls>
+            <Refs>
+              <AcctSvcrRef>BCGE20250305ZX0001</AcctSvcrRef>
+              <EndToEndId>FICTIVIA-PAY-2025-03</EndToEndId>
+            </Refs>
+            <Amt Ccy="CHF">5000.00</Amt>
+            <CdtDbtInd>CRDT</CdtDbtInd>
+            <RltdPties>
+              <Dbtr>
+                <Nm>Fictivia Widgets SA</Nm>
+                <PstlAdr>
+                  <AdrLine>Rue du Prototype 9</AdrLine>
+                  <AdrLine>1290 Versoix</AdrLine>
+                </PstlAdr>
+              </Dbtr>
+              <DbtrAcct>
+                <Id>
+                  <IBAN>CH7800240024018901234</IBAN>
+                </Id>
+              </DbtrAcct>
+            </RltdPties>
+            <RmtInf>
+              <Ustrd>Salaire mars Quillfeather</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Virement Fictivia Widgets SA</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">1350.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt>
+          <Dt>2025-03-10</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2025-03-10</Dt>
+        </ValDt>
+        <AcctSvcrRef>BCGE20250310ZX0002</AcctSvcrRef>
+        <BkTxCd>
+          <Domn>
+            <Cd>PMNT</Cd>
+            <Fmly>
+              <Cd>ICDT</Cd>
+              <SubFmlyCd>AUTT</SubFmlyCd>
+            </Fmly>
+          </Domn>
+        </BkTxCd>
+        <NtryDtls>
+          <Btch>
+            <NbOfTxs>2</NbOfTxs>
+          </Btch>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-Q-000451</EndToEndId>
+            </Refs>
+            <Amt Ccy="CHF">1200.00</Amt>
+            <CdtDbtInd>DBIT</CdtDbtInd>
+            <RltdPties>
+              <Cdtr>
+                <Nm>Régie Zéphyrin Sàrl</Nm>
+                <PstlAdr>
+                  <StrtNm>Rue de l'Exemple</StrtNm>
+                  <BldgNb>12</BldgNb>
+                  <PstCd>1204</PstCd>
+                  <TwnNm>Genève</TwnNm>
+                  <Ctry>CH</Ctry>
+                </PstlAdr>
+              </Cdtr>
+              <CdtrAcct>
+                <Id>
+                  <IBAN>CH9100788000050812345</IBAN>
+                </Id>
+              </CdtrAcct>
+            </RltdPties>
+            <RmtInf>
+              <Strd>
+                <CdtrRefInf>
+                  <Tp>
+                    <CdOrPrtry>
+                      <Prtry>QRR</Prtry>
+                    </CdOrPrtry>
+                  </Tp>
+                  <Ref>210000000003139471430009017</Ref>
+                </CdtrRefInf>
+              </Strd>
+            </RmtInf>
+          </TxDtls>
+          <TxDtls>
+            <Refs>
+              <EndToEndId>E2E-Q-000452</EndToEndId>
+            </Refs>
+            <Amt Ccy="CHF">150.00</Amt>
+            <CdtDbtInd>DBIT</CdtDbtInd>
+            <RltdPties>
+              <Cdtr>
+                <Nm>Ottoline Brackwater</Nm>
+              </Cdtr>
+              <CdtrAcct>
+                <Id>
+                  <IBAN>CH3600483000012345678</IBAN>
+                </Id>
+              </CdtrAcct>
+            </RltdPties>
+            <RmtInf>
+              <Ustrd>Cours de piano Ottoline</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Ordre groupé 2 paiements</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">14.45</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt>
+          <Dt>2025-03-31</Dt>
+        </BookgDt>
+        <ValDt>
+          <Dt>2025-03-31</Dt>
+        </ValDt>
+        <BkTxCd>
+          <Domn>
+            <Cd>ACMT</Cd>
+            <Fmly>
+              <Cd>MDOP</Cd>
+              <SubFmlyCd>CHRG</SubFmlyCd>
+            </Fmly>
+          </Domn>
+        </BkTxCd>
+        <AddtlNtryInf>Frais de tenue de compte</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">80.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>PDNG</Sts>
+        <BookgDt>
+          <Dt>2025-04-02</Dt>
+        </BookgDt>
+        <AcctSvcrRef>BCGE20250402ZX0009</AcctSvcrRef>
+        <AddtlNtryInf>Paiement en attente Kwazulu</AddtlNtryInf>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

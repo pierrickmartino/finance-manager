@@ -1,0 +1,2 @@
+# synthetic bank files: keep their exact bytes (CRLF, Windows-1252, BOM)
+test/inputs/** -text -diff

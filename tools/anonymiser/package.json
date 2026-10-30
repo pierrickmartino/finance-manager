@@ -1,0 +1,25 @@
+{
+  "name": "@finance-manager/anonymiser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone CLI that anonymises bank exports (UBS CSV, CAMT.053, OFX 1.02) into safe test fixtures.",
+  "type": "module",
+  "scripts": {
+    "anonymise": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.11.2",
+    "iconv-lite": "^0.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

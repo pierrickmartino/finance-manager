@@ -35,3 +35,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# real bank exports (personal data): keep them here, never commit them
+/bank-exports/
+*.real.csv
+*.real.xml
+*.real.ofx

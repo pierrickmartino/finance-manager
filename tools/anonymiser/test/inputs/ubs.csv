@@ -1,0 +1,19 @@
+﻿Numéro de compte:;0240 00240189.01T;
+IBAN:;CH78 0024 0024 0189 0123 4;
+Du:;2025-03-01;
+Au:;2025-03-31;
+Solde initial:;1000.00;
+Solde final:;4110.65;
+Date d'évaluation:;2025-04-01;
+Monnaie:;CHF;
+Nombre de transactions dans la période sélectionnée:;6;
+
+Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur;Monnaie;Débit;Crédit;Sous-montant;Solde;No de transaction;Description1;Description2;Description3;Notes de bas de page;
+2025-03-31;;2025-03-31;2025-03-31;CHF;-5.00;;;4110.65;;Frais de tenue de compte;Prix pour prestations;;;
+2025-03-28;;2025-03-28;2025-03-28;CHF;-1500.00;;;4115.65;9930328TI0000005;"Régie Zéphyrin Sàrl; Rue de l'Exemple 12; 1204 Genève";Ordre e-banking;"Motif du paiement: Loyer avril appartement 3B Quixote; No de compte: CH9100788000050812345; Référence QR: 210000000003139471430009017; Coûts: Ordre e-banking; No de transaction: 9930328TI0000005";;
+2025-03-20;;2025-03-20;2025-03-20;CHF;-300.00;;;5615.65;9930320TI0000004;Ordre groupé e-banking;Ordre de paiement groupé;"No de transaction: 9930320TI0000004";;
+;;;;CHF;;;-100.00;;;"Ottoline Brackwater; Chemin du Vrai-Faux 3; 1227 Carouge";;"Motif du paiement: Cadeau anniversaire; No de compte: CH3600483000012345678";;
+;;;;CHF;;;-200.00;;;"Zénobie Quillfeather; Avenue Imaginaire 44; 1003 Lausanne";;"Motif du paiement: Remboursement vacances Brackwater; No de compte: CH9300762011623852957";;
+2025-03-18;;2025-03-18;2025-03-18;CHF;;19.90;;5915.65;9930318TI0000006;Supermarché Kwazulu Plainpalais;Crédit carte de débit;"Remboursement achat; No de transaction: 9930318TI0000006";;
+2025-03-15;14:22:05;2025-03-15;2025-03-14;CHF;-104.25;;;5895.75;9930315TI0000002;Supermarché Kwazulu Plainpalais;Paiement carte de débit;"No de carte: 4930 XXXX XXXX 1187; No de transaction: 9930315TI0000002";;
+2025-03-05;;2025-03-05;2025-03-05;CHF;;5000.00;;6000.00;9930305TI0000001;"Fictivia Widgets SA; Rue du Prototype 9; 1290 Versoix";Versement;"Motif du paiement: Salaire mars Quillfeather; No de compte: CH9300762011623852957; No de transaction: 9930305TI0000001";;
