@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
-import { parseInput } from '../errors';
+import { NotFoundError, parseInput } from '../errors';
+import { normalizeText } from '@/lib/text';
 import { mutate, type Actor, type MutationScope, type ServiceContext } from '../context';
 import {
   recordClassificationChanges,
@@ -8,8 +9,15 @@ import {
 } from '../transactions/classification';
 import { filterConditions, transactionQueryInput } from '../transactions/query';
 import { isInTransfer } from '../transactions/transfer-guard';
-import { compileRules, evaluateRules, type RuleEvaluation } from './evaluator';
+import {
+  compileRules,
+  evaluateRules,
+  ruleMatches,
+  type RuleEvaluation,
+  type RuleSubject,
+} from './evaluator';
 import { loadRuleEngine, type RuleEngine } from './apply';
+import type { RuleInput } from './input';
 import { findRule } from './model';
 
 /**
@@ -123,8 +131,8 @@ const SELECT_CANDIDATES = `
          t.payee_id AS "payeeId", p.name AS "payeeName",
          t.category_id AS "categoryId",
          CASE WHEN c.id IS NULL THEN NULL ELSE g.name || ' › ' || c.name END AS "categoryName",
-         ARRAY(SELECT tt.tag_id::text FROM transaction_tag tt
-               WHERE tt.transaction_id = t.id) AS "tagIds",
+         ARRAY(SELECT tg.id::text FROM transaction_tag tt JOIN tag tg ON tg.id = tt.tag_id
+               WHERE tt.transaction_id = t.id ORDER BY lower(tg.name), tg.id) AS "tagIds",
          ARRAY(SELECT tg.name FROM transaction_tag tt JOIN tag tg ON tg.id = tt.tag_id
                WHERE tt.transaction_id = t.id ORDER BY lower(tg.name), tg.id) AS "tagNames"
   FROM "transaction" t
@@ -137,10 +145,13 @@ async function loadCandidates(
   db: Queryable,
   filter: ParsedInput['filter'],
   lock: boolean,
+  onlyId?: string,
 ): Promise<Candidate[]> {
-  const { sql, params } = filter
-    ? filterConditions(filter)
-    : { sql: '', params: [] as unknown[] };
+  const { sql, params } = onlyId
+    ? { sql: 'WHERE t.id = $1', params: [onlyId] }
+    : filter
+      ? filterConditions(filter)
+      : { sql: '', params: [] as unknown[] };
   const result = await db.query<Candidate>(
     `${SELECT_CANDIDATES} ${sql} ORDER BY t.booking_date, t.entry_order${lock ? ' FOR UPDATE OF t' : ''}`,
     params,
@@ -166,6 +177,23 @@ async function engineFor(db: Queryable, ruleIds: string[] | undefined): Promise<
   };
 }
 
+/** The Transaction as Rules see it; the Transfer guard decides whether Rules may touch it. */
+async function subjectOf(db: Queryable, candidate: Candidate): Promise<RuleSubject> {
+  return {
+    accountId: candidate.accountId,
+    bookingDate: candidate.bookingDate,
+    amountMinor: candidate.amountMinor,
+    rawDescription: candidate.rawDescription,
+    counterpartyName: candidate.counterpartyName,
+    payee:
+      candidate.payeeId && candidate.payeeName
+        ? { id: candidate.payeeId, name: candidate.payeeName }
+        : null,
+    lockedFields: candidate.lockedFields,
+    isInTransfer: await isInTransfer(db, candidate.id),
+  };
+}
+
 function plannedChange(candidate: Candidate, evaluation: RuleEvaluation): PlannedChange | null {
   const payee = evaluation.payee?.id !== candidate.payeeId ? evaluation.payee : null;
   const category = evaluation.category?.id !== candidate.categoryId ? evaluation.category : null;
@@ -181,14 +209,7 @@ async function plan(db: Queryable, input: ParsedInput, lock: boolean): Promise<P
   const changes: PlannedChange[] = [];
   let skippedTransfers = 0;
   for (const candidate of candidates) {
-    const evaluation = evaluateRules(engine.compiled, {
-      ...candidate,
-      payee:
-        candidate.payeeId && candidate.payeeName
-          ? { id: candidate.payeeId, name: candidate.payeeName }
-          : null,
-      isInTransfer: await isInTransfer(db, candidate.id),
-    });
+    const evaluation = evaluateRules(engine.compiled, await subjectOf(db, candidate));
     if (evaluation.skipped === 'transfer') skippedTransfers += 1;
     const change = plannedChange(candidate, evaluation);
     if (change) changes.push(change);
@@ -346,8 +367,8 @@ function summary(engine: RuleEngine, ruleIds: string[] | undefined, count: numbe
 /**
  * Applies the Rules to existing Transactions: the changes `previewApplyRules` shows, written
  * as one History Batch with a summary. Each change is recorded with the Rule that made it as
- * the actor. The writes are set-based, one Rule at a time, so 10 000 Transactions take seconds
- * (see `rules-existing.perf.test.ts`).
+ * the actor. The writes are set-based, one Rule at a time: 10 000 Transactions with two Rules
+ * take about 8 s, mostly History inserts (see `rules-existing.perf.test.ts`).
  */
 export async function applyRulesToExisting(
   ctx: ServiceContext,
@@ -367,4 +388,80 @@ export async function applyRulesToExisting(
     await scope.history.summarize(summary(engine, values.ruleIds, changes.length));
     return { batchId: scope.history.batchId, count: changes.length };
   });
+}
+
+/**
+ * How many Transactions each Rule matches now (enabled or not), by Rule id, to spot dead or
+ * overly broad Rules. Conditions only: a match counts even when the Rule would change nothing.
+ * Transactions in a Transfer never match.
+ */
+export async function countRuleMatches(ctx: ServiceContext): Promise<Record<string, number>> {
+  const engine = await loadRuleEngine(ctx.db);
+  const counts: Record<string, number> = Object.fromEntries(
+    engine.compiled.rules.map((rule) => [rule.definition.id, 0]),
+  );
+  if (engine.compiled.rules.length === 0) return counts;
+  for (const candidate of await loadCandidates(ctx.db, undefined, false)) {
+    const subject = await subjectOf(ctx.db, candidate);
+    for (const rule of engine.compiled.rules) {
+      if (ruleMatches(rule, subject)) counts[rule.definition.id]! += 1;
+    }
+  }
+  return counts;
+}
+
+/** At most this many words of the description go into a suggested Rule. */
+const MAX_FRAGMENT_WORDS = 3;
+const WORD = /^[\p{L}][\p{L}'&-]+$/u;
+
+/**
+ * A stable piece of a description for a "contains" condition: the first run of words (letters
+ * only, so dates, card and reference numbers are left out), normalised as Rules compare text.
+ * Null when the description has no words.
+ */
+export function descriptionFragment(rawDescription: string): string | null {
+  const run: string[] = [];
+  for (const token of normalizeText(rawDescription).split(' ')) {
+    if (WORD.test(token)) {
+      run.push(token);
+      if (run.length === MAX_FRAGMENT_WORDS) break;
+    } else if (run.length > 0) {
+      break;
+    }
+  }
+  return run.length > 0 ? run.join(' ') : null;
+}
+
+/**
+ * A Rule, not saved, that would classify Transactions like this one: same Account, a fragment
+ * of its description and its direction, setting its current Payee, Category and Tags. The Rule
+ * editor opens prefilled with it.
+ */
+export async function suggestRuleFromTransaction(
+  ctx: ServiceContext,
+  transactionId: string,
+): Promise<RuleInput> {
+  if (!z.uuid().safeParse(transactionId).success) {
+    throw new NotFoundError('Transaction not found');
+  }
+  const [candidate] = await loadCandidates(ctx.db, undefined, false, transactionId);
+  if (!candidate) throw new NotFoundError('Transaction not found');
+  const fragment = descriptionFragment(candidate.rawDescription);
+  const direction = candidate.amountMinor > 0 ? 'in' : 'out';
+  return {
+    name: fragment ?? `${candidate.accountName}, money ${direction}`,
+    enabled: true,
+    conditions: [
+      { type: 'account', accountIds: [candidate.accountId] },
+      ...(fragment
+        ? [{ type: 'text', field: 'description', operator: 'contains', value: fragment } as const]
+        : []),
+      { type: 'direction', direction },
+    ],
+    actions: {
+      payeeId: candidate.payeeId,
+      categoryId: candidate.categoryId,
+      tagIds: candidate.tagIds,
+    },
+  };
 }
