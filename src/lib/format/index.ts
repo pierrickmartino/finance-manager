@@ -46,7 +46,8 @@ export interface Formatter {
 const DEFAULT_FRACTION_DIGITS = 2;
 const fractionDigitsCache = new Map<string, number>();
 
-function fractionDigits(currency: string | undefined): number {
+/** Minor-unit decimals of a Currency (2 when none is given). */
+export function fractionDigits(currency: string | undefined): number {
   if (!currency) return DEFAULT_FRACTION_DIGITS;
   let digits = fractionDigitsCache.get(currency);
   if (digits === undefined) {

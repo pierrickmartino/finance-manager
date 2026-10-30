@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 };
 
 const NAV_LINKS = [
+  { href: '/accounts', label: 'Accounts' },
   { href: '/banks', label: 'Banks' },
+  { href: '/history', label: 'History' },
   { href: '/settings', label: 'Settings' },
 ];
 
