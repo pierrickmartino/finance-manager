@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { getAccount } from '@/server/services/accounts';
+import { BundledDetails } from '@/components/bundled-details';
 import { NotFoundError } from '@/server/services/errors';
 import { getImportPreview, type ImportPreview } from '@/server/services/imports';
 import { commitImportAction, discardImportAction } from '../actions';
@@ -98,6 +99,9 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
                   )}
                   {entry.counterpartyIban && (
                     <div className="font-mono text-xs text-zinc-500">{entry.counterpartyIban}</div>
+                  )}
+                  {entry.bundledDetails && (
+                    <BundledDetails details={entry.bundledDetails} formatAmount={money} />
                   )}
                 </td>
                 <td className={`${CELL} font-mono text-xs`}>{entry.bankReference ?? '—'}</td>
