@@ -56,6 +56,8 @@ One-time setup:
 3. In the app service's variables, set `DATABASE_URL` to `${{Postgres.DATABASE_URL}}`.
 4. Generate a public domain. Every push to `main` then deploys and migrates.
 
+Backups: a separate `backup` service (`deploy/backup/`) serves age-encrypted dumps that a machine you own pulls nightly. Setup, retention and restore are in `docs/runbooks/backup-and-restore.md`.
+
 ## Layout
 
 ```
