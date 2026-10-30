@@ -4,6 +4,14 @@ import { FieldError } from '@/components/form';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { listAccounts, type Account } from '@/server/services/accounts';
+import {
+  CATEGORY_GROUP_TYPE_LABELS,
+  CATEGORY_GROUP_TYPES,
+  listCategoryGroups,
+  type CategoryGroup,
+} from '@/server/services/categories';
+import { listPayees, type Payee } from '@/server/services/payees';
+import { listTags, type Tag } from '@/server/services/tags';
 import { ServiceError } from '@/server/services/errors';
 import {
   listTransactions,
@@ -37,9 +45,13 @@ async function loadPage(
 export default async function TransactionsPage({ searchParams }: TransactionsPageProps) {
   const fmt = await getFormatter();
   const search = readTransactionSearch(await searchParams, fmt.settings.numberFormat);
-  const [{ page, error: queryError }, accounts] = await Promise.all([
+  const ctx = await getServiceContext();
+  const [{ page, error: queryError }, accounts, groups, payees, tags] = await Promise.all([
     loadPage(search.query),
-    listAccounts(await getServiceContext()),
+    listAccounts(ctx),
+    listCategoryGroups(ctx),
+    listPayees(ctx),
+    listTags(ctx),
   ]);
   const error = search.error ?? queryError;
 
@@ -47,7 +59,7 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
     <section className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Transactions</h1>
 
-      <SearchForm values={search.values} accounts={accounts} />
+      <SearchForm values={search.values} lists={{ accounts, groups, payees, tags }} />
 
       {error && <FieldError message={error} />}
 
@@ -66,6 +78,9 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                     <th className={CELL}>Date</th>
                     <th className={CELL}>Account</th>
                     <th className={CELL}>Description</th>
+                    <th className={CELL}>Payee</th>
+                    <th className={CELL}>Category</th>
+                    <th className={CELL}>Tags</th>
                     <th className={`${CELL} text-right`}>Amount</th>
                   </tr>
                 </thead>
@@ -89,6 +104,22 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                           <div className="text-xs text-zinc-500">Manual</div>
                         )}
                       </td>
+                      <td className={CELL}>{transaction.payee?.name ?? '—'}</td>
+                      <td className={CELL}>
+                        {transaction.category ? (
+                          <>
+                            {transaction.category.name}
+                            <div className="text-xs text-zinc-500">
+                              {transaction.category.groupName}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-zinc-500">Unclassified</span>
+                        )}
+                      </td>
+                      <td className={CELL}>
+                        {transaction.tags.map((tag) => tag.name).join(', ') || '—'}
+                      </td>
                       <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
                         {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
                       </td>
@@ -106,10 +137,11 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
 
 interface SearchFormProps {
   values: SearchValues;
-  accounts: Account[];
+  lists: { accounts: Account[]; groups: CategoryGroup[]; payees: Payee[]; tags: Tag[] };
 }
 
-function SearchForm({ values, accounts }: SearchFormProps) {
+function SearchForm({ values, lists }: SearchFormProps) {
+  const { accounts, groups, payees, tags } = lists;
   return (
     // Keyed on the values so the fields follow client-side navigation between searches.
     <form
@@ -147,6 +179,63 @@ function SearchForm({ values, accounts }: SearchFormProps) {
           <option value="imported">Imported</option>
           <option value="manual">Manual</option>
         </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Payee
+        <select name="payeeId" defaultValue={values.payeeId} className={INPUT}>
+          <option value="">All</option>
+          {payees.map((payee) => (
+            <option key={payee.id} value={payee.id}>
+              {payee.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Category
+        <select name="categoryId" defaultValue={values.categoryId} className={INPUT}>
+          <option value="">All</option>
+          {groups.map((group) => (
+            <optgroup key={group.id} label={group.name}>
+              {group.categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Group type
+        <select name="groupType" defaultValue={values.groupType} className={INPUT}>
+          <option value="">All</option>
+          {CATEGORY_GROUP_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {CATEGORY_GROUP_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Tag
+        <select name="tagId" defaultValue={values.tagId} className={INPUT}>
+          <option value="">All</option>
+          {tags.map((tag) => (
+            <option key={tag.id} value={tag.id}>
+              {tag.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-2 self-center text-sm font-medium">
+        <input
+          type="checkbox"
+          name="unclassified"
+          value="true"
+          defaultChecked={values.unclassified === 'true'}
+        />
+        Unclassified only
       </label>
       <button
         type="submit"

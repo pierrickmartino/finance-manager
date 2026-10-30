@@ -4,7 +4,7 @@ import type { TransactionQuery } from '@/server/services/transactions';
 
 /**
  * The Transaction list's URL parameters (a GET form), as the form shows them and as the
- * service query. #15 adds `payeeId`, `categoryId`, `tagId`, `unclassified` here.
+ * service query.
  */
 export const SEARCH_FIELDS = [
   'from',
@@ -14,6 +14,11 @@ export const SEARCH_FIELDS = [
   'amountMax',
   'text',
   'status',
+  'payeeId',
+  'categoryId',
+  'tagId',
+  'groupType',
+  'unclassified',
 ] as const;
 
 export type SearchValues = Record<(typeof SEARCH_FIELDS)[number], string>;
@@ -62,6 +67,11 @@ export function readTransactionSearch(
     accountId: values.accountId,
     text: values.text,
     status: values.status,
+    payeeId: values.payeeId,
+    categoryId: values.categoryId,
+    tagId: values.tagId,
+    groupType: values.groupType,
+    unclassified: values.unclassified === 'true' ? true : undefined,
     amountMin: amountMin ?? undefined,
     amountMax: amountMax ?? undefined,
     page,

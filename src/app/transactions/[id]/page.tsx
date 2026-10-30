@@ -3,12 +3,29 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import type { Formatter } from '@/lib/format';
+import { ActionForm } from '@/components/action-form';
+import { BUTTON_CLASS } from '@/components/named-list';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { NotFoundError } from '@/server/services/errors';
+import { listCategoryGroups } from '@/server/services/categories';
 import { listHistory } from '@/server/services/history';
-import { getTransaction, type TransactionDetail } from '@/server/services/transactions';
+import { listPayees } from '@/server/services/payees';
+import { listTags } from '@/server/services/tags';
+import {
+  CLASSIFICATION_FIELD_LABELS,
+  getClassification,
+  getTransaction,
+  type Classification,
+  type TransactionDetail,
+} from '@/server/services/transactions';
 import { HistoryTable, historyHref } from '../../history/history-table';
+import {
+  deleteImportedTransactionFromDetailAction,
+  editClassificationAction,
+  unlockFieldAction,
+} from './actions';
+import { ClassificationForm } from './classification-form';
 
 export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
 
@@ -28,17 +45,20 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
 }
 
 /**
- * One Transaction (spec 38, 48, 116): every bank field read-only, where it came from, and its
- * History. #15 adds a classification section (Payee, Category, Tags, notes) and a delete button
- * between the bank fields and the History.
+ * One Transaction (spec 38, 48, 63-65, 116): every bank field read-only, where it came from, its
+ * classification with the fields locked against Rules, and its History.
  */
 export default async function TransactionPage({ params }: TransactionPageProps) {
   const { id } = await params;
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
-  const [history, fmt] = await Promise.all([
+  const [history, fmt, classification, groups, payees, tags] = await Promise.all([
     listHistory(ctx, { entityType: 'transaction', entityId: transaction.id }),
     getFormatter(),
+    getClassification(ctx, transaction.id),
+    listCategoryGroups(ctx),
+    listPayees(ctx),
+    listTags(ctx),
   ]);
   const amount = fmt.amount(transaction.amountMinor, { currency: transaction.currency });
 
@@ -69,6 +89,32 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         )}
       </section>
 
+      <section aria-labelledby="classification" className="flex flex-col gap-3">
+        <h2 id="classification" className="text-lg font-semibold">
+          Classification
+        </h2>
+        <ClassificationForm
+          classification={classification}
+          groups={groups}
+          payeeNames={payees.map((payee) => payee.name)}
+          tagNames={tags.map((tag) => tag.name)}
+          action={editClassificationAction.bind(null, transaction.id)}
+        />
+        <LockedFields classification={classification} />
+      </section>
+
+      {!transaction.isManual && (
+        <ActionForm
+          action={deleteImportedTransactionFromDetailAction.bind(null, transaction.id)}
+          label="Delete Transaction"
+          confirmMessage="Delete this Transaction? Importing its file again adds it back."
+        >
+          <button type="submit" className={BUTTON_CLASS}>
+            Delete Transaction
+          </button>
+        </ActionForm>
+      )}
+
       <section aria-labelledby="history" className="flex flex-col gap-3">
         <h2 id="history" className="text-lg font-semibold">
           History
@@ -86,6 +132,39 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         </Link>
       </section>
     </section>
+  );
+}
+
+/** The fields a manual edit locked against Rules, each with an Unlock button (spec 65). */
+function LockedFields({ classification }: { classification: Classification }) {
+  if (classification.lockedFields.length === 0) {
+    return <p className="text-sm text-zinc-500">No field is locked: Rules may classify it.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        Locked against Rules, because you edited them:
+      </p>
+      <ul aria-label="Locked fields" className="flex flex-wrap gap-2">
+        {classification.lockedFields.map((field) => (
+          <li key={field} className="flex items-center gap-2 text-sm">
+            <span>{CLASSIFICATION_FIELD_LABELS[field]}</span>
+            <ActionForm
+              action={unlockFieldAction.bind(null, classification.transactionId, field)}
+              label={`Unlock ${CLASSIFICATION_FIELD_LABELS[field]}`}
+            >
+              <button
+                type="submit"
+                aria-label={`Unlock ${CLASSIFICATION_FIELD_LABELS[field]}`}
+                className={BUTTON_CLASS}
+              >
+                Unlock
+              </button>
+            </ActionForm>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
