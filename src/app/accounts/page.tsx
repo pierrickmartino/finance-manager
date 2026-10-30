@@ -7,9 +7,11 @@ import {
   IMPORT_FORMAT_LABELS,
   listAccounts,
 } from '@/server/services/accounts';
+import { listSnapshotMismatches } from '@/server/services/balance-snapshots';
 import { listBanks } from '@/server/services/banks';
 import { AccountForm } from './account-form';
 import { createAccountAction } from './actions';
+import { SnapshotMismatches } from './snapshot-mismatches';
 
 export const metadata: Metadata = { title: 'Accounts · Finance Manager' };
 
@@ -17,15 +19,19 @@ const CELL = 'px-3 py-2 text-left';
 
 export default async function AccountsPage() {
   const ctx = await getServiceContext();
-  const [accounts, banks, fmt] = await Promise.all([
+  const [accounts, banks, mismatches, fmt] = await Promise.all([
     listAccounts(ctx),
     listBanks(ctx),
+    listSnapshotMismatches(ctx),
     getFormatter(),
   ]);
+  const mismatchedAccounts = new Set(mismatches.map((check) => check.accountId));
 
   return (
     <section className="flex flex-col gap-8">
       <h1 className="text-2xl font-semibold">Accounts</h1>
+
+      <SnapshotMismatches mismatches={mismatches} accounts={accounts} fmt={fmt} showAccountNames />
 
       {accounts.length === 0 ? (
         <p className="text-sm text-zinc-500">No Accounts yet.</p>
@@ -60,8 +66,20 @@ export default async function AccountsPage() {
                   </td>
                   <td className={`${CELL} text-right tabular-nums`}>
                     {fmt.amount(account.balanceMinor, { currency: account.currency })}
+                    {account.balanceSnapshotDate && (
+                      <div className="text-xs text-zinc-500">
+                        Balance snapshot of {fmt.date(account.balanceSnapshotDate)}
+                      </div>
+                    )}
                   </td>
-                  <td className={CELL}>{account.archivedAt ? 'Archived' : 'Active'}</td>
+                  <td className={CELL}>
+                    {account.archivedAt ? 'Archived' : 'Active'}
+                    {mismatchedAccounts.has(account.id) && (
+                      <div className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                        Snapshot mismatch
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

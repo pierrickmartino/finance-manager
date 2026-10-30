@@ -16,6 +16,7 @@ import { commitImport, listImportTransactions, previewImport } from '../imports'
 import {
   createManualTransaction,
   deleteManualTransaction,
+  listManualTransactions,
   updateManualTransaction,
 } from './manual';
 import type { Transaction } from './model';
@@ -87,6 +88,23 @@ describe('create a Manual transaction', () => {
     });
 
     expect((await getAccount(t.ctx, account.id)).balanceMinor).toBe(100000 - 4590 + 520000);
+  });
+});
+
+describe('list Manual transactions', () => {
+  it("lists an Account's Manual transactions by booking date, then entry order", async () => {
+    const account = await clerAccount();
+    await manual(account, '2025-03-14', -100, 'Second');
+    await manual(account, '2025-03-01', -200, 'First');
+    await manual(account, '2025-03-14', -300, 'Third');
+
+    const listed = await listManualTransactions(t.ctx, account.id);
+
+    expect(listed.map((transaction) => transaction.rawDescription)).toEqual([
+      'First',
+      'Second',
+      'Third',
+    ]);
   });
 });
 

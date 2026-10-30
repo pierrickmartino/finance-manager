@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { ConflictError, NotFoundError, parseInput, ValidationError } from '../errors';
-import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from './model';
+import {
+  SELECT_TRANSACTION,
+  TRANSACTION_ORDER,
+  transactionSnapshot,
+  type Transaction,
+} from './model';
 
 const MAX_TEXT_LENGTH = 500;
 
@@ -51,10 +56,10 @@ export interface CreateManualTransactionInput extends ManualTransactionInput {
 }
 
 const TRANSACTION_NOT_FOUND = 'Transaction not found';
-const transactionId = z.uuid();
+const uuid = z.uuid();
 
 async function findTransaction(db: Queryable, id: string, lock = false): Promise<Transaction> {
-  if (!transactionId.safeParse(id).success) throw new NotFoundError(TRANSACTION_NOT_FOUND);
+  if (!uuid.safeParse(id).success) throw new NotFoundError(TRANSACTION_NOT_FOUND);
   const result = await db.query<Transaction>(
     `${SELECT_TRANSACTION} WHERE t.id = $1${lock ? ' FOR UPDATE OF t' : ''}`,
     [id],
@@ -171,4 +176,24 @@ export async function deleteManualTransaction(ctx: ServiceContext, id: string): 
     await tx.query('DELETE FROM "transaction" WHERE id = $1', [id]);
     await history.record('transaction', id, transactionSnapshot(before), null);
   });
+}
+
+/** One Manual transaction (for its edit form). Imported ones are not found here. */
+export async function getManualTransaction(ctx: ServiceContext, id: string): Promise<Transaction> {
+  const transaction = await findTransaction(ctx.db, id);
+  if (!transaction.isManual) throw new NotFoundError(TRANSACTION_NOT_FOUND);
+  return transaction;
+}
+
+/** An Account's Manual transactions, by booking date, then in the order they were entered. */
+export async function listManualTransactions(
+  ctx: ServiceContext,
+  accountId: string,
+): Promise<Transaction[]> {
+  if (!uuid.safeParse(accountId).success) return [];
+  const result = await ctx.db.query<Transaction>(
+    `${SELECT_TRANSACTION} WHERE t.account_id = $1 AND t.is_manual ORDER BY ${TRANSACTION_ORDER}`,
+    [accountId],
+  );
+  return result.rows;
 }
