@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent for the backup pull on macOS. See docs/runbooks/backup-and-restore.md.
+  Replace YOUR_USER, then:
+    cp deploy/backup/finance-backup-pull.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/finance-backup-pull.plist
+  launchd runs a missed job when the Mac wakes up, so a sleeping Mac still pulls once a day.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>finance-backup-pull</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/YOUR_USER/finance-backup/pull.sh</string>
+    <string>/Users/YOUR_USER/.config/finance-backup/pull.env</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>17</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USER/finance-backup/pull.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USER/finance-backup/pull.log</string>
+</dict>
+</plist>

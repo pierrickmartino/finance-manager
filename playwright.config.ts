@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
+import { OWNER_STORAGE_STATE } from './e2e/support/auth';
 import { uniqueDatabaseName } from './test/support/postgres';
 
 /*
@@ -32,7 +33,16 @@ export default defineConfig({
     trace: 'retain-on-failure',
     launchOptions: { executablePath },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Runs first-run setup once per run (the E2E database starts empty) and signs in.
+    { name: 'auth', testMatch: /auth\.setup\.ts/, use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      dependencies: ['auth'],
+      // Every test starts signed in as the owner (see e2e/support/auth.ts).
+      use: { ...devices['Desktop Chrome'], storageState: OWNER_STORAGE_STATE },
+    },
+  ],
   webServer: {
     // Creates and migrates the run's database, then starts Next.js on it.
     command: 'pnpm exec tsx e2e/support/server.ts',

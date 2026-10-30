@@ -40,6 +40,7 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /blob-report/
+/e2e/.auth/
 
 # real bank exports (personal data): keep them here, never commit them
 /bank-exports/
