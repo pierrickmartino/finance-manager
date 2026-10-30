@@ -5,7 +5,7 @@ import { NotFoundError, ValidationError } from '../errors';
 import { SELECT_TRANSACTION, TRANSACTION_ORDER, transactionSnapshot } from '../transactions/model';
 import type { Transaction } from '../transactions/model';
 import { findImport, id, importSnapshot, type Import, type OpeningChange } from './model';
-import { unlinkTransfers } from './transfer-unlink';
+import { unlinkTransfers } from '../transfers/link';
 
 type Scope = Pick<MutationScope, 'tx' | 'history'>;
 

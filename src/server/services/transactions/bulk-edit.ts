@@ -6,7 +6,7 @@ import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { CLASSIFICATION_FIELDS, recordClassificationChanges } from './classification';
 import { UNCLASSIFIED_CONDITION } from './query';
-import { isInTransfer } from './transfer-guard';
+import { anyInTransfer } from './transfer-guard';
 
 /**
  * Bulk edit (spec 62, 64): sets the Payee, Category or Tags of many Transactions at once, as one
@@ -154,10 +154,8 @@ function editedFields(values: BulkValues): string[] {
 
 /** Writes and locks the given fields on every Transaction, in a few set-based statements. */
 async function writeAll({ tx }: MutationScope, ids: string[], values: BulkValues): Promise<void> {
-  if (values.categoryId) {
-    for (const id of ids) {
-      if (await isInTransfer(tx, id)) throw new ValidationError("A Transfer can't have a Category");
-    }
+  if (values.categoryId && (await anyInTransfer(tx, ids))) {
+    throw new ValidationError("A Transfer can't have a Category");
   }
   // Locks stay in CLASSIFICATION_FIELDS order: the current locks plus the edited fields.
   await tx.query(

@@ -21,6 +21,8 @@ export interface Transaction {
   bundledDetails: BundledDetail[] | null;
   notes: string | null;
   lockedFields: string[];
+  /** The Transfer this Transaction is one side of; null when it is not in a Transfer. */
+  transferId: string | null;
 }
 
 /** `${SELECT_TRANSACTION} WHERE ...`: every Transaction column, camelCase, from alias `t`. */
@@ -31,7 +33,7 @@ export const SELECT_TRANSACTION = `
          t.bank_reference AS "bankReference", t.raw_description AS "rawDescription",
          t.counterparty_name AS "counterpartyName", t.counterparty_iban AS "counterpartyIban",
          t.payment_reference AS "paymentReference", t.bundled_details AS "bundledDetails",
-         t.notes, t.locked_fields AS "lockedFields"
+         t.notes, t.locked_fields AS "lockedFields", t.transfer_id AS "transferId"
   FROM "transaction" t`;
 
 /** Sort order of Transactions: by booking date, then in the order they were written. */

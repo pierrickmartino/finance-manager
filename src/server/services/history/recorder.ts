@@ -18,6 +18,7 @@ export const HISTORY_ENTITY_TYPES = [
   'payee',
   'tag',
   'rule',
+  'transfer',
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 

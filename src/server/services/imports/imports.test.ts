@@ -188,6 +188,7 @@ describe('commit an Import (UBS CSV)', () => {
       bundledDetails: null,
       notes: null,
       lockedFields: [],
+      transferId: null,
     });
     // Same-day rows keep the bank's order
     expect(transactions.slice(9, 12).map((tr) => tr.bankReference)).toEqual([

@@ -5,7 +5,7 @@ import { CATEGORY_GROUP_TYPES } from '../categories/model';
  * The Transaction list's filters (spec story 67). Every filter is optional and blank strings
  * mean "no filter", as an empty GET form submits them. Filters combine with AND.
  *
- * To add a filter (Transfer, #19): add its field to
+ * To add a filter: add its field to
  * `transactionFilterFields` and one `where(...)` line to `filterConditions`.
  */
 
@@ -20,10 +20,13 @@ const MAX_DESCRIPTION_KEY_LENGTH = 2000;
 
 /**
  * SQL condition (alias `t`) for an Unclassified Transaction: no Category and not a Transfer.
- * #19 Transfers: add `AND t.transfer_id IS NULL` here; the filter, the Unclassified groups and
- * the progress figure all use it.
+ * The filter, the Unclassified groups and the progress figure all use it.
  */
-export const UNCLASSIFIED_CONDITION = 't.category_id IS NULL';
+export const UNCLASSIFIED_CONDITION = 't.category_id IS NULL AND t.transfer_id IS NULL';
+
+/** `only`: Transactions in a Transfer. `exclude`: Transactions not in a Transfer. */
+export const TRANSFER_FILTERS = ['only', 'exclude'] as const;
+export type TransferFilter = (typeof TRANSFER_FILTERS)[number];
 
 /** A filter field that is absent when blank (empty or only spaces). */
 function optional<S extends z.ZodType>(schema: S) {
@@ -67,8 +70,12 @@ const transactionFilterFields = {
       error: 'Category group type must be Income, Expense or Capital',
     }),
   ),
-  /** Only Transactions with no Category (and, once #19 exists, not in a Transfer). */
+  /** Only Transactions with no Category that are not in a Transfer. */
   unclassified: optional(z.boolean()),
+  /** Only Transfers, or no Transfers. */
+  transfer: optional(
+    z.enum(TRANSFER_FILTERS, { error: 'Transfer filter must be only or exclude' }),
+  ),
   /**
    * Normalised raw description, as the Unclassified groups key them. Not blank-stripped: the
    * empty key is the group of Transactions with no description.
@@ -147,6 +154,7 @@ export function filterConditions(input: ParsedQuery): SqlCondition {
   );
   where((p) => `(${UNCLASSIFIED_CONDITION}) = ${p}`, input.unclassified);
   where((p) => `t.description_key = ${p}`, input.descriptionKey);
+  where((p) => `(t.transfer_id IS NOT NULL) = ${p}`, input.transfer && input.transfer === 'only');
 
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }

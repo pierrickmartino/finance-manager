@@ -3,6 +3,7 @@ import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { ConflictError, NotFoundError, parseInput, ValidationError } from '../errors';
 import { runRulesOnTransaction } from '../rules/apply';
+import { unlinkTransfers } from '../transfers/link';
 import { refuseBankFieldChanges } from './bank-fields';
 import {
   SELECT_TRANSACTION,
@@ -145,6 +146,11 @@ export async function updateManualTransaction(
       counterpartyName: values.counterpartyName,
     });
     if (!before.isManual) throw new ValidationError(NOT_MANUAL);
+    if (before.transferId && Math.sign(values.amountMinor) !== Math.sign(before.amountMinor)) {
+      throw new ValidationError(
+        'This Transaction is part of a Transfer. Unlink the Transfer before changing its sign',
+      );
+    }
     await lockOpenAccount(tx, before.accountId);
     await tx.query(
       `UPDATE "transaction"
@@ -171,6 +177,7 @@ export async function deleteManualTransaction(ctx: ServiceContext, id: string): 
       throw new ValidationError(`${NOT_MANUAL}: delete it from its Import instead`);
     }
     await lockOpenAccount(tx, before.accountId);
+    await unlinkTransfers({ tx, history }, [id]);
     await tx.query('DELETE FROM "transaction" WHERE id = $1', [id]);
     await history.record('transaction', id, transactionSnapshot(before), null);
   });
