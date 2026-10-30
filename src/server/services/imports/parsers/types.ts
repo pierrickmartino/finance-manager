@@ -33,10 +33,19 @@ export interface ParsedEntry {
   runningBalanceMinor: number | null;
 }
 
+/** The bank's own account identifiers, for formats without an IBAN (OFX `BANKACCTFROM`). */
+export interface BankAccountId {
+  bankId: string | null;
+  branchId: string | null;
+  accountId: string | null;
+}
+
 /** What a parser makes of a whole file. All amounts are integer minor units of `currency`. */
 export interface ParsedStatement {
   /** The Account's IBAN as the file states it, normalised; null when the file has none (OFX). */
   iban: string | null;
+  /** Set by formats that identify the account without an IBAN (OFX); absent otherwise. */
+  bankAccount?: BankAccountId | null;
   currency: string;
   /** Statement period, ISO dates; null when the file doesn't say. */
   from: string | null;
