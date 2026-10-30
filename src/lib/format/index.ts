@@ -41,6 +41,8 @@ export interface Formatter {
   amount(minor: number, options?: AmountOptions): string;
   /** Formats an ISO date (`YYYY-MM-DD`), or a timestamp in Swiss local time. */
   date(value: string | Date): string;
+  /** Formats a share between 0 and 1 as a percentage with one decimal ("1.2%"). */
+  percent(share: number): string;
 }
 
 const DEFAULT_FRACTION_DIGITS = 2;
@@ -105,10 +107,22 @@ export function formatDate(value: string | Date, dateFormat: DateFormat): string
   return dateFormat.replace('yyyy', yyyy).replace('mm', mm).replace('dd', dd);
 }
 
+const PERCENT_TENTHS = 1000;
+
+export function formatPercent(share: number, numberFormat: NumberFormat): string {
+  const tenths = Math.round(share * PERCENT_TENTHS);
+  const sign = tenths < 0 ? '-' : '';
+  const abs = Math.abs(tenths);
+  const { group, decimal } = NUMBER_FORMATS[numberFormat];
+  const whole = groupThousands(String(Math.floor(abs / 10)), group);
+  return `${sign}${whole}${decimal}${abs % 10}%`;
+}
+
 export function createFormatter(settings: DisplaySettings): Formatter {
   return {
     settings,
     amount: (minor, options) => formatAmount(minor, settings.numberFormat, options),
     date: (value) => formatDate(value, settings.dateFormat),
+    percent: (share) => formatPercent(share, settings.numberFormat),
   };
 }

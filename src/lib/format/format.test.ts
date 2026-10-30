@@ -60,3 +60,20 @@ describe('formatter with other display settings', () => {
     expect(() => fmt.amount(12.5)).toThrow('integer number of minor units');
   });
 });
+
+describe('percent', () => {
+  it.each([
+    [0.25, '25.0%'],
+    [0.0123, '1.2%'],
+    [0.02, '2.0%'],
+    [0, '0.0%'],
+    [1, '100.0%'],
+  ])('formats the share %d as %s', (share, expected) => {
+    expect(createFormatter(DEFAULT_DISPLAY_SETTINGS).percent(share)).toBe(expected);
+  });
+
+  it("uses the number format's decimal separator", () => {
+    const fmt = createFormatter({ ...DEFAULT_DISPLAY_SETTINGS, numberFormat: 'dot' });
+    expect(fmt.percent(0.0123)).toBe('1,2%');
+  });
+});
