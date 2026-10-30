@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { createBank } from '../banks';
 import { backfillRates, type EcbRateSource } from '../fx';
+import { commitImport, previewImport } from '../imports';
 import { archiveAccount, createAccount } from '.';
 import { listAccountBalances } from './balances';
 
@@ -133,5 +136,35 @@ describe('Account balances in CHF', () => {
     await expect(listAccountBalances(t.ctx, { date: '8.3.2025' })).rejects.toThrow(
       'Date must be a date (YYYY-MM-DD)',
     );
+  });
+
+  it('counts only the Transactions booked up to the date', async () => {
+    const bank = await createBank(t.ctx, { name: 'UBS' });
+    const account = await createAccount(t.ctx, {
+      bankId: bank.id,
+      name: 'UBS current',
+      currency: 'CHF',
+      iban: 'CH6900235235123456010',
+      kind: 'current',
+      importFormat: 'ubs_csv',
+      openingBalanceMinor: 845_035,
+    });
+    const file = 'ubs-chf-2025-10.csv';
+    const content = readFileSync(
+      path.join(import.meta.dirname, '../../../../test/fixtures/import/ubs', file),
+    );
+    const preview = await previewImport(t.ctx, { accountId: account.id, fileName: file, content });
+    await commitImport(t.ctx, { previewId: preview.id });
+
+    const balanceOn = async (date: string) =>
+      (await listAccountBalances(t.ctx, { date }))[0]!.balanceMinor;
+
+    // The import opened the Account on the statement's first day, 2025-10-01.
+    expect(await balanceOn('2025-09-30')).toBe(0);
+    // Then the UBS running balance ("Solde") at the end of each day.
+    expect(await balanceOn('2025-10-01')).toBe(630_035);
+    expect(await balanceOn('2025-10-15')).toBe(701_290);
+    expect(await balanceOn('2025-10-24')).toBe(1_332_065);
+    expect(await balanceOn('2025-10-31')).toBe(1_290_305);
   });
 });

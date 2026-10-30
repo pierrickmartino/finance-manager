@@ -20,15 +20,8 @@ const balancesInput = z.object({
   date: z.iso.date({ error: 'Date must be a date (YYYY-MM-DD)' }).optional(),
 });
 
-/**
- * Sum per Account of the Transactions booked after `date`. None exist until the Transactions
- * ticket creates the table; that ticket should drop this table-exists guard.
- */
+/** Sum per Account of the Transactions booked after `date`. */
 async function transactionsAfter(db: Queryable, date: string): Promise<Map<string, number>> {
-  const table = await db.query<{ exists: boolean }>(
-    `SELECT to_regclass('public.transaction') IS NOT NULL AS "exists"`,
-  );
-  if (!table.rows[0]!.exists) return new Map();
   const result = await db.query<{ accountId: string; sumMinor: number }>(
     `SELECT account_id AS "accountId", sum(amount_minor)::bigint AS "sumMinor"
      FROM "transaction" WHERE booking_date > $1 GROUP BY account_id`,
