@@ -21,7 +21,7 @@ import {
 } from '@/server/services/transactions';
 import { HistoryTable, historyHref } from '../../history/history-table';
 import {
-  deleteImportedTransactionFromDetailAction,
+  deleteTransactionFromDetailAction,
   editClassificationAction,
   unlockFieldAction,
 } from './actions';
@@ -103,17 +103,33 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         <LockedFields classification={classification} />
       </section>
 
-      {!transaction.isManual && (
+      <div className="flex items-start gap-3">
+        {transaction.isManual && (
+          <Link
+            href={`/accounts/${transaction.accountId}/manual/${transaction.id}`}
+            className={BUTTON_CLASS}
+          >
+            Edit details
+          </Link>
+        )}
         <ActionForm
-          action={deleteImportedTransactionFromDetailAction.bind(null, transaction.id)}
+          action={deleteTransactionFromDetailAction.bind(
+            null,
+            transaction.id,
+            transaction.isManual,
+          )}
           label="Delete Transaction"
-          confirmMessage="Delete this Transaction? Importing its file again adds it back."
+          confirmMessage={
+            transaction.isManual
+              ? 'Delete this Manual transaction?'
+              : 'Delete this Transaction? Importing its file again adds it back.'
+          }
         >
           <button type="submit" className={BUTTON_CLASS}>
             Delete Transaction
           </button>
         </ActionForm>
-      )}
+      </div>
 
       <section aria-labelledby="history" className="flex flex-col gap-3">
         <h2 id="history" className="text-lg font-semibold">

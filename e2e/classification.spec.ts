@@ -84,4 +84,13 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   await expect(rows.first()).toContainText(payeeName);
   await expect(rows.first()).toContainText(categoryName);
   await expect(rows.first()).toContainText(tagName);
+
+  // Deleting it from the detail view goes back to the list
+  await rows.first().getByRole('link').click();
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Delete Transaction' }).click();
+  await expect(page).toHaveURL(/\/transactions$/);
+  await search.getByLabel('Category').selectOption({ label: categoryName });
+  await search.getByRole('button', { name: 'Search' }).click();
+  await expect(page.getByText('No Transactions match.')).toBeVisible();
 });

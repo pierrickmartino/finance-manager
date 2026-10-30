@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
 import { deleteImportedTransaction } from '@/server/services/imports';
+import { deleteManualTransaction } from '@/server/services/transactions/manual';
 import {
   editClassification,
   getClassification,
@@ -76,14 +77,16 @@ export async function unlockFieldAction(
   return result;
 }
 
-/** Deletes an imported Transaction and goes back to the list (the detail page is gone). */
-export async function deleteImportedTransactionFromDetailAction(
+/** Deletes a Transaction and goes back to the list (the detail page is gone). */
+export async function deleteTransactionFromDetailAction(
   id: string,
+  isManual: boolean,
   _previous: ActionResult<unknown> | null,
 ): Promise<ActionResult<unknown>> {
-  const result = await runAction(async () =>
-    deleteImportedTransaction(await getServiceContext(), id),
-  );
+  const result = await runAction(async () => {
+    const ctx = await getServiceContext();
+    await (isManual ? deleteManualTransaction(ctx, id) : deleteImportedTransaction(ctx, id));
+  });
   if (!result.ok) return result;
   revalidatePath('/transactions');
   revalidatePath('/accounts', 'layout');
