@@ -3,7 +3,7 @@ import { setupTestDatabase } from '@test/support/db';
 import { createBank } from '../banks';
 import { mutate } from '../context';
 import { updateDisplaySettings } from '../settings';
-import { listHistory } from '.';
+import { getBatchSummaries, listHistory } from '.';
 
 const t = setupTestDatabase();
 
@@ -189,5 +189,24 @@ describe('History', () => {
     await updateDisplaySettings(t.ctx, { numberFormat: 'apostrophe', dateFormat: 'dd.mm.yyyy' });
 
     expect(await listHistory(t.ctx)).toEqual([]);
+  });
+
+  it('keeps one readable summary per Batch, rolled back with it', async () => {
+    const batchId = await mutate(t.ctx, async ({ history }) => {
+      await history.record('bank', 'b1', null, { name: 'UBS' });
+      await history.summarize('Created UBS');
+      return history.batchId;
+    });
+    await expect(
+      mutate(t.ctx, async ({ history }) => {
+        await history.summarize('Never happened');
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+
+    expect(await getBatchSummaries(t.ctx, [batchId, '00000000-0000-4000-8000-000000000000'])).toEqual({
+      [batchId]: 'Created UBS',
+    });
+    expect(await getBatchSummaries(t.ctx, [])).toEqual({});
   });
 });

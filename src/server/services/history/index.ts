@@ -84,3 +84,17 @@ export async function listHistory(
   );
   return result.rows;
 }
+
+/** The readable summary of each given Batch that has one, keyed by Batch id. */
+export async function getBatchSummaries(
+  ctx: ServiceContext,
+  batchIds: readonly string[],
+): Promise<Record<string, string>> {
+  const ids = parseInput(z.array(z.uuid({ error: 'Batch must be a Batch id' })), batchIds);
+  if (ids.length === 0) return {};
+  const result = await ctx.db.query<{ id: string; summary: string }>(
+    `SELECT id, summary FROM history_batch WHERE id = ANY($1::uuid[])`,
+    [ids],
+  );
+  return Object.fromEntries(result.rows.map((row) => [row.id, row.summary]));
+}

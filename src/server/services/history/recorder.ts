@@ -43,6 +43,11 @@ export interface HistoryRecorder {
     before: HistorySnapshot | null,
     after: HistorySnapshot | null,
   ): Promise<void>;
+  /**
+   * Gives the Batch one readable summary, for actions that touch many entities (a merge, a
+   * bulk edit). Calling it again replaces the summary.
+   */
+  summarize(summary: string): Promise<void>;
 }
 
 interface FieldChange {
@@ -91,6 +96,13 @@ export function createHistoryRecorder(tx: pg.PoolClient, actor: Actor): HistoryR
           changes.map((change) => change.before),
           changes.map((change) => change.after),
         ],
+      );
+    },
+    async summarize(summary) {
+      await tx.query(
+        `INSERT INTO history_batch (id, summary) VALUES ($1, $2)
+         ON CONFLICT (id) DO UPDATE SET summary = EXCLUDED.summary`,
+        [batchId, summary],
       );
     },
   };
