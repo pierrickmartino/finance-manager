@@ -12,6 +12,7 @@ export const HISTORY_ENTITY_TYPES = [
   'settings',
   'import',
   'transaction',
+  'balance_snapshot',
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 

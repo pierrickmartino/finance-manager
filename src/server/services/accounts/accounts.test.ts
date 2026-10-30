@@ -38,6 +38,7 @@ describe('Accounts', () => {
       openingDate: '2021-01-01',
       archivedAt: null,
       balanceMinor: 123456,
+      balanceSnapshotDate: null,
     });
     expect(await listAccounts(t.ctx)).toEqual([account]);
     expect(await getAccount(t.ctx, account.id)).toEqual(account);
