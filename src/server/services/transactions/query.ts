@@ -16,6 +16,14 @@ export const TRANSACTION_STATUSES = ['imported', 'manual'] as const;
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
 
 const MAX_TEXT_LENGTH = 200;
+const MAX_DESCRIPTION_KEY_LENGTH = 2000;
+
+/**
+ * SQL condition (alias `t`) for an Unclassified Transaction: no Category and not a Transfer.
+ * #19 Transfers: add `AND t.transfer_id IS NULL` here; the filter, the Unclassified groups and
+ * the progress figure all use it.
+ */
+export const UNCLASSIFIED_CONDITION = 't.category_id IS NULL';
 
 /** A filter field that is absent when blank (empty or only spaces). */
 function optional<S extends z.ZodType>(schema: S) {
@@ -61,6 +69,11 @@ const transactionFilterFields = {
   ),
   /** Only Transactions with no Category (and, once #19 exists, not in a Transfer). */
   unclassified: optional(z.boolean()),
+  /**
+   * Normalised raw description, as the Unclassified groups key them. Not blank-stripped: the
+   * empty key is the group of Transactions with no description.
+   */
+  descriptionKey: z.string().max(MAX_DESCRIPTION_KEY_LENGTH).optional(),
 };
 
 export const transactionQueryInput = z
@@ -132,7 +145,8 @@ export function filterConditions(input: ParsedQuery): SqlCondition {
                     WHERE fc.id = t.category_id AND fg.type = ${p})`,
     input.groupType,
   );
-  where((p) => `(t.category_id IS NULL) = ${p}`, input.unclassified);
+  where((p) => `(${UNCLASSIFIED_CONDITION}) = ${p}`, input.unclassified);
+  where((p) => `t.description_key = ${p}`, input.descriptionKey);
 
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }
