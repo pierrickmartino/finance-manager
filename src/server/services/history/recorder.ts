@@ -12,6 +12,7 @@ export const HISTORY_ENTITY_TYPES = [
   'settings',
   'import',
   'transaction',
+  'balance_snapshot',
   'category_group',
   'category',
   'payee',

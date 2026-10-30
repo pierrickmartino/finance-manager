@@ -36,19 +36,34 @@ export interface Account {
   archivedAt: Date | null;
   /** Current balance in the Account's own Currency, in minor units. */
   balanceMinor: number;
+  /**
+   * Set when the Account has no Transactions and its balance is its latest Balance snapshot's
+   * (a snapshot-only loan Account): that snapshot's date. Null when computed from Transactions.
+   */
+  balanceSnapshotDate: string | null;
 }
 
 // The balance in the Account's own Currency: the opening balance plus every Transaction.
-const NATIVE_BALANCE = `a.opening_balance_minor + COALESCE(
-    (SELECT sum(t.amount_minor) FROM "transaction" t WHERE t.account_id = a.id), 0)::bigint`;
+// An Account with no Transactions but with Balance snapshots (a loan) is tracked through its
+// snapshots only: its balance is the latest snapshot's.
+const NATIVE_BALANCE = `CASE WHEN tx.count = 0 AND latest.balance_minor IS NOT NULL
+    THEN latest.balance_minor
+    ELSE a.opening_balance_minor + tx.sum END`;
 
 const SELECT_ACCOUNT = `
   SELECT a.id, a.bank_id AS "bankId", b.name AS "bankName", a.name, a.currency, a.iban,
          a.kind, a.import_format AS "importFormat",
          a.opening_balance_minor AS "openingBalanceMinor", a.opening_date AS "openingDate",
-         a.archived_at AS "archivedAt", ${NATIVE_BALANCE} AS "balanceMinor"
+         a.archived_at AS "archivedAt", ${NATIVE_BALANCE} AS "balanceMinor",
+         CASE WHEN tx.count = 0 THEN latest.date END AS "balanceSnapshotDate"
   FROM account a
-  JOIN bank b ON b.id = a.bank_id`;
+  JOIN bank b ON b.id = a.bank_id
+  CROSS JOIN LATERAL (
+    SELECT count(*)::integer AS count, COALESCE(sum(t.amount_minor), 0)::bigint AS sum
+    FROM "transaction" t WHERE t.account_id = a.id) tx
+  LEFT JOIN LATERAL (
+    SELECT s.date, s.balance_minor FROM balance_snapshot s
+    WHERE s.account_id = a.id ORDER BY s.date DESC LIMIT 1) latest ON true`;
 
 const accountId = z.uuid();
 const ACCOUNT_NOT_FOUND = 'Account not found';

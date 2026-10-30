@@ -59,6 +59,7 @@ describe('Account balances in CHF', () => {
         account: expect.objectContaining({ id: eur.id, currency: 'EUR' }),
         date: '2025-03-08',
         balanceMinor: 100_000,
+        snapshotDate: null,
         chf: {
           amountMinor: 93_240,
           rate: {
@@ -73,6 +74,7 @@ describe('Account balances in CHF', () => {
         account: expect.objectContaining({ id: chf.id, currency: 'CHF' }),
         date: '2025-03-08',
         balanceMinor: 50_000,
+        snapshotDate: null,
         chf: {
           amountMinor: 50_000,
           rate: { currency: 'CHF', date: '2025-03-08', rateDate: '2025-03-08', rateToChf: '1' },

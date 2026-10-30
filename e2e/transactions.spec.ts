@@ -34,7 +34,7 @@ test('searches imported Transactions and opens one with its bank fields and Hist
 
   // The Account's Transactions, newest first
   await page.getByRole('navigation').getByRole('link', { name: 'Transactions' }).click();
-  await expect(page.getByRole('heading', { name: 'Transactions' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible();
   const search = page.getByRole('form', { name: 'Search Transactions' });
   await search.getByLabel('Account').selectOption({ label: accountName });
   await search.getByRole('button', { name: 'Search' }).click();

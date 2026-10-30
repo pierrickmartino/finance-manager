@@ -9,10 +9,12 @@ import { listAccountBalances, type AccountBalance } from '@/server/services/acco
 import type { ServiceContext } from '@/server/services/context';
 import { ServiceError } from '@/server/services/errors';
 import { getRateStatus } from '@/server/services/fx';
+import { listSnapshotMismatches } from '@/server/services/balance-snapshots';
 import { listBanks } from '@/server/services/banks';
 import { AccountForm } from './account-form';
 import { createAccountAction } from './actions';
 import { RateStatusNotice } from './rate-status';
+import { SnapshotMismatches } from './snapshot-mismatches';
 
 export const metadata: Metadata = { title: 'Accounts · Finance Manager' };
 
@@ -56,19 +58,28 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
   const ctx = await getServiceContext();
   const params = await searchParams;
   const requestedDate = typeof params.date === 'string' ? params.date : '';
-  const [{ balances, error }, rateStatus, banks, fmt] = await Promise.all([
+  const [{ balances, error }, rateStatus, banks, mismatches, fmt] = await Promise.all([
     loadBalances(ctx, requestedDate),
     getRateStatus(ctx),
     listBanks(ctx),
+    listSnapshotMismatches(ctx),
     getFormatter(),
   ]);
   const shownDate = balances[0]?.date ?? requestedDate;
+  const mismatchedAccounts = new Set(mismatches.map((check) => check.accountId));
 
   return (
     <section className="flex flex-col gap-8">
       <h1 className="text-2xl font-semibold">Accounts</h1>
 
       <RateStatusNotice status={rateStatus} fmt={fmt} />
+
+      <SnapshotMismatches
+        mismatches={mismatches}
+        accounts={balances.map((balance) => balance.account)}
+        fmt={fmt}
+        showAccountNames
+      />
 
       <form aria-label="Balance date" className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-sm">
@@ -123,11 +134,23 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
                   </td>
                   <td className={`${CELL} text-right tabular-nums`}>
                     {fmt.amount(balance.balanceMinor, { currency: account.currency })}
+                    {balance.snapshotDate && (
+                      <div className="text-xs text-zinc-500">
+                        Balance snapshot of {fmt.date(balance.snapshotDate)}
+                      </div>
+                    )}
                   </td>
                   <td className={`${CELL} text-right tabular-nums`}>
                     <ChfCell balance={{ account, ...balance }} fmt={fmt} />
                   </td>
-                  <td className={CELL}>{account.archivedAt ? 'Archived' : 'Active'}</td>
+                  <td className={CELL}>
+                    {account.archivedAt ? 'Archived' : 'Active'}
+                    {mismatchedAccounts.has(account.id) && (
+                      <div className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                        Snapshot mismatch
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
