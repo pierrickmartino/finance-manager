@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FieldError } from '@/components/form';
-import type { Formatter } from '@/lib/format';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { ServiceError } from '@/server/services/errors';
@@ -12,8 +11,8 @@ import {
   listHistory,
   type HistoryEntry,
   type HistoryFilter,
-  type JsonValue,
 } from '@/server/services/history';
+import { HistoryTable } from './history-table';
 
 export const metadata: Metadata = { title: 'History · Finance Manager' };
 
@@ -22,14 +21,6 @@ type FilterValues = Record<(typeof FILTER_FIELDS)[number], string>;
 
 const INPUT =
   'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
-const CELL = 'px-3 py-2 text-left align-top';
-
-const TIME = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Europe/Zurich',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-});
 
 interface HistoryPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -52,19 +43,6 @@ async function loadHistory(
     if (error instanceof ServiceError) return { entries: [], error: error.message };
     throw error;
   }
-}
-
-/** Renders a recorded value. Fields ending in "Minor" hold amounts in minor units. */
-function renderValue(field: string, value: JsonValue, fmt: Formatter): string {
-  if (value === null) return '—';
-  if (typeof value === 'number' && field.endsWith('Minor')) return fmt.amount(value);
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value);
-}
-
-function filterHref(filter: Partial<FilterValues>): string {
-  const query = new URLSearchParams(Object.entries(filter).filter(([, value]) => value));
-  return `/history?${query.toString()}`;
 }
 
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
@@ -115,58 +93,8 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       {entries.length === 0 ? (
         !error && <p className="text-sm text-zinc-500">No History entries match.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table aria-label="History entries" className="w-full text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800">
-              <tr>
-                <th className={CELL}>When</th>
-                <th className={CELL}>Actor</th>
-                <th className={CELL}>Entity</th>
-                <th className={CELL}>Field</th>
-                <th className={CELL}>Before</th>
-                <th className={CELL}>After</th>
-                <th className={CELL}>Batch</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {entries.map((entry) => (
-                <tr key={entry.id}>
-                  <td className={`${CELL} whitespace-nowrap tabular-nums`}>
-                    {fmt.date(entry.at)} {TIME.format(entry.at)}
-                  </td>
-                  <td className={CELL}>
-                    {entry.actorType}
-                    {entry.actorId && <span className="text-zinc-500"> {entry.actorId}</span>}
-                  </td>
-                  <td className={CELL}>
-                    <Link
-                      href={filterHref({ entityType: entry.entityType, entityId: entry.entityId })}
-                      className="hover:underline"
-                    >
-                      {entry.entityType}
-                    </Link>
-                    <div className="font-mono text-xs text-zinc-500">{entry.entityId}</div>
-                  </td>
-                  <td className={CELL}>{entry.field}</td>
-                  <td className={`${CELL} break-all`}>
-                    {renderValue(entry.field, entry.before, fmt)}
-                  </td>
-                  <td className={`${CELL} break-all`}>
-                    {renderValue(entry.field, entry.after, fmt)}
-                  </td>
-                  <td className={CELL}>
-                    <Link
-                      href={filterHref({ batchId: entry.batchId })}
-                      className="font-mono text-xs hover:underline"
-                      title={entry.batchId}
-                    >
-                      {entry.batchId.slice(0, 8)}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div>
+          <HistoryTable entries={entries} fmt={fmt} />
           {entries.length === DEFAULT_HISTORY_LIMIT && (
             <p className="mt-2 text-sm text-zinc-500">
               Showing the newest {DEFAULT_HISTORY_LIMIT} entries. Narrow the filters to see older
