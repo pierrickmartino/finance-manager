@@ -1,0 +1,4 @@
+# Fixture bytes are asserted on (BOM, CRLF, Windows-1252): never normalise them.
+*.ofx binary
+*.csv -text
+*.xml -text

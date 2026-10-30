@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.04" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:iso:std:iso:20022:tech:xsd:camt.053.001.04 camt.053.001.04.xsd">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>BCGE-STMT-20251101-0001</MsgId>
+      <CreDtTm>2025-11-01T05:12:00</CreDtTm>
+      <MsgPgntn><PgNb>1</PgNb><LastPgInd>true</LastPgInd></MsgPgntn>
+    </GrpHdr>
+    <Stmt>
+      <Id>BCGE-STMT-20251101-0001-1</Id>
+      <ElctrncSeqNb>10</ElctrncSeqNb>
+      <CreDtTm>2025-11-01T05:12:00</CreDtTm>
+      <FrToDt><FrDtTm>2025-10-01T00:00:00</FrDtTm><ToDtTm>2025-10-31T23:59:59</ToDtTm></FrToDt>
+      <Acct>
+        <Id><IBAN>CH3400788000050012345</IBAN></Id>
+        <Ccy>CHF</Ccy>
+        <Ownr><Nm>Alex Muster</Nm></Ownr>
+        <Svcr><FinInstnId><BICFI>BCGECHGGXXX</BICFI><Nm>Banque Cantonale de Genève</Nm></FinInstnId></Svcr>
+      </Acct>
+      <Bal>
+        <Tp><CdOrPrtry><Cd>OPBD</Cd></CdOrPrtry></Tp>
+        <Amt Ccy="CHF">15230.40</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt><Dt>2025-10-01</Dt></Dt>
+      </Bal>
+      <Bal>
+        <Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp>
+        <Amt Ccy="CHF">16908.15</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Dt><Dt>2025-10-31</Dt></Dt>
+      </Bal>
+      <TxsSummry>
+        <TtlNtries><NbOfNtries>8</NbOfNtries></TtlNtries>
+        <TtlCdtNtries><NbOfNtries>2</NbOfNtries><Sum>5150.00</Sum></TtlCdtNtries>
+        <TtlDbtNtries><NbOfNtries>6</NbOfNtries><Sum>3472.25</Sum></TtlDbtNtries>
+      </TxsSummry>
+      <Ntry>
+        <Amt Ccy="CHF">1187.35</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-02</Dt></BookgDt>
+        <ValDt><Dt>2025-10-02</Dt></ValDt>
+        <AcctSvcrRef>BCGE20251002000117</AcctSvcrRef>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>ICDT</Cd><SubFmlyCd>ESCT</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <Btch><NbOfTxs>3</NbOfTxs><TtlAmt Ccy="CHF">1187.35</TtlAmt><CdtDbtInd>DBIT</CdtDbtInd></Btch>
+          <TxDtls><Refs><EndToEndId>E2E-20251002-0001</EndToEndId></Refs><Amt Ccy="CHF">142.85</Amt><CdtDbtInd>DBIT</CdtDbtInd><RltdPties><Dbtr><Nm>Alex Muster</Nm><PstlAdr><StrtNm>Rue de l'Exemple</StrtNm><BldgNb>1</BldgNb><PstCd>1200</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Dbtr><DbtrAcct><Id><IBAN>CH3400788000050012345</IBAN></Id></DbtrAcct><Cdtr><Nm>Services Industriels Exemple</Nm><PstlAdr><StrtNm>Chemin du Test</StrtNm><BldgNb>2</BldgNb><PstCd>1219</PstCd><TwnNm>Le Lignon</TwnNm><Ctry>CH</Ctry></PstlAdr></Cdtr><CdtrAcct><Id><IBAN>CH2000788000099887766</IBAN></Id></CdtrAcct></RltdPties><RmtInf><Ustrd>Facture électricité 09/2025</Ustrd></RmtInf></TxDtls>
+          <TxDtls><Refs><EndToEndId>E2E-20251002-0002</EndToEndId></Refs><Amt Ccy="CHF">389.50</Amt><CdtDbtInd>DBIT</CdtDbtInd><RltdPties><Dbtr><Nm>Alex Muster</Nm><PstlAdr><StrtNm>Rue de l'Exemple</StrtNm><BldgNb>1</BldgNb><PstCd>1200</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Dbtr><DbtrAcct><Id><IBAN>CH3400788000050012345</IBAN></Id></DbtrAcct><Cdtr><Nm>Assurance Ménage Exemple SA</Nm><PstlAdr><StrtNm>Quai Imaginaire</StrtNm><BldgNb>8</BldgNb><PstCd>1201</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Cdtr><CdtrAcct><Id><IBAN>CH5300700110000777888</IBAN></Id></CdtrAcct></RltdPties><RmtInf><Ustrd>Prime ménage RC 2025-2026</Ustrd></RmtInf></TxDtls>
+          <TxDtls><Refs><EndToEndId>E2E-20251002-0003</EndToEndId></Refs><Amt Ccy="CHF">655.00</Amt><CdtDbtInd>DBIT</CdtDbtInd><RltdPties><Dbtr><Nm>Alex Muster</Nm><PstlAdr><StrtNm>Rue de l'Exemple</StrtNm><BldgNb>1</BldgNb><PstCd>1200</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Dbtr><DbtrAcct><Id><IBAN>CH3400788000050012345</IBAN></Id></DbtrAcct><Cdtr><Nm>Garderie Les Exemples</Nm><PstlAdr><StrtNm>Rue des Enfants</StrtNm><BldgNb>3</BldgNb><PstCd>1205</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Cdtr><CdtrAcct><Id><IBAN>CH1509000000055667788</IBAN></Id></CdtrAcct></RltdPties><RmtInf><Ustrd>Garderie octobre 2025 - enfant A. et enfant B.</Ustrd></RmtInf></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Ordre groupé e-banking (3 paiements)</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">100.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-05</Dt></BookgDt>
+        <ValDt><Dt>2025-10-05</Dt></ValDt>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>CCRD</Cd><SubFmlyCd>CWDL</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Retrait Bancomat BCGE Genève Exemple</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">100.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-05</Dt></BookgDt>
+        <ValDt><Dt>2025-10-05</Dt></ValDt>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>CCRD</Cd><SubFmlyCd>CWDL</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Retrait Bancomat BCGE Genève Exemple</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">72.40</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-08</Dt></BookgDt>
+        <ValDt><Dt>2025-10-07</Dt></ValDt>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>CCRD</Cd><SubFmlyCd>POSD</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Achat Debit Mastercard Boulangerie Exemple Genève</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">2000.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-10</Dt></BookgDt>
+        <ValDt><Dt>2025-10-10</Dt></ValDt>
+        <AcctSvcrRef>BCGE20251010000342</AcctSvcrRef>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>ICDT</Cd><SubFmlyCd>ESCT</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>E2E-20251010-0001</EndToEndId></Refs><RltdPties><Dbtr><Nm>Alex Muster</Nm><PstlAdr><StrtNm>Rue de l'Exemple</StrtNm><BldgNb>1</BldgNb><PstCd>1200</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Dbtr><DbtrAcct><Id><IBAN>CH3400788000050012345</IBAN></Id></DbtrAcct><Cdtr><Nm>Alex Muster</Nm><PstlAdr><StrtNm>Rue de l'Exemple</StrtNm><BldgNb>1</BldgNb><PstCd>1200</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Cdtr><CdtrAcct><Id><IBAN>CH6900235235123456010</IBAN></Id></CdtrAcct></RltdPties><RmtInf><Ustrd>Alimentation compte UBS</Ustrd></RmtInf></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Ordre e-banking</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">530.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-15</Dt></BookgDt>
+        <ValDt><Dt>2025-10-15</Dt></ValDt>
+        <AcctSvcrRef>BCGE20251015000511</AcctSvcrRef>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>RCDT</Cd><SubFmlyCd>ESCT</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs><RltdPties><Dbtr><Nm>Caisse d'Allocations Exemple</Nm><PstlAdr><StrtNm>Route Inventée</StrtNm><BldgNb>10</BldgNb><PstCd>1211</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Dbtr><DbtrAcct><Id><IBAN>CH5600788000044332211</IBAN></Id></DbtrAcct><Cdtr><Nm>Alex Muster</Nm><PstlAdr><StrtNm>Rue de l'Exemple</StrtNm><BldgNb>1</BldgNb><PstCd>1200</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Cdtr><CdtrAcct><Id><IBAN>CH3400788000050012345</IBAN></Id></CdtrAcct></RltdPties><RmtInf><Ustrd>Allocations familiales octobre 2025</Ustrd></RmtInf></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Crédit</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">4800.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-24</Dt></BookgDt>
+        <ValDt><Dt>2025-10-25</Dt></ValDt>
+        <AcctSvcrRef>BCGE20251024000777</AcctSvcrRef>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>RCDT</Cd><SubFmlyCd>ESCT</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>SAL-2025-10-0042</EndToEndId></Refs><RltdPties><Dbtr><Nm>Employeur Deux Exemple SA</Nm><PstlAdr><StrtNm>Rue Fictive</StrtNm><BldgNb>20</BldgNb><PstCd>1227</PstCd><TwnNm>Carouge GE</TwnNm><Ctry>CH</Ctry></PstlAdr></Dbtr><DbtrAcct><Id><IBAN>CH4700700110000654321</IBAN></Id></DbtrAcct><Cdtr><Nm>Alex Muster</Nm><PstlAdr><StrtNm>Rue de l'Exemple</StrtNm><BldgNb>1</BldgNb><PstCd>1200</PstCd><TwnNm>Genève</TwnNm><Ctry>CH</Ctry></PstlAdr></Cdtr><CdtrAcct><Id><IBAN>CH3400788000050012345</IBAN></Id></CdtrAcct></RltdPties><RmtInf><Ustrd>Salaire octobre 2025</Ustrd></RmtInf></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Crédit salaire</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">12.50</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2025-10-31</Dt></BookgDt>
+        <ValDt><Dt>2025-10-31</Dt></ValDt>
+        <AcctSvcrRef>BCGE20251031000901</AcctSvcrRef>
+        <BkTxCd><Domn><Cd>ACMT</Cd><Fmly><Cd>MDOP</Cd><SubFmlyCd>CHRG</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Frais de tenue de compte octobre 2025</AddtlNtryInf>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CHF">45.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>false</RvslInd>
+        <Sts>PDNG</Sts>
+        <ValDt><Dt>2025-11-02</Dt></ValDt>
+        <AcctSvcrRef>BCGE20251031000950</AcctSvcrRef>
+        <BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>CCRD</Cd><SubFmlyCd>POSD</SubFmlyCd></Fmly></Domn></BkTxCd>
+        <NtryDtls>
+          <TxDtls><Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs></TxDtls>
+        </NtryDtls>
+        <AddtlNtryInf>Achat Debit Mastercard Station Exemple (en attente)</AddtlNtryInf>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

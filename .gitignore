@@ -40,3 +40,9 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /blob-report/
+
+# real bank exports (personal data): keep them here, never commit them
+/bank-exports/
+*.real.csv
+*.real.xml
+*.real.ofx

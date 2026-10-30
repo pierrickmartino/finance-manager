@@ -14,6 +14,9 @@ const config = [
       'playwright-report/**',
       'test-results/**',
       'next-env.d.ts',
+      // Standalone packages and fixture scripts with their own tooling.
+      'tools/**',
+      'test/fixtures/**',
     ],
   },
   {

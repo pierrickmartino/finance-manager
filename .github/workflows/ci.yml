@@ -64,3 +64,21 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  anonymiser:
+    name: Anonymiser (tools/anonymiser)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/anonymiser
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: tools/anonymiser/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
