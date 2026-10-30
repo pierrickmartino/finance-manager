@@ -5,6 +5,7 @@ import {
   NUMBER_FORMATS,
   type DisplaySettings,
 } from '@/lib/format';
+import type { Queryable } from '@/server/db/client';
 import { mutate, type ServiceContext } from '../context';
 import { parseInput } from '../errors';
 
@@ -15,9 +16,13 @@ const displaySettingsInput = z.object({
   dateFormat: z.enum(DATE_FORMATS, { error: 'Unknown date format' }),
 });
 
-export async function getDisplaySettings(ctx: ServiceContext): Promise<DisplaySettings> {
-  const result = await ctx.db.query<DisplaySettings>(
-    'SELECT number_format AS "numberFormat", date_format AS "dateFormat" FROM settings',
+const SETTINGS_ENTITY_ID = 'display';
+
+async function readDisplaySettings(db: Queryable, lock = false): Promise<DisplaySettings> {
+  const result = await db.query<DisplaySettings>(
+    `SELECT number_format AS "numberFormat", date_format AS "dateFormat" FROM settings${
+      lock ? ' FOR UPDATE' : ''
+    }`,
   );
   const row = result.rows[0];
   if (!row) return DEFAULT_DISPLAY_SETTINGS;
@@ -26,12 +31,17 @@ export async function getDisplaySettings(ctx: ServiceContext): Promise<DisplaySe
   return parsed.success ? parsed.data : DEFAULT_DISPLAY_SETTINGS;
 }
 
+export async function getDisplaySettings(ctx: ServiceContext): Promise<DisplaySettings> {
+  return readDisplaySettings(ctx.db);
+}
+
 export async function updateDisplaySettings(
   ctx: ServiceContext,
   input: DisplaySettings,
 ): Promise<DisplaySettings> {
   const settings = parseInput(displaySettingsInput, input);
-  return mutate(ctx, async ({ tx }) => {
+  return mutate(ctx, async ({ tx, history }) => {
+    const before = await readDisplaySettings(tx, true);
     await tx.query(
       `INSERT INTO settings (number_format, date_format) VALUES ($1, $2)
        ON CONFLICT (id) DO UPDATE
@@ -40,6 +50,7 @@ export async function updateDisplaySettings(
              updated_at = now()`,
       [settings.numberFormat, settings.dateFormat],
     );
+    await history.record('settings', SETTINGS_ENTITY_ID, { ...before }, { ...settings });
     return settings;
   });
 }

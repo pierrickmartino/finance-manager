@@ -22,12 +22,14 @@ export type CreateBankInput = z.input<typeof createBankInput>;
 export async function createBank(ctx: ServiceContext, input: CreateBankInput): Promise<Bank> {
   const { name } = parseInput(createBankInput, input);
   try {
-    return await mutate(ctx, async ({ tx }) => {
+    return await mutate(ctx, async ({ tx, history }) => {
       const result = await tx.query<Bank>(
         'INSERT INTO bank (name) VALUES ($1) RETURNING id, name',
         [name],
       );
-      return result.rows[0]!;
+      const bank = result.rows[0]!;
+      await history.record('bank', bank.id, null, { name: bank.name });
+      return bank;
     });
   } catch (error: unknown) {
     if (isUniqueViolation(error, 'bank_name_unique')) {
