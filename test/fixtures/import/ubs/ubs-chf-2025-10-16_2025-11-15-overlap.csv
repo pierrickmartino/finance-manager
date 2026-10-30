@@ -1,0 +1,23 @@
+﻿Numéro de compte:;0235 00123456.01;
+IBAN:;CH69 0023 5235 1234 5601 0;
+Du:;2025-10-16;
+Au:;2025-11-15;
+Solde initial:;7012.90;
+Solde final:;10490.30;
+Évaluation en date du:;2025-11-16;
+Monnaie:;CHF;
+Nombre de transactions dans la période sélectionnée:;12;
+
+Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur;Monnaie;Débit;Crédit;Sous-montant;Solde;No de transaction;Description1;Description2;Description3;Notes de bas de page;
+2025-11-14;11:09:27;2025-11-14;2025-11-14;CHF;-56.85;;;10490.30;9930318TI0000119;Coop Exemple Carouge, 1227 Carouge GE;Paiement carte de débit;Carte no XXXX 4321;;
+2025-11-12;;2025-11-12;2025-11-12;CHF;-64.90;;;10547.15;9930316TI0000118;Télécom Exemple SA, Case postale, 1000 Lausanne;Débit direct;"Raison du paiement: Facture 11/2025; IBAN: CH20 0900 0000 0876 5432 1";;
+2025-11-07;10:44:51;2025-11-07;2025-11-07;CHF;-38.70;;;10612.05;9930311TI0000117;Pharmacie Exemple, 1205 Genève;Paiement carte de débit;Carte no XXXX 4321;;
+2025-11-03;19:20:05;2025-11-04;2025-11-03;CHF;-102.30;;;10650.75;9930308TI0000116;Migros Exemple Plainpalais, 1205 Genève;Paiement carte de débit;Carte no XXXX 4321;;
+2025-11-01;;2025-11-03;2025-11-01;CHF;-2150.00;;;10753.05;9930307TI0000115;Régie Exemple SA, Rue du Modèle 12, 1204 Genève;Ordre permanent e-banking;"Raison du paiement: Loyer novembre 2025; IBAN: CH78 0900 0000 0123 4567 8; Frais: 0.00";;
+2025-10-31;;2025-10-31;2025-10-31;CHF;-5.00;;;12903.05;9930304TI0000114;UBS Switzerland AG;Frais de tenue de compte;Prix du forfait octobre 2025;;
+2025-10-28;;2025-10-28;2025-10-28;CHF;-412.60;;;12908.05;9930301TI0000113;Assurance Maladie Exemple, 1950 Sion;Débit direct LSV+;"Raison du paiement: Prime novembre 2025; IBAN: CH05 0900 0000 0112 2334 4";;
+2025-10-24;;2025-10-24;2025-10-25;CHF;;6250.00;;13320.65;9930298TI0000112;Employeur Exemple SA, Avenue Fictive 5, 1003 Lausanne;Crédit;"Raison du paiement: Salaire octobre 2025; IBAN: CH03 0070 0110 0001 2345 6";;
+2025-10-24;16:03:11;2025-10-24;2025-10-24;CHF;-4.50;;;7070.65;9930297TI0000111;Café Exemple, 1204 Genève;Paiement carte de débit;Carte no XXXX 4321;;
+2025-10-24;08:12:40;2025-10-24;2025-10-24;CHF;-4.50;;;7075.15;9930297TI0000110;Café Exemple, 1204 Genève;Paiement carte de débit;Carte no XXXX 4321;;
+2025-10-18;17:55:20;2025-10-20;2025-10-18;CHF;-23.15;;;7079.65;9930293TI0000109;Migros Exemple Plainpalais, 1205 Genève;Paiement carte de débit;Carte no XXXX 4321;;
+2025-10-17;09:31:02;2025-10-17;2025-10-17;CHF;;89.90;;7102.80;9930290TI0000108;Boutique Exemple Sport, 1201 Genève;Remboursement carte de débit;"Carte no XXXX 4321; Remboursement achat du 04.10.2025";;
