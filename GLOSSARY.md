@@ -65,7 +65,11 @@ A Statement balance entered by hand, for Accounts whose exports contain no balan
 ### Classification
 
 **Category group**:
-The top level of the two-level classification, typed as either Income or Expense.
+The top level of the two-level classification, typed as Income, Expense or Capital.
+
+**Capital**:
+The Category group type for large one-off movements of wealth, such as a property sale or a pension buy-in. These count as neither income nor expense but still affect cash flow and balances.
+_Avoid_: Exceptional, one-off, investment
 
 **Category**:
 The second level of classification, belonging to exactly one Category group. Signed amounts net within it, so a refund reduces spending.
