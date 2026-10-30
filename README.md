@@ -58,6 +58,8 @@ One-time setup:
 
 Backups: a separate `backup` service (`deploy/backup/`) serves age-encrypted dumps that a machine you own pulls nightly. Setup, retention and restore are in `docs/runbooks/backup-and-restore.md`.
 
+FX rates: a separate `fx-rates` cron service (`deploy/fx-rates/railway.json`) runs `pnpm fx:fetch` daily at 16:20 UTC to fetch ECB reference rates. Setup, backfill and the stale-rates warning are in `docs/runbooks/fx-rates.md`.
+
 ## Signing in
 
 The app is single-user and reachable on the public internet, so every page and server action needs a session.

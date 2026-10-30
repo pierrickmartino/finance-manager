@@ -23,6 +23,8 @@
     "db:migrate:down": "tsx --env-file-if-exists=.env.local scripts/migrate.ts down",
     "db:new-migration": "tsx scripts/new-migration.ts",
     "auth:reset": "tsx --env-file-if-exists=.env.local scripts/reset-credentials.ts",
+    "fx:fetch": "tsx --env-file-if-exists=.env.local scripts/fx-rates.ts fetch",
+    "fx:backfill": "tsx --env-file-if-exists=.env.local scripts/fx-rates.ts backfill",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
   },
   "dependencies": {
