@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
-import { listHistory } from '../history';
+import { seedTransactions } from '@test/support/transactions';
+import { createAccount } from '../accounts';
+import { createBank } from '../banks';
+import { getBatchSummaries, listHistory } from '../history';
+import { listTransactions } from '../transactions';
+import { editClassification, getClassification } from '../transactions/classification';
 import {
   createCategory,
   createCategoryGroup,
   deleteCategory,
   deleteCategoryGroup,
   listCategoryGroups,
+  mergeCategory,
   moveCategory,
   renameCategory,
   reorderCategories,
@@ -178,6 +184,95 @@ describe('Category groups and Categories', () => {
     });
     await expect(createCategory(t.ctx, { groupId: missing, name: 'X' })).rejects.toMatchObject({
       code: 'not_found',
+    });
+  });
+});
+
+async function transactions(count: number): Promise<string[]> {
+  const bank = await createBank(t.ctx, { name: 'UBS' });
+  const account = await createAccount(t.ctx, {
+    bankId: bank.id,
+    name: 'Current',
+    currency: 'CHF',
+    iban: null,
+    kind: 'current',
+    importFormat: 'ubs_csv',
+    openingBalanceMinor: 0,
+  });
+  return seedTransactions(
+    t.ctx.db,
+    account,
+    Array.from({ length: count }, (_, n) => ({
+      bookingDate: '2025-10-01',
+      amountMinor: -100 * (n + 1),
+    })),
+  );
+}
+
+describe('Categories with Transactions', () => {
+  it('refuses to delete a Category that still has Transactions', async () => {
+    const [id] = await transactions(1);
+    const group = await createCategoryGroup(t.ctx, { name: 'Food', type: 'expense' });
+    const groceries = await createCategory(t.ctx, { groupId: group.id, name: 'Groceries' });
+    await editClassification(t.ctx, id!, { categoryId: groceries.id });
+
+    await expect(deleteCategory(t.ctx, groceries.id)).rejects.toMatchObject({
+      code: 'conflict',
+    });
+    expect((await getClassification(t.ctx, id!)).category?.id).toBe(groceries.id);
+  });
+
+  it('a merge reassigns the Transactions, deletes the source and writes one Batch', async () => {
+    const [a, b, c] = await transactions(3);
+    const food = await createCategoryGroup(t.ctx, { name: 'Food', type: 'expense' });
+    const shops = await createCategory(t.ctx, { groupId: food.id, name: 'Shops' });
+    const groceries = await createCategory(t.ctx, { groupId: food.id, name: 'Groceries' });
+    await editClassification(t.ctx, a!, { categoryId: shops.id });
+    await editClassification(t.ctx, b!, { categoryId: shops.id });
+    await editClassification(t.ctx, c!, { categoryId: groceries.id });
+
+    const result = await mergeCategory(t.ctx, shops.id, groceries.id);
+
+    expect(result.transactionCount).toBe(2);
+    expect((await listTransactions(t.ctx, { categoryId: groceries.id })).total).toBe(3);
+    expect((await listCategoryGroups(t.ctx))[0]!.categories).toMatchObject([
+      { name: 'Groceries', transactionCount: 3 },
+    ]);
+    const batch = await listHistory(t.ctx, { batchId: result.batchId });
+    expect(batch.filter((entry) => entry.entityType === 'transaction')).toMatchObject([
+      { field: 'category', before: 'Food › Shops', after: 'Food › Groceries' },
+      { field: 'category', before: 'Food › Shops', after: 'Food › Groceries' },
+    ]);
+    expect(batch.filter((entry) => entry.entityType === 'category')).toMatchObject([
+      { entityId: shops.id, after: null },
+      { entityId: shops.id, after: null },
+      { entityId: shops.id, after: null },
+    ]);
+    expect(await getBatchSummaries(t.ctx, [result.batchId])).toEqual({
+      [result.batchId]: 'Merged Category "Food › Shops" into "Food › Groceries" (2 Transactions)',
+    });
+    await expect(mergeCategory(t.ctx, groceries.id, groceries.id)).rejects.toMatchObject({
+      code: 'validation',
+    });
+  });
+
+  it('moving a Category changes the group type its Transactions report under', async () => {
+    const [id] = await transactions(1);
+    const expense = await createCategoryGroup(t.ctx, { name: 'Home', type: 'expense' });
+    const capital = await createCategoryGroup(t.ctx, { name: 'Wealth', type: 'capital' });
+    const notary = await createCategory(t.ctx, { groupId: expense.id, name: 'Notary' });
+    await editClassification(t.ctx, id!, { categoryId: notary.id });
+    expect((await listTransactions(t.ctx, { groupType: 'expense' })).total).toBe(1);
+
+    await moveCategory(t.ctx, notary.id, capital.id);
+
+    expect((await listTransactions(t.ctx, { groupType: 'expense' })).total).toBe(0);
+    expect(
+      (await listTransactions(t.ctx, { groupType: 'capital' })).transactions.map((tx) => tx.id),
+    ).toEqual([id]);
+    expect((await getClassification(t.ctx, id!)).category).toMatchObject({
+      id: notary.id,
+      groupType: 'capital',
     });
   });
 });

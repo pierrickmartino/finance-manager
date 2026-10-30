@@ -61,16 +61,12 @@ export async function mergePayees(
     const { tx, history } = scope;
     const source = await findPayee(tx, sourceId, true);
     const target = await findPayee(tx, targetId, true);
-    const ids = await tx.query<{ id: string }>(
-      'SELECT id FROM "transaction" WHERE payee_id = $1',
-      [sourceId],
-    );
+    const ids = await tx.query<{ id: string }>('SELECT id FROM "transaction" WHERE payee_id = $1', [
+      sourceId,
+    ]);
     const transactionIds = ids.rows.map((row) => row.id);
     await recordClassificationChanges(scope, transactionIds, () =>
-      tx.query('UPDATE "transaction" SET payee_id = $1 WHERE payee_id = $2', [
-        targetId,
-        sourceId,
-      ]),
+      tx.query('UPDATE "transaction" SET payee_id = $1 WHERE payee_id = $2', [targetId, sourceId]),
     );
     await tx.query('DELETE FROM payee WHERE id = $1', [sourceId]);
     await history.record('payee', sourceId, { name: source.name }, null);

@@ -55,7 +55,9 @@ const transactionFilterFields = {
   tagId: optional(z.uuid({ error: 'Unknown Tag' })),
   /** The type of the Category's group: income, expense or capital. */
   groupType: optional(
-    z.enum(CATEGORY_GROUP_TYPES, { error: 'Category group type must be Income, Expense or Capital' }),
+    z.enum(CATEGORY_GROUP_TYPES, {
+      error: 'Category group type must be Income, Expense or Capital',
+    }),
   ),
   /** Only Transactions with no Category (and, once #19 exists, not in a Transfer). */
   unclassified: optional(z.boolean()),
@@ -121,7 +123,8 @@ export function filterConditions(input: ParsedQuery): SqlCondition {
   where((p) => `t.payee_id = ${p}::uuid`, input.payeeId);
   where((p) => `t.category_id = ${p}::uuid`, input.categoryId);
   where(
-    (p) => `EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id = ${p}::uuid)`,
+    (p) =>
+      `EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id = ${p}::uuid)`,
     input.tagId,
   );
   where(

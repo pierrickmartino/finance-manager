@@ -12,6 +12,7 @@ import {
   getClassification,
   unlockFields,
 } from './classification';
+import { getTransaction, listTransactions } from '.';
 
 const t = setupTestDatabase();
 
@@ -116,9 +117,10 @@ describe('edit classification', () => {
     const id = await transaction();
     const missing = '00000000-0000-4000-8000-000000000000';
 
-    await expect(
-      editClassification(t.ctx, id, { amountMinor: 1 } as never),
-    ).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('amount') });
+    await expect(editClassification(t.ctx, id, { amountMinor: 1 } as never)).rejects.toMatchObject({
+      code: 'validation',
+      message: expect.stringContaining('amount'),
+    });
     await expect(editClassification(t.ctx, id, { categoryId: missing })).rejects.toMatchObject({
       code: 'not_found',
     });
@@ -183,6 +185,40 @@ describe('applying a classification as a Rule', () => {
         { name: 'Mine', source: 'manual' },
       ],
       lockedFields: ['category'],
+    });
+  });
+});
+
+describe('the Transaction list', () => {
+  it("shows each Transaction's classification and filters by Payee, Category, Tag and Unclassified", async () => {
+    const classified = await transaction();
+    const other = await transaction();
+    const groceries = await category();
+    const result = await editClassification(t.ctx, classified, {
+      payeeName: 'Migros',
+      categoryId: groceries.id,
+      tagNames: ['Family'],
+    });
+    const ids = async (query: Parameters<typeof listTransactions>[1]) =>
+      (await listTransactions(t.ctx, query)).transactions.map((tx) => tx.id);
+
+    expect(await ids({ payeeId: result.payee!.id })).toEqual([classified]);
+    expect(await ids({ categoryId: groceries.id })).toEqual([classified]);
+    expect(await ids({ tagId: result.tags[0]!.id })).toEqual([classified]);
+    expect(await ids({ unclassified: true })).toEqual([other]);
+    expect(await ids({ payeeId: '', categoryId: '', tagId: '', groupType: '' })).toHaveLength(2);
+    await expect(listTransactions(t.ctx, { payeeId: 'nope' })).rejects.toMatchObject({
+      code: 'validation',
+    });
+    expect(await getTransaction(t.ctx, classified)).toMatchObject({
+      payee: { name: 'Migros' },
+      category: { name: 'Groceries', groupName: 'Food' },
+      tags: [{ name: 'Family' }],
+    });
+    expect(await getTransaction(t.ctx, other)).toMatchObject({
+      payee: null,
+      category: null,
+      tags: [],
     });
   });
 });

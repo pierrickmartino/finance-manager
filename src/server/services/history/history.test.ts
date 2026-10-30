@@ -204,7 +204,9 @@ describe('History', () => {
       }),
     ).rejects.toThrow('boom');
 
-    expect(await getBatchSummaries(t.ctx, [batchId, '00000000-0000-4000-8000-000000000000'])).toEqual({
+    expect(
+      await getBatchSummaries(t.ctx, [batchId, '00000000-0000-4000-8000-000000000000']),
+    ).toEqual({
       [batchId]: 'Created UBS',
     });
     expect(await getBatchSummaries(t.ctx, [])).toEqual({});

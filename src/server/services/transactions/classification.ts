@@ -175,9 +175,10 @@ const transactionId = z.uuid();
 async function lockTransaction(scope: MutationScope, id: string): Promise<Transaction> {
   const notFound = new NotFoundError('Transaction not found');
   if (!transactionId.safeParse(id).success) throw notFound;
-  const result = await scope.tx.query<Transaction>(`${SELECT_TRANSACTION} WHERE t.id = $1 FOR UPDATE`, [
-    id,
-  ]);
+  const result = await scope.tx.query<Transaction>(
+    `${SELECT_TRANSACTION} WHERE t.id = $1 FOR UPDATE`,
+    [id],
+  );
   const transaction = result.rows[0];
   if (!transaction) throw notFound;
   return transaction;
@@ -200,7 +201,10 @@ function editedFields(changes: ParsedChanges): ClassificationField[] {
   return CLASSIFICATION_FIELDS.filter((field) => touched[field]);
 }
 
-async function resolvePayeeId(scope: MutationScope, changes: ParsedChanges): Promise<string | null> {
+async function resolvePayeeId(
+  scope: MutationScope,
+  changes: ParsedChanges,
+): Promise<string | null> {
   if (changes.payeeName) return (await findOrCreatePayee(scope, changes.payeeName)).id;
   if (changes.payeeId) return (await findPayee(scope.tx, changes.payeeId)).id;
   return null;
@@ -247,7 +251,9 @@ async function writeField(
       ]);
       return;
     case 'category': {
-      const categoryId = changes.categoryId ? (await findCategory(tx, changes.categoryId)).id : null;
+      const categoryId = changes.categoryId
+        ? (await findCategory(tx, changes.categoryId)).id
+        : null;
       if (categoryId && (await isInTransfer(tx, id))) {
         throw new ValidationError("A Transfer can't have a Category");
       }
@@ -301,10 +307,7 @@ export async function applyClassification(
   return after;
 }
 
-export async function getClassification(
-  ctx: ServiceContext,
-  id: string,
-): Promise<Classification> {
+export async function getClassification(ctx: ServiceContext, id: string): Promise<Classification> {
   if (!transactionId.safeParse(id).success) throw new NotFoundError('Transaction not found');
   return requireClassification(ctx.db, id);
 }

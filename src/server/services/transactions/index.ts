@@ -1,15 +1,55 @@
 import { z } from 'zod';
 import type { ServiceContext } from '../context';
 import { NotFoundError, parseInput } from '../errors';
+import { loadClassifications, type Classification } from './classification';
 import { SELECT_TRANSACTION, type Transaction } from './model';
 import { filterConditions, transactionQueryInput, type TransactionQuery } from './query';
 
 export type { Transaction } from './model';
+export {
+  CLASSIFICATION_FIELD_LABELS,
+  CLASSIFICATION_FIELDS,
+  editClassification,
+  getClassification,
+  unlockFields,
+  type Classification,
+  type ClassificationChanges,
+  type ClassificationField,
+} from './classification';
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type TransactionQuery } from './query';
 
-/** A Transaction as the list shows it: with the name of its Account. */
+/** A Transaction as the list shows it: with the name of its Account and its classification. */
 export interface TransactionListItem extends Transaction {
   accountName: string;
+  payee: Classification['payee'];
+  category: Classification['category'];
+  tags: Classification['tags'];
+}
+
+type TransactionRow = Omit<TransactionListItem, 'payee' | 'category' | 'tags'>;
+
+/** Adds the Payee, Category and Tags to rows read with SELECT_TRANSACTION. */
+async function withClassification<T extends TransactionRow>(
+  ctx: ServiceContext,
+  rows: T[],
+): Promise<(T & Pick<TransactionListItem, 'payee' | 'category' | 'tags'>)[]> {
+  const classifications = new Map(
+    (
+      await loadClassifications(
+        ctx.db,
+        rows.map((row) => row.id),
+      )
+    ).map((c) => [c.transactionId, c]),
+  );
+  return rows.map((row) => {
+    const classification = classifications.get(row.id);
+    return {
+      ...row,
+      payee: classification?.payee ?? null,
+      category: classification?.category ?? null,
+      tags: classification?.tags ?? [],
+    };
+  });
 }
 
 export interface TransactionPage {
@@ -51,7 +91,7 @@ export async function listTransactions(
       `SELECT count(*)::int AS total ${FROM_LIST} ${where.sql}`,
       where.params,
     ),
-    ctx.db.query<TransactionListItem>(
+    ctx.db.query<TransactionRow>(
       `${selectTransactions()} ${where.sql}
        ORDER BY t.booking_date DESC, t.entry_order DESC
        LIMIT $${limit} OFFSET $${limit + 1}`,
@@ -60,7 +100,7 @@ export async function listTransactions(
   ]);
   const total = count.rows[0]?.total ?? 0;
   return {
-    transactions: rows.rows,
+    transactions: await withClassification(ctx, rows.rows),
     total,
     page,
     pageSize,
@@ -74,7 +114,7 @@ const transactionId = z.uuid();
 export async function getTransaction(ctx: ServiceContext, id: string): Promise<TransactionDetail> {
   const notFound = new NotFoundError('Transaction not found');
   if (!transactionId.safeParse(id).success) throw notFound;
-  const result = await ctx.db.query<TransactionDetail>(
+  const result = await ctx.db.query<Omit<TransactionDetail, 'payee' | 'category' | 'tags'>>(
     `${selectTransactions(
       `, CASE WHEN i.id IS NULL THEN NULL ELSE json_build_object(
            'id', i.id, 'fileName', i.file_name, 'importedAt', i.imported_at) END AS "import"`,
@@ -83,11 +123,12 @@ export async function getTransaction(ctx: ServiceContext, id: string): Promise<T
      WHERE t.id = $1`,
     [id],
   );
-  const transaction = result.rows[0];
-  if (!transaction) throw notFound;
-  const { import: source } = transaction;
+  const row = result.rows[0];
+  if (!row) throw notFound;
+  const [transaction] = await withClassification(ctx, [row]);
+  const { import: source } = transaction!;
   return {
-    ...transaction,
+    ...transaction!,
     import: source && { ...source, importedAt: new Date(source.importedAt) },
   };
 }

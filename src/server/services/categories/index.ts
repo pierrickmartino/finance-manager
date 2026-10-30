@@ -1,12 +1,7 @@
 import { z } from 'zod';
 import type pg from 'pg';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
-import {
-  ConflictError,
-  isUniqueViolation,
-  parseInput,
-  ValidationError,
-} from '../errors';
+import { ConflictError, isUniqueViolation, parseInput, ValidationError } from '../errors';
 import {
   CATEGORY_GROUP_TYPES,
   CATEGORY_ORDER,
@@ -29,6 +24,7 @@ export {
   type CategoryGroup,
   type CategoryGroupType,
 } from './model';
+export { mergeCategory, type CategoryMergeResult } from './merge';
 export { seedStarterCategories } from './seed';
 
 const name = (what: string) =>
@@ -162,9 +158,7 @@ export async function deleteCategoryGroup(ctx: ServiceContext, id: string): Prom
     const group = await findGroup(tx, id, true);
     const members = await tx.query('SELECT 1 FROM category WHERE group_id = $1 LIMIT 1', [id]);
     if (members.rowCount) {
-      throw new ConflictError(
-        `"${group.name}" still has Categories: move or delete them first`,
-      );
+      throw new ConflictError(`"${group.name}" still has Categories: move or delete them first`);
     }
     await tx.query('DELETE FROM category_group WHERE id = $1', [id]);
     await history.record('category_group', id, groupSnapshot(group), null);
@@ -205,7 +199,10 @@ export async function reorderCategoryGroups(
   const order = parseInput(idList, ids);
   await mutate(ctx, async ({ tx, history }) => {
     const before = await tx.query<Group>(`${SELECT_GROUP} ORDER BY ${GROUP_ORDER} FOR UPDATE`);
-    checkOrder(order, before.rows.map((group) => group.id));
+    checkOrder(
+      order,
+      before.rows.map((group) => group.id),
+    );
     await applyOrder(tx, 'category_group', order);
     for (const group of before.rows) {
       const after = { ...group, sort: order.indexOf(group.id) };
@@ -227,7 +224,10 @@ export async function reorderCategories(
       `${SELECT_CATEGORY} WHERE c.group_id = $1 ORDER BY ${CATEGORY_ORDER} FOR UPDATE OF c`,
       [groupId],
     );
-    checkOrder(order, before.rows.map((category) => category.id));
+    checkOrder(
+      order,
+      before.rows.map((category) => category.id),
+    );
     await applyOrder(tx, 'category', order);
     for (const category of before.rows) {
       const after = { ...category, sort: order.indexOf(category.id) };
@@ -241,10 +241,7 @@ export async function reorderCategories(
   });
 }
 
-export async function createCategory(
-  ctx: ServiceContext,
-  input: CategoryInput,
-): Promise<Category> {
+export async function createCategory(ctx: ServiceContext, input: CategoryInput): Promise<Category> {
   const values = parseInput(categoryInput, input);
   return mutate(ctx, (scope) => insertCategory(scope, values));
 }
@@ -309,4 +306,3 @@ export async function deleteCategory(ctx: ServiceContext, id: string): Promise<v
     await history.record('category', id, categorySnapshot(category), null);
   });
 }
-
