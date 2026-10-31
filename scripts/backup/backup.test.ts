@@ -88,11 +88,18 @@ function getBackup(baseUrl: string, token?: string): Promise<Response> {
   });
 }
 
+/** The status of a backup request, after reading its whole body (so the request is over). */
+async function backupStatus(baseUrl: string, token?: string): Promise<number> {
+  const response = await getBackup(baseUrl, token);
+  await response.arrayBuffer();
+  return response.status;
+}
+
 describe('backup server', () => {
   it('rejects requests without the backup secret or with a wrong one', async () => {
     await withServer({}, async (baseUrl) => {
-      expect((await getBackup(baseUrl)).status).toBe(401);
-      expect((await getBackup(baseUrl, 'x'.repeat(64))).status).toBe(401);
+      expect(await backupStatus(baseUrl)).toBe(401);
+      expect(await backupStatus(baseUrl, 'x'.repeat(64))).toBe(401);
     });
   });
 
@@ -120,21 +127,34 @@ describe('backup server', () => {
   it('refuses a second dump within the minimum interval', async () => {
     let clock = 1_000_000;
     await withServer({ minIntervalSeconds: 600, now: () => clock }, async (baseUrl) => {
-      expect((await getBackup(baseUrl, TOKEN)).status).toBe(200);
+      expect(await backupStatus(baseUrl, TOKEN)).toBe(200);
       clock += 599_000;
-      expect((await getBackup(baseUrl, TOKEN)).status).toBe(429);
+      expect(await backupStatus(baseUrl, TOKEN)).toBe(429);
       clock += 1_000;
-      expect((await getBackup(baseUrl, TOKEN)).status).toBe(200);
+      expect(await backupStatus(baseUrl, TOKEN)).toBe(200);
+    });
+  });
+
+  it('allows the next dump once the interval has passed, even while an earlier one is still being read', async () => {
+    let clock = 1_000_000;
+    await withServer({ minIntervalSeconds: 600, now: () => clock }, async (baseUrl) => {
+      // Headers only: the first body is still on its way when the next request arrives.
+      const first = await getBackup(baseUrl, TOKEN);
+      expect(first.status).toBe(200);
+      clock += 600_000;
+
+      expect(await backupStatus(baseUrl, TOKEN)).toBe(200);
+      await first.arrayBuffer();
     });
   });
 
   it('locks /backup for an hour after too many failed attempts', async () => {
     let clock = 1_000_000;
     await withServer({ maxFailedAuthPerHour: 3, now: () => clock }, async (baseUrl) => {
-      for (let i = 0; i < 3; i += 1) expect((await getBackup(baseUrl, 'wrong')).status).toBe(401);
-      expect((await getBackup(baseUrl, TOKEN)).status).toBe(429);
+      for (let i = 0; i < 3; i += 1) expect(await backupStatus(baseUrl, 'wrong')).toBe(401);
+      expect(await backupStatus(baseUrl, TOKEN)).toBe(429);
       clock += 60 * 60 * 1000;
-      expect((await getBackup(baseUrl, TOKEN)).status).toBe(200);
+      expect(await backupStatus(baseUrl, TOKEN)).toBe(200);
     });
   });
 

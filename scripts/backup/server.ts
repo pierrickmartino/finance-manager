@@ -142,10 +142,17 @@ export async function startBackupServer(options: BackupServerOptions): Promise<B
     }
     isDumping = true;
     lastDumpStartedAt = at;
-    const dir = await mkdtemp(path.join(tmpdir(), 'fm-backup-'));
-    const file = path.join(dir, 'dump.age');
+    let dir: string | null = null;
     try {
-      await dumpEncrypted(options, file);
+      dir = await mkdtemp(path.join(tmpdir(), 'fm-backup-'));
+      const file = path.join(dir, 'dump.age');
+      try {
+        await dumpEncrypted(options, file);
+      } finally {
+        // Only pg_dump must not run twice at once. Sending a finished file does not count, so
+        // the next request depends on the clock alone, not on how fast this client reads.
+        isDumping = false;
+      }
       const [{ size }, sha256] = await Promise.all([stat(file), sha256File(file)]);
       res.writeHead(200, {
         'content-type': 'application/octet-stream',
@@ -162,7 +169,7 @@ export async function startBackupServer(options: BackupServerOptions): Promise<B
       else res.destroy();
     } finally {
       isDumping = false;
-      await rm(dir, { recursive: true, force: true });
+      if (dir) await rm(dir, { recursive: true, force: true });
     }
   };
 
