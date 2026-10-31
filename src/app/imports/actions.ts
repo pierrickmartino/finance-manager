@@ -13,6 +13,7 @@ import {
   undoImport,
 } from '@/server/services/imports';
 import { readNearDuplicateDecisions } from './near-duplicate-decisions';
+import { readTransferDecisions } from './transfer-decisions';
 
 /** Uploads a bank file into an Account and opens its preview. Nothing is saved yet. */
 export async function previewImportAction(
@@ -45,6 +46,7 @@ export async function commitImportAction(
       previewId,
       acceptOpeningBalance: formText(formData, 'acceptOpeningBalance') === 'on',
       nearDuplicateDecisions: readNearDuplicateDecisions(formData),
+      transferDecisions: readTransferDecisions(formData),
     }),
   );
   if (!result.ok) return result;

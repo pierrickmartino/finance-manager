@@ -12,6 +12,7 @@ import { ReconciliationSummary } from '../reconciliation-summary';
 import { CommitImportForm } from './commit-import-form';
 import { NearDuplicates } from './near-duplicates';
 import { RuleClassificationCell } from './rule-classification';
+import { TransferCandidates } from './transfer-candidates';
 
 export const metadata: Metadata = { title: 'Import preview · Finance Manager' };
 
@@ -125,7 +126,12 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
                 </td>
                 <td className={`${CELL} font-mono text-xs`}>{entry.bankReference ?? '—'}</td>
                 <td className={`${CELL} text-right tabular-nums`}>{money(entry.amountMinor)}</td>
-                <td className={CELL}>{STATUS_LABELS[entry.status]}</td>
+                <td className={CELL}>
+                  {STATUS_LABELS[entry.status]}
+                  {entry.transferCandidates.length > 0 && (
+                    <div className="text-xs text-sky-700">Possible Transfer</div>
+                  )}
+                </td>
                 <td className={CELL}>
                   <RuleClassificationCell classification={entry.classification} />
                 </td>
@@ -150,6 +156,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
           currency={account.currency}
           fmt={fmt}
         />
+        <TransferCandidates entries={preview.entries} currency={account.currency} fmt={fmt} />
       </CommitImportForm>
     </section>
   );

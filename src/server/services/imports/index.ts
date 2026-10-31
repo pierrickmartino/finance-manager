@@ -38,6 +38,7 @@ export type {
 } from './pipeline';
 export type { BalanceCheck, Reconciliation, RunningBalanceBreak } from './reconcile';
 export type { Import } from './model';
+export type { ImportTransferCandidate } from '../transfers/candidates';
 export { deleteImportedTransaction, undoImport } from './undo';
 
 /** Largest bank file accepted, in bytes. Monthly exports are a few tens of kilobytes. */

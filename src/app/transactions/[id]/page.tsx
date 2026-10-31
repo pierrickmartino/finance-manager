@@ -25,7 +25,9 @@ import {
   editClassificationAction,
   unlockFieldAction,
 } from './actions';
+import { getTransferCounterpart, listLinkOptions } from '@/server/services/transfers';
 import { ClassificationForm } from './classification-form';
+import { TransferSection } from './transfer-section';
 
 export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
 
@@ -52,13 +54,14 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
   const { id } = await params;
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
-  const [history, fmt, classification, groups, payees, tags] = await Promise.all([
+  const [history, fmt, classification, groups, payees, tags, counterpart] = await Promise.all([
     listHistory(ctx, { entityType: 'transaction', entityId: transaction.id }),
     getFormatter(),
     getClassification(ctx, transaction.id),
     listCategoryGroups(ctx),
     listPayees(ctx),
     listTags(ctx),
+    getTransferCounterpart(ctx, transaction.id),
   ]);
   const amount = fmt.amount(transaction.amountMinor, { currency: transaction.currency });
 
@@ -88,6 +91,13 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
           <BundledDetails transaction={transaction} fmt={fmt} />
         )}
       </section>
+
+      <TransferSection
+        transactionId={transaction.id}
+        counterpart={counterpart}
+        options={counterpart ? [] : await listLinkOptions(ctx, transaction.id)}
+        fmt={fmt}
+      />
 
       <section aria-labelledby="classification" className="flex flex-col gap-3">
         <h2 id="classification" className="text-lg font-semibold">

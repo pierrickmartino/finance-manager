@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
+import { ValidationError } from '@/server/services/errors';
 import { deleteImportedTransaction } from '@/server/services/imports';
+import { linkTransfer, unlinkTransfer } from '@/server/services/transfers';
 import { deleteManualTransaction } from '@/server/services/transactions/manual';
 import {
   editClassification,
@@ -74,6 +76,37 @@ export async function unlockFieldAction(
 ): Promise<ActionResult<unknown>> {
   const result = await runAction(async () => unlockFields(await getServiceContext(), id, [field]));
   if (result.ok) revalidate(id);
+  return result;
+}
+
+/** Links this Transaction and the chosen one as a Transfer (spec 88). */
+export async function linkTransferAction(
+  id: string,
+  _previous: ActionResult<unknown> | null,
+  formData: FormData,
+): Promise<ActionResult<unknown>> {
+  const result = await runAction(async () => {
+    const otherId = formText(formData, 'otherId');
+    if (!otherId) throw new ValidationError('Choose the other side of the Transfer');
+    return linkTransfer(await getServiceContext(), { transactionIds: [id, otherId] });
+  });
+  if (result.ok) {
+    revalidate(id);
+    revalidatePath('/unclassified');
+  }
+  return result;
+}
+
+/** Unlinks the Transfer this Transaction is in; both sides stay. */
+export async function unlinkTransferAction(
+  id: string,
+  _previous: ActionResult<unknown> | null,
+): Promise<ActionResult<unknown>> {
+  const result = await runAction(async () => unlinkTransfer(await getServiceContext(), id));
+  if (result.ok) {
+    revalidate(id);
+    revalidatePath('/unclassified');
+  }
   return result;
 }
 

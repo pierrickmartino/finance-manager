@@ -106,7 +106,9 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                       </td>
                       <td className={CELL}>{transaction.payee?.name ?? '—'}</td>
                       <td className={CELL}>
-                        {transaction.category ? (
+                        {transaction.transferId ? (
+                          <span className="text-sky-700 dark:text-sky-400">Transfer</span>
+                        ) : transaction.category ? (
                           <>
                             {transaction.category.name}
                             <div className="text-xs text-zinc-500">
@@ -226,6 +228,14 @@ function SearchForm({ values, lists }: SearchFormProps) {
               {tag.name}
             </option>
           ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Transfers
+        <select name="transfer" defaultValue={values.transfer} className={INPUT}>
+          <option value="">Included</option>
+          <option value="only">Only Transfers</option>
+          <option value="exclude">Excluded</option>
         </select>
       </label>
       <label className="flex items-center gap-2 self-center text-sm font-medium">
