@@ -61,6 +61,18 @@ Backups: a separate `backup` service (`deploy/backup/`) serves age-encrypted dum
 
 FX rates: a separate `fx-rates` cron service (`deploy/fx-rates/railway.json`) runs `pnpm fx:fetch` daily at 16:20 UTC to fetch ECB reference rates. Setup, backfill and the stale-rates warning are in `docs/runbooks/fx-rates.md`.
 
+## Bringing in history before the bank files (Crédit Agricole)
+
+An Account's opening balance is its balance at the start of the opening date, so it already includes everything booked before. Manual transactions dated before the opening date are therefore refused (they would count twice), and the opening date can't move past a Transaction already on the Account.
+
+Recommended order for the Crédit Agricole Account (Manual history from 2021, then OFX files):
+
+1. Create the Account with opening date `2021-01-01` and the balance it had on that day (0 if it opened later).
+2. Enter the Manual transactions from 2021 up to the day before the first OFX file's period.
+3. Import the OFX files, oldest first. With Manual history present, the first Import checks its derived opening balance against the history instead of replacing the opening balance; a difference means a Manual transaction is missing or wrong.
+
+If an OFX file was imported first (it set the opening balance and date to the file's start), open the Account page and set the opening date back to `2021-01-01` with that day's balance before entering the earlier Manual transactions.
+
 ## Signing in
 
 The app is single-user and reachable on the public internet, so every page and server action needs a session.

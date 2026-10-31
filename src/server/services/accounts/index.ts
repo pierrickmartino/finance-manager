@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
-import { ConflictError, isUniqueViolation, NotFoundError, parseInput } from '../errors';
+import {
+  ConflictError,
+  isUniqueViolation,
+  NotFoundError,
+  parseInput,
+  ValidationError,
+} from '../errors';
 import type { HistorySnapshot } from '../history';
 import {
   accountInput,
@@ -176,6 +182,7 @@ export async function updateAccount(
         "The Import format and Currency can't change once the Account has Transactions",
       );
     }
+    await refuseOpeningAfterTransactions(tx, id, values.openingDate);
     await withUniqueChecks(values, bankName, () =>
       tx.query(
         `UPDATE account
@@ -189,6 +196,28 @@ export async function updateAccount(
     await history.record('account', id, snapshot(before), snapshot(after));
     return after;
   });
+}
+
+/**
+ * The opening balance includes everything before its date, so the date can't move past a
+ * Transaction already on the Account: that Transaction would count twice.
+ */
+async function refuseOpeningAfterTransactions(
+  db: Queryable,
+  id: string,
+  openingDate: string | null,
+): Promise<void> {
+  if (!openingDate) return;
+  const result = await db.query<{ earliest: string | null }>(
+    'SELECT min(booking_date) AS earliest FROM "transaction" WHERE account_id = $1',
+    [id],
+  );
+  const earliest = result.rows[0]?.earliest;
+  if (earliest && earliest < openingDate) {
+    throw new ValidationError(
+      `The opening date must not be after the earliest Transaction on this Account (${earliest})`,
+    );
+  }
 }
 
 /** Archives an Account: it is kept, with its Transactions and History, and listed as archived. */

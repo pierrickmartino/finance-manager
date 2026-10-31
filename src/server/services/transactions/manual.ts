@@ -72,10 +72,16 @@ async function findTransaction(db: Queryable, id: string, lock = false): Promise
   return transaction;
 }
 
-/** Locks the Account (so balances stay consistent) and returns its Currency. */
-async function lockOpenAccount(db: Queryable, accountId: string): Promise<{ currency: string }> {
-  const result = await db.query<{ currency: string; archived: boolean }>(
-    'SELECT currency, archived_at IS NOT NULL AS archived FROM account WHERE id = $1 FOR UPDATE',
+interface OpenAccount {
+  currency: string;
+  openingDate: string | null;
+}
+
+/** Locks the Account (so balances stay consistent) and returns its Currency and opening date. */
+async function lockOpenAccount(db: Queryable, accountId: string): Promise<OpenAccount> {
+  const result = await db.query<OpenAccount & { archived: boolean }>(
+    `SELECT currency, opening_date AS "openingDate", archived_at IS NOT NULL AS archived
+     FROM account WHERE id = $1 FOR UPDATE`,
     [accountId],
   );
   const account = result.rows[0];
@@ -83,7 +89,20 @@ async function lockOpenAccount(db: Queryable, accountId: string): Promise<{ curr
   if (account.archived) {
     throw new ConflictError('This Account is archived: Transactions can no longer be added');
   }
-  return { currency: account.currency };
+  return { currency: account.currency, openingDate: account.openingDate };
+}
+
+/**
+ * The opening balance is the balance at the start of the opening date, so it already includes
+ * everything booked before it (for example when an Import derived it). A Manual transaction
+ * dated earlier would count twice: the user must first move the opening date and balance back.
+ */
+function refuseBeforeOpening(account: OpenAccount, bookingDate: string): void {
+  if (account.openingDate && bookingDate < account.openingDate) {
+    throw new ValidationError(
+      `This Account's opening balance is dated ${account.openingDate} and already includes everything before. To record earlier history, first set an earlier opening date and balance on the Account page`,
+    );
+  }
 }
 
 /**
@@ -107,7 +126,8 @@ export async function createManualTransaction(
   const values = parseInput(createManualTransactionInput, input);
   return mutate(ctx, async (scope) => {
     const { tx, history } = scope;
-    const { currency } = await lockOpenAccount(tx, values.accountId);
+    const account = await lockOpenAccount(tx, values.accountId);
+    refuseBeforeOpening(account, values.bookingDate);
     const inserted = await tx.query<{ id: string }>(
       `INSERT INTO "transaction" (account_id, is_manual, booking_date, amount_minor, currency,
          raw_description, counterparty_name)
@@ -116,7 +136,7 @@ export async function createManualTransaction(
         values.accountId,
         values.bookingDate,
         values.amountMinor,
-        currency,
+        account.currency,
         values.description,
         values.counterpartyName,
       ],
@@ -151,7 +171,7 @@ export async function updateManualTransaction(
         'This Transaction is part of a Transfer. Unlink the Transfer before changing its sign',
       );
     }
-    await lockOpenAccount(tx, before.accountId);
+    refuseBeforeOpening(await lockOpenAccount(tx, before.accountId), values.bookingDate);
     await tx.query(
       `UPDATE "transaction"
        SET booking_date = $1, amount_minor = $2, raw_description = $3, counterparty_name = $4

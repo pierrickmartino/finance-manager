@@ -6,6 +6,7 @@ import {
   archiveAccount,
   createAccount,
   getAccount,
+  updateAccount,
   type Account,
   type AccountInput,
 } from '../accounts';
@@ -239,6 +240,85 @@ describe('Manual transactions before an imported period', () => {
     expect(preview.reconciliation.opening).toMatchObject({ differenceMinor: -50000 });
   });
 });
+
+describe('Manual history before the opening balance', () => {
+  // Committing the October UBS file on an empty Account sets its opening balance to
+  // 8450.35 CHF on 2025-10-01: that balance already includes everything before.
+  async function importedAccount(): Promise<Account> {
+    const account = await clerAccount({ importFormat: 'ubs_csv', openingBalanceMinor: 0 });
+    const preview = await previewUbsOctober(account);
+    await commitImport(t.ctx, { previewId: preview.id });
+    return getAccount(t.ctx, account.id);
+  }
+
+  const EARLIER_OPENING =
+    "This Account's opening balance is dated 2025-10-01 and already includes everything before. To record earlier history, first set an earlier opening date and balance on the Account page";
+
+  it('refuses a Manual transaction dated before the opening date, which would count twice', async () => {
+    const account = await importedAccount();
+
+    await expect(manual(account, '2025-09-30', -4965, 'Card fee')).rejects.toThrow(EARLIER_OPENING);
+    expect((await getAccount(t.ctx, account.id)).balanceMinor).toBe(account.balanceMinor);
+  });
+
+  it('refuses moving a Manual transaction before the opening date', async () => {
+    const account = await importedAccount();
+    const created = await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-10-01',
+      amountMinor: -4965,
+      description: 'Card fee',
+    });
+
+    await expect(
+      updateManualTransaction(t.ctx, created.id, {
+        bookingDate: '2025-09-30',
+        amountMinor: -4965,
+        description: 'Card fee',
+      }),
+    ).rejects.toThrow(EARLIER_OPENING);
+  });
+
+  it('accepts the history once the opening date and balance are moved earlier', async () => {
+    const account = await importedAccount();
+    await updateAccount(t.ctx, account.id, {
+      ...accountInput(account),
+      openingBalanceMinor: 0,
+      openingDate: '2021-01-01',
+    });
+
+    await manual(account, '2021-01-04', 850000, 'Opening deposit');
+    await manual(account, '2025-09-30', -4965, 'Card fee');
+
+    expect((await getAccount(t.ctx, account.id)).balanceMinor).toBe(
+      account.balanceMinor - 845035 + 850000 - 4965,
+    );
+  });
+
+  it('refuses an opening date after a Transaction already on the Account', async () => {
+    const account = await clerAccount({ openingDate: '2021-01-01' });
+    await manual(account, '2024-05-02', -1000, 'Bakery');
+
+    await expect(
+      updateAccount(t.ctx, account.id, { ...accountInput(account), openingDate: '2024-06-01' }),
+    ).rejects.toThrow(
+      'The opening date must not be after the earliest Transaction on this Account (2024-05-02)',
+    );
+  });
+});
+
+function accountInput(account: Account): AccountInput {
+  return {
+    bankId: account.bankId,
+    name: account.name,
+    currency: account.currency,
+    iban: account.iban,
+    kind: account.kind,
+    importFormat: account.importFormat,
+    openingBalanceMinor: account.openingBalanceMinor,
+    openingDate: account.openingDate,
+  };
+}
 
 async function manual(
   account: Account,
