@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { seedTransactions } from '@test/support/transactions';
 import { createAccount, type Account } from '../accounts';
@@ -7,6 +7,7 @@ import { createCategory, createCategoryGroup } from '../categories';
 import { getBatchSummaries, listHistory } from '../history';
 import { createPayee } from '../payees';
 import { createTag } from '../tags';
+import { linkTransfer } from '../transfers';
 import { editClassification, getClassification } from '../transactions';
 import { createRule, setRuleEnabled, type RuleInput } from '.';
 import {
@@ -16,17 +17,16 @@ import {
   suggestRuleFromTransaction,
 } from './existing';
 
-/**
- * Transfers (#19) don't exist yet, so the Transfer guard is replaced by a set of ids. Once #19
- * lands, make a real Transfer instead.
- */
-const transfers = vi.hoisted(() => new Set<string>());
-vi.mock('../transactions/transfer-guard', () => ({
-  isInTransfer: async (_db: unknown, id: string) => transfers.has(id),
-}));
-
 const t = setupTestDatabase();
-beforeEach(() => transfers.clear());
+
+/** Links the Transaction with a new opposite one on another Account, as a Transfer. */
+async function makeTransfer(transactionId: string, amountMinor: number): Promise<void> {
+  const other = await account(`Other side ${transactionId.slice(0, 8)}`);
+  const [counterpart] = await seedTransactions(t.ctx.db, other, [
+    { bookingDate: '2025-10-02', amountMinor: -amountMinor, rawDescription: 'COUNTERPART' },
+  ]);
+  await linkTransfer(t.ctx, { transactionIds: [transactionId, counterpart!] });
+}
 
 async function account(name = 'Current'): Promise<Account> {
   const bank = await createBank(t.ctx, { name: `Bank ${name}` });
@@ -190,7 +190,7 @@ describe('what applying Rules leaves alone', () => {
       { bookingDate: '2025-10-02', amountMinor: -50000, rawDescription: 'TRANSFER TO SAVINGS' },
       { bookingDate: '2025-10-03', amountMinor: -100, rawDescription: 'TRANSFER FEE' },
     ]);
-    transfers.add(inTransfer!);
+    await makeTransfer(inTransfer!, -50000);
     await createRule(t.ctx, {
       name: 'Transfers',
       conditions: [descriptionContains('transfer')],
@@ -200,7 +200,8 @@ describe('what applying Rules leaves alone', () => {
     const preview = await previewApplyRules(t.ctx, {});
     const result = await applyRulesToExisting(t.ctx, {});
 
-    expect(preview).toMatchObject({ examined: 2, changedCount: 1, skippedTransfers: 1 });
+    // The Transfer's other side is examined and skipped too.
+    expect(preview).toMatchObject({ examined: 3, changedCount: 1, skippedTransfers: 2 });
     expect(result.count).toBe(1);
     expect((await getClassification(t.ctx, inTransfer!)).category).toBeNull();
     expect((await getClassification(t.ctx, plain!)).category?.name).toBe('Groceries');
@@ -271,7 +272,7 @@ describe('Rule match counts', () => {
       { bookingDate: '2025-10-04', amountMinor: 250000, rawDescription: 'SALARY' },
       { bookingDate: '2025-10-05', amountMinor: -300, rawDescription: 'MIGROS TRANSFER' },
     ]);
-    transfers.add(ids[3]!);
+    await makeTransfer(ids[3]!, -300);
     const actions = { payeeId: null, categoryId: groceries.id, tagIds: [] };
     const migrosRule = await createRule(t.ctx, {
       name: 'Migros',

@@ -4,7 +4,13 @@ import { parseInput, ValidationError } from '../errors';
 import type { HistoryEntityType, JsonValue } from './recorder';
 
 export { HISTORY_ENTITY_TYPES } from './recorder';
-export type { HistoryEntityType, HistoryRecorder, HistorySnapshot, JsonValue } from './recorder';
+export type {
+  EntityChange,
+  HistoryEntityType,
+  HistoryRecorder,
+  HistorySnapshot,
+  JsonValue,
+} from './recorder';
 
 export interface HistoryEntry {
   id: string;

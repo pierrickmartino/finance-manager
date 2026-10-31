@@ -12,9 +12,12 @@ import { applyRulesToExisting, countRuleMatches, previewApplyRules } from './exi
 
 /**
  * Applying Rules to 10 000 Transactions finishes in reasonable time (ticket #18). Measured on
- * Postgres 16 (local, warm, 2026-10-30), two Rules setting Payee, Category and a Tag on all
- * 10 000: preview 0.8 s, commit 7.8 s (most of it the 20 000 History
- * inserts, one per Transaction per Rule), match counts 0.5 s. The budgets are generous
+ * Postgres 16 (local, warm), two Rules setting Payee, Category and a Tag on all 10 000:
+ * - 2026-10-30: preview 0.8 s, commit 7.8 s (20 000 History inserts, one per Transaction per
+ *   Rule), match counts 0.5 s.
+ * - 2026-10-31, after batched History (`recordMany`, one INSERT per Rule) and the set-based
+ *   Transfer check: preview 0.5 s, commit 3.2 s, match counts 0.5 s.
+ * The budgets are generous
  * so a slow CI runner doesn't flake; they catch order-of-magnitude regressions.
  */
 const t = setupTestDatabase();

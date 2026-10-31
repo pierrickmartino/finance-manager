@@ -8,7 +8,7 @@ import {
   type ClassificationField,
 } from '../transactions/classification';
 import { filterConditions, transactionQueryInput } from '../transactions/query';
-import { isInTransfer } from '../transactions/transfer-guard';
+import { transfersAmong } from '../transactions/transfer-guard';
 import {
   compileRules,
   evaluateRules,
@@ -159,6 +159,9 @@ async function loadCandidates(
   return result.rows;
 }
 
+const candidateIds = (candidates: readonly Candidate[]): string[] =>
+  candidates.map((candidate) => candidate.id);
+
 /** The engine restricted to the chosen Rules (forced on), or every Rule as stored. */
 async function engineFor(db: Queryable, ruleIds: string[] | undefined): Promise<RuleEngine> {
   const engine = await loadRuleEngine(db);
@@ -177,8 +180,8 @@ async function engineFor(db: Queryable, ruleIds: string[] | undefined): Promise<
   };
 }
 
-/** The Transaction as Rules see it; the Transfer guard decides whether Rules may touch it. */
-async function subjectOf(db: Queryable, candidate: Candidate): Promise<RuleSubject> {
+/** The Transaction as Rules see it; Rules never touch one in a Transfer. */
+function subjectOf(candidate: Candidate, inTransfer: ReadonlySet<string>): RuleSubject {
   return {
     accountId: candidate.accountId,
     bookingDate: candidate.bookingDate,
@@ -190,7 +193,7 @@ async function subjectOf(db: Queryable, candidate: Candidate): Promise<RuleSubje
         ? { id: candidate.payeeId, name: candidate.payeeName }
         : null,
     lockedFields: candidate.lockedFields,
-    isInTransfer: await isInTransfer(db, candidate.id),
+    isInTransfer: inTransfer.has(candidate.id),
   };
 }
 
@@ -206,10 +209,11 @@ function plannedChange(candidate: Candidate, evaluation: RuleEvaluation): Planne
 async function plan(db: Queryable, input: ParsedInput, lock: boolean): Promise<Plan> {
   const engine = await engineFor(db, input.ruleIds);
   const candidates = await loadCandidates(db, input.filter, lock);
+  const inTransfer = await transfersAmong(db, candidateIds(candidates));
   const changes: PlannedChange[] = [];
   let skippedTransfers = 0;
   for (const candidate of candidates) {
-    const evaluation = evaluateRules(engine.compiled, await subjectOf(db, candidate));
+    const evaluation = evaluateRules(engine.compiled, subjectOf(candidate, inTransfer));
     if (evaluation.skipped === 'transfer') skippedTransfers += 1;
     const change = plannedChange(candidate, evaluation);
     if (change) changes.push(change);
@@ -367,8 +371,8 @@ function summary(engine: RuleEngine, ruleIds: string[] | undefined, count: numbe
 /**
  * Applies the Rules to existing Transactions: the changes `previewApplyRules` shows, written
  * as one History Batch with a summary. Each change is recorded with the Rule that made it as
- * the actor. The writes are set-based, one Rule at a time: 10 000 Transactions with two Rules
- * take about 8 s, mostly History inserts (see `rules-existing.perf.test.ts`).
+ * the actor. The writes and their History are set-based, one Rule at a time: 10 000
+ * Transactions with two Rules take about 3 s (see `rules-existing.perf.test.ts`).
  */
 export async function applyRulesToExisting(
   ctx: ServiceContext,
@@ -401,8 +405,10 @@ export async function countRuleMatches(ctx: ServiceContext): Promise<Record<stri
     engine.compiled.rules.map((rule) => [rule.definition.id, 0]),
   );
   if (engine.compiled.rules.length === 0) return counts;
-  for (const candidate of await loadCandidates(ctx.db, undefined, false)) {
-    const subject = await subjectOf(ctx.db, candidate);
+  const candidates = await loadCandidates(ctx.db, undefined, false);
+  const inTransfer = await transfersAmong(ctx.db, candidateIds(candidates));
+  for (const candidate of candidates) {
+    const subject = subjectOf(candidate, inTransfer);
     for (const rule of engine.compiled.rules) {
       if (ruleMatches(rule, subject)) counts[rule.definition.id]! += 1;
     }

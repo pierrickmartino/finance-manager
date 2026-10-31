@@ -211,4 +211,33 @@ describe('History', () => {
     });
     expect(await getBatchSummaries(t.ctx, [])).toEqual({});
   });
+
+  it('records many entities in one call, the same entries in the same order as one call each', async () => {
+    const changes = [
+      { entityId: 'b1', before: null, after: { name: 'UBS', kind: 'bank' } },
+      { entityId: 'b2', before: { name: 'Cler' }, after: { name: 'Cler' } },
+      { entityId: 'b3', before: { name: 'BCGE' }, after: null },
+    ];
+    const one = await mutate(t.ctx, async ({ history }) => {
+      for (const change of changes) {
+        await history.record('bank', change.entityId, change.before, change.after);
+      }
+      return history.batchId;
+    });
+    const many = await mutate(t.ctx, async ({ history }) => {
+      await history.recordMany('bank', changes);
+      await history.recordMany('bank', []);
+      return history.batchId;
+    });
+
+    const shape = async (batchId: string) =>
+      (await listHistory(t.ctx, { batchId })).map(({ entityId, field, before, after }) => ({
+        entityId,
+        field,
+        before,
+        after,
+      }));
+    expect(await shape(many)).toEqual(await shape(one));
+    expect(await shape(many)).toHaveLength(3);
+  });
 });

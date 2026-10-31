@@ -53,6 +53,12 @@ export interface HistoryRecorder {
     after: HistorySnapshot | null,
   ): Promise<void>;
   /**
+   * `record` for many entities of one type in one INSERT: the same entries, in the same order,
+   * as one `record` call per change. Use it when one action touches many entities (bulk edit,
+   * applying Rules, an Import commit).
+   */
+  recordMany(entityType: HistoryEntityType, changes: readonly EntityChange[]): Promise<void>;
+  /**
    * Gives the Batch one readable summary, for actions that touch many entities (a merge, a
    * bulk edit). Calling it again replaces the summary.
    */
@@ -63,6 +69,13 @@ export interface HistoryRecorder {
    * joins that action's Batch, but its entries name the Rule as their actor.
    */
   as(actor: Actor): HistoryRecorder;
+}
+
+/** How one entity changed, for `recordMany`. */
+export interface EntityChange {
+  entityId: string;
+  before: HistorySnapshot | null;
+  after: HistorySnapshot | null;
 }
 
 interface FieldChange {
@@ -87,33 +100,55 @@ function diff(before: HistorySnapshot | null, after: HistorySnapshot | null): Fi
     .filter((change) => change.before !== change.after);
 }
 
+/** Rows per INSERT, so one statement's parameter arrays stay a few MB at most. */
+const MAX_ROWS_PER_INSERT = 20_000;
+
+type EntryRow = FieldChange & { entityId: string };
+
 export function createHistoryRecorder(
   tx: pg.PoolClient,
   actor: Actor,
   batchId: string = randomUUID(),
 ): HistoryRecorder {
-  return {
-    batchId,
-    async record(entityType, entityId, before, after) {
-      const changes = diff(before, after);
-      if (changes.length === 0) return;
+  /** Inserts the rows in order: `seq` follows the array order. */
+  async function insert(entityType: HistoryEntityType, rows: readonly EntryRow[]): Promise<void> {
+    for (let start = 0; start < rows.length; start += MAX_ROWS_PER_INSERT) {
+      const chunk = rows.slice(start, start + MAX_ROWS_PER_INSERT);
       await tx.query(
         `INSERT INTO history_entry
            (batch_id, actor_type, actor_id, entity_type, entity_id, field, before, after)
-         SELECT $1, $2, $3, $4, $5, change.field, change.before, change.after
-         FROM unnest($6::text[], $7::jsonb[], $8::jsonb[]) WITH ORDINALITY
-           AS change(field, before, after, n)
+         SELECT $1, $2, $3, $4, change.entity_id, change.field, change.before, change.after
+         FROM unnest($5::text[], $6::text[], $7::jsonb[], $8::jsonb[]) WITH ORDINALITY
+           AS change(entity_id, field, before, after, n)
          ORDER BY change.n`,
         [
           batchId,
           actor.type,
           actor.id,
           entityType,
-          entityId,
-          changes.map((change) => change.field),
-          changes.map((change) => change.before),
-          changes.map((change) => change.after),
+          chunk.map((row) => row.entityId),
+          chunk.map((row) => row.field),
+          chunk.map((row) => row.before),
+          chunk.map((row) => row.after),
         ],
+      );
+    }
+  }
+
+  return {
+    batchId,
+    async record(entityType, entityId, before, after) {
+      await insert(
+        entityType,
+        diff(before, after).map((change) => ({ ...change, entityId })),
+      );
+    },
+    async recordMany(entityType, changes) {
+      await insert(
+        entityType,
+        changes.flatMap(({ entityId, before, after }) =>
+          diff(before, after).map((change) => ({ ...change, entityId })),
+        ),
       );
     },
     async summarize(summary) {

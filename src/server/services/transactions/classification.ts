@@ -9,7 +9,6 @@ import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { refuseBankFieldChanges } from './bank-fields';
 import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from './model';
-import { isInTransfer } from './transfer-guard';
 
 /**
  * Classification of one Transaction: Payee, Category, Tags and notes (spec 63-65).
@@ -186,15 +185,17 @@ export async function recordClassificationChanges<T>(
   const after = new Map(
     (await loadClassifications(scope.tx, transactionIds)).map((row) => [row.transactionId, row]),
   );
-  for (const old of before) {
-    const now = after.get(old.transactionId);
-    await scope.history.record(
-      'transaction',
-      old.transactionId,
-      classificationSnapshot(old),
-      now ? classificationSnapshot(now) : null,
-    );
-  }
+  await scope.history.recordMany(
+    'transaction',
+    before.map((old) => {
+      const now = after.get(old.transactionId);
+      return {
+        entityId: old.transactionId,
+        before: classificationSnapshot(old),
+        after: now ? classificationSnapshot(now) : null,
+      };
+    }),
+  );
   return result;
 }
 
@@ -265,7 +266,7 @@ async function writeTags(
 /** Writes one field's new value. */
 async function writeField(
   scope: MutationScope,
-  id: string,
+  { id, transferId }: Pick<Transaction, 'id' | 'transferId'>,
   field: ClassificationField,
   changes: ParsedChanges,
   by: TagSource,
@@ -282,7 +283,8 @@ async function writeField(
       const categoryId = changes.categoryId
         ? (await findCategory(tx, changes.categoryId)).id
         : null;
-      if (categoryId && (await isInTransfer(tx, id))) {
+      // The Transaction row is locked, so its Transfer link can't change under this check.
+      if (categoryId && transferId !== null) {
         throw new ValidationError("A Transfer can't have a Category");
       }
       await tx.query('UPDATE "transaction" SET category_id = $1 WHERE id = $2', [categoryId, id]);
@@ -316,7 +318,7 @@ export async function applyClassification(
   const locked = new Set<ClassificationField>(before.lockedFields);
   const fields = editedFields(values).filter((field) => by === 'manual' || !locked.has(field));
 
-  for (const field of fields) await writeField(scope, id, field, values, by);
+  for (const field of fields) await writeField(scope, transaction, field, values, by);
   if (by === 'manual') {
     const lockedFields = CLASSIFICATION_FIELDS.filter((f) => locked.has(f) || fields.includes(f));
     await scope.tx.query('UPDATE "transaction" SET locked_fields = $1 WHERE id = $2', [

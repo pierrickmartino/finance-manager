@@ -6,7 +6,6 @@ import {
   type Classification,
 } from '../transactions/classification';
 import type { Transaction } from '../transactions/model';
-import { isInTransfer } from '../transactions/transfer-guard';
 import {
   compileRules,
   evaluateRules,
@@ -193,11 +192,7 @@ export async function runRulesOnTransaction(
 ): Promise<RuleEvaluation> {
   const rules = engine ?? (await loadRuleEngine(scope.tx));
   const [classification] = await loadClassifications(scope.tx, [transaction.id]);
-  const subject = ruleSubject(
-    transaction,
-    classification ?? null,
-    await isInTransfer(scope.tx, transaction.id),
-  );
+  const subject = ruleSubject(transaction, classification ?? null, transaction.transferId !== null);
   const evaluation = evaluateRules(rules.compiled, subject);
   await applyRuleAssignments(scope, transaction.id, evaluation);
   return evaluation;

@@ -279,9 +279,18 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
     const created = await findImport(tx, importId);
     await history.record('import', importId, null, importSnapshot(created));
 
-    for (const entry of added) {
-      const transaction = await insertTransaction(tx, account, importId, entry);
-      await history.record('transaction', transaction.id, null, transactionSnapshot(transaction));
+    const inserted: Transaction[] = [];
+    for (const entry of added) inserted.push(await insertTransaction(tx, account, importId, entry));
+    await history.recordMany(
+      'transaction',
+      inserted.map((transaction) => ({
+        entityId: transaction.id,
+        before: null,
+        after: transactionSnapshot(transaction),
+      })),
+    );
+    for (const [index, entry] of added.entries()) {
+      const transaction = inserted[index]!;
       const otherSide = transfers.get(entry.fingerprint);
       if (otherSide) {
         // A Transfer: no Rules, no Category (spec 77).

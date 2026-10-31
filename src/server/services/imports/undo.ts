@@ -29,9 +29,14 @@ async function deleteTransactions(scope: Scope, transactions: readonly Transacti
   );
   const snapshots = await deletionSnapshots(scope.tx, current.rows);
   await scope.tx.query('DELETE FROM "transaction" WHERE id = ANY($1::uuid[])', [ids]);
-  for (const transaction of current.rows) {
-    await scope.history.record('transaction', transaction.id, snapshots.get(transaction.id)!, null);
-  }
+  await scope.history.recordMany(
+    'transaction',
+    current.rows.map((transaction) => ({
+      entityId: transaction.id,
+      before: snapshots.get(transaction.id)!,
+      after: null,
+    })),
+  );
 }
 
 async function readOpeningChange(tx: Queryable, importId: string): Promise<OpeningChange | null> {
