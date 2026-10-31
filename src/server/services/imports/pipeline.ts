@@ -123,17 +123,64 @@ export function parseFile(account: ImportAccount, content: Uint8Array): ParsedSt
   }
 }
 
+/** Positions of a French BBAN: bank code 5, branch code 5, account number 11, key 2. */
+const FR_BBAN = { bank: [0, 5], branch: [5, 10], account: [10, 21], key: [21, 23] } as const;
+
+const padLeft = (value: string, length: number): string => value.trim().padStart(length, '0');
+
 /**
- * Whether a file's bank account identifiers (OFX `BANKID` / `BRANCHID` / `ACCTID`) fit the
- * IBAN. A French IBAN's BBAN is the bank code, the branch code, the account number and a key,
- * in that order, so the BBAN must start with the bank and branch codes and then hold the
- * account number. Identifiers the file leaves out are not checked.
+ * Whether a file's bank account identifiers (OFX `BANKID` / `BRANCHID` / `ACCTID`) are exactly
+ * this French IBAN's, field by field. OFX may drop leading zeros, so each identifier is
+ * zero-padded to its field's width. ACCTID may also carry the 2-digit key after the account
+ * number. Non-French IBANs have no known layout and never match.
  */
-function ibanHoldsBankAccount(iban: string, bankAccount: BankAccountId): boolean {
+function ibanMatchesBankAccount(iban: string, bankAccount: CompleteBankAccountId): boolean {
+  if (!iban.startsWith('FR') || iban.length !== 27) return false;
   const bban = iban.slice(4);
-  const prefix = `${bankAccount.bankId ?? ''}${bankAccount.branchId ?? ''}`;
-  if (!bban.startsWith(prefix)) return false;
-  return !bankAccount.accountId || bban.slice(prefix.length).includes(bankAccount.accountId);
+  const field = ([from, to]: readonly [number, number]): string => bban.slice(from, to);
+  const accountId = bankAccount.accountId.trim();
+  const isAccountMatch =
+    padLeft(accountId, 11) === field(FR_BBAN.account) ||
+    (accountId.length === 13 && accountId === field(FR_BBAN.account) + field(FR_BBAN.key));
+  return (
+    padLeft(bankAccount.bankId, 5) === field(FR_BBAN.bank) &&
+    padLeft(bankAccount.branchId, 5) === field(FR_BBAN.branch) &&
+    isAccountMatch
+  );
+}
+
+type CompleteBankAccountId = { [K in keyof BankAccountId]: NonNullable<BankAccountId[K]> };
+
+function completeBankAccount(
+  bankAccount: BankAccountId | null | undefined,
+): CompleteBankAccountId | null {
+  if (!bankAccount?.bankId || !bankAccount.branchId || !bankAccount.accountId) return null;
+  return {
+    bankId: bankAccount.bankId,
+    branchId: bankAccount.branchId,
+    accountId: bankAccount.accountId,
+  };
+}
+
+/**
+ * OFX names the account by bank, branch and account number instead of an IBAN. On an Account
+ * with an IBAN all three are required and must be exactly the IBAN's.
+ */
+function checkBankAccount(account: ImportAccount, statement: ParsedStatement): void {
+  if (!account.iban) return;
+  const isRequired = account.importFormat === 'ofx' || statement.bankAccount;
+  if (!isRequired) return;
+  const bankAccount = completeBankAccount(statement.bankAccount);
+  if (!bankAccount) {
+    throw new ValidationError(
+      "This file doesn't name its bank, branch and account (BANKID, BRANCHID, ACCTID), so it can't be checked against this Account's IBAN",
+    );
+  }
+  if (!ibanMatchesBankAccount(account.iban, bankAccount)) {
+    throw new ValidationError(
+      `This file is for bank ${bankAccount.bankId}, branch ${bankAccount.branchId}, account ${bankAccount.accountId}, which is not this Account (IBAN ${account.iban})`,
+    );
+  }
 }
 
 /** Stage 2: the file must be this Account's statement (IBAN or bank identifiers, Currency). */
@@ -143,17 +190,7 @@ export function checkStatementAccount(account: ImportAccount, statement: ParsedS
       `This file is for IBAN ${statement.iban}, but this Account's IBAN is ${account.iban}`,
     );
   }
-  const { bankAccount } = statement;
-  if (bankAccount && account.iban && !ibanHoldsBankAccount(account.iban, bankAccount)) {
-    const named = [
-      bankAccount.bankId && `bank ${bankAccount.bankId}`,
-      bankAccount.branchId && `branch ${bankAccount.branchId}`,
-      bankAccount.accountId && `account ${bankAccount.accountId}`,
-    ].filter(Boolean);
-    throw new ValidationError(
-      `This file is for ${named.join(', ')}, which is not this Account (IBAN ${account.iban})`,
-    );
-  }
+  checkBankAccount(account, statement);
   if (statement.currency !== account.currency) {
     throw new ValidationError(
       `This file is in ${statement.currency}, but this Account is in ${account.currency}`,

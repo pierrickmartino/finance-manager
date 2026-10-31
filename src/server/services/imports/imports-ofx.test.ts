@@ -130,6 +130,69 @@ describe('rejected OFX uploads', () => {
     );
   });
 
+  /** The October fixture with its BANKACCTFROM block replaced (the block is plain ASCII). */
+  function withBankAccount(block: string): { fileName: string; content: Uint8Array } {
+    const { fileName, content } = fixture(CA_OCTOBER);
+    const text = Buffer.from(content).toString('latin1');
+    const replaced = text.replace(/<BANKACCTFROM>[\s\S]*?<\/BANKACCTFROM>/, block);
+    return { fileName, content: Buffer.from(replaced, 'latin1') };
+  }
+
+  it('rejects a file for another account at the same bank and branch', async () => {
+    const account = await caAccount();
+
+    await expect(
+      previewImport(t.ctx, {
+        accountId: account.id,
+        ...withBankAccount(
+          '<BANKACCTFROM><BANKID>18206<BRANCHID>00400<ACCTID>61234567891</BANKACCTFROM>',
+        ),
+      }),
+    ).rejects.toThrow('This file is for bank 18206, branch 00400, account 61234567891');
+  });
+
+  it('rejects an account number that only appears inside the IBAN', async () => {
+    const account = await caAccount();
+
+    await expect(
+      previewImport(t.ctx, {
+        accountId: account.id,
+        ...withBankAccount(
+          '<BANKACCTFROM><BANKID>18206<BRANCHID>00400<ACCTID>234567890</BANKACCTFROM>',
+        ),
+      }),
+    ).rejects.toThrow('which is not this Account');
+  });
+
+  it('accepts identifiers given without leading zeros', async () => {
+    const account = await caAccount();
+
+    const preview = await previewImport(t.ctx, {
+      accountId: account.id,
+      ...withBankAccount(
+        '<BANKACCTFROM><BANKID>18206<BRANCHID>400<ACCTID>61234567890</BANKACCTFROM>',
+      ),
+    });
+
+    expect(preview.counts.new).toBe(7);
+  });
+
+  it('rejects a file without BANKID, BRANCHID and ACCTID when the Account has an IBAN', async () => {
+    const account = await caAccount();
+
+    await expect(
+      previewImport(t.ctx, {
+        accountId: account.id,
+        ...withBankAccount('<BANKACCTFROM><BANKID>18206<BRANCHID>00400</BANKACCTFROM>'),
+      }),
+    ).rejects.toThrow(
+      "This file doesn't name its bank, branch and account (BANKID, BRANCHID, ACCTID), so it can't be checked against this Account's IBAN",
+    );
+    await expect(
+      previewImport(t.ctx, { accountId: account.id, ...withBankAccount('') }),
+    ).rejects.toThrow("This file doesn't name its bank, branch and account");
+  });
+
   it('accepts the file on an Account without IBAN', async () => {
     const account = await caAccount({ iban: null });
 

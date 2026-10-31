@@ -44,9 +44,7 @@ export function isEncryptedSecret(value: string): boolean {
 export function readSecretKey(env: Record<string, string | undefined> = process.env): Buffer {
   const encoded = env[SECRET_KEY_ENV]?.trim();
   if (!encoded) {
-    throw new Error(
-      `${SECRET_KEY_ENV} is not set. Generate one with \`openssl rand -base64 32\`.`,
-    );
+    throw new Error(`${SECRET_KEY_ENV} is not set. Generate one with \`openssl rand -base64 32\`.`);
   }
   const key = Buffer.from(encoded, 'base64');
   if (key.length !== KEY_BYTES) {
