@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Queryable } from '@/server/db/client';
 import type { ServiceContext } from '../context';
 import { NotFoundError, parseInput } from '../errors';
 import { BASE_CURRENCY, currencyCode, isoDate } from './constants';
@@ -64,7 +65,7 @@ const rateTableInput = z
  * a list of balances, or the Transfer matcher's FX lookup. `currencies` defaults to all.
  */
 export async function loadRateTable(
-  ctx: ServiceContext,
+  ctx: { db: Queryable },
   range: { currencies?: string[]; from: string; to: string },
 ): Promise<RateTable> {
   const input = parseInput(rateTableInput, range);

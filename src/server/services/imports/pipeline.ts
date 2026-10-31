@@ -9,6 +9,10 @@ import {
 } from '../rules/apply';
 import { evaluateRules } from '../rules/evaluator';
 import { SELECT_TRANSACTION, TRANSACTION_ORDER, type Transaction } from '../transactions/model';
+import {
+  findImportTransferCandidates,
+  type ImportTransferCandidate,
+} from '../transfers/candidates';
 import { fingerprintEntries } from './fingerprint';
 import {
   parserFor,
@@ -27,7 +31,8 @@ import {
 /**
  * The import pipeline: parse → check against the Account → Fingerprint → classify →
  * reconcile → preview. Each stage is a function below; `buildPreview` runs them in order.
- * Rules run on the entries a commit may add (`applyRules`). Transfer candidates slot in last.
+ * Rules run on the entries a commit may add (`applyRules`), then Transfer candidates are
+ * searched on all other Accounts (`findTransfers`).
  */
 
 /** The Account fields the pipeline needs. */
@@ -56,6 +61,11 @@ export interface PreviewEntry extends ParsedEntry {
    * Committing writes exactly this. Null for a duplicate, which is never added.
    */
   classification: RuleClassification | null;
+  /**
+   * Existing Transactions on other Accounts that may be the other side of a Transfer, best
+   * first (spec 83-87). Empty for a duplicate. Nothing is linked unless the commit confirms one.
+   */
+  transferCandidates: ImportTransferCandidate[];
 }
 
 export type NearDuplicateDecision = 'keep' | 'skip';
@@ -216,7 +226,14 @@ async function classifyEntries(
       : candidates.length > 0
         ? 'near_duplicate'
         : 'new';
-    return { ...entry, fingerprint, status, nearDuplicates: candidates, classification: null };
+    return {
+      ...entry,
+      fingerprint,
+      status,
+      nearDuplicates: candidates,
+      classification: null,
+      transferCandidates: [],
+    };
   });
 }
 
@@ -236,6 +253,20 @@ async function applyRules(
     const evaluation = evaluateRules(engine.compiled, subject);
     return { ...entry, classification: describeEvaluation(engine, evaluation) };
   });
+}
+
+/** Stage 6: Transfer candidates on all other Accounts for every entry a commit may add. */
+async function findTransfers(
+  db: Queryable,
+  account: ImportAccount,
+  entries: readonly PreviewEntry[],
+): Promise<PreviewEntry[]> {
+  const candidates = await findImportTransferCandidates(
+    db,
+    account.id,
+    entries.map((entry) => ({ ...entry, skip: entry.status === 'duplicate' })),
+  );
+  return entries.map((entry, index) => ({ ...entry, transferCandidates: candidates[index]! }));
 }
 
 /** The first day of the statement: its stated start, or else its first entry's booking date. */
@@ -278,11 +309,8 @@ export async function buildPreview(
   decisions: NearDuplicateDecisions = {},
 ): Promise<PreviewBody> {
   checkStatementAccount(account, statement);
-  const entries = await applyRules(
-    db,
-    account,
-    await classifyEntries(db, account, statement.entries),
-  );
+  const classified = await classifyEntries(db, account, statement.entries);
+  const entries = await findTransfers(db, account, await applyRules(db, account, classified));
   const newEntries = entries.filter((entry) => entry.status === 'new');
   const added = entries.filter((entry) => isAdded(entry, decisions));
   const balances = await loadBalances(db, account.id, statement);

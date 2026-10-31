@@ -3,8 +3,9 @@ import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
 import { getOpeningBalance, setOpeningBalance } from '../accounts';
 import { mutate, type ServiceContext } from '../context';
-import { NotFoundError, parseInput } from '../errors';
+import { NotFoundError, parseInput, ValidationError } from '../errors';
 import { applyRuleAssignments } from '../rules/apply';
+import { linkPair } from '../transfers/link';
 import {
   SELECT_TRANSACTION,
   TRANSACTION_ORDER,
@@ -64,7 +65,14 @@ export interface CommitImportInput {
   acceptOpeningBalance?: boolean;
   /** Keep or skip per near-duplicate, keyed by its Fingerprint. Unlisted ones are skipped. */
   nearDuplicateDecisions?: NearDuplicateDecisions;
+  /**
+   * The Transfer candidates the user confirmed: per entry Fingerprint, the id of the existing
+   * Transaction to link it with. Entries not listed are linked to nothing (spec 87).
+   */
+  transferDecisions?: TransferDecisions;
 }
+
+export type TransferDecisions = Readonly<Record<string, string>>;
 
 const previewImportInput = z.object({
   accountId: z.uuid({ error: 'Account is required' }),
@@ -86,7 +94,33 @@ const commitImportInput = z.object({
   previewId: z.uuid({ error: 'Import preview not found' }),
   acceptOpeningBalance: z.boolean().default(true),
   nearDuplicateDecisions: z.record(z.string(), z.enum(['keep', 'skip'])).default({}),
+  transferDecisions: z
+    .record(z.string(), z.uuid({ error: 'This Transaction is no longer a Transfer candidate' }))
+    .default({}),
 });
+
+/**
+ * The confirmed other side of each added entry, keyed by Fingerprint. A confirmation must name
+ * one of the entry's current candidates: the preview was rebuilt, so a Transaction linked or
+ * deleted since no longer qualifies.
+ */
+function confirmedTransfers(
+  added: readonly PreviewEntry[],
+  decisions: Readonly<Record<string, string>>,
+): Map<string, string> {
+  const confirmed = new Map<string, string>();
+  for (const entry of added) {
+    const chosen = decisions[entry.fingerprint];
+    if (!chosen) continue;
+    if (!entry.transferCandidates.some((candidate) => candidate.transaction.id === chosen)) {
+      throw new ValidationError(
+        `The Transaction chosen for the entry of ${entry.bookingDate} is no longer a Transfer candidate`,
+      );
+    }
+    confirmed.set(entry.fingerprint, chosen);
+  }
+  return confirmed;
+}
 
 const PREVIEW_NOT_FOUND = 'This Import preview no longer exists. Upload the file again.';
 
@@ -219,6 +253,7 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
       values.nearDuplicateDecisions,
     );
     const { statement, reconciliation, entries, added } = preview;
+    const transfers = confirmedTransfers(added, values.transferDecisions);
 
     await tx.query(
       `INSERT INTO import (id, account_id, file_name, import_format, statement_from, statement_to,
@@ -246,7 +281,11 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
     for (const entry of added) {
       const transaction = await insertTransaction(tx, account, importId, entry);
       await history.record('transaction', transaction.id, null, transactionSnapshot(transaction));
-      if (entry.classification) {
+      const otherSide = transfers.get(entry.fingerprint);
+      if (otherSide) {
+        // A Transfer: no Rules, no Category (spec 77).
+        await linkPair(scope, [transaction.id, otherSide]);
+      } else if (entry.classification) {
         await applyRuleAssignments(scope, transaction.id, entry.classification);
       }
     }
