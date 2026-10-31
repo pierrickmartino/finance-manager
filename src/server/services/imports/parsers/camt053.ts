@@ -152,6 +152,10 @@ function readEntry(entry: XmlElement, index: number): ParsedEntry | null {
   );
   const single = details.length === 1 ? details[0]! : null;
   const counterparty = single ? readCounterparty(single, direction) : null;
+  // Card payments, ATM withdrawals and fees carry no related parties: BCGE names the merchant
+  // (or the fee) only in AddtlNtryInf. A bundled entry's counterparties are its details.
+  const counterpartyName =
+    counterparty?.name ?? (details.length > 1 ? null : textAt(entry, 'AddtlNtryInf'));
 
   return {
     bookingDate,
@@ -160,7 +164,7 @@ function readEntry(entry: XmlElement, index: number): ParsedEntry | null {
     currency,
     bankReference: reference,
     rawDescription: readRawDescription(entry, details),
-    counterpartyName: counterparty?.name ?? null,
+    counterpartyName,
     counterpartyIban: counterparty?.iban ?? null,
     paymentReference: single ? readRemittance(single) : null,
     bundledDetails:

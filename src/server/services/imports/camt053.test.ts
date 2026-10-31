@@ -90,14 +90,17 @@ describe('preview an Import (BCGE CAMT.053)', () => {
       counterpartyIban: 'CH4700700110000654321',
       paymentReference: 'Salaire octobre 2025',
     });
-    // A card entry: no related parties, no remittance text
+    // A card entry: no related parties, so the counterparty comes from AddtlNtryInf
     expect(preview.entries[3]).toMatchObject({
       bankReference: null,
-      counterpartyName: null,
+      counterpartyName: 'Achat Debit Mastercard Boulangerie Exemple Genève',
       counterpartyIban: null,
       paymentReference: null,
       rawDescription: 'Achat Debit Mastercard Boulangerie Exemple Genève',
     });
+    // ATM withdrawals and fees have no related parties either
+    expect(preview.entries[1]!.counterpartyName).toBe('Retrait Bancomat BCGE Genève Exemple');
+    expect(preview.entries[7]!.counterpartyName).toBe('Frais de tenue de compte octobre 2025');
     expect(preview.counts).toEqual({ total: 8, new: 8, duplicate: 0, nearDuplicate: 0 });
   });
 });
