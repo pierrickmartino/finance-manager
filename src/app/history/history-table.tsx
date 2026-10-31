@@ -4,13 +4,6 @@ import type { HistoryEntry, JsonValue } from '@/server/services/history';
 
 const CELL = 'px-3 py-2 text-left align-top';
 
-const TIME = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Europe/Zurich',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-});
-
 /** Renders a recorded value. Fields ending in "Minor" hold amounts in minor units. */
 function renderValue(field: string, value: JsonValue, fmt: Formatter): string {
   if (value === null) return '—';
@@ -59,7 +52,7 @@ export function HistoryTable({
           {entries.map((entry) => (
             <tr key={entry.id}>
               <td className={`${CELL} whitespace-nowrap tabular-nums`}>
-                {fmt.date(entry.at)} {TIME.format(entry.at)}
+                {fmt.dateTime(entry.at, { hasSeconds: true })}
               </td>
               <td className={CELL}>
                 {entry.actorType}

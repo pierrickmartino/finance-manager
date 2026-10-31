@@ -37,12 +37,19 @@ export interface AmountOptions {
   isWhole?: boolean;
 }
 
+export interface DateTimeOptions {
+  /** Adds the seconds ("10:05:09"). */
+  hasSeconds?: boolean;
+}
+
 export interface Formatter {
   readonly settings: DisplaySettings;
   /** Formats an amount held as integer minor units (ADR-0002). */
   amount(minor: number, options?: AmountOptions): string;
   /** Formats an ISO date (`YYYY-MM-DD`), or a timestamp in Swiss local time. */
   date(value: string | Date): string;
+  /** Formats a timestamp as its Swiss local date and time ("01.07.2025 10:05"). */
+  dateTime(value: Date, options?: DateTimeOptions): string;
   /** Formats a share between 0 and 1 as a percentage with one decimal ("1.2%"). */
   percent(share: number): string;
   /** Formats a reporting period key: `2025-03` → "Mar 2025", `2025-Q1` → "Q1 2025", `2025`. */
@@ -116,6 +123,31 @@ export function formatDate(value: string | Date, dateFormat: DateFormat): string
   return dateFormat.replace('yyyy', yyyy).replace('mm', mm).replace('dd', dd);
 }
 
+const TIME_FORMATS = {
+  minutes: new Intl.DateTimeFormat('en-GB', {
+    timeZone: DISPLAY_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }),
+  seconds: new Intl.DateTimeFormat('en-GB', {
+    timeZone: DISPLAY_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }),
+};
+
+export function formatDateTime(
+  value: Date,
+  dateFormat: DateFormat,
+  { hasSeconds = false }: DateTimeOptions = {},
+): string {
+  const time = TIME_FORMATS[hasSeconds ? 'seconds' : 'minutes'].format(value);
+  return `${formatDate(value, dateFormat)} ${time}`;
+}
+
 const PERCENT_TENTHS = 1000;
 
 export function formatPercent(share: number, numberFormat: NumberFormat): string {
@@ -158,6 +190,7 @@ export function createFormatter(settings: DisplaySettings): Formatter {
     settings,
     amount: (minor, options) => formatAmount(minor, settings.numberFormat, options),
     date: (value) => formatDate(value, settings.dateFormat),
+    dateTime: (value, options) => formatDateTime(value, settings.dateFormat, options),
     percent: (share) => formatPercent(share, settings.numberFormat),
     period: formatPeriod,
   };

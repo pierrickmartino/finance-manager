@@ -101,3 +101,24 @@ describe('period', () => {
     expect(() => formatPeriod('March')).toThrow('Expected a period key');
   });
 });
+
+describe('dateTime', () => {
+  // 2025-07-01 08:05:09 UTC is 10:05:09 in Zurich (summer time).
+  const at = new Date('2025-07-01T08:05:09Z');
+
+  it('formats a timestamp as the date in the user format and the Swiss local time', () => {
+    expect(createFormatter(DEFAULT_DISPLAY_SETTINGS).dateTime(at)).toBe('01.07.2025 10:05');
+  });
+
+  it('adds seconds when asked, and follows the date format', () => {
+    const fmt = createFormatter({ ...DEFAULT_DISPLAY_SETTINGS, dateFormat: 'yyyy-mm-dd' });
+
+    expect(fmt.dateTime(at, { hasSeconds: true })).toBe('2025-07-01 10:05:09');
+  });
+
+  it('uses Swiss winter time in January', () => {
+    const fmt = createFormatter(DEFAULT_DISPLAY_SETTINGS);
+
+    expect(fmt.dateTime(new Date('2025-01-15T23:30:00Z'))).toBe('16.01.2025 00:30');
+  });
+});
