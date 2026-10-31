@@ -108,6 +108,21 @@ export async function listTransactions(
   };
 }
 
+/** The list items of the given Transactions, in the order of `ids` (unknown ids are skipped). */
+export async function listTransactionsByIds(
+  ctx: ServiceContext,
+  ids: readonly string[],
+): Promise<TransactionListItem[]> {
+  if (ids.length === 0) return [];
+  const rows = await ctx.db.query<TransactionRow>(
+    `${selectTransactions()} WHERE t.id = ANY($1::uuid[])`,
+    [ids],
+  );
+  const byId = new Map(rows.rows.map((row) => [row.id, row]));
+  const ordered = ids.flatMap((id) => byId.get(id) ?? []);
+  return withClassification(ctx, ordered);
+}
+
 const transactionId = z.uuid();
 
 /** One Transaction with its Account name and source Import. */

@@ -4,6 +4,12 @@
  * any cell drills down to its Transactions (`listCellTransactions`).
  */
 export { runWidgetQuery, type ReportTable } from './engine';
+export {
+  listCellTransactions,
+  type CellRef,
+  type CellTransaction,
+  type CellTransactionPage,
+} from './drill';
 export type { ReportHeader } from './headers';
 export {
   AXIS_LABELS,

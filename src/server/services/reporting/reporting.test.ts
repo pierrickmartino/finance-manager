@@ -6,7 +6,7 @@ import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { editClassification, type ClassificationChanges } from '../transactions';
 import { linkTransfer } from '../transfers';
-import { runWidgetQuery, type WidgetQueryInput } from '.';
+import { listCellTransactions, runWidgetQuery, type CellRef, type WidgetQueryInput } from '.';
 
 const t = setupTestDatabase();
 
@@ -401,6 +401,92 @@ describe('date ranges', () => {
         dateRange: { kind: 'fixed', from: '2025-02-01', to: '2025-01-01' },
       }),
     ).rejects.toThrow('From must not be after To');
+  });
+});
+
+describe('drill down into a cell', () => {
+  /** Every cell, row total, column total and the grand total equal the sum of their list. */
+  async function expectDrillDownConsistent(query: WidgetQueryInput): Promise<void> {
+    const report = await runWidgetQuery(t.ctx, query);
+    const listed = async (cell: CellRef) => {
+      const page = await listCellTransactions(t.ctx, query, { ...cell, pageSize: 200 });
+      const sum = page.transactions.reduce((total, item) => total + item.chfMinor, 0);
+      expect(page.sumChfMinor).toBe(page.total === 0 ? null : sum);
+      expect(page.transactions).toHaveLength(page.total);
+      return page.total === 0 ? null : sum;
+    };
+    for (const [r, row] of report.rows.entries()) {
+      for (const [c, column] of report.columns.entries()) {
+        expect(await listed({ row: row.key, column: column.key })).toBe(report.cells[r]![c]);
+      }
+      expect(await listed({ row: row.key })).toBe(report.rowTotals[r]);
+    }
+    for (const [c, column] of report.columns.entries()) {
+      expect(await listed({ column: column.key })).toBe(report.columnTotals[c]);
+    }
+    expect(await listed({})).toBe(report.total);
+  }
+
+  it('lists the Transactions of a cell with their CHF values', async () => {
+    const { groceries } = await dataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: 'month', columns: 'category' },
+      { row: '2025-01', column: groceries.id },
+    );
+
+    expect(page.total).toBe(3);
+    expect(page.sumChfMinor).toBe(-19400);
+    expect(
+      page.transactions.map((item) => [
+        item.bookingDate,
+        item.accountName,
+        item.amountMinor,
+        item.currency,
+        item.chfMinor,
+        item.category?.name,
+      ]),
+    ).toEqual([
+      ['2025-01-20', 'UBS', 2000, 'CHF', 2000, 'Groceries'],
+      ['2025-01-11', 'CA', -10000, 'EUR', -9400, 'Groceries'],
+      ['2025-01-10', 'UBS', -12000, 'CHF', -12000, 'Groceries'],
+    ]);
+  });
+
+  it('adds up, cell by cell, for month × Category', async () => {
+    await dataset();
+    await expectDrillDownConsistent({ dateRange: Q1_2025, rows: 'month', columns: 'category' });
+  });
+
+  it('adds up, cell by cell, for Tag × Payee and Capital in net cash flow', async () => {
+    await dataset();
+    await expectDrillDownConsistent({ dateRange: Q1_2025, rows: 'tag', columns: 'payee' });
+    await expectDrillDownConsistent({
+      dateRange: Q1_2025,
+      rows: 'categoryGroupType',
+      columns: 'quarter',
+      includeCapital: true,
+    });
+  });
+
+  it('pages through a cell, newest first', async () => {
+    await dataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025 },
+      { page: 2, pageSize: 3 },
+    );
+
+    expect(page).toMatchObject({ total: 7, page: 2, pageSize: 3, pageCount: 3 });
+    expect(page.transactions.map((item) => item.bookingDate)).toEqual([
+      '2025-01-25',
+      '2025-01-20',
+      '2025-01-11',
+    ]);
+    // The sum covers the whole cell, not just the page.
+    expect(page.sumChfMinor).toBe(564949);
   });
 });
 
