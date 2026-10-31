@@ -90,8 +90,14 @@ function draftOf(condition: RuleCondition, fmt: Formatter): ConditionDraft {
   }
 }
 
-/** The draft to edit an existing Rule, or a blank one. */
-export function ruleToDraft(rule: Rule | null, fmt: Formatter): RuleDraft {
+/**
+ * The draft to edit an existing Rule or a suggested one (created from a Transaction), or a
+ * blank one.
+ */
+export function ruleToDraft(
+  rule: Pick<Rule, 'name' | 'enabled' | 'conditions' | 'actions'> | null,
+  fmt: Formatter,
+): RuleDraft {
   if (!rule) {
     return {
       name: '',

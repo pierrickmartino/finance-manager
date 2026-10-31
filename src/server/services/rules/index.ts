@@ -9,14 +9,28 @@ import { ruleInput, type ParsedRuleInput, type RuleInput } from './input';
 import { findRule, loadRules, ruleSnapshot, type Rule } from './model';
 
 /**
- * Managing Rules (spec 69-82): create, edit, enable or disable, reorder, delete. Rules only
- * run on import and when a Manual transaction is saved (`./apply.ts`), so none of these
- * operations ever touches a Transaction (spec 78).
+ * Managing Rules (spec 69-82): create, edit, enable or disable, reorder, delete. Rules run on
+ * import and when a Manual transaction is saved (`./apply.ts`), and on existing Transactions
+ * only when asked (`./existing.ts`), so none of these operations touches a Transaction
+ * (spec 78).
  */
 
 export type { Rule } from './model';
 export type { RuleInput } from './input';
 export type { NamedRuleAssignment, RuleClassification } from './apply';
+export {
+  applyRulesToExisting,
+  countRuleMatches,
+  MAX_PREVIEW_ROWS,
+  previewApplyRules,
+  suggestRuleFromTransaction,
+  type ApplyRulesInput,
+  type ApplyRulesPreview,
+  type ApplyRulesResult,
+  type RuleFieldChange,
+  type RuleSuggestion,
+  type TransactionRuleChange,
+} from './existing';
 export type {
   AmountOperator,
   DateOperator,
