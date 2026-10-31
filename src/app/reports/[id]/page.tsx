@@ -3,12 +3,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ActionForm } from '@/components/action-form';
 import { FieldError } from '@/components/form';
-import { queryToParams } from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
 import { NotFoundError } from '@/server/services/errors';
 import { getWidget, MEASURE_LABELS, type Widget } from '@/server/services/reporting';
+import { balanceHref, editWidgetHref } from '../../dashboards/load';
 import { deleteWidgetAction } from '../actions';
-import { loadReport } from '../load';
+import { loadSavedWidget } from '../load';
+import { toPivotData } from '../pivot-data';
 import { ReportView } from '../report-view';
 
 export const metadata: Metadata = { title: 'Widget · Finance Manager' };
@@ -25,9 +26,7 @@ async function findWidget(id: string): Promise<Widget> {
 /** A saved Widget, shown as its table (Dashboards place it on a grid later). */
 export default async function WidgetPage({ params }: { params: Promise<{ id: string }> }) {
   const widget = await findWidget((await params).id);
-  const { report, error } = await loadReport(widget.query);
-  const editParams = queryToParams(widget.query);
-  editParams.set('widget', widget.id);
+  const { report, error } = await loadSavedWidget(widget);
 
   return (
     <section className="flex flex-col gap-6">
@@ -37,7 +36,7 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
           <Link href="/reports" className="underline">
             All Widgets
           </Link>
-          <Link href={`/reports/builder?${editParams}`} className="underline">
+          <Link href={editWidgetHref(widget)} className="underline">
             Edit
           </Link>
           <ActionForm
@@ -55,7 +54,14 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
         {MEASURE_LABELS[widget.query.measure]} in CHF
       </p>
       {error && <FieldError message={error} />}
-      {report && <ReportView report={report} title={widget.name} />}
+      {report && (
+        <ReportView
+          report={report}
+          title={widget.name}
+          visualisation={widget.visualisation}
+          data={widget.source === 'account_balances' ? toPivotData(report, balanceHref) : undefined}
+        />
+      )}
     </section>
   );
 }

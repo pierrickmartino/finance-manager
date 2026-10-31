@@ -5,8 +5,10 @@ import { listCategoryGroups } from '@/server/services/categories';
 import { ServiceError } from '@/server/services/errors';
 import { listPayees } from '@/server/services/payees';
 import {
+  runSavedWidget,
   runWidgetQuery,
   type ReportTable,
+  type Widget,
   type WidgetQueryInput,
 } from '@/server/services/reporting';
 import { listTags } from '@/server/services/tags';
@@ -18,6 +20,18 @@ export async function loadReport(
 ): Promise<{ report: ReportTable | null; error: string | null }> {
   try {
     return { report: await runWidgetQuery(await getServiceContext(), query), error: null };
+  } catch (error: unknown) {
+    if (error instanceof ServiceError) return { report: null, error: error.message };
+    throw error;
+  }
+}
+
+/** Runs a saved Widget (its query, or the Account balances), like `loadReport`. */
+export async function loadSavedWidget(
+  widget: Widget,
+): Promise<{ report: ReportTable | null; error: string | null }> {
+  try {
+    return { report: await runSavedWidget(await getServiceContext(), widget), error: null };
   } catch (error: unknown) {
     if (error instanceof ServiceError) return { report: null, error: error.message };
     throw error;

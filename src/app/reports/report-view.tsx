@@ -1,11 +1,23 @@
+import type { ChartSource } from '@/lib/reporting/chart-data';
 import { FieldError } from '@/components/form';
 import { getFormatter } from '@/server/formatter';
-import type { ReportTable } from '@/server/services/reporting';
+import type { ReportTable, Visualisation } from '@/server/services/reporting';
+import { WidgetVisualisation } from '../dashboards/widget-visualisation';
 import { toPivotData } from './pivot-data';
-import { PivotTable } from './pivot-table';
 
-/** A report's notes (range, partial period, unconverted amounts) and its pivot table. */
-export async function ReportView({ report, title }: { report: ReportTable; title: string }) {
+/** A report's notes (range, partial period, unconverted amounts) and its visualisation. */
+export async function ReportView({
+  report,
+  title,
+  visualisation = 'table',
+  data = toPivotData(report),
+}: {
+  report: ReportTable;
+  title: string;
+  visualisation?: Visualisation;
+  /** The table with its links; by default each value drills down to its Transactions. */
+  data?: ChartSource;
+}) {
   const fmt = await getFormatter();
   const { range, partialPeriod } = report;
   return (
@@ -24,7 +36,7 @@ export async function ReportView({ report, title }: { report: ReportTable; title
           } left out: no FX rate on or before their date.`}
         />
       )}
-      <PivotTable data={toPivotData(report)} title={title} />
+      <WidgetVisualisation data={data} title={title} visualisation={visualisation} />
     </div>
   );
 }

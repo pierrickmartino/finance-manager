@@ -9,8 +9,10 @@ import {
   createWidget,
   deleteWidget,
   updateWidget,
+  type Visualisation,
   type WidgetQueryInput,
 } from '@/server/services/reporting';
+import { addWidget } from '@/server/services/dashboards';
 
 type Result = ActionResult<unknown>;
 
@@ -25,14 +27,25 @@ function readQuery(formData: FormData): WidgetQueryInput {
 /** Saves the report shown in the editor as a new Widget, or updates the Widget being edited. */
 export async function saveWidgetAction(_previous: Result | null, formData: FormData) {
   const widgetId = formText(formData, 'widgetId');
+  const dashboardId = formText(formData, 'dashboardId');
   const result = await runAction(async () => {
     const ctx = await getServiceContext();
-    const input = { name: formText(formData, 'name'), query: readQuery(formData) };
-    return widgetId ? updateWidget(ctx, widgetId, input) : createWidget(ctx, input);
+    const input = {
+      name: formText(formData, 'name'),
+      query: readQuery(formData),
+      visualisation: (formText(formData, 'visualisation') || undefined) as Visualisation,
+    };
+    if (widgetId) return updateWidget(ctx, widgetId, input);
+    return dashboardId ? addWidget(ctx, dashboardId, input) : createWidget(ctx, input);
   });
   if (!result.ok) return result;
   revalidatePath('/reports', 'layout');
-  redirect(`/reports/${result.data.id}`);
+  revalidatePath('/dashboards', 'layout');
+  redirect(
+    result.data.dashboardId
+      ? `/dashboards/${result.data.dashboardId}`
+      : `/reports/${result.data.id}`,
+  );
 }
 
 export async function deleteWidgetAction(

@@ -33,6 +33,8 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
 export interface AmountOptions {
   /** ISO code. Sets the number of decimals and, when given, prefixes the result ("CHF 1'234.50"). */
   currency?: string;
+  /** Rounds to whole units (half away from zero) and drops the decimals, e.g. for chart axes. */
+  isWhole?: boolean;
 }
 
 export interface Formatter {
@@ -77,6 +79,11 @@ export function formatAmount(
   const digits = fractionDigits(options.currency);
   const scale = 10 ** digits;
   const abs = Math.abs(minor);
+  if (options.isWhole) {
+    const units = Math.round(abs / scale);
+    const number = `${minor < 0 && units > 0 ? '-' : ''}${groupThousands(String(units), group)}`;
+    return options.currency ? `${options.currency} ${number}` : number;
+  }
   const whole = groupThousands(String(Math.floor(abs / scale)), group);
   const fraction = digits > 0 ? decimal + String(abs % scale).padStart(digits, '0') : '';
   const sign = minor < 0 ? '-' : '';

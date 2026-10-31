@@ -3,25 +3,11 @@
 import Link from 'next/link';
 import { Fragment, useEffect, useState } from 'react';
 import { useFormatter } from '@/components/formatter-provider';
-import type { Measure, ReportHeader } from '@/server/services/reporting';
+import type { ChartSource } from '@/lib/reporting/chart-data';
+import type { ReportHeader } from '@/server/services/reporting';
 
 /** What the pivot shows: the engine's table, plus where each value drills down to. */
-export interface PivotData {
-  measure: Measure;
-  rows: ReportHeader[];
-  columns: ReportHeader[];
-  cells: (number | null)[][];
-  rowTotals: (number | null)[];
-  columnTotals: (number | null)[];
-  total: number | null;
-  /** Drill-down links, same shape as the values. */
-  hrefs: {
-    cells: string[][];
-    rowTotals: string[];
-    columnTotals: string[];
-    total: string;
-  };
-}
+export type PivotData = ChartSource;
 
 const CELL = 'px-3 py-1.5 text-right tabular-nums whitespace-nowrap';
 const HEAD = 'px-3 py-1.5 font-medium whitespace-nowrap';
@@ -34,7 +20,16 @@ function headerLabel(header: ReportHeader): string {
  * The table visualisation and its full-screen pivot view (spec 105). Every value is a link to
  * the Transactions behind it (spec 107).
  */
-export function PivotTable({ data, title }: { data: PivotData; title: string }) {
+export function PivotTable({
+  data,
+  title,
+  isCompact = false,
+}: {
+  data: PivotData;
+  title: string;
+  /** On a Dashboard card, whose header already names it: the title shows in full screen only. */
+  isCompact?: boolean;
+}) {
   const fmt = useFormatter();
   const [isFullScreen, setFullScreen] = useState(false);
 
@@ -72,11 +67,11 @@ export function PivotTable({ data, title }: { data: PivotData; title: string }) 
       className={
         isFullScreen
           ? 'fixed inset-0 z-50 flex flex-col gap-3 overflow-auto bg-white p-4 dark:bg-zinc-950'
-          : 'flex flex-col gap-3'
+          : `flex flex-col gap-3 ${isCompact ? 'h-full' : ''}`
       }
     >
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">{title}</h2>
+        {isCompact && !isFullScreen ? <span /> : <h2 className="text-lg font-semibold">{title}</h2>}
         <button
           type="button"
           onClick={() => setFullScreen(!isFullScreen)}
@@ -88,7 +83,11 @@ export function PivotTable({ data, title }: { data: PivotData; title: string }) 
       {data.rows.length === 0 ? (
         <p className="text-sm text-zinc-500">No complete period in this date range yet.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div
+          className={
+            isCompact && !isFullScreen ? 'min-h-0 flex-1 overflow-auto' : 'overflow-x-auto'
+          }
+        >
           <table aria-label="Pivot" className="text-sm">
             <thead className="border-b border-zinc-200 dark:border-zinc-800">
               <tr>

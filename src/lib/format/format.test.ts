@@ -20,6 +20,13 @@ describe('formatter with Swiss defaults', () => {
     expect(fmt.amount(123450, { currency: 'EUR' })).toBe("EUR 1'234.50");
   });
 
+  it('rounds to whole units for chart axes, half away from zero', () => {
+    expect(fmt.amount(123450, { isWhole: true })).toBe("1'235");
+    expect(fmt.amount(-123449, { isWhole: true })).toBe("-1'234");
+    expect(fmt.amount(-50, { isWhole: true, currency: 'CHF' })).toBe('CHF -1');
+    expect(fmt.amount(0, { isWhole: true })).toBe('0');
+  });
+
   it('formats an ISO date as dd.mm.yyyy', () => {
     expect(fmt.date('2024-03-07')).toBe('07.03.2024');
   });

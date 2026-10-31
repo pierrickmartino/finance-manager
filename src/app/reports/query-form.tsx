@@ -35,6 +35,8 @@ interface QueryFormProps {
   lists: QueryFormLists;
   /** Extra hidden fields to keep (e.g. the Widget being edited). */
   hidden?: Record<string, string>;
+  /** More fields of the same GET form (e.g. the visualisation). */
+  children?: ReactNode;
 }
 
 function Labelled({ label, children }: { label: string; children: ReactNode }) {
@@ -50,7 +52,7 @@ function Labelled({ label, children }: { label: string; children: ReactNode }) {
  * The Widget query definition as a GET form (spec 99–103): submitting it shows the report.
  * Fields that don't apply to the chosen date range are ignored.
  */
-export function QueryForm({ query, lists, hidden = {} }: QueryFormProps) {
+export function QueryForm({ query, lists, hidden = {}, children }: QueryFormProps) {
   const { accounts, groups, payees, tags } = lists;
   const range = query.dateRange;
   const filters = query.filters ?? {};
@@ -231,6 +233,8 @@ export function QueryForm({ query, lists, hidden = {} }: QueryFormProps) {
           </select>
         </Labelled>
       </fieldset>
+
+      {children}
 
       <div className="flex items-center gap-3">
         <button

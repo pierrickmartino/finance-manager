@@ -1,6 +1,6 @@
+import type { ChartSource } from '@/lib/reporting/chart-data';
 import { cellToParams, queryToParams } from '@/lib/reporting/widget-params';
 import type { CellRef, ReportHeader, ReportTable } from '@/server/services/reporting';
-import type { PivotData } from './pivot-table';
 
 /** The drill-down page of one cell of a Widget query. */
 export function drillHref(report: ReportTable, cell: CellRef): string {
@@ -14,8 +14,14 @@ function key(axis: unknown, header: ReportHeader): string | null | undefined {
   return axis === null ? undefined : header.key;
 }
 
-/** The engine's table with a drill-down link for every value. */
-export function toPivotData(report: ReportTable): PivotData {
+/**
+ * The engine's table with a link for every value: by default its drill-down to the
+ * Transactions; `hrefOf` links elsewhere (the Account balances link to each Account).
+ */
+export function toPivotData(
+  report: ReportTable,
+  hrefOf: (cell: CellRef) => string = (cell) => drillHref(report, cell),
+): ChartSource {
   const row = (header: ReportHeader) => key(report.query.rows, header);
   const column = (header: ReportHeader) => key(report.query.columns, header);
   return {
@@ -28,11 +34,11 @@ export function toPivotData(report: ReportTable): PivotData {
     total: report.total,
     hrefs: {
       cells: report.rows.map((r) =>
-        report.columns.map((c) => drillHref(report, { row: row(r), column: column(c) })),
+        report.columns.map((c) => hrefOf({ row: row(r), column: column(c) })),
       ),
-      rowTotals: report.rows.map((r) => drillHref(report, { row: row(r) })),
-      columnTotals: report.columns.map((c) => drillHref(report, { column: column(c) })),
-      total: drillHref(report, {}),
+      rowTotals: report.rows.map((r) => hrefOf({ row: row(r) })),
+      columnTotals: report.columns.map((c) => hrefOf({ column: column(c) })),
+      total: hrefOf({}),
     },
   };
 }
