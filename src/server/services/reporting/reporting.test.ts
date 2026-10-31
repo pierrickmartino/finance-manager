@@ -86,7 +86,11 @@ async function dataset() {
       amountMinor: -12000,
       classify: as(groceries, { payeeName: 'Migros', tagNames: ['Family', 'Weekly'] }),
     },
-    { bookingDate: '2025-01-20', amountMinor: 2000, classify: as(groceries, { payeeName: 'Migros' }) },
+    {
+      bookingDate: '2025-01-20',
+      amountMinor: 2000,
+      classify: as(groceries, { payeeName: 'Migros' }),
+    },
     {
       bookingDate: '2025-02-03',
       amountMinor: -8000,
@@ -487,6 +491,8 @@ describe('drill down into a cell', () => {
     ]);
     // The sum covers the whole cell, not just the page.
     expect(page.sumChfMinor).toBe(564949);
+    const pastTheEnd = await listCellTransactions(t.ctx, { dateRange: Q1_2025 }, { page: 9 });
+    expect(pastTheEnd).toMatchObject({ total: 7, sumChfMinor: 564949, transactions: [] });
   });
 });
 

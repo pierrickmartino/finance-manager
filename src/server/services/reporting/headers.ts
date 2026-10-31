@@ -85,7 +85,11 @@ export async function axisHeaders(
   }
   const present = [...keys].filter((key): key is string => key !== null);
   const labelled = await labelKeys(db, axis, present);
-  const headers = labelled.map(({ key, label }) => ({ key, label, isPartial: false }));
+  const headers: ReportHeader[] = labelled.map(({ key, label }) => ({
+    key,
+    label,
+    isPartial: false,
+  }));
   if (keys.has(null)) {
     headers.push({ key: null, label: NONE_LABELS[axis] ?? 'None', isPartial: false });
   }

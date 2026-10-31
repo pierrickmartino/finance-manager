@@ -89,7 +89,8 @@ export async function runWidgetQuery(
     UNION ALL ${groupedSelect('all', null, null)}
     UNION ALL SELECT 'unconverted', NULL, NULL, NULL, count(*)::int
       FROM report_base WHERE chf_minor IS NULL`;
-  const aggregates = range.from <= range.to ? (await ctx.db.query<AggregateRow>(sql, params.values)).rows : [];
+  const aggregates =
+    range.from <= range.to ? (await ctx.db.query<AggregateRow>(sql, params.values)).rows : [];
 
   const byGrouping = (grouping: Grouping) => aggregates.filter((row) => row.grouping === grouping);
   const cellRows = byGrouping('cell');

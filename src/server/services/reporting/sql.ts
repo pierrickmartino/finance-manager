@@ -136,7 +136,5 @@ export function axisCondition(axis: ReportAxis, key: string | null, params: SqlP
       : `EXISTS (SELECT 1 FROM transaction_tag dt
                  WHERE dt.transaction_id = b.id AND dt.tag_id = ${params.add(key)}::uuid)`;
   }
-  return key === null
-    ? `${axisKey(axis)} IS NULL`
-    : `${axisKey(axis)} = ${params.add(key)}::text`;
+  return key === null ? `${axisKey(axis)} IS NULL` : `${axisKey(axis)} = ${params.add(key)}::text`;
 }

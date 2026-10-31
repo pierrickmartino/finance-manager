@@ -12,6 +12,19 @@ export {
 } from './drill';
 export type { ReportHeader } from './headers';
 export {
+  createWidget,
+  deleteWidget,
+  getWidget,
+  listWidgets,
+  runWidget,
+  updateWidget,
+  VISUALISATION_LABELS,
+  VISUALISATIONS,
+  type Visualisation,
+  type Widget,
+  type WidgetInput,
+} from './widgets';
+export {
   AXIS_LABELS,
   isTimeAxis,
   MEASURE_LABELS,

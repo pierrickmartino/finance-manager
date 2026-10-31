@@ -19,6 +19,7 @@ export const HISTORY_ENTITY_TYPES = [
   'tag',
   'rule',
   'transfer',
+  'widget',
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 

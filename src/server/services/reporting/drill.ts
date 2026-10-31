@@ -88,35 +88,34 @@ export async function listCellTransactions(
   const cte = baseCte(query, range, await currenciesInUse(ctx), params);
   const limit = params.add(pageSize);
   const offset = params.add((page - 1) * pageSize);
+  // The whole cell's count and sum, plus one page of it.
   const result = await ctx.db.query<{
-    id: string;
-    chfMinor: number;
     total: number;
-    sumMinor: number;
+    sumMinor: number | null;
+    items: { id: string; chfMinor: number }[] | null;
   }>(
-    `${cte}
-     SELECT b.id, b.chf_minor AS "chfMinor", count(*) OVER ()::int AS total,
-       (sum(b.chf_minor) OVER ())::bigint AS "sumMinor"
-     FROM report_base b JOIN "transaction" t ON t.id = b.id
-     WHERE ${conditions.join(' AND ')}
-     ORDER BY t.booking_date DESC, t.entry_order DESC
-     LIMIT ${limit} OFFSET ${offset}`,
+    `${cte}, cell AS (
+       SELECT b.id, b.chf_minor, t.booking_date, t.entry_order
+       FROM report_base b JOIN "transaction" t ON t.id = b.id
+       WHERE ${conditions.join(' AND ')}
+     )
+     SELECT (SELECT count(*)::int FROM cell) AS total,
+       (SELECT sum(chf_minor)::bigint FROM cell) AS "sumMinor",
+       (SELECT json_agg(json_build_object('id', p.id, 'chfMinor', p.chf_minor)
+                        ORDER BY p.booking_date DESC, p.entry_order DESC)
+        FROM (SELECT * FROM cell ORDER BY booking_date DESC, entry_order DESC
+              LIMIT ${limit} OFFSET ${offset}) p) AS items`,
     params.values,
   );
-  const first = result.rows[0];
-  if (!first) {
-    // Past the last page, or an empty cell: count the cell without listing it.
-    return page === 1 ? empty : listCellTransactions(ctx, queryInput, { ...cellRef, page: 1 })
-      .then((firstPage) => ({ ...firstPage, transactions: [], page }));
-  }
-  const chf = new Map(result.rows.map((row) => [row.id, row.chfMinor]));
-  const items = await listTransactionsByIds(ctx, [...chf.keys()]);
+  const { total, sumMinor, items } = result.rows[0]!;
+  const chf = new Map((items ?? []).map((item) => [item.id, item.chfMinor]));
+  const transactions = await listTransactionsByIds(ctx, [...chf.keys()]);
   return {
-    transactions: items.map((item) => ({ ...item, chfMinor: chf.get(item.id)! })),
-    total: first.total,
-    sumChfMinor: first.sumMinor,
+    transactions: transactions.map((item) => ({ ...item, chfMinor: chf.get(item.id)! })),
+    total,
+    sumChfMinor: sumMinor,
     page,
     pageSize,
-    pageCount: Math.ceil(first.total / pageSize),
+    pageCount: Math.ceil(total / pageSize),
   };
 }

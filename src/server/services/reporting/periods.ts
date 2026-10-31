@@ -58,7 +58,10 @@ export function periodSpan(key: string, unit: TimeAxis): DateSpan {
   if (unit === 'month') return periodOf(`${key}-01`, 'month');
   if (unit === 'quarter') {
     const quarter = Number(key.slice(6));
-    return periodOf(`${key.slice(0, 4)}-${String((quarter - 1) * 3 + 1).padStart(2, '0')}-01`, unit);
+    return periodOf(
+      `${key.slice(0, 4)}-${String((quarter - 1) * 3 + 1).padStart(2, '0')}-01`,
+      unit,
+    );
   }
   return periodOf(`${key}-01-01`, 'year');
 }
@@ -95,7 +98,8 @@ export interface ResolvedRange {
  * today, flagged as partial.
  */
 export function resolveRange(range: DateRange, today: string): ResolvedRange {
-  if (range.kind === 'fixed') return { range: { from: range.from, to: range.to }, partialPeriod: null };
+  if (range.kind === 'fixed')
+    return { range: { from: range.from, to: range.to }, partialPeriod: null };
 
   const unit: TimeAxis = range.kind === 'last' ? range.unit : 'month';
   const current = periodOf(today, unit);
