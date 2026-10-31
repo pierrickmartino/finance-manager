@@ -44,11 +44,11 @@ test('exports the filtered Transaction list as CSV for Excel', async ({ page }) 
   expect(download.suggestedFilename()).toMatch(/^transactions-\d{4}-\d{2}-\d{2}\.csv$/);
   const text = await readFile(await download.path(), 'utf8');
 
-  expect(text.startsWith('\uFEFFBank,Account,Account Currency,Booking date,')).toBe(true);
+  expect(text.startsWith('\uFEFFBank;Account;Account Currency;Booking date;')).toBe(true);
   const lines = text.trimEnd().split('\r\n');
   expect(lines).toHaveLength(2);
-  expect(lines[1]).toContain(`${bankName},${accountName},CHF,`);
-  expect(lines[1]).toContain(',-64.90,-64.90,');
+  expect(lines[1]).toContain(`${bankName};${accountName};CHF;`);
+  expect(lines[1]).toContain(';-64.90;-64.90;');
 });
 
 test('refuses the export without a valid session', async ({ playwright, baseURL }) => {

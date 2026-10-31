@@ -20,7 +20,7 @@ async function collect(chunks: AsyncIterable<string>): Promise<string> {
   return text;
 }
 
-/** A small RFC 4180 reader, independent of the writer: rows of cells. */
+/** A small RFC 4180 reader with `;` as the separator, independent of the writer. */
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -39,7 +39,7 @@ function parseCsv(text: string): string[][] {
       }
     } else if (char === '"') {
       quoted = true;
-    } else if (char === ',') {
+    } else if (char === ';') {
       row.push(cell);
       cell = '';
     } else if (char === '\r' && text[index + 1] === '\n') {
@@ -113,6 +113,8 @@ describe('CSV export of Transactions', () => {
     const text = await collect(exportTransactionsCsv(t.ctx));
 
     expect(text.startsWith('\uFEFF')).toBe(true);
+    // Semicolon separated, as Excel with a Swiss or French list separator expects.
+    expect(text.startsWith('\uFEFFBank;Account;Account Currency;Booking date;')).toBe(true);
     expect(parseCsv(text.slice(1))).toEqual([HEADER]);
   });
 
@@ -257,7 +259,7 @@ describe('CSV export of Transactions', () => {
   });
 
   it('escapes separators, quotes and line breaks in text cells', async () => {
-    const ubs = await account('UBS', 'Compte, "principal"');
+    const ubs = await account('UBS', 'Compte; "principal"');
     await seedOne(ubs, {
       rawDescription: 'ORDRE; e-banking, "Loyer"\r\nOctobre',
       counterpartyName: 'Müller & Fils',
@@ -266,8 +268,8 @@ describe('CSV export of Transactions', () => {
     const text = await collect(exportTransactionsCsv(t.ctx));
     const [row] = parseCsv(text.slice(1)).slice(1);
 
-    expect(text).toContain('"Compte, ""principal"""');
-    expect(row![1]).toBe('Compte, "principal"');
+    expect(text).toContain('"Compte; ""principal"""');
+    expect(row![1]).toBe('Compte; "principal"');
     expect(row![7]).toBe('ORDRE; e-banking, "Loyer"\r\nOctobre');
     expect(row![8]).toBe('Müller & Fils');
   });

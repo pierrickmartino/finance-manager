@@ -52,7 +52,7 @@ describe('CSV export of 20k Transactions', () => {
       const lines = chunk.split('\r\n').slice(0, -1);
       largestChunkLines = Math.max(largestChunkLines, lines.length);
       if (chunks === 1) continue; // BOM and header
-      for (const line of lines) ids.add(line.slice(line.lastIndexOf(',') + 1));
+      for (const line of lines) ids.add(line.slice(line.lastIndexOf(';') + 1));
     }
     const ms = performance.now() - start;
 

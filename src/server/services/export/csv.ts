@@ -1,9 +1,14 @@
-/** Writing CSV (RFC 4180): comma separated, CRLF line ends, quotes only where needed. */
+/**
+ * Writing CSV (RFC 4180 quoting): semicolon separated, CRLF line ends, quotes only where needed.
+ * The semicolon is what Excel expects where the list separator is `;` (Swiss and French
+ * Windows settings, story 118); amounts keep a point as decimal separator.
+ */
 
 /** Byte order mark, so Excel reads the file as UTF-8. */
 export const BOM = '\uFEFF';
+export const SEPARATOR = ';';
 const LINE_END = '\r\n';
-const NEEDS_QUOTES = /[",\r\n]/;
+const NEEDS_QUOTES = /[";,\r\n]/;
 /** Characters that make a spreadsheet read a cell as a formula (CSV/formula injection). */
 const FORMULA_START = /^[=+\-@\t\r]/;
 
@@ -14,7 +19,7 @@ function cell(value: string): string {
 
 /** One CSV line, line end included. */
 export function csvLine(values: readonly string[]): string {
-  return values.map(cell).join(',') + LINE_END;
+  return values.map(cell).join(SEPARATOR) + LINE_END;
 }
 
 /**
