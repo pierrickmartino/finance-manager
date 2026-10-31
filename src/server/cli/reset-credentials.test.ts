@@ -13,6 +13,11 @@ function totpCode(secret: string): string {
   return new TOTP({ secret }).generate();
 }
 
+/** The code of the next 30-second step (a code works once; the window accepts one step ahead). */
+function nextTotpCode(secret: string): string {
+  return new TOTP({ secret }).generate({ timestamp: Date.now() + 30_000 });
+}
+
 /** Runs the CLI with scripted answers and returns everything it printed. */
 async function runCli(answers: string[]): Promise<{ exitCode: number; output: string }> {
   const lines: string[] = [];
@@ -96,7 +101,7 @@ describe('Credential reset CLI', () => {
     expect(exitCode).toBe(1);
     expect(output).toContain('Passwords do not match');
     await expect(
-      login(t.ctx, { password: OLD_PASSWORD, code: totpCode(enrolment.secret) }),
+      login(t.ctx, { password: OLD_PASSWORD, code: nextTotpCode(enrolment.secret) }),
     ).resolves.toHaveProperty('token');
   });
 

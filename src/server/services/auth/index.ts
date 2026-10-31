@@ -2,6 +2,12 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2';
 import { Secret, TOTP } from 'otpauth';
 import { z } from 'zod';
+import {
+  decryptSecret,
+  encryptSecret,
+  isEncryptedSecret,
+  readSecretKey,
+} from '@/server/crypto/secret-box';
 import { withTransaction } from '@/server/db/transaction';
 import type { ServiceContext } from '../context';
 import {
@@ -71,10 +77,19 @@ function totpFor(secret: string): TOTP {
   return new TOTP({ issuer: ISSUER, label: ACCOUNT_LABEL, secret: Secret.fromBase32(secret) });
 }
 
-function isValidTotp(secret: string, code: string): boolean {
+/** The time step a valid code belongs to, or null when the code is not valid now. */
+function matchTotpStep(secret: string, code: string): number | null {
   const token = code.replace(/\s/g, '');
-  if (!/^\d{6}$/.test(token)) return false;
-  return totpFor(secret).validate({ token, window: TOTP_WINDOW }) !== null;
+  if (!/^\d{6}$/.test(token)) return null;
+  const totp = totpFor(secret);
+  const timestamp = Date.now();
+  const delta = totp.validate({ token, timestamp, window: TOTP_WINDOW });
+  return delta === null ? null : totp.counter({ timestamp }) + delta;
+}
+
+/** The TOTP secret as stored: encrypted with the key from TOTP_ENCRYPTION_KEY. */
+function sealTotpSecret(secret: string): string {
+  return encryptSecret(secret, readSecretKey());
 }
 
 function sha256(value: string): string {
@@ -109,7 +124,8 @@ export async function getAuthStatus(ctx: ServiceContext): Promise<AuthStatus> {
  */
 export async function completeSetup(ctx: ServiceContext, input: SetupInput): Promise<SetupResult> {
   const { password, totpSecret, totpCode } = parseInput(setupInput, input);
-  if (!isValidTotp(totpSecret, totpCode)) {
+  const step = matchTotpStep(totpSecret, totpCode);
+  if (step === null) {
     throw new ValidationError('The authenticator code is not valid. Check the time on your phone.');
   }
   const passwordHash = await argon2Hash(password);
@@ -117,9 +133,10 @@ export async function completeSetup(ctx: ServiceContext, input: SetupInput): Pro
 
   const session = await withTransaction(ctx.db, async (tx) => {
     const inserted = await tx.query(
-      `INSERT INTO auth_credential (password_hash, totp_secret) VALUES ($1, $2)
+      `INSERT INTO auth_credential (password_hash, totp_secret_enc, totp_last_step)
+       VALUES ($1, $2, $3)
        ON CONFLICT (id) DO NOTHING`,
-      [passwordHash, totpSecret],
+      [passwordHash, sealTotpSecret(totpSecret), step],
     );
     if (inserted.rowCount !== 1) {
       throw new ConflictError('Setup has already been completed');
@@ -155,12 +172,13 @@ export async function resetCredentials(
 
   await withTransaction(ctx.db, async (tx) => {
     await tx.query(
-      `INSERT INTO auth_credential (password_hash, totp_secret) VALUES ($1, $2)
+      `INSERT INTO auth_credential (password_hash, totp_secret_enc) VALUES ($1, $2)
        ON CONFLICT (id) DO UPDATE
          SET password_hash = EXCLUDED.password_hash,
-             totp_secret = EXCLUDED.totp_secret,
+             totp_secret_enc = EXCLUDED.totp_secret_enc,
+             totp_last_step = NULL,
              updated_at = now()`,
-      [passwordHash, totp.secret],
+      [passwordHash, sealTotpSecret(totp.secret)],
     );
     await insertRecoveryCodes(tx, recoveryCodes);
     await tx.query('DELETE FROM auth_session');
@@ -206,7 +224,9 @@ const INVALID_LOGIN = 'Wrong password or code';
 
 interface Credential {
   passwordHash: string;
-  totpSecret: string;
+  totpSecretEnc: string;
+  /** BIGINT, parsed to a number by the pool. */
+  totpLastStep: number | null;
 }
 
 type LoginOutcome = { kind: 'ok'; session: NewSession } | { kind: 'failed' | 'rate_limited' };
@@ -258,12 +278,33 @@ async function checkCredentials(
   { password, code }: z.output<typeof loginInput>,
 ): Promise<boolean> {
   const result = await tx.query<Credential>(
-    `SELECT password_hash AS "passwordHash", totp_secret AS "totpSecret" FROM auth_credential`,
+    `SELECT password_hash AS "passwordHash", totp_secret_enc AS "totpSecretEnc",
+            totp_last_step AS "totpLastStep"
+     FROM auth_credential FOR UPDATE`,
   );
   const credential = result.rows[0];
   if (!credential) return false;
   if (!(await argon2Verify(credential.passwordHash, password))) return false;
-  return isValidTotp(credential.totpSecret, code) || redeemRecoveryCode(tx, code);
+  return (await redeemTotpCode(tx, credential, code)) || redeemRecoveryCode(tx, code);
+}
+
+/**
+ * Accepts a TOTP code once: a code whose time step is at or before the last accepted one is
+ * refused. A legacy plaintext secret (stored before encryption at rest) is encrypted here.
+ */
+async function redeemTotpCode(tx: Tx, credential: Credential, code: string): Promise<boolean> {
+  const isLegacyPlaintext = !isEncryptedSecret(credential.totpSecretEnc);
+  const secret = isLegacyPlaintext
+    ? credential.totpSecretEnc
+    : decryptSecret(credential.totpSecretEnc, readSecretKey());
+  const step = matchTotpStep(secret, code);
+  if (step === null) return false;
+  if (credential.totpLastStep !== null && step <= credential.totpLastStep) return false;
+  await tx.query(
+    `UPDATE auth_credential SET totp_last_step = $1, totp_secret_enc = coalesce($2, totp_secret_enc)`,
+    [step, isLegacyPlaintext ? sealTotpSecret(secret) : null],
+  );
+  return true;
 }
 
 /** Marks a recovery code used; false when it is unknown or already used. */

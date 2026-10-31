@@ -88,10 +88,12 @@ You need: the backup file (`*.dump.age`), the private key (or its passphrase-pro
 4. **Start the app against it and verify.**
    ```sh
    export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/finance_restore
+   export TOTP_ENCRYPTION_KEY=...   # the production key: the dump holds the authenticator secret encrypted with it
    pnpm db:migrate          # applies migrations newer than the backup; "No migrations to run" if none
    pnpm build && pnpm start -p 3100
    curl http://localhost:3100/api/health     # {"status":"ok"}
    ```
+   Without the production `TOTP_ENCRYPTION_KEY` signing in with the authenticator fails with a server error (the secret cannot be decrypted): run `pnpm auth:reset` against the restored database to set new credentials.
    Open `http://localhost:3100` and check that the data you expect is there (Banks, Accounts, the latest Transactions). Compare the row counts printed in step 3 with what you expect from production.
 5. **Switch over (real disaster only).** In Railway, point the app's `DATABASE_URL` (and the backup service's) at the restored database, redeploy, and check `/api/health`. Keep the broken database until you are sure nothing else is needed from it.
 

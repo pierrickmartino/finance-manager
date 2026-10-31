@@ -10,7 +10,8 @@ Requirements: Node 22, pnpm 10, PostgreSQL 16.
 
 ```sh
 pnpm install
-cp .env.example .env.local          # then point DATABASE_URL at your database
+cp .env.example .env.local          # then point DATABASE_URL at your database and set
+                                    # TOTP_ENCRYPTION_KEY (openssl rand -base64 32)
 createdb finance_manager            # or any name matching DATABASE_URL
 pnpm db:migrate
 pnpm dev                            # http://localhost:3000
@@ -53,7 +54,7 @@ One-time setup:
 
 1. Create a Railway project in an EU region and add a **PostgreSQL** service.
 2. Add a service from this GitHub repository. Railway picks up `railway.json`.
-3. In the app service's variables, set `DATABASE_URL` to `${{Postgres.DATABASE_URL}}`.
+3. In the app service's variables, set `DATABASE_URL` to `${{Postgres.DATABASE_URL}}` and `TOTP_ENCRYPTION_KEY` to the output of `openssl rand -base64 32` (it encrypts the authenticator secret at rest; the app refuses to start without it). Keep a copy in your password manager, not next to the backups.
 4. Generate a public domain. Every push to `main` then deploys and migrates.
 
 Backups: a separate `backup` service (`deploy/backup/`) serves age-encrypted dumps that a machine you own pulls nightly. Setup, retention and restore are in `docs/runbooks/backup-and-restore.md`.
@@ -67,6 +68,8 @@ The app is single-user and reachable on the public internet, so every page and s
 - **First run:** open the app and you land on `/setup`. Choose a password (at least 12 characters), scan the QR code with an authenticator app, enter its code, and save the 10 recovery codes shown once. Setup then disables itself for good.
 - **Login:** password plus the authenticator code, or a recovery code instead (each works once). After 5 failed attempts within 15 minutes, logins are refused until the failures are 15 minutes old.
 - **Sessions** end after 30 minutes without a request, or on *Sign out*.
+- **Authenticator codes work once.** A code that has signed you in is refused if you try it again, even while your phone still shows it; wait for the next one.
+- **Authenticator secret at rest** is encrypted with AES-256-GCM using `TOTP_ENCRYPTION_KEY`. A database set up before this (migration `encrypt_totp_secret`) still holds the secret in plain text: the first successful login after the upgrade encrypts it, or run `pnpm auth:reset` to replace it outright. Set `TOTP_ENCRYPTION_KEY` before deploying the upgrade. If the key is lost or changed, the stored secret can no longer be read: run `pnpm auth:reset`.
 - **Lost the password or the authenticator?** There is no email reset. Run `pnpm auth:reset` in the app's shell (on Railway: `railway ssh`, then `pnpm auth:reset`). It asks for a new password, prints a new authenticator QR code and secret plus new recovery codes, signs out every session and lifts any login lockout.
 
 ## Layout

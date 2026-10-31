@@ -16,6 +16,8 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'test/**/*.test.ts', 'scripts/**/*.test.ts'],
     globalSetup: ['test/support/global-setup.ts'],
+    // A throwaway key for the TOTP secret's encryption at rest (not used anywhere real).
+    env: { TOTP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') },
     testTimeout: 20_000,
     hookTimeout: 30_000,
     coverage: {

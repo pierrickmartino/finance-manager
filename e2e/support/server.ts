@@ -6,6 +6,7 @@
  * connects, which races with the first interaction. E2E_SERVER=dev opts back in for debugging.
  */
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { migrate } from '../../src/server/db/migrate';
 import { createDatabase, databaseUrl, dropDatabase } from '../../test/support/postgres';
 
@@ -16,7 +17,12 @@ async function main(): Promise<void> {
     throw new Error('E2E_DATABASE_NAME and E2E_PORT must be set (see playwright.config.ts)');
   }
   const url = databaseUrl(name);
-  const env = { ...process.env, DATABASE_URL: url };
+  const env = {
+    ...process.env,
+    DATABASE_URL: url,
+    // A throwaway key per run: the run's database starts empty.
+    TOTP_ENCRYPTION_KEY: process.env.TOTP_ENCRYPTION_KEY ?? randomBytes(32).toString('base64'),
+  };
   const isDev = process.env.E2E_SERVER === 'dev';
 
   if (!isDev) {
