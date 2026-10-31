@@ -4,6 +4,7 @@ import 'react-grid-layout/css/styles.css';
 import { useState, useTransition, type ReactNode } from 'react';
 import ReactGridLayout, { useContainerWidth, type Layout } from 'react-grid-layout';
 import { FieldError } from '@/components/form';
+import { isGridMoveKey, moveWidgetByKey } from '@/lib/reporting/grid-move';
 import type { WidgetLayout } from '@/server/services/reporting';
 import { saveLayoutAction } from '../actions';
 
@@ -72,6 +73,16 @@ export function DashboardGrid({
     ...widget,
     layout: layouts[widget.id] ?? widget.layout,
   }));
+
+  /** Arrow keys on a Widget's move handle move it, and the move is saved like a drag. */
+  const moveByKey = (widgetId: string, key: string): boolean => {
+    if (!isGridMoveKey(key)) return false;
+    const current = placed.map(({ id, layout }) => ({ id, ...layout }));
+    save(
+      moveWidgetByKey(current, widgetId, key).map(({ id, ...layout }) => ({ i: id, ...layout })),
+    );
+    return true;
+  };
   const isStacked = mounted && width < STACKED_BELOW;
 
   const card = (widget: GridWidget, isDraggable: boolean) => (
@@ -87,7 +98,11 @@ export function DashboardGrid({
           <button
             type="button"
             aria-label={`Move ${widget.title}`}
-            title="Drag to move"
+            aria-describedby="widget-move-help"
+            title="Drag, or use the arrow keys, to move"
+            onKeyDown={(event) => {
+              if (moveByKey(widget.id, event.key)) event.preventDefault();
+            }}
             className="widget-drag-handle cursor-grab touch-none text-zinc-400 active:cursor-grabbing"
           >
             ⠿
@@ -104,6 +119,9 @@ export function DashboardGrid({
       {error && <FieldError message={error} />}
       <p role="status" className="sr-only">
         {isSaving ? 'Saving layout…' : ''}
+      </p>
+      <p id="widget-move-help" className="sr-only">
+        Use the arrow keys to move this Widget.
       </p>
       {!mounted ? null : isStacked ? (
         <div className="flex flex-col gap-4">
