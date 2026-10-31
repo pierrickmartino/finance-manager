@@ -65,7 +65,7 @@ function VisualisationSelect({ value }: { value: Visualisation }) {
 }
 
 /** The Account balances Widget has no query: only its visualisation and name change. */
-async function loadBalances(widget: Widget): Promise<ReportTable> {
+async function runBalancesWidget(widget: Widget): Promise<ReportTable> {
   return runSavedWidget(await getServiceContext(), widget);
 }
 
@@ -84,7 +84,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const query = isBalances ? widget.query : queryFromParams(params);
   const [{ report, error }, lists] = await Promise.all([
     isBalances
-      ? loadBalances(widget).then((table) => ({ report: table, error: null }))
+      ? runBalancesWidget(widget).then((table) => ({ report: table, error: null }))
       : loadReport(query),
     loadQueryFormLists(),
   ]);

@@ -65,8 +65,11 @@ export interface BulkEditResult {
   count: number;
 }
 
-/** The selected Transaction ids, without repeats, locked for the edit. */
-async function selectTransactions(
+/**
+ * The selected Transaction ids, without repeats: the ones given plus the members of the chosen
+ * Unclassified group (locked here, so the group can't change under the edit).
+ */
+async function resolveSelectedIds(
   { tx }: MutationScope,
   input: z.output<typeof bulkEditInput>,
 ): Promise<string[]> {
@@ -197,7 +200,7 @@ export async function bulkEditClassification(
 ): Promise<BulkEditResult> {
   const values = parseInput(bulkEditInput, input);
   return mutate(ctx, async (scope) => {
-    const ids = await selectTransactions(scope, values);
+    const ids = await resolveSelectedIds(scope, values);
     if (ids.length === 0) throw new ValidationError('Select at least one Transaction');
     await lockSelected(scope, ids);
     const { changes, summary } = await resolveChanges(scope, values.changes);

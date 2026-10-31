@@ -70,7 +70,7 @@ export interface TransactionDetail extends TransactionListItem {
 const FROM_LIST = `FROM "transaction" t JOIN account a ON a.id = t.account_id`;
 
 /** SELECT_TRANSACTION plus the Account name and any extra columns and joins. */
-function selectTransactions(extraColumns = '', extraJoins = ''): string {
+function transactionListSql(extraColumns = '', extraJoins = ''): string {
   return SELECT_TRANSACTION.replace(
     'FROM "transaction" t',
     `, a.name AS "accountName" ${extraColumns} ${FROM_LIST} ${extraJoins}`,
@@ -92,7 +92,7 @@ export async function listTransactions(
       where.params,
     ),
     ctx.db.query<TransactionRow>(
-      `${selectTransactions()} ${where.sql}
+      `${transactionListSql()} ${where.sql}
        ORDER BY t.booking_date DESC, t.entry_order DESC
        LIMIT $${limit} OFFSET $${limit + 1}`,
       [...where.params, pageSize, (page - 1) * pageSize],
@@ -115,7 +115,7 @@ export async function listTransactionsByIds(
 ): Promise<TransactionListItem[]> {
   if (ids.length === 0) return [];
   const rows = await ctx.db.query<TransactionRow>(
-    `${selectTransactions()} WHERE t.id = ANY($1::uuid[])`,
+    `${transactionListSql()} WHERE t.id = ANY($1::uuid[])`,
     [ids],
   );
   const byId = new Map(rows.rows.map((row) => [row.id, row]));
@@ -130,7 +130,7 @@ export async function getTransaction(ctx: ServiceContext, id: string): Promise<T
   const notFound = new NotFoundError('Transaction not found');
   if (!transactionId.safeParse(id).success) throw notFound;
   const result = await ctx.db.query<Omit<TransactionDetail, 'payee' | 'category' | 'tags'>>(
-    `${selectTransactions(
+    `${transactionListSql(
       `, CASE WHEN i.id IS NULL THEN NULL ELSE json_build_object(
            'id', i.id, 'fileName', i.file_name, 'importedAt', i.imported_at) END AS "import"`,
       'LEFT JOIN import i ON i.id = t.import_id',
