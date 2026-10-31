@@ -18,7 +18,12 @@ import {
   type TransactionPage,
   type TransactionQuery,
 } from '@/server/services/transactions';
-import { readTransactionSearch, transactionsHref, type SearchValues } from './search';
+import {
+  readTransactionSearch,
+  transactionsExportHref,
+  transactionsHref,
+  type SearchValues,
+} from './search';
 
 export const metadata: Metadata = { title: 'Transactions · Finance Manager' };
 
@@ -60,6 +65,14 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
       <h1 className="text-2xl font-semibold">Transactions</h1>
 
       <SearchForm values={search.values} lists={{ accounts, groups, payees, tags }} />
+
+      <p className="text-sm">
+        {/* A plain link: the route streams a file download, there is nothing to prefetch. */}
+        <a href={transactionsExportHref(search.values)} download className="underline">
+          Export CSV
+        </a>{' '}
+        <span className="text-zinc-500">(every Transaction matching the filters, for Excel)</span>
+      </p>
 
       {error && <FieldError message={error} />}
 

@@ -2,7 +2,11 @@ import { fractionDigits } from '@/lib/format';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { BASE_CURRENCY, toChfMinor } from '../fx';
-import { filterConditions, transactionQueryInput, type TransactionQuery } from '../transactions/query';
+import {
+  filterConditions,
+  transactionQueryInput,
+  type TransactionQuery,
+} from '../transactions/query';
 import { BOM, csvLine, decimalCell, textCell } from './csv';
 
 /** The export's columns, in order. */

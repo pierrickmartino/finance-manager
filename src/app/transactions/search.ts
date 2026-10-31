@@ -81,10 +81,20 @@ export function readTransactionSearch(
   return { values, page, query, error: null };
 }
 
-/** The list URL for these search values on a given page. */
-export function transactionsHref(values: SearchValues, page = 1): string {
+/** `path` with the non-blank search values (and the page, after the first) as its query. */
+function withSearch(path: string, values: SearchValues, page = 1): string {
   const query = new URLSearchParams(Object.entries(values).filter(([, value]) => value));
   if (page > 1) query.set('page', String(page));
   const search = query.toString();
-  return search ? `/transactions?${search}` : '/transactions';
+  return search ? `${path}?${search}` : path;
+}
+
+/** The list URL for these search values on a given page. */
+export function transactionsHref(values: SearchValues, page = 1): string {
+  return withSearch('/transactions', values, page);
+}
+
+/** The CSV export URL for these search values: the same filters, every page. */
+export function transactionsExportHref(values: SearchValues): string {
+  return withSearch('/api/transactions/export', values);
 }

@@ -40,29 +40,25 @@ async function seedLedger(): Promise<void> {
 }
 
 describe('CSV export of 20k Transactions', () => {
-  it(
-    'streams them in bounded chunks, each Transaction once',
-    async () => {
-      await seedLedger();
-      const ids = new Set<string>();
-      let chunks = 0;
-      let largestChunkLines = 0;
-      const start = performance.now();
+  it('streams them in bounded chunks, each Transaction once', async () => {
+    await seedLedger();
+    const ids = new Set<string>();
+    let chunks = 0;
+    let largestChunkLines = 0;
+    const start = performance.now();
 
-      for await (const chunk of exportTransactionsCsv(t.ctx)) {
-        chunks += 1;
-        const lines = chunk.split('\r\n').slice(0, -1);
-        largestChunkLines = Math.max(largestChunkLines, lines.length);
-        if (chunks === 1) continue; // BOM and header
-        for (const line of lines) ids.add(line.slice(line.lastIndexOf(',') + 1));
-      }
-      const ms = performance.now() - start;
+    for await (const chunk of exportTransactionsCsv(t.ctx)) {
+      chunks += 1;
+      const lines = chunk.split('\r\n').slice(0, -1);
+      largestChunkLines = Math.max(largestChunkLines, lines.length);
+      if (chunks === 1) continue; // BOM and header
+      for (const line of lines) ids.add(line.slice(line.lastIndexOf(',') + 1));
+    }
+    const ms = performance.now() - start;
 
-      expect(ids.size).toBe(TRANSACTION_COUNT);
-      expect(chunks).toBe(1 + Math.ceil(TRANSACTION_COUNT / EXPORT_BATCH_SIZE));
-      expect(largestChunkLines).toBeLessThanOrEqual(EXPORT_BATCH_SIZE);
-      expect(ms).toBeLessThan(BUDGET_MS);
-    },
-    60_000,
-  );
+    expect(ids.size).toBe(TRANSACTION_COUNT);
+    expect(chunks).toBe(1 + Math.ceil(TRANSACTION_COUNT / EXPORT_BATCH_SIZE));
+    expect(largestChunkLines).toBeLessThanOrEqual(EXPORT_BATCH_SIZE);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  }, 60_000);
 });

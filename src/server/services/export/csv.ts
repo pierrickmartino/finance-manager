@@ -1,7 +1,7 @@
 /** Writing CSV (RFC 4180): comma separated, CRLF line ends, quotes only where needed. */
 
 /** Byte order mark, so Excel reads the file as UTF-8. */
-export const BOM = '﻿';
+export const BOM = '\uFEFF';
 const LINE_END = '\r\n';
 const NEEDS_QUOTES = /[",\r\n]/;
 /** Characters that make a spreadsheet read a cell as a formula (CSV/formula injection). */

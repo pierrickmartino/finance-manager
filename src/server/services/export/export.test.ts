@@ -101,7 +101,9 @@ async function seedOne(on: Account, row: Partial<SeedTransaction> = {}): Promise
 }
 
 /** The export's data rows (header and BOM dropped). */
-async function exportRows(filter?: Parameters<typeof exportTransactionsCsv>[1]): Promise<string[][]> {
+async function exportRows(
+  filter?: Parameters<typeof exportTransactionsCsv>[1],
+): Promise<string[][]> {
   const [, ...rows] = parseCsv((await collect(exportTransactionsCsv(t.ctx, filter))).slice(1));
   return rows;
 }
@@ -110,7 +112,7 @@ describe('CSV export of Transactions', () => {
   it('starts with a UTF-8 BOM and the header row, columns in order', async () => {
     const text = await collect(exportTransactionsCsv(t.ctx));
 
-    expect(text.startsWith('﻿')).toBe(true);
+    expect(text.startsWith('\uFEFF')).toBe(true);
     expect(parseCsv(text.slice(1))).toEqual([HEADER]);
   });
 
@@ -210,7 +212,11 @@ describe('CSV export of Transactions', () => {
       { bookingDate: '2025-10-01', amountMinor: -400, rawDescription: 'CAFE DU MARCHE' },
     ]);
 
-    const rows = await exportRows({ accountId: ubs.id, from: '2025-10-01', text: 'cafe du marche' });
+    const rows = await exportRows({
+      accountId: ubs.id,
+      from: '2025-10-01',
+      text: 'cafe du marche',
+    });
 
     expect(rows.map((row) => [row[1], row[3], row[7]])).toEqual([
       ['Compte courant', '2025-10-01', 'Café du marché'],
