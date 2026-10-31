@@ -29,6 +29,22 @@ describe('CAMT.053', () => {
     expect(statement.entries.at(-1)).toEqual({ bookingDate: '', amount: -8000, status: 'PDNG' });
   });
 
+  test('reads and keeps amounts without a leading zero (".3"), as BCGE writes them', () => {
+    const input = Buffer.from(
+      readInput(INPUT)
+        .toString('utf8')
+        .replace('<Amt Ccy="CHF">14.45</Amt>', '<Amt Ccy="CHF">.3</Amt>')
+        .replace('<Amt Ccy="CHF">6135.55</Amt>', '<Amt Ccy="CHF">6149.70</Amt>'),
+    );
+
+    const output = anonymise('camt053', input, SEED);
+    const statement = readStatement('camt053', output);
+
+    expect(statement.entries.map((e) => e.amount)).toContain(-30);
+    expect(reconciles(statement)).toBe(true);
+    expect(output.toString('utf8')).toContain('<Amt Ccy="CHF">.3</Amt>');
+  });
+
   test('rejects a file that is not well-formed XML', () => {
     const broken = Buffer.from(readInput(INPUT).toString('utf8').replace('</Stmt>', ''));
     expect(() => readStatement('camt053', broken)).toThrow();
