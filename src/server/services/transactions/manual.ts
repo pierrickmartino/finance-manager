@@ -5,6 +5,7 @@ import { ConflictError, NotFoundError, parseInput, ValidationError } from '../er
 import { runRulesOnTransaction } from '../rules/apply';
 import { unlinkTransfers } from '../transfers/link';
 import { refuseBankFieldChanges } from './bank-fields';
+import { deletionSnapshots } from './classification';
 import {
   SELECT_TRANSACTION,
   TRANSACTION_ORDER,
@@ -198,8 +199,9 @@ export async function deleteManualTransaction(ctx: ServiceContext, id: string): 
     }
     await lockOpenAccount(tx, before.accountId);
     await unlinkTransfers({ tx, history }, [id]);
+    const snapshots = await deletionSnapshots(tx, [await findTransaction(tx, id)]);
     await tx.query('DELETE FROM "transaction" WHERE id = $1', [id]);
-    await history.record('transaction', id, transactionSnapshot(before), null);
+    await history.record('transaction', id, snapshots.get(id)!, null);
   });
 }
 

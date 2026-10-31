@@ -11,6 +11,7 @@ import {
   type AccountInput,
 } from '../accounts';
 import { createBank } from '../banks';
+import { createCategory, createCategoryGroup } from '../categories';
 import { ConflictError, ValidationError } from '../errors';
 import { listHistory } from '../history';
 import { commitImport, listImportTransactions, previewImport } from '../imports';
@@ -20,6 +21,7 @@ import {
   listManualTransactions,
   updateManualTransaction,
 } from './manual';
+import { editClassification } from './classification';
 import type { Transaction } from './model';
 
 const t = setupTestDatabase();
@@ -203,6 +205,25 @@ describe('delete a Manual transaction', () => {
     );
   });
 
+  it('records its Payee, Category and Tags in the deletion', async () => {
+    const account = await clerAccount();
+    const created = await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-03-14',
+      amountMinor: -4590,
+      description: 'Coop Pronto',
+    });
+    await classify(created.id);
+
+    await deleteManualTransaction(t.ctx, created.id);
+
+    expect(await deletedValues(created.id)).toMatchObject({
+      payee: 'Coop',
+      category: 'Living › Groceries',
+      tags: ['family', 'weekly'],
+    });
+  });
+
   it('refuses to delete an imported Transaction', async () => {
     const imported = await importedTransaction();
 
@@ -347,4 +368,22 @@ async function importedTransaction(): Promise<Transaction> {
   const preview = await previewUbsOctober(account);
   const committed = await commitImport(t.ctx, { previewId: preview.id });
   return (await listImportTransactions(t.ctx, committed.id))[0]!;
+}
+
+/** Gives a Transaction a Payee, a Category and two Tags (by hand). */
+async function classify(transactionId: string): Promise<void> {
+  const group = await createCategoryGroup(t.ctx, { name: 'Living', type: 'expense' });
+  const category = await createCategory(t.ctx, { groupId: group.id, name: 'Groceries' });
+  await editClassification(t.ctx, transactionId, {
+    payeeName: 'Coop',
+    categoryId: category.id,
+    tagNames: ['family', 'weekly'],
+  });
+}
+
+/** The values a deletion recorded per field (its Batch is the newest one). */
+async function deletedValues(transactionId: string): Promise<Record<string, unknown>> {
+  const entries = await listHistory(t.ctx, { entityType: 'transaction', entityId: transactionId });
+  const deletion = entries.filter((entry) => entry.batchId === entries[0]!.batchId);
+  return Object.fromEntries(deletion.map((entry) => [entry.field, entry.before]));
 }

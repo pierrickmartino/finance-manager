@@ -8,7 +8,7 @@ import type { HistorySnapshot } from '../history';
 import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { refuseBankFieldChanges } from './bank-fields';
-import { SELECT_TRANSACTION, type Transaction } from './model';
+import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from './model';
 import { isInTransfer } from './transfer-guard';
 
 /**
@@ -138,6 +138,34 @@ export function classificationSnapshot(classification: Classification): HistoryS
     notes,
     lockedFields: [...lockedFields],
   };
+}
+
+/**
+ * What History records when Transactions are deleted: the bank fields plus the
+ * classification (Payee, Category, Tags as readable names), so a deletion loses nothing
+ * (story 111). Call it before the DELETE: Tags go with the Transaction.
+ */
+export async function deletionSnapshots(
+  db: Queryable,
+  transactions: readonly Transaction[],
+): Promise<Map<string, HistorySnapshot>> {
+  const classifications = await loadClassifications(
+    db,
+    transactions.map((transaction) => transaction.id),
+  );
+  const byId = new Map(classifications.map((c) => [c.transactionId, c]));
+  return new Map(
+    transactions.map((transaction) => {
+      const classification = byId.get(transaction.id);
+      return [
+        transaction.id,
+        {
+          ...transactionSnapshot(transaction),
+          ...(classification ? classificationSnapshot(classification) : {}),
+        },
+      ];
+    }),
+  );
 }
 
 /**

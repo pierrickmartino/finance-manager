@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { createAccount, getAccount, type Account, type AccountInput } from '../accounts';
 import { createBank } from '../banks';
+import { createCategory, createCategoryGroup } from '../categories';
 import { listHistory } from '../history';
+import { editClassification } from '../transactions/classification';
 import { refuseBankFieldChanges } from '../transactions/bank-fields';
 import {
   commitImport,
@@ -233,6 +235,21 @@ describe('undo an Import', () => {
     });
   });
 
+  it("records each Transaction's Payee, Category and Tags in the undo", async () => {
+    const account = await ubsAccount();
+    const october = await importFixture(account, UBS_OCTOBER);
+    const [first] = await listImportTransactions(t.ctx, october.id);
+    await classify(first!.id);
+
+    await undoImport(t.ctx, october.id);
+
+    expect(await deletedValues(first!.id)).toMatchObject({
+      payee: 'Coop',
+      category: 'Living › Groceries',
+      tags: ['family', 'weekly'],
+    });
+  });
+
   it('refuses to undo an Import twice', async () => {
     const account = await ubsAccount();
     const october = await importFixture(account, UBS_OCTOBER);
@@ -277,6 +294,21 @@ describe('delete one imported Transaction', () => {
     expect((await getAccount(t.ctx, account.id)).balanceMinor).toBe(0);
   });
 
+  it('records its Payee, Category and Tags in the deletion', async () => {
+    const account = await ubsAccount();
+    const october = await importFixture(account, UBS_OCTOBER);
+    const [first] = await listImportTransactions(t.ctx, october.id);
+    await classify(first!.id);
+
+    await deleteImportedTransaction(t.ctx, first!.id);
+
+    expect(await deletedValues(first!.id)).toMatchObject({
+      payee: 'Coop',
+      category: 'Living › Groceries',
+      tags: ['family', 'weekly'],
+    });
+  });
+
   it('refuses an unknown Transaction', async () => {
     await expect(
       deleteImportedTransaction(t.ctx, '00000000-0000-4000-8000-000000000000'),
@@ -307,3 +339,21 @@ describe('bank fields of an imported Transaction', () => {
     ).not.toThrow();
   });
 });
+
+/** Gives a Transaction a Payee, a Category and two Tags (by hand). */
+async function classify(transactionId: string): Promise<void> {
+  const group = await createCategoryGroup(t.ctx, { name: 'Living', type: 'expense' });
+  const category = await createCategory(t.ctx, { groupId: group.id, name: 'Groceries' });
+  await editClassification(t.ctx, transactionId, {
+    payeeName: 'Coop',
+    categoryId: category.id,
+    tagNames: ['family', 'weekly'],
+  });
+}
+
+/** The values a deletion recorded per field (its Batch is the newest one). */
+async function deletedValues(transactionId: string): Promise<Record<string, unknown>> {
+  const entries = await listHistory(t.ctx, { entityType: 'transaction', entityId: transactionId });
+  const deletion = entries.filter((entry) => entry.batchId === entries[0]!.batchId);
+  return Object.fromEntries(deletion.map((entry) => [entry.field, entry.before]));
+}

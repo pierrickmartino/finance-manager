@@ -2,7 +2,8 @@ import type { Queryable } from '@/server/db/client';
 import { getOpeningBalance, hasTransactions, setOpeningBalance } from '../accounts';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, ValidationError } from '../errors';
-import { SELECT_TRANSACTION, TRANSACTION_ORDER, transactionSnapshot } from '../transactions/model';
+import { deletionSnapshots } from '../transactions/classification';
+import { SELECT_TRANSACTION, TRANSACTION_ORDER } from '../transactions/model';
 import type { Transaction } from '../transactions/model';
 import { findImport, id, importSnapshot, type Import, type OpeningChange } from './model';
 import { unlinkTransfers } from '../transfers/link';
@@ -19,20 +20,17 @@ async function lockAccount(tx: Queryable, accountId: string): Promise<void> {
  */
 async function deleteTransactions(scope: Scope, transactions: readonly Transaction[]) {
   if (transactions.length === 0) return;
-  await unlinkTransfers(
-    scope,
-    transactions.map((transaction) => transaction.id),
+  const ids = transactions.map((transaction) => transaction.id);
+  await unlinkTransfers(scope, ids);
+  // Unlinking cleared transferId, so snapshot the Transactions as they are now.
+  const current = await scope.tx.query<Transaction>(
+    `${SELECT_TRANSACTION} WHERE t.id = ANY($1::uuid[]) ORDER BY ${TRANSACTION_ORDER}`,
+    [ids],
   );
-  await scope.tx.query('DELETE FROM "transaction" WHERE id = ANY($1::uuid[])', [
-    transactions.map((transaction) => transaction.id),
-  ]);
-  for (const transaction of transactions) {
-    await scope.history.record(
-      'transaction',
-      transaction.id,
-      transactionSnapshot(transaction),
-      null,
-    );
+  const snapshots = await deletionSnapshots(scope.tx, current.rows);
+  await scope.tx.query('DELETE FROM "transaction" WHERE id = ANY($1::uuid[])', [ids]);
+  for (const transaction of current.rows) {
+    await scope.history.record('transaction', transaction.id, snapshots.get(transaction.id)!, null);
   }
 }
 
