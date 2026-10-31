@@ -333,6 +333,26 @@ describe('synthetic CAMT.053 files', () => {
     expect(preview.reconciliation.status).toBe('ok');
   });
 
+  it('reads amounts without a leading zero (".3"), as BCGE writes them', async () => {
+    const account = await bcgeAccount();
+
+    const preview = await previewImport(t.ctx, {
+      accountId: account.id,
+      ...xmlFile(
+        syntheticStatement(
+          [
+            { status: '<Sts>BOOK</Sts>', amount: '.3', bookingDate: '2025-12-03' },
+            { status: '<Sts>BOOK</Sts>', amount: '9.7', bookingDate: '2025-12-04' },
+          ],
+          '90.00',
+        ),
+      ),
+    });
+
+    expect(preview.entries.map((entry) => entry.amountMinor)).toEqual([-30, -970]);
+    expect(preview.reconciliation.status).toBe('ok');
+  });
+
   it('skips the pending entry of the BCGE export', async () => {
     const account = await bcgeAccount();
 
@@ -360,6 +380,9 @@ describe('synthetic CAMT.053 files', () => {
     ).rejects.toThrow('is not closed');
     await expect(
       preview(xmlFile(syntheticStatement([{ ...booked, amount: '10,00' }]))),
+    ).rejects.toThrow('is not an amount');
+    await expect(
+      preview(xmlFile(syntheticStatement([{ ...booked, amount: '.' }]))),
     ).rejects.toThrow('is not an amount');
     await expect(
       preview(xmlFile(syntheticStatement([{ ...booked, bookingDate: undefined }]))),
