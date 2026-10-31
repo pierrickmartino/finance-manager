@@ -7,6 +7,7 @@ import { createCategory, createCategoryGroup } from '../categories';
 import { listHistory } from '../history';
 import { deleteImportedTransaction } from '../imports';
 import { createRule } from '../rules';
+import { applyRulesToExisting } from '../rules/existing';
 import {
   editClassification,
   getClassification,
@@ -241,6 +242,24 @@ describe('Transfers carry no Category', () => {
     });
 
     expect((await getClassification(t.ctx, manual.id)).category).toBeNull();
+  });
+});
+
+describe('Rules applied to existing Transactions skip Transfers', () => {
+  it('leaves a Transfer without a Category', async () => {
+    const { out, into } = await pair();
+    const category = await groceries();
+    await createRule(t.ctx, {
+      name: 'Bank orders',
+      conditions: [{ type: 'text', field: 'description', operator: 'contains', value: 'ordre' }],
+      actions: { categoryId: category.id },
+    });
+    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+
+    await applyRulesToExisting(t.ctx, {});
+
+    expect((await getClassification(t.ctx, into)).category).toBeNull();
+    expect((await getClassification(t.ctx, out)).category).toBeNull();
   });
 });
 
