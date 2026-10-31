@@ -75,7 +75,7 @@ Pick a machine that is on (or wakes) every night: a home server, a NAS that can 
 
 ## Restore
 
-You need: the backup file (`*.dump.age`), the private key (or its passphrase-protected file), `age`, and the PostgreSQL 16 client tools (`psql`, `pg_restore`; macOS: `brew install age libpq`).
+You need: the backup file (`*.dump.age`), the private key (or its passphrase-protected file), `age`, and the client tools (`psql`, `pg_restore`) of the **target server's major version**, 16 by default. A newer `pg_restore` emits settings an older server rejects, so `restore.sh` refuses it up front. macOS: `brew install age postgresql@16`, then put `$(brew --prefix postgresql@16)/bin` first on `PATH` (Homebrew's `libpq` is always the newest version, so don't use it).
 
 1. **Pick the backup.** Usually the newest file in `daily/`. To recover from an older mistake, pick an older daily or monthly file.
 2. **Create an empty database.** Locally: `createdb finance_restore`. On Railway: add a new Postgres service, and use its `DATABASE_PUBLIC_URL` from your machine. Do not restore over the live database; `restore.sh` refuses any database that already has tables.
@@ -106,7 +106,7 @@ You need: the backup file (`*.dump.age`), the private key (or its passphrase-pro
 
 ## Tests and the agent walk-through
 
-`scripts/backup/backup.test.ts` (part of `pnpm test`, needs `age` and the PostgreSQL client) generates a throwaway key pair per run and checks:
+`scripts/backup/backup.test.ts` (part of `pnpm test`, needs `age` and the PostgreSQL client of the test server's major version) generates a throwaway key pair per run and checks:
 
 - `/backup` refuses a missing or wrong secret, enforces the dump interval and the failed-auth lockout, and refuses to start with a short secret or without a valid public key;
 - the served artifact starts with the age header, contains neither the `PGDMP` magic nor row data, fails to decrypt with another key, and decrypts to a `pg_dump` archive with the right key;

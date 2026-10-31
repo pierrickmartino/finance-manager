@@ -15,7 +15,8 @@ env:
 jobs:
   checks:
     name: Lint, typecheck, service tests
-    runs-on: ubuntu-latest
+    # Pinned: the PGDG repository below must support the runner's Ubuntu release.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -32,8 +33,20 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The backup tests (scripts/backup) need age; pg_dump 16 ships with the runner image.
-      - run: sudo apt-get update && sudo apt-get install -y age
+      # The backup tests (scripts/backup) need age and the client tools of the server's major
+      # version: the runner's own pg_dump/pg_restore are newer, and pg_restore 17+ emits
+      # settings Postgres 16 rejects. Same PGDG source as deploy/backup/Dockerfile.
+      - name: Install age and the PostgreSQL 16 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends age postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+      - run: pg_restore --version
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck

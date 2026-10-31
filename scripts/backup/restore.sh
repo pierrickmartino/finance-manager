@@ -5,7 +5,8 @@
 #
 # The decrypted dump is streamed from `age` into `pg_restore` and never written to disk.
 # The restore runs in one transaction: on any error the target is left empty.
-# Needs age, psql and pg_restore (same major version as the dump, or newer).
+# Needs age, psql and pg_restore. pg_restore must be the target server's major version (or
+# older, down to the dump's): a newer one emits settings the server rejects.
 # See docs/runbooks/backup-and-restore.md.
 set -euo pipefail
 
@@ -38,6 +39,14 @@ table_count() {
 
 existing="$(table_count)" || fail "cannot connect to the target database"
 [ "$existing" = "0" ] || fail "target database is not empty ($existing tables); restore into a fresh one"
+
+# pg_restore 17+ emits `SET transaction_timeout`, which older servers reject, so a client newer
+# than the server fails mid-restore. Check up front instead.
+client_major="$(pg_restore --version | sed -E 's/[^0-9]*([0-9]+).*/\1/')"
+server_num="$(psql "$target" --no-psqlrc --tuples-only --no-align --quiet --command 'SHOW server_version_num')"
+server_major=$((server_num / 10000))
+[ "$client_major" -le "$server_major" ] ||
+  fail "pg_restore $client_major is newer than the target server ($server_major); use the PostgreSQL $server_major client tools (macOS: brew install postgresql@$server_major, then put \"\$(brew --prefix postgresql@$server_major)/bin\" first on PATH)"
 
 errors="$(mktemp)"
 trap 'rm -f "$errors"' EXIT
