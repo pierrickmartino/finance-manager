@@ -75,7 +75,8 @@ async function seedSixYears(): Promise<void> {
     `INSERT INTO transfer (id) SELECT gen_random_uuid() FROM generate_series(1, 1)`,
   );
   await t.ctx.db.query(
-    `WITH cats AS (SELECT id, row_number() OVER (ORDER BY id) - 1 AS position FROM category)
+    `WITH cats AS (SELECT c.id, row_number() OVER (ORDER BY g.sort, c.sort) - 1 AS position
+                  FROM category c JOIN category_group g ON g.id = c.group_id)
      INSERT INTO "transaction" (account_id, import_id, is_manual, booking_date, amount_minor,
        currency, fingerprint, raw_description, category_id, transfer_id)
      SELECT acc.id, imp.id, false, DATE '2020-01-01' + (n % 2190), ((n * 7919) % 200000) - 150000,
