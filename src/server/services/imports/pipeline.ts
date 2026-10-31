@@ -1,0 +1,374 @@
+import type { Queryable } from '@/server/db/client';
+import { IMPORT_FORMAT_LABELS, type ImportFormat } from '../accounts';
+import { ValidationError } from '../errors';
+import {
+  describeEvaluation,
+  loadRuleEngine,
+  ruleSubject,
+  type RuleClassification,
+} from '../rules/apply';
+import { evaluateRules } from '../rules/evaluator';
+import { SELECT_TRANSACTION, TRANSACTION_ORDER, type Transaction } from '../transactions/model';
+import {
+  findImportTransferCandidates,
+  type ImportTransferCandidate,
+} from '../transfers/candidates';
+import { fingerprintEntries } from './fingerprint';
+import {
+  parserFor,
+  UnreadableFileError,
+  type BankAccountId,
+  type ParsedEntry,
+  type ParsedStatement,
+} from './parsers';
+import {
+  reconcile,
+  statementOpeningMinor,
+  type AccountBalances,
+  type Reconciliation,
+} from './reconcile';
+
+/**
+ * The import pipeline: parse → check against the Account → Fingerprint → classify →
+ * reconcile → preview. Each stage is a function below; `buildPreview` runs them in order.
+ * Rules run on the entries a commit may add (`applyRules`), then Transfer candidates are
+ * searched on all other Accounts (`findTransfers`).
+ */
+
+/** The Account fields the pipeline needs. */
+export interface ImportAccount {
+  id: string;
+  currency: string;
+  iban: string | null;
+  importFormat: ImportFormat | null;
+}
+
+/**
+ * `new`: will be added on commit. `duplicate`: same Fingerprint as a Transaction the Account
+ * already holds (or an earlier entry of the same file), skipped silently (spec 21).
+ * `near_duplicate`: a different Fingerprint, but the Account already holds a Transaction with
+ * the same amount and booking date (spec 22). The user keeps or skips it; skip by default.
+ */
+export type EntryStatus = 'new' | 'duplicate' | 'near_duplicate';
+
+export interface PreviewEntry extends ParsedEntry {
+  fingerprint: string;
+  status: EntryStatus;
+  /** For a `near_duplicate`: the Account's Transactions it may repeat. Empty otherwise. */
+  nearDuplicates: Transaction[];
+  /**
+   * The Payee, Category and Tags the Rules give the entry, and which Rule set each (spec 29).
+   * Committing writes exactly this. Null for a duplicate, which is never added.
+   */
+  classification: RuleClassification | null;
+  /**
+   * Existing Transactions on other Accounts that may be the other side of a Transfer, best
+   * first (spec 83-87). Empty for a duplicate. Nothing is linked unless the commit confirms one.
+   */
+  transferCandidates: ImportTransferCandidate[];
+}
+
+export type NearDuplicateDecision = 'keep' | 'skip';
+/** The user's choice per near-duplicate entry, keyed by the entry's Fingerprint. */
+export type NearDuplicateDecisions = Readonly<Record<string, NearDuplicateDecision>>;
+
+/** Whether committing adds the entry: new ones always, near-duplicates only when kept. */
+export function isAdded(entry: PreviewEntry, decisions: NearDuplicateDecisions): boolean {
+  if (entry.status === 'near_duplicate') return decisions[entry.fingerprint] === 'keep';
+  return entry.status === 'new';
+}
+
+export interface PreviewBody {
+  /**
+   * `openingBalanceMinor` is the file's opening balance: the one it states or, for a file with
+   * a closing balance only (OFX), the one derived from it (see `isOpeningBalanceDerived`).
+   */
+  statement: Pick<
+    ParsedStatement,
+    'from' | 'to' | 'currency' | 'openingBalanceMinor' | 'closingBalanceMinor'
+  >;
+  /** True when the file states no opening balance and it was computed as closing − entries. */
+  isOpeningBalanceDerived: boolean;
+  /** Oldest first. */
+  entries: PreviewEntry[];
+  /** The entries committing adds, given the near-duplicate decisions (skip by default). */
+  added: PreviewEntry[];
+  counts: { total: number; new: number; duplicate: number; nearDuplicate: number };
+  /** Reconciles with the `added` entries. */
+  reconciliation: Reconciliation;
+  /**
+   * On an Account with no Transactions: the opening balance the file implies (stated, or derived
+   * from the closing balance), dated the first day of the period. Committing can accept it.
+   */
+  proposedOpeningBalance: { amountMinor: number; date: string } | null;
+}
+
+/** Stage 1: parse the file with the Account's format. Wrong-format files are rejected here. */
+export function parseFile(account: ImportAccount, content: Uint8Array): ParsedStatement {
+  if (!account.importFormat) {
+    throw new ValidationError('This Account has no Import format, so files cannot be imported');
+  }
+  const label = IMPORT_FORMAT_LABELS[account.importFormat];
+  const parser = parserFor(account.importFormat);
+  if (!parser) throw new ValidationError(`${label} files cannot be imported yet`);
+  try {
+    return parser.parse(content);
+  } catch (error: unknown) {
+    if (error instanceof UnreadableFileError) {
+      throw new ValidationError(
+        `This file doesn't match the Account's Import format (${label}): ${error.message}`,
+      );
+    }
+    throw error;
+  }
+}
+
+/** Positions of a French BBAN: bank code 5, branch code 5, account number 11, key 2. */
+const FR_BBAN = { bank: [0, 5], branch: [5, 10], account: [10, 21], key: [21, 23] } as const;
+
+const padLeft = (value: string, length: number): string => value.trim().padStart(length, '0');
+
+/**
+ * Whether a file's bank account identifiers (OFX `BANKID` / `BRANCHID` / `ACCTID`) are exactly
+ * this French IBAN's, field by field. OFX may drop leading zeros, so each identifier is
+ * zero-padded to its field's width. ACCTID may also carry the 2-digit key after the account
+ * number. Non-French IBANs have no known layout and never match.
+ */
+function ibanMatchesBankAccount(iban: string, bankAccount: CompleteBankAccountId): boolean {
+  if (!iban.startsWith('FR') || iban.length !== 27) return false;
+  const bban = iban.slice(4);
+  const field = ([from, to]: readonly [number, number]): string => bban.slice(from, to);
+  const accountId = bankAccount.accountId.trim();
+  const isAccountMatch =
+    padLeft(accountId, 11) === field(FR_BBAN.account) ||
+    (accountId.length === 13 && accountId === field(FR_BBAN.account) + field(FR_BBAN.key));
+  return (
+    padLeft(bankAccount.bankId, 5) === field(FR_BBAN.bank) &&
+    padLeft(bankAccount.branchId, 5) === field(FR_BBAN.branch) &&
+    isAccountMatch
+  );
+}
+
+type CompleteBankAccountId = { [K in keyof BankAccountId]: NonNullable<BankAccountId[K]> };
+
+function completeBankAccount(
+  bankAccount: BankAccountId | null | undefined,
+): CompleteBankAccountId | null {
+  if (!bankAccount?.bankId || !bankAccount.branchId || !bankAccount.accountId) return null;
+  return {
+    bankId: bankAccount.bankId,
+    branchId: bankAccount.branchId,
+    accountId: bankAccount.accountId,
+  };
+}
+
+/**
+ * OFX names the account by bank, branch and account number instead of an IBAN. On an Account
+ * with an IBAN all three are required and must be exactly the IBAN's.
+ */
+function checkBankAccount(account: ImportAccount, statement: ParsedStatement): void {
+  if (!account.iban) return;
+  const isRequired = account.importFormat === 'ofx' || statement.bankAccount;
+  if (!isRequired) return;
+  const bankAccount = completeBankAccount(statement.bankAccount);
+  if (!bankAccount) {
+    throw new ValidationError(
+      "This file doesn't name its bank, branch and account (BANKID, BRANCHID, ACCTID), so it can't be checked against this Account's IBAN",
+    );
+  }
+  if (!ibanMatchesBankAccount(account.iban, bankAccount)) {
+    throw new ValidationError(
+      `This file is for bank ${bankAccount.bankId}, branch ${bankAccount.branchId}, account ${bankAccount.accountId}, which is not this Account (IBAN ${account.iban})`,
+    );
+  }
+}
+
+/** Stage 2: the file must be this Account's statement (IBAN or bank identifiers, Currency). */
+export function checkStatementAccount(account: ImportAccount, statement: ParsedStatement): void {
+  if (statement.iban && account.iban && statement.iban !== account.iban) {
+    throw new ValidationError(
+      `This file is for IBAN ${statement.iban}, but this Account's IBAN is ${account.iban}`,
+    );
+  }
+  checkBankAccount(account, statement);
+  if (statement.currency !== account.currency) {
+    throw new ValidationError(
+      `This file is in ${statement.currency}, but this Account is in ${account.currency}`,
+    );
+  }
+  const foreign = statement.entries.find((entry) => entry.currency !== account.currency);
+  if (foreign) {
+    throw new ValidationError(
+      `An entry of ${foreign.bookingDate} is in ${foreign.currency}, but this Account is in ${account.currency}`,
+    );
+  }
+}
+
+const sameDayAmount = (bookingDate: string, amountMinor: number): string =>
+  `${bookingDate}|${amountMinor}`;
+
+/**
+ * The Account's Transactions with the booking date and amount of one of the entries, grouped by
+ * that pair. Manual transactions count too: a Manual one entered before the bank file arrives
+ * is the typical near-duplicate.
+ */
+async function loadSameDayAmounts(
+  db: Queryable,
+  accountId: string,
+  entries: readonly ParsedEntry[],
+): Promise<Map<string, Transaction[]>> {
+  const byKey = new Map<string, Transaction[]>();
+  if (entries.length === 0) return byKey;
+  const result = await db.query<Transaction>(
+    `${SELECT_TRANSACTION}
+     WHERE t.account_id = $1
+       AND (t.booking_date, t.amount_minor) IN (
+         SELECT * FROM unnest($2::date[], $3::bigint[]))
+     ORDER BY ${TRANSACTION_ORDER}`,
+    [accountId, entries.map((e) => e.bookingDate), entries.map((e) => e.amountMinor)],
+  );
+  for (const row of result.rows) {
+    const key = sameDayAmount(row.bookingDate, row.amountMinor);
+    byKey.set(key, [...(byKey.get(key) ?? []), row]);
+  }
+  return byKey;
+}
+
+/**
+ * Stages 3 and 4: Fingerprint each entry and classify it against the Account's Transactions:
+ * a known Fingerprint is a duplicate; otherwise an existing Transaction with the same booking
+ * date and amount makes it a near-duplicate; otherwise it is new.
+ */
+async function classifyEntries(
+  db: Queryable,
+  account: ImportAccount,
+  entries: readonly ParsedEntry[],
+): Promise<PreviewEntry[]> {
+  const fingerprints = fingerprintEntries(account.id, entries);
+  const existing = await db.query<{ fingerprint: string }>(
+    `SELECT fingerprint FROM "transaction" WHERE account_id = $1 AND fingerprint = ANY($2::text[])`,
+    [account.id, fingerprints],
+  );
+  const known = new Set(existing.rows.map((row) => row.fingerprint));
+  const sameDayAmounts = await loadSameDayAmounts(db, account.id, entries);
+  return entries.map((entry, index) => {
+    const fingerprint = fingerprints[index]!;
+    const isDuplicate = known.has(fingerprint);
+    known.add(fingerprint);
+    const candidates = isDuplicate
+      ? []
+      : (sameDayAmounts.get(sameDayAmount(entry.bookingDate, entry.amountMinor)) ?? []);
+    const status: EntryStatus = isDuplicate
+      ? 'duplicate'
+      : candidates.length > 0
+        ? 'near_duplicate'
+        : 'new';
+    return {
+      ...entry,
+      fingerprint,
+      status,
+      nearDuplicates: candidates,
+      classification: null,
+      transferCandidates: [],
+    };
+  });
+}
+
+/**
+ * Stage 5: run the Rules on every entry a commit may add. New entries have no Payee, no locks
+ * and no Transfer yet, so only the bank fields matter.
+ */
+async function applyRules(
+  db: Queryable,
+  account: ImportAccount,
+  entries: readonly PreviewEntry[],
+): Promise<PreviewEntry[]> {
+  const engine = await loadRuleEngine(db);
+  return entries.map((entry) => {
+    if (entry.status === 'duplicate') return entry;
+    const subject = ruleSubject({ ...entry, accountId: account.id }, null, false);
+    const evaluation = evaluateRules(engine.compiled, subject);
+    return { ...entry, classification: describeEvaluation(engine, evaluation) };
+  });
+}
+
+/** Stage 6: Transfer candidates on all other Accounts for every entry a commit may add. */
+async function findTransfers(
+  db: Queryable,
+  account: ImportAccount,
+  entries: readonly PreviewEntry[],
+): Promise<PreviewEntry[]> {
+  const candidates = await findImportTransferCandidates(
+    db,
+    account.id,
+    entries.map((entry) => ({ ...entry, skip: entry.status === 'duplicate' })),
+  );
+  return entries.map((entry, index) => ({ ...entry, transferCandidates: candidates[index]! }));
+}
+
+/** The first day of the statement: its stated start, or else its first entry's booking date. */
+function periodStart(statement: ParsedStatement): string | null {
+  return statement.from ?? statement.entries[0]?.bookingDate ?? null;
+}
+
+function periodEnd(statement: ParsedStatement): string | null {
+  return statement.to ?? statement.entries.at(-1)?.bookingDate ?? null;
+}
+
+async function loadBalances(
+  db: Queryable,
+  accountId: string,
+  statement: ParsedStatement,
+): Promise<AccountBalances> {
+  const result = await db.query<AccountBalances>(
+    `SELECT EXISTS (SELECT 1 FROM "transaction" t WHERE t.account_id = a.id) AS "hasTransactions",
+            a.opening_balance_minor + COALESCE((SELECT sum(t.amount_minor) FROM "transaction" t
+              WHERE t.account_id = a.id AND ($2::date IS NULL OR t.booking_date < $2)), 0)::bigint
+              AS "balanceBeforePeriodMinor",
+            a.opening_balance_minor + COALESCE((SELECT sum(t.amount_minor) FROM "transaction" t
+              WHERE t.account_id = a.id AND ($3::date IS NULL OR t.booking_date <= $3)), 0)::bigint
+              AS "balanceAtPeriodEndMinor"
+     FROM account a WHERE a.id = $1`,
+    [accountId, periodStart(statement), periodEnd(statement)],
+  );
+  return result.rows[0]!;
+}
+
+/**
+ * Runs the stages after parsing against the Account's current Transactions. Read-only, so a
+ * preview can be rebuilt at any time; commit rebuilds it inside its transaction with the
+ * user's near-duplicate decisions (none: every near-duplicate is skipped).
+ */
+export async function buildPreview(
+  db: Queryable,
+  account: ImportAccount,
+  statement: ParsedStatement,
+  decisions: NearDuplicateDecisions = {},
+): Promise<PreviewBody> {
+  checkStatementAccount(account, statement);
+  const classified = await classifyEntries(db, account, statement.entries);
+  const entries = await findTransfers(db, account, await applyRules(db, account, classified));
+  const newEntries = entries.filter((entry) => entry.status === 'new');
+  const added = entries.filter((entry) => isAdded(entry, decisions));
+  const balances = await loadBalances(db, account.id, statement);
+  const opening = statementOpeningMinor(statement);
+  const start = periodStart(statement);
+  const { from, to, currency, closingBalanceMinor } = statement;
+  return {
+    statement: { from, to, currency, openingBalanceMinor: opening, closingBalanceMinor },
+    isOpeningBalanceDerived: statement.openingBalanceMinor === null && opening !== null,
+    entries,
+    added,
+    counts: {
+      total: entries.length,
+      new: newEntries.length,
+      duplicate: entries.filter((entry) => entry.status === 'duplicate').length,
+      nearDuplicate: entries.filter((entry) => entry.status === 'near_duplicate').length,
+    },
+    reconciliation: reconcile(statement, added, balances),
+    proposedOpeningBalance:
+      !balances.hasTransactions && opening !== null && start !== null
+        ? { amountMinor: opening, date: start }
+        : null,
+  };
+}
