@@ -1,10 +1,13 @@
+import { decodeEntities } from './text';
 import { UnreadableFileError } from './types';
 
 /**
  * A small, strict XML reader for bank statements: elements, attributes, text, CDATA, comments
  * and processing instructions. Element namespace prefixes are dropped (`ns:Ntry` is `Ntry`);
- * attribute names are kept whole (`xmlns:ns`). Document
- * type declarations are refused, so no entity expansion can happen. Throws `UnreadableFileError`.
+ * attribute names are kept whole (`xmlns:ns`). Only the predefined entities and character
+ * references are decoded; document type declarations are refused, so no entity can be defined
+ * or expanded. Input over MAX_XML_LENGTH characters is refused before parsing. The parse is
+ * iterative, so deep nesting cannot overflow the stack. Throws `UnreadableFileError`.
  */
 
 export interface XmlElement {
@@ -24,32 +27,11 @@ interface MutableElement {
 
 const NAME = /[A-Za-z_][\w.:-]*/y;
 const ATTRIBUTE = /\s+([A-Za-z_][\w.:-]*)\s*=\s*("([^"]*)"|'([^']*)')/y;
-const NAMED_ENTITIES: Record<string, string> = {
-  lt: '<',
-  gt: '>',
-  amp: '&',
-  quot: '"',
-  apos: "'",
-};
+/** Larger than any bank statement the Import accepts (5 MB), so only junk is refused. */
+export const MAX_XML_LENGTH = 8 * 1024 * 1024;
 
 function localName(name: string): string {
   return name.slice(name.indexOf(':') + 1);
-}
-
-function decodeEntities(text: string): string {
-  return text.replace(/&(#x[0-9a-fA-F]+|#\d+|\w+);|&/g, (match, ref: string | undefined) => {
-    if (!ref) throw new UnreadableFileError('it has a stray "&"');
-    if (ref.startsWith('#')) {
-      const code = ref[1] === 'x' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
-      if (!Number.isFinite(code) || code > 0x10ffff) {
-        throw new UnreadableFileError(`it has an invalid character reference "${match}"`);
-      }
-      return String.fromCodePoint(code);
-    }
-    const named = NAMED_ENTITIES[ref];
-    if (named === undefined) throw new UnreadableFileError(`it has an unknown entity "${match}"`);
-    return named;
-  });
 }
 
 function skipTo(xml: string, from: number, terminator: string, what: string): number {
@@ -88,6 +70,11 @@ function readStartTag(
 }
 
 export function parseXml(xml: string): XmlElement {
+  if (xml.length > MAX_XML_LENGTH) {
+    throw new UnreadableFileError(
+      `it is too large to read as XML (over ${MAX_XML_LENGTH / 1024 / 1024} MB of text)`,
+    );
+  }
   const stack: MutableElement[] = [];
   let root: MutableElement | null = null;
   let pos = 0;

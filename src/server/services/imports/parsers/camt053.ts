@@ -1,3 +1,4 @@
+import { decodeUtf8 } from './text';
 import {
   UnreadableFileError,
   type BundledDetail,
@@ -21,17 +22,8 @@ const CLOSING_BALANCE = ['CLBD'] as const;
 
 type Direction = 'CRDT' | 'DBIT';
 
-function decode(content: Uint8Array): string {
-  try {
-    // The BOM, if any, is dropped by the decoder.
-    return new TextDecoder('utf-8', { fatal: true }).decode(content);
-  } catch {
-    throw new UnreadableFileError('it is not UTF-8 text');
-  }
-}
-
 function readStatement(content: Uint8Array): XmlElement {
-  const document = parseXml(decode(content));
+  const document = parseXml(decodeUtf8(content));
   const isCamt053 = Object.entries(document.attributes).some(
     ([name, value]) =>
       (name === 'xmlns' || name.startsWith('xmlns:')) && value.includes('camt.053'),

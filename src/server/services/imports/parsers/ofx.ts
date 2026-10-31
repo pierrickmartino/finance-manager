@@ -1,4 +1,5 @@
 import { decodeWindows1252 } from './cp1252';
+import { decodeEntities } from './text';
 import {
   UnreadableFileError,
   type ImportParser,
@@ -25,11 +26,8 @@ interface OfxNode {
 
 const TAG = /<(\/?)([A-Za-z0-9._]+)>([^<]*)/g;
 
-const ENTITIES: Record<string, string> = { '&lt;': '<', '&gt;': '>', '&amp;': '&', '&nbsp;': ' ' };
-
-function decodeEntities(text: string): string {
-  return text.replace(/&(?:lt|gt|amp|nbsp);/g, (entity) => ENTITIES[entity]!);
-}
+/** SGML entities OFX files use; anything else is left as it is (OFX text is not strict). */
+const OFX_ENTITIES = { lt: '<', gt: '>', amp: '&', nbsp: ' ' };
 
 function decode(content: Uint8Array): string {
   const headerEnd = content.indexOf(0x3c); // the first `<`
@@ -73,7 +71,7 @@ function parseSgml(body: string): OfxNode {
       stack.push(node);
       lastLeaf = null;
     } else {
-      node.value = decodeEntities(text);
+      node.value = decodeEntities(text, { named: OFX_ENTITIES, isStrict: false });
       lastLeaf = node;
     }
   }

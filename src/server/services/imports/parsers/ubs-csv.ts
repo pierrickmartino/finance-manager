@@ -1,3 +1,4 @@
+import { decodeUtf8 } from './text';
 import {
   UnreadableFileError,
   type ImportParser,
@@ -67,15 +68,6 @@ function splitLine(line: string): string[] {
   if (quoted) throw new UnreadableFileError('a quoted field is not closed');
   fields.push(field);
   return fields;
-}
-
-function decode(content: Uint8Array): string {
-  try {
-    // The BOM is dropped by the decoder.
-    return new TextDecoder('utf-8', { fatal: true }).decode(content);
-  } catch {
-    throw new UnreadableFileError('it is not UTF-8 text');
-  }
 }
 
 function readMetadata(lines: string[]): { meta: Map<string, string>; headerIndex: number } {
@@ -165,7 +157,7 @@ function readRow(
 }
 
 export function parseUbsCsv(content: Uint8Array): ParsedStatement {
-  const lines = decode(content).split(/\r?\n/);
+  const lines = decodeUtf8(content).split(/\r?\n/);
   const { meta, headerIndex } = readMetadata(lines);
   const currency = readCurrency(requireMeta(meta, META.currency), 'Monnaie');
   const col = columnIndexes(splitLine(lines[headerIndex]!));
