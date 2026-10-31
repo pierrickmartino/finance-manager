@@ -22,8 +22,10 @@ export function readIsoDate(text: string, what: string): string {
 }
 
 /**
- * A plain decimal amount (`-87.45`, `+500.00`, `1187,35`), no thousands separators, read as
- * integer minor units of `currency`. More decimals than the Currency has are refused.
+ * A plain decimal amount (`-87.45`, `+500.00`, `1187,35`, `.3`), no thousands separators, read
+ * as integer minor units of `currency`. The whole part may be omitted (`.3` = `0.30`), as in
+ * `xs:decimal`: BCGE's CAMT.053 writes sub-unit amounts that way. More decimals than the
+ * Currency has are refused.
  */
 export function readDecimalMinor(
   text: string,
@@ -33,9 +35,9 @@ export function readDecimalMinor(
 ): number {
   const digits = fractionDigits(currency);
   const sep = decimalSeparator === '.' ? '\\.' : ',';
-  const pattern = new RegExp(`^([+-]?)(\\d+)(?:${sep}(\\d{1,${Math.max(digits, 1)}}))?$`);
+  const pattern = new RegExp(`^([+-]?)(\\d*)(?:${sep}(\\d{1,${Math.max(digits, 1)}}))?$`);
   const match = pattern.exec(text.trim());
-  if (!match || (digits === 0 && match[3])) {
+  if (!match || (match[2] === '' && !match[3]) || (digits === 0 && match[3])) {
     throw new UnreadableFileError(`${what} "${text}" is not an amount`);
   }
   const [, sign, whole = '', fraction = ''] = match;
