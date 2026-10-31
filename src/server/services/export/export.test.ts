@@ -4,7 +4,11 @@ import { seedTransactions, type SeedTransaction } from '@test/support/transactio
 import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
+import { backfillRates, convertToChf, type EcbRateSource } from '../fx';
+import { ValidationError } from '../errors';
 import { editClassification, getTransaction } from '../transactions';
+import { createManualTransaction } from '../transactions/manual';
+import { linkTransfer } from '../transfers';
 import { exportTransactionsCsv } from '.';
 
 const t = setupTestDatabase();
@@ -156,5 +160,130 @@ describe('CSV export of Transactions', () => {
         id,
       ],
     ]);
+  });
+
+  it('values each Transaction in CHF at its booking-date rate, like the shared FX conversion', async () => {
+    const source: EcbRateSource = {
+      async fetchReferenceRates(request) {
+        return [
+          { date: '2025-10-09', perEur: { CHF: '0.9301' } },
+          { date: '2025-10-10', perEur: { CHF: '0.9324' } },
+        ].filter((day) => day.date >= request.from && day.date <= request.to);
+      },
+    };
+    await backfillRates(t.ctx, source, { from: '2025-10-09', to: '2025-10-12' });
+    const ca = await account('Crédit Agricole', 'Compte EUR', 'EUR');
+    await seedTransactions(t.ctx.db, ca, [
+      { bookingDate: '2020-01-02', amountMinor: -500 },
+      { bookingDate: '2025-10-09', amountMinor: 100005 },
+      { bookingDate: '2025-10-10', amountMinor: -123456 },
+      { bookingDate: '2025-10-12', amountMinor: -1 },
+    ]);
+
+    const rows = await exportRows();
+
+    expect(rows.map((row) => [row[3], row[5], row[6]])).toEqual([
+      ['2020-01-02', '-5.00', ''], // before any rate: left empty, never 0
+      ['2025-10-09', '1000.05', '930.15'], // 930.146505
+      ['2025-10-10', '-1234.56', '-1151.10'], // -1151.103744
+      ['2025-10-12', '-0.01', '-0.01'], // Sunday: Friday's rate, -0.009324 rounds away from 0
+    ]);
+    for (const row of rows.slice(1)) {
+      const chf = await convertToChf(t.ctx, {
+        amountMinor: Math.round(Number(row[5]) * 100),
+        currency: 'EUR',
+        date: row[3]!,
+      });
+      expect(Math.round(Number(row[6]) * 100)).toBe(chf.amountMinor);
+    }
+  });
+
+  it('exports only the Transactions matching the list filters', async () => {
+    const ubs = await account('UBS', 'Compte courant');
+    const bcge = await account('BCGE', 'Épargne');
+    await seedTransactions(t.ctx.db, ubs, [
+      { bookingDate: '2025-09-30', amountMinor: -100, rawDescription: 'CAFÉ DU MARCHÉ' },
+      { bookingDate: '2025-10-01', amountMinor: -200, rawDescription: 'Café du marché' },
+      { bookingDate: '2025-10-02', amountMinor: -300, rawDescription: 'MIGROS' },
+    ]);
+    await seedTransactions(t.ctx.db, bcge, [
+      { bookingDate: '2025-10-01', amountMinor: -400, rawDescription: 'CAFE DU MARCHE' },
+    ]);
+
+    const rows = await exportRows({ accountId: ubs.id, from: '2025-10-01', text: 'cafe du marche' });
+
+    expect(rows.map((row) => [row[1], row[3], row[7]])).toEqual([
+      ['Compte courant', '2025-10-01', 'Café du marché'],
+    ]);
+  });
+
+  it('refuses invalid filters before writing anything', () => {
+    expect(() => exportTransactionsCsv(t.ctx, { from: '2025-10-02', to: '2025-10-01' })).toThrow(
+      ValidationError,
+    );
+  });
+
+  it('shows the other side of a Transfer on both of its Transactions', async () => {
+    const ubs = await account('UBS', 'Compte courant');
+    const bcge = await account('BCGE', 'Épargne');
+    const out = await seedOne(ubs, { bookingDate: '2025-10-10', amountMinor: -200000 });
+    const into = await seedOne(bcge, { bookingDate: '2025-10-11', amountMinor: 200000 });
+    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+
+    const rows = await exportRows();
+
+    expect(rows.map((row) => [row[20], row[17], row[18]])).toEqual([
+      [out, 'BCGE · Épargne', into],
+      [into, 'UBS · Compte courant', out],
+    ]);
+  });
+
+  it('marks Manual transactions as manual in the Source column', async () => {
+    const cler = await account('Cler', 'Compte Cler');
+    const manual = await createManualTransaction(t.ctx, {
+      accountId: cler.id,
+      bookingDate: '2025-10-10',
+      amountMinor: -4200,
+      description: 'Loyer',
+    });
+
+    expect((await exportRows()).map((row) => [row[19], row[20]])).toEqual([['manual', manual.id]]);
+  });
+
+  it('escapes separators, quotes and line breaks in text cells', async () => {
+    const ubs = await account('UBS', 'Compte, "principal"');
+    await seedOne(ubs, {
+      rawDescription: 'ORDRE; e-banking, "Loyer"\r\nOctobre',
+      counterpartyName: 'Müller & Fils',
+    });
+
+    const text = await collect(exportTransactionsCsv(t.ctx));
+    const [row] = parseCsv(text.slice(1)).slice(1);
+
+    expect(text).toContain('"Compte, ""principal"""');
+    expect(row![1]).toBe('Compte, "principal"');
+    expect(row![7]).toBe('ORDRE; e-banking, "Loyer"\r\nOctobre');
+    expect(row![8]).toBe('Müller & Fils');
+  });
+
+  it('neutralises text cells a spreadsheet would run as formulas, keeping amounts numeric', async () => {
+    const ubs = await account('UBS', 'Compte courant');
+    const id = await seedOne(ubs, {
+      amountMinor: -5000,
+      rawDescription: '=HYPERLINK("http://evil.example","x")',
+      counterpartyName: '+41 22 000 00 00',
+      paymentReference: '-2+3',
+    });
+    await editClassification(t.ctx, id, { notes: '@SUM(A1:A9)', payeeName: 'Coop' });
+
+    const [row] = await exportRows();
+
+    expect(row![5]).toBe('-50.00');
+    expect(row![6]).toBe('-50.00');
+    expect(row![7]).toBe(`'=HYPERLINK("http://evil.example","x")`);
+    expect(row![8]).toBe(`'+41 22 000 00 00`);
+    expect(row![10]).toBe(`'-2+3`);
+    expect(row![16]).toBe(`'@SUM(A1:A9)`);
+    expect(row![11]).toBe('Coop');
   });
 });
