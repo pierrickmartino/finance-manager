@@ -336,6 +336,36 @@ describe('synthetic CAMT.053 files', () => {
     expect(preview.reconciliation.status).toBe('ok');
   });
 
+  it('keeps every card payment of a batch sharing one AcctSvcrRef, as BCGE writes them', async () => {
+    const account = await bcgeAccount();
+    const card = (amount: string, info: string): SyntheticEntry => ({
+      status: '<Sts><Cd>BOOK</Cd></Sts>',
+      amount,
+      bookingDate: '2025-12-13',
+      reference: 'AH22391019/058226',
+      info,
+    });
+    const file = xmlFile(
+      syntheticStatement(
+        [card('0.07', 'Kiosque'), card('1.49', 'Migros'), card('0.34', 'Coop')],
+        '98.10',
+      ),
+    );
+
+    const preview = await previewImport(t.ctx, { accountId: account.id, ...file });
+    expect(preview.entries.map((entry) => [entry.fingerprint, entry.status])).toEqual([
+      ['AH22391019/058226', 'new'],
+      ['AH22391019/058226#1', 'new'],
+      ['AH22391019/058226#2', 'new'],
+    ]);
+    expect(preview.reconciliation.status).toBe('ok');
+    await commitImport(t.ctx, { previewId: preview.id });
+
+    const again = await previewImport(t.ctx, { accountId: account.id, ...file });
+    expect(again.counts).toEqual({ total: 3, new: 0, duplicate: 3, nearDuplicate: 0 });
+    expect(again.reconciliation.status).toBe('ok');
+  });
+
   it('reads amounts without a leading zero (".3"), as BCGE writes them', async () => {
     const account = await bcgeAccount();
 

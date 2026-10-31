@@ -28,6 +28,23 @@ describe('Fingerprints (ADR-0003)', () => {
     ]);
   });
 
+  it('counts a bank reference repeated in the same file, keeping the first one bare', () => {
+    // BCGE gives every card payment of a day's batch the same entry AcctSvcrRef.
+    const fingerprints = fingerprintEntries(ACCOUNT, [
+      entry({ bankReference: 'AH22391019/058226', amountMinor: -700 }),
+      entry({ bankReference: 'AH22391019/058226', amountMinor: -14890 }),
+      entry({ bankReference: 'BCGE20251010000342' }),
+      entry({ bankReference: 'AH22391019/058226', amountMinor: -3400 }),
+    ]);
+
+    expect(fingerprints).toEqual([
+      'AH22391019/058226',
+      'AH22391019/058226#1',
+      'BCGE20251010000342',
+      'AH22391019/058226#2',
+    ]);
+  });
+
   it('hashes entries without a reference, counting identical ones in the same file', () => {
     const [first, second, other] = fingerprintEntries(ACCOUNT, [
       entry(),
