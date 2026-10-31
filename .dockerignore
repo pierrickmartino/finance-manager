@@ -1,0 +1,20 @@
+# Keep the build context to what the images need, and keep secrets and bank data out of it.
+.git
+.github
+.claude
+.agents
+.codex
+node_modules
+**/node_modules
+.next
+coverage
+test-results
+playwright-report
+e2e/.auth
+*.tsbuildinfo
+.env
+.env*.local
+bank-exports
+*.real.csv
+*.real.xml
+*.real.ofx

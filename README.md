@@ -48,18 +48,55 @@ Each file has an `-- Up Migration` and a `-- Down Migration` section. Migrations
 
 ## Deployment (Railway, EU)
 
-`railway.json` configures the service: build with `pnpm build`, run `pnpm db:migrate` as the pre-deploy step (so migrations apply on every deploy before traffic switches), start with `pnpm start`, health-check `/api/health`, and run in `europe-west4`.
+The app ships as a plain Docker image, so nothing depends on Railway's deprecated config-as-code files (`railway.json` stops being read on 2026-12-01). Railway builds the root `Dockerfile` automatically. The few settings that used to live in `railway.json` are set once in the service dashboard (the checklists below).
 
-One-time setup:
+What the image does:
 
-1. Create a Railway project in an EU region and add a **PostgreSQL** service.
-2. Add a service from this GitHub repository. Railway picks up `railway.json`.
-3. In the app service's variables, set `DATABASE_URL` to `${{Postgres.DATABASE_URL}}` and `TOTP_ENCRYPTION_KEY` to the output of `openssl rand -base64 32` (it encrypts the authenticator secret at rest; the app refuses to start without it). Keep a copy in your password manager, not next to the backups.
-4. Generate a public domain. Every push to `main` then deploys and migrates.
+- **Build:** `pnpm install --frozen-lockfile`, `pnpm build`, then prune to production dependencies. The build needs no database and no secrets.
+- **Start** (`scripts/docker-start.sh`): check that `DATABASE_URL` and `TOTP_ENCRYPTION_KEY` are set, apply pending migrations (`pnpm db:migrate`), then `next start` on `$PORT`. If a migration fails, the container exits before serving, the health check never passes, and Railway keeps the previous deployment live.
 
-Backups: a separate `backup` service (`deploy/backup/`) serves age-encrypted dumps that a machine you own pulls nightly. Setup, retention and restore are in `docs/runbooks/backup-and-restore.md`.
+Three services share one Railway project and one Postgres database:
 
-FX rates: a separate `fx-rates` cron service (`deploy/fx-rates/railway.json`) runs `pnpm fx:fetch` daily at 16:20 UTC to fetch ECB reference rates. Setup, backfill and the stale-rates warning are in `docs/runbooks/fx-rates.md`.
+| Service | Image | Runs |
+| --- | --- | --- |
+| `web` | root `Dockerfile` | the app, always on, public domain |
+| `fx-rates` | root `Dockerfile` | `pnpm fx:fetch` once a day (cron), then exits |
+| `backup` | `deploy/backup/Dockerfile` | serves encrypted dumps to your pull machine |
+
+### 1. Project and database
+
+1. Create a Railway project. In **Project Settings**, choose an EU region (for example *EU West (Amsterdam)*) as the default for new services.
+2. Add a **PostgreSQL** service (New, Database, PostgreSQL). Note its major version (`SELECT version();`); the backup service needs it.
+
+### 2. The `web` service
+
+1. New, **GitHub Repo**, pick this repository. Rename the service `web`. Railway detects the root `Dockerfile` and builds it.
+2. **Variables**:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (the private URL).
+   - `TOTP_ENCRYPTION_KEY` = the output of `openssl rand -base64 32`. It encrypts the authenticator secret at rest, and the app refuses to start without it. Keep a copy in your password manager, not next to the backups.
+3. **Settings**:
+   - Source: branch `main` (or the branch you deploy). Optionally tick *Wait for CI* so a red build never deploys.
+   - Deploy, **Healthcheck Path**: `/api/health`. Healthcheck timeout: 120 s, which leaves time for migrations.
+   - Deploy, **Regions**: the EU region, **1 replica**.
+   - Leave **Custom Start Command** and **Pre-deploy Command** empty: the image migrates and starts by itself.
+   - Networking: **Generate Domain** (or add your own domain).
+4. Deploy. The logs show `Migrated up: ...`, then `Ready`. Open the domain: the first-run setup screen creates your password and enrols TOTP.
+
+Every push to the deploy branch then rebuilds, migrates and switches traffic once `/api/health` answers.
+
+### 3. The `fx-rates` cron service
+
+Setup and checks: `docs/runbooks/fx-rates.md`. In short: a second service from the same repository, the same `DATABASE_URL`, **Custom Start Command** `pnpm fx:fetch`, **Cron Schedule** `20 16 * * *`, restart policy **Never**, no domain.
+
+### 4. The `backup` service
+
+Setup, key custody, the pull machine and restore: `docs/runbooks/backup-and-restore.md`. In short: a third service from the same repository with the variable `RAILWAY_DOCKERFILE_PATH=deploy/backup/Dockerfile` (or set the Dockerfile path under Settings, Build), its own variables, healthcheck `/health`, one replica, and a public domain for your pull machine.
+
+### Operations
+
+- **Reset credentials:** `railway ssh` into `web` (or use the service's shell), then `pnpm auth:reset`.
+- **Run a migration by hand:** not needed; every deploy migrates. To roll back the latest one: `pnpm db:migrate:down` in the service shell.
+- **Check the image locally:** `docker build -t finance-manager .`, then `docker run --rm -p 3000:3000 -e DATABASE_URL=... -e TOTP_ENCRYPTION_KEY=... finance-manager`. CI builds both images and smoke-tests the app image on every push.
 
 ## Bringing in history before the bank files (Crédit Agricole)
 

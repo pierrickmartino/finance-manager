@@ -67,6 +67,45 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  docker:
+    name: Docker images (build and smoke test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t finance-manager .
+      - run: docker build -f deploy/backup/Dockerfile -t finance-backup .
+      # The image as Railway runs it: migrate on start, then serve /api/health.
+      - name: Smoke test the app image
+        run: |
+          docker run -d --name app --network host \
+            -e PORT=3000 \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres \
+            -e TOTP_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+            finance-manager
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs app
+          exit 1
+      - name: The app image refuses to start without TOTP_ENCRYPTION_KEY
+        run: |
+          if docker run --rm --network host \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres \
+            finance-manager; then
+            echo "expected a non-zero exit"; exit 1
+          fi
+      - name: The FX job command loads in the app image
+        run: docker run --rm finance-manager pnpm exec tsx --version
+
   anonymiser:
     name: Anonymiser (tools/anonymiser)
     runs-on: ubuntu-latest

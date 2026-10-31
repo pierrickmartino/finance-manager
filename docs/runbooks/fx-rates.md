@@ -20,19 +20,25 @@ Both need `DATABASE_URL`. Both are idempotent: unchanged rates are not rewritten
 
 ## Railway: the `fx-rates` cron service
 
-The daily fetch is a separate Railway service that runs on a cron schedule. Railway starts it, runs `pnpm fx:fetch`, and the process exits. Config as code: `deploy/fx-rates/railway.json`.
+The daily fetch is a separate Railway service that runs on a cron schedule. It uses the app's root `Dockerfile` (the same image as `web`) with a different start command: Railway starts it, runs `pnpm fx:fetch`, and the process exits.
 
 - Schedule: `20 16 * * *`, which is 16:20 UTC every day (17:20 or 18:20 in Zurich), after the ECB publishes in both winter and summer time. Weekend runs fetch nothing new and are harmless.
-- `restartPolicyType: NEVER`: a failed run is not retried in a loop. The next day's run catches up, because it always re-fetches the last week.
-- The build skips `next build`. The job runs from source with `tsx`, a runtime dependency.
+- Restart policy **Never**: a failed run is not retried in a loop. The next day's run catches up, because it always re-fetches the last week.
+- The job runs from source with `tsx`, a runtime dependency kept in the image.
 
-Checklist (only you can do this):
+Checklist (only you can do this, in the Railway dashboard):
 
-- [ ] In the Railway project, add a new service from this GitHub repository and name it `fx-rates`.
-- [ ] In the service settings, set the config file path to `deploy/fx-rates/railway.json`. Check that **Cron Schedule** shows `20 16 * * *`.
-- [ ] Set the variable `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (the private URL).
-- [ ] The service needs outbound HTTPS to `data-api.ecb.europa.eu`, which Railway allows by default. It needs no public domain.
-- [ ] Deploy it after the app service, whose pre-deploy step creates the `fx_rate` table. On the first run the table is empty, so the job backfills from 2021-01-01. Check the run's logs for a line like `FX rates 2020-12-25 to 2026-10-30: 1520 new, 0 corrected`.
+- [ ] In the Railway project, New, **GitHub Repo**, pick this repository, and name the service `fx-rates`. Railway builds the root `Dockerfile`.
+- [ ] **Variables**: `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (the private URL). It needs no `TOTP_ENCRYPTION_KEY`.
+- [ ] **Settings**, Deploy:
+  - **Custom Start Command**: `pnpm fx:fetch` (it replaces the image's default, which would start the web server).
+  - **Cron Schedule**: `20 16 * * *`.
+  - **Restart Policy**: Never.
+  - **Regions**: the EU region, 1 replica.
+  - No healthcheck path and no public domain.
+- [ ] Optional, under Settings, Source, **Watch Paths**: `scripts/fx-rates.ts`, `src/server/fx/**`, `src/server/services/fx/**`, `src/server/db/**`, `package.json`, `pnpm-lock.yaml`, so unrelated pushes don't rebuild it.
+- [ ] The service needs outbound HTTPS to `data-api.ecb.europa.eu`, which Railway allows by default.
+- [ ] Deploy it after the `web` service, whose start-up migrations create the `fx_rate` table. On the first run the table is empty, so the job backfills from 2021-01-01. Check the run's logs for a line like `FX rates 2020-12-25 to 2026-10-30: 1520 new, 0 corrected`. To trigger a run without waiting for the schedule, use **Run now** on the cron service if your dashboard offers it, or the command below.
 - [ ] Open the Accounts page. The rate status should show the time of that run and no warning.
 
 To run it now rather than wait for the schedule, run `pnpm fx:fetch` locally with `DATABASE_URL` set to the database's public URL (`DATABASE_PUBLIC_URL`).
