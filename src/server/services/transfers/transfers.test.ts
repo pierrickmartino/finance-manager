@@ -20,7 +20,7 @@ import {
   updateManualTransaction,
 } from '../transactions/manual';
 import { getClassificationProgress, listUnclassifiedGroups } from '../transactions/unclassified';
-import { linkTransfer, unlinkTransfer } from '.';
+import { getTransferCounterpart, linkTransfer, listLinkOptions, unlinkTransfer } from '.';
 
 const t = setupTestDatabase();
 
@@ -115,6 +115,31 @@ describe('link two Transactions as a Transfer', () => {
     const transfer = await linkTransfer(t.ctx, { transactionIds: [out, into] });
 
     expect((await getTransaction(t.ctx, into)).transferId).toBe(transfer.id);
+  });
+});
+
+describe('the Transfer of a Transaction', () => {
+  it('names the other side', async () => {
+    const { ubs, out, into } = await pair();
+    const alone = await seedOne(ubs, { amountMinor: -1000 });
+    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+
+    const other = await getTransferCounterpart(t.ctx, into);
+
+    expect(other).toMatchObject({ id: out, accountName: 'BCGE', amountMinor: -200000 });
+    expect(await getTransferCounterpart(t.ctx, alone)).toBeNull();
+  });
+
+  it('offers opposite, unlinked Transactions on other Accounts, closest amount first', async () => {
+    const { ubs, bcge, out, into } = await pair();
+    const far = await seedOne(bcge, { amountMinor: -5000, bookingDate: '2025-10-12' });
+    await seedOne(bcge, { amountMinor: 5000 }); // same sign
+    await seedOne(ubs, { amountMinor: -200000 }); // same Account
+    await seedOne(bcge, { amountMinor: -200000, bookingDate: '2025-12-31' }); // too far away
+
+    const options = await listLinkOptions(t.ctx, into);
+
+    expect(options.map((option) => option.id)).toEqual([out, far]);
   });
 });
 
