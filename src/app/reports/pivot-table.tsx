@@ -107,7 +107,11 @@ export function PivotTable({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {data.rows.map((row, r) => (
                 <tr key={row.key ?? 'none'}>
-                  <th scope="row" className={`${HEAD} text-left`}>
+                  <th
+                    scope="row"
+                    title={headerLabel(row)}
+                    className={`${HEAD} text-left ${isCompact && !isFullScreen ? 'max-w-56 truncate' : ''}`}
+                  >
                     {headerLabel(row)}
                   </th>
                   {data.columns.map((column, c) => (

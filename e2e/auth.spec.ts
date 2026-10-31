@@ -40,7 +40,8 @@ test.describe('signed out', () => {
 
     await signIn(page, code);
 
-    await expect(page.getByRole('heading', { name: 'Banks' })).toBeVisible();
+    // The landing page is the first Dashboard.
+    await expect(page).toHaveURL(/\/dashboards\//);
   });
 });
 
