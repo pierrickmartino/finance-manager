@@ -44,6 +44,9 @@ existing="$(table_count)" || fail "cannot connect to the target database"
 # than the server fails mid-restore. Check up front instead.
 client_major="$(pg_restore --version | sed -E 's/[^0-9]*([0-9]+).*/\1/')"
 server_num="$(psql "$target" --no-psqlrc --tuples-only --no-align --quiet --command 'SHOW server_version_num')"
+# Both values reach shell arithmetic, which would evaluate anything but digits.
+[[ "$client_major" =~ ^[0-9]+$ ]] || fail "cannot read the pg_restore version: $client_major"
+[[ "$server_num" =~ ^[0-9]+$ ]] || fail "cannot read the server version: $server_num"
 server_major=$((server_num / 10000))
 [ "$client_major" -le "$server_major" ] ||
   fail "pg_restore $client_major is newer than the target server ($server_major); use the PostgreSQL $server_major client tools (macOS: brew install postgresql@$server_major, then put \"\$(brew --prefix postgresql@$server_major)/bin\" first on PATH)"
