@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
+import { seedEurRates } from '@test/support/fx';
 import { seedTransactions, type SeedTransaction } from '@test/support/transactions';
 import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
@@ -36,16 +37,6 @@ async function seed(on: Account, rows: Row[]): Promise<string[]> {
   return ids;
 }
 
-async function seedRates(rates: [currency: string, date: string, rate: string][]): Promise<void> {
-  for (const [currency, date, rate] of rates) {
-    await t.ctx.db.query('INSERT INTO fx_rate (currency, date, rate_to_chf) VALUES ($1, $2, $3)', [
-      currency,
-      date,
-      rate,
-    ]);
-  }
-}
-
 /**
  * The reporting dataset, January to March 2025:
  * - UBS (CHF): salary, groceries and a groceries refund, a property purchase (Capital), a
@@ -68,11 +59,11 @@ async function dataset() {
 
   const ubs = await account('UBS');
   const ca = await account('CA', 'EUR');
-  await seedRates([
-    ['EUR', '2025-01-10', '0.9400'],
-    ['EUR', '2025-01-13', '0.9500'],
-    ['EUR', '2025-02-10', '0.9301'],
-    ['EUR', '2025-02-21', '0.9400'],
+  await seedEurRates(t.ctx, [
+    ['2025-01-10', '0.9400'],
+    ['2025-01-13', '0.9500'],
+    ['2025-02-10', '0.9301'],
+    ['2025-02-21', '0.9400'],
   ]);
 
   const [, , , , , transferOut] = await seed(ubs, [

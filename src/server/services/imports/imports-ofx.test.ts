@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { createAccount, getAccount, type Account, type AccountInput } from '../accounts';
 import { createBank } from '../banks';
+import { createManualTransaction } from '../transactions/manual';
 import { commitImport, listImportTransactions, previewImport, undoImport, type Import } from '.';
 
 const t = setupTestDatabase();
@@ -23,21 +24,18 @@ async function importFixture(account: Account, name: string): Promise<Import> {
   return commitImport(t.ctx, { previewId: preview.id });
 }
 
-/**
- * Stands in for Manual transactions (#13) until that service exists: inserts them directly, as
- * `is_manual` rows without Import or Fingerprint.
- */
+/** Records Manual transactions (the history entered by hand before the OFX files). */
 async function insertManualTransactions(
   account: Account,
   rows: readonly (readonly [bookingDate: string, amountMinor: number])[],
 ): Promise<void> {
   for (const [bookingDate, amountMinor] of rows) {
-    await t.ctx.db.query(
-      `INSERT INTO "transaction" (account_id, is_manual, booking_date, amount_minor, currency,
-         raw_description)
-       VALUES ($1, true, $2, $3, $4, 'Manual')`,
-      [account.id, bookingDate, amountMinor, account.currency],
-    );
+    await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate,
+      amountMinor,
+      description: 'Manual',
+    });
   }
 }
 

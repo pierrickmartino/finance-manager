@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
+import { seedEurRates } from '@test/support/fx';
 import { seedTransactions } from '@test/support/transactions';
 import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
@@ -55,9 +56,7 @@ async function dataset() {
   const current = await account('UBS', 'Current', 'CHF', 1_000_000);
   const savings = await account('UBS Savings', 'Savings', 'CHF', 20_000_000);
   const livret = await account('CA', 'Livret', 'EUR', 100_000);
-  await t.ctx.db.query(
-    `INSERT INTO fx_rate (currency, date, rate_to_chf) VALUES ('EUR', '2025-04-01', '0.95')`,
-  );
+  await seedEurRates(t.ctx, [['2025-04-01', '0.95']]);
 
   const ids = await seedTransactions(t.ctx.db, current, [
     { bookingDate: '2025-01-25', amountMinor: 500_000 },
