@@ -17,6 +17,8 @@ const config = [
       // Standalone packages and fixture scripts with their own tooling.
       'tools/**',
       'test/fixtures/**',
+      // Agent tooling, including other agents' worktrees under .claude/worktrees.
+      '.claude/**',
     ],
   },
   {
