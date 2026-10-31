@@ -106,7 +106,7 @@ describe('the starter Dashboard', () => {
     expect(widgets.map((w) => [w.name, w.visualisation])).toEqual([
       ['Income vs. expense', 'stacked_bar'],
       ['Net cash flow', 'line'],
-      ['Spending by Category', 'donut'],
+      ['Spending by Category', 'stacked_bar'],
       ['Account balances in CHF', 'table'],
     ]);
     const [entry] = await listHistory(t.ctx, { entityType: 'dashboard' });
@@ -138,12 +138,15 @@ describe('the starter Dashboard', () => {
     expect(netCashFlow!.rowTotals.slice(9)).toEqual([480_000, -308_000, -5_000]);
     expect(netCashFlow!.total).toBe(167_000);
 
-    // Spending by Category over the 12 months.
-    expect(spending!.rows.map((row) => row.label)).toEqual([
+    // Spending by Category over time: month × Category (story 108).
+    expect(spending!.rows.map((row) => row.key)).toEqual(MONTHS);
+    expect(spending!.columns.map((column) => column.label)).toEqual([
       'Food › Groceries',
       'Food › Restaurants',
     ]);
-    expect(spending!.rowTotals).toEqual([-20_000, -8_000]);
+    expect(spending!.cells[9]).toEqual([-20_000, null]);
+    expect(spending!.cells[10]).toEqual([null, -8_000]);
+    expect(spending!.columnTotals).toEqual([-20_000, -8_000]);
 
     // Account balances today, in CHF.
     expect(balances!.rows.map((row) => [row.key, row.label])).toEqual([

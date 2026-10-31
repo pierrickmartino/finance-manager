@@ -42,15 +42,16 @@ export const STARTER_WIDGETS: ReadonlyArray<{
     layout: { x: 6, y: 0, w: 6, h: 8 },
   },
   {
+    // Spending by Category over time (story 108): one stacked bar per month.
     name: 'Spending by Category',
     source: 'query',
     query: {
       dateRange: LAST_12_MONTHS,
-      rows: 'category',
-      columns: null,
+      rows: 'month',
+      columns: 'category',
       filters: { categoryGroupTypes: ['expense'] },
     },
-    visualisation: 'donut',
+    visualisation: 'stacked_bar',
     layout: { x: 0, y: 8, w: 6, h: 9 },
   },
   {
