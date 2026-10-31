@@ -7,6 +7,7 @@ import type { Queryable } from '@/server/db/client';
  */
 export interface SeedTransaction {
   bookingDate: string;
+  valueDate?: string | null;
   amountMinor: number;
   rawDescription?: string;
   counterpartyName?: string | null;
@@ -29,8 +30,8 @@ export async function seedTransactions(
     const result = await db.query<{ id: string }>(
       `INSERT INTO "transaction" (account_id, import_id, is_manual, booking_date, amount_minor,
          currency, fingerprint, raw_description, counterparty_name, counterparty_iban,
-         payment_reference)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+         payment_reference, value_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
       [
         account.id,
         isManual ? null : importId,
@@ -43,6 +44,7 @@ export async function seedTransactions(
         row.counterpartyName ?? null,
         row.counterpartyIban ?? null,
         row.paymentReference ?? null,
+        row.valueDate ?? null,
       ],
     );
     ids.push(result.rows[0]!.id);
