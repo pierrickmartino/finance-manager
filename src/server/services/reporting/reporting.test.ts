@@ -128,6 +128,7 @@ describe('run a Widget query', () => {
     });
 
     expect(keys(report.rows)).toEqual(['2025-01', '2025-02', '2025-03']);
+    expect(labels(report.rows)).toEqual(['Jan 2025', 'Feb 2025', 'Mar 2025']);
     expect(keys(report.columns)).toEqual([salary.id, groceries.id, restaurants.id, null]);
     expect(labels(report.columns)).toEqual([
       'Income › Salary',
@@ -221,8 +222,10 @@ describe('axes', () => {
     });
 
     expect(keys(quarters.rows)).toEqual(['2024-Q4', '2025-Q1', '2025-Q2']);
+    expect(quarters.rows.map((row) => row.label)).toEqual(['Q4 2024', 'Q1 2025', 'Q2 2025']);
     expect(quarters.cells).toEqual([[null], [564949], [null]]);
     expect(keys(years.rows)).toEqual(['2024', '2025']);
+    expect(years.rows.map((row) => row.label)).toEqual(['2024', '2025']);
     expect(years.cells).toEqual([[null], [564949]]);
   });
 

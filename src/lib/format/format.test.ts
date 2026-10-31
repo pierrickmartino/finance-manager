@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFormatter, DEFAULT_DISPLAY_SETTINGS } from '.';
+import { createFormatter, DEFAULT_DISPLAY_SETTINGS, formatPeriod } from '.';
 
 describe('formatter with Swiss defaults', () => {
   const fmt = createFormatter(DEFAULT_DISPLAY_SETTINGS);
@@ -82,5 +82,22 @@ describe('percent', () => {
   it("uses the number format's decimal separator", () => {
     const fmt = createFormatter({ ...DEFAULT_DISPLAY_SETTINGS, numberFormat: 'dot' });
     expect(fmt.percent(0.0123)).toBe('1,2%');
+  });
+});
+
+describe('period', () => {
+  it.each([
+    ['2025-03', 'Mar 2025'],
+    ['2024-12', 'Dec 2024'],
+    ['2025-Q1', 'Q1 2025'],
+    ['2025', '2025'],
+  ])('formats the period key %s as %s', (key, expected) => {
+    expect(createFormatter(DEFAULT_DISPLAY_SETTINGS).period(key)).toBe(expected);
+    expect(formatPeriod(key)).toBe(expected);
+  });
+
+  it('refuses something that is not a period key', () => {
+    expect(() => formatPeriod('2025-13')).toThrow('Expected a period key');
+    expect(() => formatPeriod('March')).toThrow('Expected a period key');
   });
 });

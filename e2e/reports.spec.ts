@@ -41,7 +41,7 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
 
   const pivot = page.getByRole('table', { name: 'Pivot' });
   await expect(pivot.getByRole('columnheader', { name: 'Unclassified' })).toBeVisible();
-  await expect(pivot.getByRole('rowheader', { name: '2025-10' })).toBeVisible();
+  await expect(pivot.getByRole('rowheader', { name: 'Oct 2025' })).toBeVisible();
 
   // The full-screen pivot view, and back.
   await page.getByRole('button', { name: 'Full screen' }).click();
@@ -50,9 +50,9 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await expect(page.getByRole('button', { name: 'Full screen' })).toBeVisible();
 
   // Drill into the cell: all 14 October Transactions are unclassified.
-  await pivot.getByRole('link', { name: /^2025-10, Unclassified: / }).click();
+  await pivot.getByRole('link', { name: /^Oct 2025, Unclassified: / }).click();
   await expect(
-    page.getByRole('heading', { name: 'Transactions in 2025-10 · Unclassified' }),
+    page.getByRole('heading', { name: 'Transactions in Oct 2025 · Unclassified' }),
   ).toBeVisible();
   await expect(page.getByRole('status')).toContainText('14 Transactions');
   await expect(
@@ -66,6 +66,6 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await page.getByRole('button', { name: 'Save Widget' }).click();
   await expect(page.getByRole('heading', { level: 1, name: widgetName })).toBeVisible();
   await expect(
-    page.getByRole('table', { name: 'Pivot' }).getByRole('rowheader', { name: '2025-10' }),
+    page.getByRole('table', { name: 'Pivot' }).getByRole('rowheader', { name: 'Oct 2025' }),
   ).toBeVisible();
 });

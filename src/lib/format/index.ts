@@ -45,6 +45,8 @@ export interface Formatter {
   date(value: string | Date): string;
   /** Formats a share between 0 and 1 as a percentage with one decimal ("1.2%"). */
   percent(share: number): string;
+  /** Formats a reporting period key: `2025-03` → "Mar 2025", `2025-Q1` → "Q1 2025", `2025`. */
+  period(key: string): string;
 }
 
 const DEFAULT_FRACTION_DIGITS = 2;
@@ -125,11 +127,38 @@ export function formatPercent(share: number, numberFormat: NumberFormat): string
   return `${sign}${whole}${decimal}${abs % 10}%`;
 }
 
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+const PERIOD_KEY = /^(\d{4})(?:-(0[1-9]|1[0-2])|-Q([1-4]))?$/;
+
+/** A reporting period key (month `YYYY-MM`, quarter `YYYY-Qn` or year `YYYY`) for display. */
+export function formatPeriod(key: string): string {
+  const match = PERIOD_KEY.exec(key);
+  if (!match) throw new Error(`Expected a period key (YYYY-MM, YYYY-Qn or YYYY), got "${key}"`);
+  const [, year, month, quarter] = match;
+  if (month) return `${MONTH_NAMES[Number(month) - 1]} ${year}`;
+  if (quarter) return `Q${quarter} ${year}`;
+  return year!;
+}
+
 export function createFormatter(settings: DisplaySettings): Formatter {
   return {
     settings,
     amount: (minor, options) => formatAmount(minor, settings.numberFormat, options),
     date: (value) => formatDate(value, settings.dateFormat),
     percent: (share) => formatPercent(share, settings.numberFormat),
+    period: formatPeriod,
   };
 }

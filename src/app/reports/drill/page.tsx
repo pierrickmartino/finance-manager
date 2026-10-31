@@ -40,7 +40,7 @@ async function loadCell(
   }
 }
 
-/** "2025-03 · Food › Groceries": the labels of the cell's row and column. */
+/** "Mar 2025 · Food › Groceries": the labels of the cell's row and column. */
 function describeCell(report: ReportTable | null, cell: CellRef): string {
   const label = (headers: ReportHeader[] | undefined, key: string | null | undefined) =>
     key === undefined

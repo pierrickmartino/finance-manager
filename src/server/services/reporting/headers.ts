@@ -1,3 +1,4 @@
+import { formatPeriod } from '@/lib/format';
 import type { Queryable } from '@/server/db/client';
 import { CATEGORY_GROUP_TYPE_LABELS, CATEGORY_GROUP_TYPES } from '../categories/model';
 import { intersect, periodSpan, periodsIn, type DateSpan } from './periods';
@@ -79,7 +80,7 @@ export async function axisHeaders(
   if (isTimeAxis(axis)) {
     return periodsIn(range, axis).map((key) => ({
       key,
-      label: key,
+      label: formatPeriod(key),
       isPartial: partialPeriod !== null && intersect(periodSpan(key, axis), partialPeriod) !== null,
     }));
   }
