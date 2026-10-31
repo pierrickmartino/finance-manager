@@ -340,4 +340,27 @@ describe('restore.sh', () => {
     expect(result.code).not.toBe(0);
     expect(result.stderr).toMatch(/decrypt/i);
   });
+
+  it('refuses a pg_restore newer than the target server before touching it', async () => {
+    // pg_restore 17+ emits settings an older server rejects (SET transaction_timeout), so a
+    // newer client fails mid-restore. A stub on PATH reports a far-future major version.
+    const binDir = path.join(workDir, `newer-pg-${randomBytes(3).toString('hex')}`);
+    await mkdir(binDir);
+    await writeFile(
+      path.join(binDir, 'pg_restore'),
+      '#!/bin/sh\necho "pg_restore (PostgreSQL) 99.0"\n',
+      { mode: 0o755 },
+    );
+    const backup = await pulledBackup();
+    const target = await emptyDatabase();
+
+    const result = await runScript(
+      'restore.sh',
+      ['--identity', key.identityFile, '--target', databaseUrl(target), backup],
+      { PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}` },
+    );
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/pg_restore 99 is newer than the target server \(\d+\)/);
+  });
 });

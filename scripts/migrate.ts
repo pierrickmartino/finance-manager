@@ -1,6 +1,6 @@
 /**
  * Applies (or rolls back) SQL migrations against DATABASE_URL.
- *   pnpm db:migrate          apply all pending migrations (also the Railway pre-deploy step)
+ *   pnpm db:migrate          apply all pending migrations (also run by scripts/docker-start.sh on every deploy)
  *   pnpm db:migrate:down     roll back the most recent migration
  */
 import { migrate } from '../src/server/db/migrate';

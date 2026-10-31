@@ -15,7 +15,8 @@ env:
 jobs:
   checks:
     name: Lint, typecheck, service tests
-    runs-on: ubuntu-latest
+    # Pinned: the PGDG repository below must support the runner's Ubuntu release.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -32,8 +33,20 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The backup tests (scripts/backup) need age; pg_dump 16 ships with the runner image.
-      - run: sudo apt-get update && sudo apt-get install -y age
+      # The backup tests (scripts/backup) need age and the client tools of the server's major
+      # version: the runner's own pg_dump/pg_restore are newer, and pg_restore 17+ emits
+      # settings Postgres 16 rejects. Same PGDG source as deploy/backup/Dockerfile.
+      - name: Install age and the PostgreSQL 16 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends age postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+      - run: pg_restore --version
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
@@ -66,6 +79,45 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  docker:
+    name: Docker images (build and smoke test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t finance-manager .
+      - run: docker build -f deploy/backup/Dockerfile -t finance-backup .
+      # The image as Railway runs it: migrate on start, then serve /api/health.
+      - name: Smoke test the app image
+        run: |
+          docker run -d --name app --network host \
+            -e PORT=3000 \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres \
+            -e TOTP_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+            finance-manager
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs app
+          exit 1
+      - name: The app image refuses to start without TOTP_ENCRYPTION_KEY
+        run: |
+          if docker run --rm --network host \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres \
+            finance-manager; then
+            echo "expected a non-zero exit"; exit 1
+          fi
+      - name: The FX job command loads in the app image
+        run: docker run --rm finance-manager pnpm exec tsx --version
 
   anonymiser:
     name: Anonymiser (tools/anonymiser)

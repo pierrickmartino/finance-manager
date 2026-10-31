@@ -14,8 +14,8 @@ Railway project (EU)                                     Your always-on machine
                                                                   private key: offline, never here
 ```
 
-- **Backup service** (`scripts/backup/server.ts`, image `deploy/backup/Dockerfile`, config `deploy/backup/railway.json`): a separate Railway service. `GET /backup` runs `pg_dump --format=custom` and pipes it straight into `age`, encrypted to your public key(s). The plaintext dump never touches disk and never leaves Railway's private network; only ciphertext goes out. The service holds **no private key** and **no credentials to your storage**: your machine pulls, Railway never pushes.
-- **Auth and rate limits**: `/backup` needs `Authorization: Bearer <BACKUP_TOKEN>`, a dedicated secret (at least 32 characters, used for nothing else, compared in constant time). It allows one dump per 10 minutes (`BACKUP_MIN_INTERVAL_SECONDS`) and one at a time, and after 10 failed authentications in an hour it answers `429` to everyone for the rest of that hour. The limits are in memory, so the service must run as **one replica** (as configured).
+- **Backup service** (`scripts/backup/server.ts`, image `deploy/backup/Dockerfile`): a separate Railway service. `GET /backup` runs `pg_dump --format=custom` and pipes it straight into `age`, encrypted to your public key(s). The plaintext dump never touches disk and never leaves Railway's private network; only ciphertext goes out. The service holds **no private key** and **no credentials to your storage**: your machine pulls, Railway never pushes.
+- **Auth and rate limits**: `/backup` needs `Authorization: Bearer <BACKUP_TOKEN>`, a dedicated secret (at least 32 characters, used for nothing else, compared in constant time). It allows one dump per 10 minutes (`BACKUP_MIN_INTERVAL_SECONDS`) and one at a time, and after 10 failed authentications in an hour it answers `429` to everyone for the rest of that hour. The limits are in memory, so the service must run as **one replica** (set under Settings, Deploy, Regions).
 - **Pull script** (`scripts/backup/pull.sh`): runs nightly on your machine, downloads the ciphertext, checks its SHA-256 and that it is an age file, and stores it. It never decrypts, so your private key does not need to be on that machine.
 - **Retention**: `daily/finance-YYYY-MM-DD.dump.age` keeps the newest 14; `monthly/finance-YYYY-MM.dump.age` (the first pull of each month) keeps the newest 12. Dates are UTC. Change with `KEEP_DAILY` / `KEEP_MONTHLY`.
 - **Restore script** (`scripts/backup/restore.sh`): decrypts and pipes into `pg_restore` in a single transaction, into an empty database only.
@@ -37,12 +37,14 @@ Work through these once. Tick them in the issue (#6) as you go.
 **Railway (backup service)**
 
 - [ ] In the Railway project, add a new service from this GitHub repository and name it `backup`.
-- [ ] In the service's settings, set the config file path to `deploy/backup/railway.json` (it builds `deploy/backup/Dockerfile` and health-checks `/health`).
+- [ ] Point it at the backup image: add the service variable `RAILWAY_DOCKERFILE_PATH` = `deploy/backup/Dockerfile` (or set the Dockerfile path under Settings, Build). Without it, Railway would build the app's root `Dockerfile`.
+- [ ] **Settings**, Deploy: **Healthcheck Path** `/health`; **Restart Policy** On Failure; **Regions** the EU region with **1 replica** (the rate limits are in memory); leave the start command empty.
+- [ ] Optional, under Settings, Source, **Watch Paths**: `scripts/backup/server.ts`, `deploy/backup/**`, so app changes don't rebuild it.
 - [ ] Set the service variables:
   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (the private URL, so the plaintext dump stays on Railway's private network; do not use `DATABASE_PUBLIC_URL`).
   - `BACKUP_TOKEN` = a fresh secret, for example from `openssl rand -hex 32`. Store it in your password manager as well.
   - `BACKUP_AGE_RECIPIENTS` = your public key(s), `age1...`, comma separated.
-  - `PG_MAJOR` = the Postgres major version of the Railway database (run `SELECT version();` on it). The default is 16. The client must be the same major version or newer.
+  - `PG_MAJOR` = the Postgres major version of the Railway database (run `SELECT version();` on it). The default is 16. The client must be the same major version or newer. Railway passes service variables to the Dockerfile's matching `ARG` at build time, so changing it needs a redeploy.
 - [ ] Generate a public domain for the `backup` service. Note the URL.
 - [ ] Check it: `curl https://<backup-domain>/health` returns `{"status":"ok"}`; `curl -i https://<backup-domain>/backup` without the token returns `401`.
 
@@ -73,7 +75,7 @@ Pick a machine that is on (or wakes) every night: a home server, a NAS that can 
 
 ## Restore
 
-You need: the backup file (`*.dump.age`), the private key (or its passphrase-protected file), `age`, and the PostgreSQL 16 client tools (`psql`, `pg_restore`; macOS: `brew install age libpq`).
+You need: the backup file (`*.dump.age`), the private key (or its passphrase-protected file), `age`, and the client tools (`psql`, `pg_restore`) of the **target server's major version**, 16 by default. A newer `pg_restore` emits settings an older server rejects, so `restore.sh` refuses it up front. macOS: `brew install age postgresql@16`, then put `$(brew --prefix postgresql@16)/bin` first on `PATH` (Homebrew's `libpq` is always the newest version, so don't use it).
 
 1. **Pick the backup.** Usually the newest file in `daily/`. To recover from an older mistake, pick an older daily or monthly file.
 2. **Create an empty database.** Locally: `createdb finance_restore`. On Railway: add a new Postgres service, and use its `DATABASE_PUBLIC_URL` from your machine. Do not restore over the live database; `restore.sh` refuses any database that already has tables.
@@ -104,7 +106,7 @@ You need: the backup file (`*.dump.age`), the private key (or its passphrase-pro
 
 ## Tests and the agent walk-through
 
-`scripts/backup/backup.test.ts` (part of `pnpm test`, needs `age` and the PostgreSQL client) generates a throwaway key pair per run and checks:
+`scripts/backup/backup.test.ts` (part of `pnpm test`, needs `age` and the PostgreSQL client of the test server's major version) generates a throwaway key pair per run and checks:
 
 - `/backup` refuses a missing or wrong secret, enforces the dump interval and the failed-auth lockout, and refuses to start with a short secret or without a valid public key;
 - the served artifact starts with the age header, contains neither the `PGDMP` magic nor row data, fails to decrypt with another key, and decrypts to a `pg_dump` archive with the right key;
