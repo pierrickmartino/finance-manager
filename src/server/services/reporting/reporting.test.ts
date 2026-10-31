@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { seedTransactions, type SeedTransaction } from '@test/support/transactions';
 import { createAccount, type Account } from '../accounts';
@@ -152,5 +152,274 @@ describe('run a Widget query', () => {
     // The EUR Transaction of 2025-01-05 predates the first EUR rate: it is never counted as 0.
     expect(report.unconvertedCount).toBe(1);
     expect(report.total).toBe(564949);
+  });
+});
+
+describe('income, expense, Capital and Transfers', () => {
+  it('splits income and expense by Category group type, without Capital or Transfers', async () => {
+    await dataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      columns: 'categoryGroupType',
+    });
+
+    expect(keys(report.columns)).toEqual(['income', 'expense', null]);
+    expect(labels(report.columns)).toEqual(['Income', 'Expense', 'Unclassified']);
+    expect(report.cells).toEqual([
+      [600000, -19400, null],
+      [null, -12651, null],
+      [null, null, -3000],
+    ]);
+  });
+
+  it('includes Capital in net cash flow, but never Transfers', async () => {
+    await dataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      includeCapital: true,
+    });
+
+    // February: groceries -80.00, restaurant -46.51 and the property purchase -50 000.00.
+    // The Transfer (-1 000.00 out, EUR 1 060.00 in) still counts on neither side.
+    expect(report.cells).toEqual([[580600], [-5012651], [-3000]]);
+    expect(report.total).toBe(-4435051);
+  });
+
+  it('reports Capital alone when filtered on the Capital type', async () => {
+    const { property } = await dataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      columns: 'category',
+      filters: { categoryGroupTypes: ['capital'] },
+    });
+
+    expect(keys(report.columns)).toEqual([property.id]);
+    expect(report.total).toBe(-5000000);
+  });
+});
+
+describe('axes', () => {
+  it('groups by quarter and year, listing every period of the range', async () => {
+    await dataset();
+
+    const quarters = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'fixed', from: '2024-11-15', to: '2025-04-30' },
+      rows: 'quarter',
+    });
+    const years = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'fixed', from: '2024-11-15', to: '2025-04-30' },
+      rows: 'year',
+    });
+
+    expect(keys(quarters.rows)).toEqual(['2024-Q4', '2025-Q1', '2025-Q2']);
+    expect(quarters.cells).toEqual([[null], [564949], [null]]);
+    expect(keys(years.rows)).toEqual(['2024', '2025']);
+    expect(years.cells).toEqual([[null], [564949]]);
+  });
+
+  it('groups by Category group, Account and Currency', async () => {
+    const { ubs, ca, income, food } = await dataset();
+
+    const groups = await runWidgetQuery(t.ctx, { dateRange: Q1_2025, rows: 'categoryGroup' });
+    const accounts = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'account',
+      columns: 'currency',
+    });
+
+    expect(keys(groups.rows)).toEqual([income.id, food.id, null]);
+    expect(groups.cells).toEqual([[600000], [-32051], [-3000]]);
+    expect(keys(accounts.rows)).toEqual([ca.id, ubs.id]);
+    expect(labels(accounts.rows)).toEqual(['Bank CA · CA', 'Bank UBS · UBS']);
+    expect(keys(accounts.columns)).toEqual(['CHF', 'EUR']);
+    expect(accounts.cells).toEqual([
+      [null, -14051],
+      [579000, null],
+    ]);
+  });
+
+  it('groups by Payee, with Transactions without a Payee last', async () => {
+    await dataset();
+
+    const report = await runWidgetQuery(t.ctx, { dateRange: Q1_2025, rows: 'payee' });
+
+    expect(labels(report.rows)).toEqual(['Coop', 'Employer', 'Migros', 'No Payee']);
+    expect(report.cells).toEqual([[-8000], [600000], [-10000], [-17051]]);
+  });
+
+  it('counts a Transaction under each of its Tags, but once in the totals', async () => {
+    await dataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'tag',
+      columns: 'month',
+    });
+
+    expect(labels(report.rows)).toEqual(['Family', 'Weekly', 'Work', 'No Tag']);
+    expect(report.cells).toEqual([
+      [-12000, -8000, null],
+      [-12000, null, null],
+      [600000, null, null],
+      [-7400, -4651, -3000],
+    ]);
+    // January: 6 000.00 - 120.00 + 20.00 - 94.00, with the Family+Weekly groceries once.
+    expect(report.columnTotals).toEqual([580600, -12651, -3000]);
+    expect(report.total).toBe(564949);
+  });
+
+  it('refuses the same axis on rows and columns', async () => {
+    await expect(
+      runWidgetQuery(t.ctx, { dateRange: Q1_2025, rows: 'month', columns: 'month' }),
+    ).rejects.toThrow('Rows and columns must use different axes');
+  });
+});
+
+describe('measures', () => {
+  it('counts Transactions', async () => {
+    const { groceries } = await dataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      columns: 'category',
+      measure: 'count',
+      filters: { categoryIds: [groceries.id] },
+    });
+
+    expect(report.cells).toEqual([[3], [1], [null]]);
+    expect(report.total).toBe(4);
+  });
+
+  it('averages per month over the range, and per month within each period', async () => {
+    const { food } = await dataset();
+
+    const byGroup = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'categoryGroup',
+      measure: 'average',
+      averagePer: 'month',
+    });
+    const byQuarter = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-04-30' },
+      rows: 'quarter',
+      measure: 'average',
+      filters: { categoryGroupIds: [food.id] },
+    });
+
+    // Food over three months: -320.51 / 3 = -106.836…, rounded to -106.84.
+    expect(byGroup.cells).toEqual([[200000], [-10684], [-1000]]);
+    // Q1 has three months of the range, Q2 one (April), but no Transactions.
+    expect(byQuarter.cells).toEqual([[-10684], [null]]);
+    // The total divides by the four months of the range: -320.51 / 4 = -80.1275.
+    expect(byQuarter.total).toBe(-8013);
+  });
+});
+
+describe('date ranges', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** 2025-04-10 in Zurich. */
+  const onApril10 = () =>
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2025-04-10T10:00:00Z') });
+
+  it('covers the last N complete months, leaving out the current one', async () => {
+    const { ubs } = await dataset();
+    await seed(ubs, [{ bookingDate: '2025-04-02', amountMinor: -999 }]);
+    onApril10();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'last', count: 2, unit: 'month' },
+      rows: 'month',
+    });
+
+    expect(report.range).toEqual({ from: '2025-02-01', to: '2025-03-31' });
+    expect(report.partialPeriod).toBeNull();
+    expect(keys(report.rows)).toEqual(['2025-02', '2025-03']);
+    expect(report.cells).toEqual([[-12651], [-3000]]);
+  });
+
+  it('adds the current period up to today, flagged as partial, when asked', async () => {
+    const { ubs } = await dataset();
+    await seed(ubs, [
+      { bookingDate: '2025-04-02', amountMinor: -999 },
+      { bookingDate: '2025-04-11', amountMinor: -111 },
+    ]);
+    onApril10();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'last', count: 1, unit: 'quarter', includeCurrent: true },
+      rows: 'month',
+    });
+
+    expect(report.range).toEqual({ from: '2025-01-01', to: '2025-04-10' });
+    expect(report.partialPeriod).toEqual({ from: '2025-04-01', to: '2025-04-10' });
+    expect(report.rows.map((row) => [row.key, row.isPartial])).toEqual([
+      ['2025-01', false],
+      ['2025-02', false],
+      ['2025-03', false],
+      ['2025-04', true],
+    ]);
+    expect(report.cells.at(-1)).toEqual([-999]);
+  });
+
+  it('covers complete years and year to date', async () => {
+    onApril10();
+
+    const years = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'last', count: 2, unit: 'year' },
+    });
+    const ytd = await runWidgetQuery(t.ctx, { dateRange: { kind: 'yearToDate' } });
+
+    expect(years.range).toEqual({ from: '2023-01-01', to: '2024-12-31' });
+    expect(ytd.range).toEqual({ from: '2025-01-01', to: '2025-03-31' });
+  });
+
+  it('is empty in January for year to date of complete months', async () => {
+    await dataset();
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2025-01-20T10:00:00Z') });
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'yearToDate' },
+      rows: 'month',
+    });
+
+    expect(report.rows).toEqual([]);
+    expect(report.total).toBeNull();
+  });
+
+  it('refuses a fixed range that ends before it starts', async () => {
+    await expect(
+      runWidgetQuery(t.ctx, {
+        dateRange: { kind: 'fixed', from: '2025-02-01', to: '2025-01-01' },
+      }),
+    ).rejects.toThrow('From must not be after To');
+  });
+});
+
+describe('filters', () => {
+  it('filters by Account, Payee, Tag, Currency and Category group type', async () => {
+    const { ca } = await dataset();
+    const idOf = async (table: 'payee' | 'tag', name: string) =>
+      (await t.ctx.db.query<{ id: string }>(`SELECT id FROM ${table} WHERE name = $1`, [name]))
+        .rows[0]!.id;
+    const total = async (filters: WidgetQueryInput['filters']) =>
+      (await runWidgetQuery(t.ctx, { dateRange: Q1_2025, filters })).total;
+
+    expect(await total({ accountIds: [ca.id] })).toBe(-14051);
+    expect(await total({ payeeIds: [await idOf('payee', 'Migros')] })).toBe(-10000);
+    expect(await total({ tagIds: [await idOf('tag', 'Family')] })).toBe(-20000);
+    expect(await total({ currencies: ['EUR'] })).toBe(-14051);
+    // Typed only: the unclassified -30.00 drops out.
+    expect(await total({ categoryGroupTypes: ['income', 'expense'] })).toBe(567949);
+    // Empty lists mean no filter, as an empty form submits them.
+    expect(await total({ accountIds: [], currencies: [] })).toBe(564949);
   });
 });
