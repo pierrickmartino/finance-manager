@@ -8,11 +8,14 @@ import { getServiceContext } from '@/server/app-context';
 import { getRequestDisplaySettings } from '@/server/formatter';
 import { ValidationError } from '@/server/services/errors';
 import {
+  applyRulesToExisting,
   createRule,
   deleteRule,
   reorderRules,
   setRuleEnabled,
   updateRule,
+  type ApplyRulesInput,
+  type ApplyRulesResult,
   type RuleInput,
 } from '@/server/services/rules';
 import { draftToRuleInput, DraftError } from './rule-draft';
@@ -104,5 +107,34 @@ export async function deleteRuleAction(id: string, _previous: Result | null): Pr
 export async function reorderRulesAction(ids: string[]): Promise<Result> {
   const result = await runAction(async () => reorderRules(await getServiceContext(), ids));
   if (result.ok) revalidate();
+  return result;
+}
+
+/**
+ * Creates a Rule from a Transaction (the prefilled editor), then opens its apply preview so
+ * the Transactions it matches can be reclassified.
+ */
+export async function createRuleThenPreviewAction(
+  _previous: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const result = await runAction(async () =>
+    createRule(await getServiceContext(), await readRule(formData)),
+  );
+  if (!result.ok) return result;
+  revalidate();
+  redirect(`/rules/apply?ruleId=${encodeURIComponent(result.data.id)}`);
+}
+
+/** Commits the apply preview: the same Rules on the same Transactions, one History Batch. */
+export async function applyRulesAction(
+  input: ApplyRulesInput,
+  _previous: ActionResult<ApplyRulesResult> | null,
+): Promise<ActionResult<ApplyRulesResult>> {
+  const result = await runAction(async () =>
+    applyRulesToExisting(await getServiceContext(), input),
+  );
+  // Classification shows almost everywhere: the lists, Unclassified, History, the Rules.
+  if (result.ok) revalidatePath('/', 'layout');
   return result;
 }

@@ -15,6 +15,8 @@ export interface RuleRow {
   enabled: boolean;
   conditions: string[];
   actions: string;
+  /** Transactions the Rule matches now. */
+  matchCount: number;
   toggle: BoundAction;
   remove: BoundAction;
 }
@@ -80,6 +82,7 @@ export function RuleList({ rows, reorder }: RuleListProps) {
             <th className={CELL}>Rule</th>
             <th className={CELL}>When</th>
             <th className={CELL}>Then</th>
+            <th className={`${CELL} text-right`}>Matches</th>
             <th className={CELL}>Status</th>
             <th className={CELL}>
               <span className="sr-only">Actions</span>
@@ -128,6 +131,7 @@ export function RuleList({ rows, reorder }: RuleListProps) {
                   </ul>
                 </td>
                 <td className={CELL}>{row.actions || '—'}</td>
+                <td className={`${CELL} text-right tabular-nums`}>{row.matchCount}</td>
                 <td className={CELL}>{row.enabled ? 'Enabled' : 'Disabled'}</td>
                 <td className={CELL}>
                   <div className="flex flex-wrap gap-1">
@@ -149,6 +153,13 @@ export function RuleList({ rows, reorder }: RuleListProps) {
                     >
                       ↓
                     </button>
+                    <Link
+                      href={`/rules/apply?ruleId=${id}`}
+                      aria-label={`Apply ${row.name} to existing Transactions`}
+                      className={BUTTON_CLASS}
+                    >
+                      Apply
+                    </Link>
                     <ActionForm
                       action={row.toggle}
                       label={`${row.enabled ? 'Disable' : 'Enable'} ${row.name}`}

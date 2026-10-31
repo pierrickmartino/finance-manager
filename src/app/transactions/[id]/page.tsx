@@ -101,6 +101,11 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
           action={editClassificationAction.bind(null, transaction.id)}
         />
         <LockedFields classification={classification} />
+        <p className="text-sm">
+          <Link href={`/rules/new?fromTransaction=${transaction.id}`} className="underline">
+            Create rule from this Transaction
+          </Link>
+        </p>
       </section>
 
       <div className="flex items-start gap-3">

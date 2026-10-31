@@ -183,9 +183,16 @@ export function BulkEditForm({
                   {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
                 </td>
                 <td className={`${CELL} whitespace-nowrap`}>
-                  {/* Per-Transaction actions. #18 adds "Create rule from this Transaction" here. */}
                   <Link href={`/transactions/${transaction.id}`} className="hover:underline">
                     Open
+                  </Link>{' '}
+                  ·{' '}
+                  <Link
+                    href={`/rules/new?fromTransaction=${transaction.id}`}
+                    aria-label={`Create rule from ${transaction.rawDescription || 'Transaction'} on ${fmt.date(transaction.bookingDate)}`}
+                    className="hover:underline"
+                  >
+                    Create rule
                   </Link>
                 </td>
               </tr>

@@ -28,6 +28,7 @@ export {
   type ApplyRulesPreview,
   type ApplyRulesResult,
   type RuleFieldChange,
+  type RuleSuggestion,
   type TransactionRuleChange,
 } from './existing';
 export type {

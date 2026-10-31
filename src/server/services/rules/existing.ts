@@ -13,11 +13,11 @@ import {
   compileRules,
   evaluateRules,
   ruleMatches,
+  type RuleDefinition,
   type RuleEvaluation,
   type RuleSubject,
 } from './evaluator';
 import { loadRuleEngine, type RuleEngine } from './apply';
-import type { RuleInput } from './input';
 import { findRule } from './model';
 
 /**
@@ -410,6 +410,9 @@ export async function countRuleMatches(ctx: ServiceContext): Promise<Record<stri
   return counts;
 }
 
+/** An unsaved Rule; it can be passed to `createRule` as is. */
+export type RuleSuggestion = Omit<RuleDefinition, 'id'>;
+
 /** At most this many words of the description go into a suggested Rule. */
 const MAX_FRAGMENT_WORDS = 3;
 const WORD = /^[\p{L}][\p{L}'&-]+$/u;
@@ -440,7 +443,7 @@ export function descriptionFragment(rawDescription: string): string | null {
 export async function suggestRuleFromTransaction(
   ctx: ServiceContext,
   transactionId: string,
-): Promise<RuleInput> {
+): Promise<RuleSuggestion> {
   if (!z.uuid().safeParse(transactionId).success) {
     throw new NotFoundError('Transaction not found');
   }
