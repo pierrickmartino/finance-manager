@@ -9,8 +9,9 @@ import {
   renameCategoryAction,
   shiftCategoryAction,
 } from './actions';
-import { Menu } from './menu';
-import { DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS, usageBarClass } from './styles';
+import { Menu } from '@/components/menu';
+import { DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
+import { usageBarClass } from './styles';
 import { usagePercent } from './view';
 
 interface CategoryRowProps {

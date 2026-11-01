@@ -8,15 +8,14 @@ import {
   updateGroupAction,
 } from './actions';
 import { CategoryRow } from './category-row';
-import { Menu } from './menu';
+import { Menu } from '@/components/menu';
 import {
   CARD_CLASS,
   DANGER_BUTTON_CLASS,
   GHOST_BUTTON_CLASS,
   PRIMARY_BUTTON_CLASS,
-  TypeBadge,
-  TypeSelect,
-} from './styles';
+} from '@/components/surface';
+import { TypeBadge, TypeSelect } from './styles';
 import { transactionTotal } from './view';
 
 interface GroupDetailProps {

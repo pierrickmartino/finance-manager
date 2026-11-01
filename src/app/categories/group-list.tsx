@@ -3,14 +3,9 @@ import { ActionForm } from '@/components/action-form';
 import { INPUT_CLASS } from '@/components/named-list';
 import { CATEGORY_GROUP_TYPE_LABELS, type CategoryGroup } from '@/server/services/categories';
 import { createGroupAction } from './actions';
-import { Menu } from './menu';
-import {
-  CARD_CLASS,
-  GHOST_BUTTON_CLASS,
-  PRIMARY_BUTTON_CLASS,
-  TypeDot,
-  TypeSelect,
-} from './styles';
+import { Menu } from '@/components/menu';
+import { CARD_CLASS, GHOST_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
+import { TypeDot, TypeSelect } from './styles';
 import { groupsByType } from './view';
 
 interface GroupListProps {
