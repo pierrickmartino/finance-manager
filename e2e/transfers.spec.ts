@@ -9,7 +9,7 @@ const UBS_OCTOBER = path.join(FIXTURES, 'ubs/ubs-chf-2025-10.csv');
 
 /** Creates a Bank and an Account with no IBAN (IBANs are unique across the shared E2E DB). */
 async function createAccount(page: Page, name: string, format: string): Promise<void> {
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(`${name} bank`);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: `${name} bank` })).toBeVisible();

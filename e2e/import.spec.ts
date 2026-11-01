@@ -15,7 +15,7 @@ test('uploads a UBS CSV, previews it, commits it, and skips it when uploaded aga
   const bankName = `UBS ${suffix}`;
   const accountName = `UBS current ${suffix}`;
 
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

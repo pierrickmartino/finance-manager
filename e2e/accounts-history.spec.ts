@@ -7,7 +7,7 @@ import {
 } from './support/accounts';
 
 async function createBank(page: Page, name: string): Promise<void> {
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(name);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: name })).toBeVisible();

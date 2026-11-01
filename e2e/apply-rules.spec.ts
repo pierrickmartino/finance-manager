@@ -10,7 +10,7 @@ function uniqueWord(): string {
 }
 
 async function openNewManualAccount(page: Page, accountName: string, bankName: string) {
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

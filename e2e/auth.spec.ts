@@ -47,7 +47,7 @@ test.describe('signed out', () => {
 
 test('an operation submitted after the session ended is rejected', async ({ page, context }) => {
   const name = `Expired ${Date.now()}`;
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   // The session ends (as after 30 idle minutes) while the form is open.
   const session = (await context.cookies()).find((cookie) => cookie.name === 'fm_session')!;
   await context.addCookies([{ ...session, value: 'expired' }]);

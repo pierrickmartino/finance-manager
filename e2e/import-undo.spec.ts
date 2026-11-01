@@ -25,7 +25,7 @@ test('reviews a near-duplicate side by side, deletes one imported Transaction, a
   const bankName = `UBS undo ${suffix}`;
   const accountName = `UBS undo ${suffix}`;
 
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

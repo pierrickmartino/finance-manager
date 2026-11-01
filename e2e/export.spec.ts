@@ -15,7 +15,7 @@ test('exports the filtered Transaction list as CSV for Excel', async ({ page }) 
   const bankName = `Export bank ${suffix}`;
   const accountName = `Export account ${suffix}`;
 
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

@@ -12,7 +12,7 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
 }) => {
   // An Account of its own, so the report can be filtered to it in the shared E2E database.
   const name = `Reports ${Date.now()}`;
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(`${name} bank`);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: `${name} bank` })).toBeVisible();
