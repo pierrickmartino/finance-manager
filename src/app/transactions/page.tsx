@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { FieldError } from '@/components/form';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
@@ -24,6 +26,17 @@ import {
   transactionsHref,
   type SearchValues,
 } from './search';
+// PROTOTYPE — throwaway `?variant=` switch; see ./_prototype/shared.tsx.
+import { VariantA, NAME as NAME_A } from './_prototype/variant-a-ledger';
+import { VariantB, NAME as NAME_B } from './_prototype/variant-b-feed';
+import { VariantC, NAME as NAME_C } from './_prototype/variant-c-workbench';
+
+const PROTOTYPE_VARIANTS = [
+  { key: 'current', name: 'Today' },
+  { key: 'A', name: NAME_A },
+  { key: 'B', name: NAME_B },
+  { key: 'C', name: NAME_C },
+];
 
 export const metadata: Metadata = { title: 'Transactions · Finance Manager' };
 
@@ -49,7 +62,9 @@ async function loadPage(
 
 export default async function TransactionsPage({ searchParams }: TransactionsPageProps) {
   const fmt = await getFormatter();
-  const search = readTransactionSearch(await searchParams, fmt.settings.numberFormat);
+  const params = await searchParams;
+  const search = readTransactionSearch(params, fmt.settings.numberFormat);
+  const variant = typeof params.variant === 'string' ? params.variant : 'current';
   const ctx = await getServiceContext();
   const [{ page, error: queryError }, accounts, groups, payees, tags] = await Promise.all([
     loadPage(search.query),
@@ -59,6 +74,31 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
     listTags(ctx),
   ]);
   const error = search.error ?? queryError;
+
+  const switcher =
+    process.env.NODE_ENV === 'production' ? null : (
+      <Suspense>
+        <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} current={variant} />
+      </Suspense>
+    );
+  const variantProps = {
+    fmt,
+    values: search.values,
+    page,
+    error,
+    lists: { accounts, groups, payees, tags },
+    variant,
+    selected: typeof params.selected === 'string' ? params.selected : '',
+  };
+  if (process.env.NODE_ENV !== 'production' && variant !== 'current') {
+    const Variant = { A: VariantA, B: VariantB, C: VariantC }[variant] ?? VariantA;
+    return (
+      <>
+        <Variant {...variantProps} />
+        {switcher}
+      </>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-6">
@@ -146,6 +186,7 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
             <Pagination values={search.values} page={page} />
           </>
         ))}
+      {switcher}
     </section>
   );
 }
