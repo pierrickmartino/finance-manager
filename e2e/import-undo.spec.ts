@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { openAccountPage, openNewAccountForm } from './support/accounts';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -28,13 +29,12 @@ test('reviews a near-duplicate side by side, deletes one imported Transaction, a
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();
-  await page.goto('/accounts');
-  const form = page.getByRole('region', { name: 'New Account' });
+  const form = await openNewAccountForm(page);
   await form.getByLabel('Bank').selectOption({ label: bankName });
   await form.getByLabel('Account name').fill(accountName);
   await form.getByLabel('Import format').selectOption({ label: 'UBS CSV' });
   await form.getByRole('button', { name: 'Add Account' }).click();
-  await page.getByRole('row').filter({ hasText: accountName }).getByRole('link').click();
+  await openAccountPage(page, accountName);
   await expect(page.getByRole('heading', { name: accountName })).toBeVisible();
 
   // October, then the same file with the Télécom row renumbered

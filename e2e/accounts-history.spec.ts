@@ -1,4 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  accountDetail,
+  accountListEntry,
+  openAccountPage,
+  openNewAccountForm,
+} from './support/accounts';
 
 async function createBank(page: Page, name: string): Promise<void> {
   await page.goto('/banks');
@@ -24,8 +30,7 @@ test('creates, edits and archives an Account, then finds each change in History'
   await createBank(page, bankName);
 
   // Create
-  await page.goto('/accounts');
-  const form = page.getByRole('region', { name: 'New Account' });
+  const form = await openNewAccountForm(page);
   await form.getByLabel('Bank').selectOption({ label: bankName });
   await form.getByLabel('Account name').fill(accountName);
   await form.getByLabel('Kind').selectOption({ label: 'Savings' });
@@ -34,13 +39,14 @@ test('creates, edits and archives an Account, then finds each change in History'
   await form.getByLabel('Opening date').fill('2021-01-01');
   await form.getByRole('button', { name: 'Add Account' }).click();
 
-  const row = page.getByRole('row').filter({ hasText: accountName });
-  await expect(row).toContainText("CHF 1'234.50");
-  await expect(row).toContainText('Active');
-  await expect(form.getByLabel('Account name')).toHaveValue('');
+  // The new Account is selected right away
+  const detail = accountDetail(page, accountName);
+  await expect(detail).toContainText("CHF 1'234.50");
+  await expect(detail).toContainText('Active');
+  await expect(accountListEntry(page, accountName)).toHaveAttribute('aria-current', 'true');
 
   // A rejected edit keeps what was typed and explains why
-  await row.getByRole('link', { name: accountName }).click();
+  await openAccountPage(page, accountName);
   await expect(page.getByRole('heading', { name: accountName })).toBeVisible();
   await page.getByLabel('Opening balance').fill('12x');
   await page.getByRole('button', { name: 'Save' }).click();
@@ -59,10 +65,10 @@ test('creates, edits and archives an Account, then finds each change in History'
   await expect(page.getByText(/Archived on/)).toBeVisible();
 
   await page.goto('/accounts');
-  await expect(page.getByRole('row').filter({ hasText: renamed })).toContainText('Archived');
+  await expect(accountListEntry(page, renamed)).toContainText('(archived)');
 
   // History, filtered to this Account
-  await page.getByRole('link', { name: renamed }).click();
+  await openAccountPage(page, renamed);
   await page.getByRole('link', { name: 'History of this Account' }).click();
   const entries = page.getByRole('table', { name: 'History entries' });
   const historyRows = entries.locator('tbody tr');
