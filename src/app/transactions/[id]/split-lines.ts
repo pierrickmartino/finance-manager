@@ -19,7 +19,7 @@ export function editableAmount(
   numberFormat: NumberFormat,
   currency: string,
 ): string {
-  return formatAmount(minor, numberFormat, { currency }).slice(currency.length + 1);
+  return formatAmount(minor, numberFormat, { currency, hasCurrencyCode: false });
 }
 
 interface SplitSource {
@@ -38,12 +38,9 @@ function bundledDrafts(
   amount: (minor: number) => string,
 ): SplitLineDraft[] | null {
   const details = transaction.bundledDetails ?? [];
-  if (details.length === 0) return null;
-  let total = 0;
-  for (const detail of details) {
-    if (detail.amountMinor === null) return null;
-    total += detail.amountMinor;
-  }
+  const amounts = details.map((detail) => detail.amountMinor);
+  if (amounts.length === 0 || amounts.includes(null)) return null;
+  const total = amounts.reduce<number>((sum, minor) => sum + (minor ?? 0), 0);
   if (total !== transaction.amountMinor) return null;
   return details.map((detail) => ({
     amount: amount(detail.amountMinor ?? 0),
@@ -88,12 +85,9 @@ export function remainingMinor(
   numberFormat: NumberFormat,
   currency: string,
 ): number | null {
-  let remaining = totalMinor;
-  for (const text of amounts) {
-    if (text.trim() === '') continue;
-    const minor = parseAmount(text, numberFormat, currency);
-    if (minor === null) return null;
-    remaining -= minor;
-  }
-  return remaining;
+  const typed = amounts
+    .filter((text) => text.trim() !== '')
+    .map((text) => parseAmount(text, numberFormat, currency));
+  if (typed.includes(null)) return null;
+  return typed.reduce<number>((remaining, minor) => remaining - (minor ?? 0), totalMinor);
 }

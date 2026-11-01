@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
+import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
 import type { Classification } from '@/server/services/transactions';
@@ -107,7 +108,7 @@ export function ClassificationForm({
         <textarea
           name="notes"
           rows={3}
-          maxLength={2000}
+          maxLength={MAX_NOTES_LENGTH}
           defaultValue={classification.notes ?? ''}
           className={INPUT}
         />

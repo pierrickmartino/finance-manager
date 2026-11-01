@@ -20,6 +20,11 @@ describe('formatter with Swiss defaults', () => {
     expect(fmt.amount(123450, { currency: 'EUR' })).toBe("EUR 1'234.50");
   });
 
+  it("uses the Currency's decimals without its code when the code is hidden", () => {
+    expect(fmt.amount(123450, { currency: 'JPY', hasCurrencyCode: false })).toBe("123'450");
+    expect(fmt.amount(-7000, { currency: 'CHF', hasCurrencyCode: false })).toBe('-70.00');
+  });
+
   it('rounds to whole units for chart axes, half away from zero', () => {
     expect(fmt.amount(123450, { isWhole: true })).toBe("1'235");
     expect(fmt.amount(-123449, { isWhole: true })).toBe("-1'234");

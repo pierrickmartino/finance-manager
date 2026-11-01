@@ -1,8 +1,9 @@
+import { categoryLabel } from '@/lib/classification';
 import { mutate, type ServiceContext } from '../context';
 import { ValidationError } from '../errors';
 import { retargetRules } from '../rules/references';
 import { recordClassificationChanges } from '../transactions/classification';
-import { categorySnapshot, findCategory, type Category } from './model';
+import { categorySnapshot, findCategory } from './model';
 
 /** What a merge did: how many Transactions moved, and its Batch. */
 export interface CategoryMergeResult {
@@ -10,12 +11,9 @@ export interface CategoryMergeResult {
   batchId: string;
 }
 
-const label = (category: Category): string => `${category.groupName} › ${category.name}`;
-
 /**
  * Merges `sourceId` into `targetId` (spec 56): its Transactions and Split lines take the target
- * Category, and
- * the emptied source is deleted. One Batch with a readable summary. Locks are kept.
+ * Category, and the emptied source is deleted. One Batch with a readable summary. Locks are kept.
  */
 export async function mergeCategory(
   ctx: ServiceContext,
@@ -48,7 +46,7 @@ export async function mergeCategory(
     await tx.query('DELETE FROM category WHERE id = $1', [sourceId]);
     await history.record('category', sourceId, categorySnapshot(source), null);
     await history.summarize(
-      `Merged Category "${label(source)}" into "${label(target)}" (${transactionIds.length} Transactions)`,
+      `Merged Category "${categoryLabel(source)}" into "${categoryLabel(target)}" (${transactionIds.length} Transactions)`,
     );
     return { transactionCount: transactionIds.length, batchId: history.batchId };
   });

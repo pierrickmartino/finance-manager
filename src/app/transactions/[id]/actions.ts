@@ -2,11 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { z } from 'zod';
 import { parseAmount } from '@/lib/format/parse-amount';
 import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
 import { getRequestDisplaySettings } from '@/server/formatter';
-import { ValidationError } from '@/server/services/errors';
+import { parseInput, ValidationError } from '@/server/services/errors';
 import { deleteImportedTransaction } from '@/server/services/imports';
 import { linkTransfer, unlinkTransfer } from '@/server/services/transfers';
 import { deleteManualTransaction } from '@/server/services/transactions/manual';
@@ -22,6 +23,7 @@ import {
   type ClassificationChanges,
   type ClassificationField,
 } from '@/server/services/transactions';
+import type { SplitLineDraft } from './split-lines';
 
 const sameText = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
@@ -60,25 +62,35 @@ function revalidate(id: string): void {
   revalidatePath('/transactions');
 }
 
-const formTexts = (formData: FormData, field: string): string[] =>
-  formData.getAll(field).map((value) => (typeof value === 'string' ? value : ''));
+/** The split form's `lines` field: one JSON object per line, as the form edits it. */
+const splitDraftsInput = z.array(
+  z.object({ amount: z.string(), categoryId: z.string(), tags: z.string(), note: z.string() }),
+  { error: 'The Split lines could not be read' },
+);
+
+function readSplitDrafts(formData: FormData): SplitLineDraft[] {
+  try {
+    return parseInput(splitDraftsInput, JSON.parse(formText(formData, 'lines')));
+  } catch (error) {
+    if (error instanceof SyntaxError)
+      throw new ValidationError('The Split lines could not be read');
+    throw error;
+  }
+}
 
 /** The split form's lines, with amounts read in the user's number format. */
 async function readSplitLines(formData: FormData, currency: string): Promise<SplitLineInput[]> {
   const { numberFormat } = await getRequestDisplaySettings();
-  const categoryIds = formTexts(formData, 'categoryId');
-  const tags = formTexts(formData, 'tags');
-  const notes = formTexts(formData, 'note');
-  return formTexts(formData, 'amount').map((text, index) => {
-    const amountMinor = parseAmount(text, numberFormat, currency);
+  return readSplitDrafts(formData).map((draft, index) => {
+    const amountMinor = parseAmount(draft.amount, numberFormat, currency);
     if (amountMinor === null) {
       throw new ValidationError(`Line ${index + 1}: enter a valid amount`);
     }
     return {
       amountMinor,
-      categoryId: categoryIds[index] ?? '',
-      tagNames: readTags(tags[index] ?? ''),
-      note: notes[index] ?? null,
+      categoryId: draft.categoryId,
+      tagNames: readTags(draft.tags),
+      note: draft.note,
     };
   });
 }

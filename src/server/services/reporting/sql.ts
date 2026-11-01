@@ -81,7 +81,8 @@ function minorUnitFactors(currencies: readonly string[]): Record<string, string>
  * `WITH report_base AS (...)`: reportable rows (unsplit Transactions and Split lines) in
  * `range` that pass the filters, never Transfers (spec 89). `id` is always the Transaction's,
  * `line_id` the Split line's (NULL for an unsplit Transaction). `chf_minor` is NULL when the
- * Currency has no rate on or before the booking date. `currencies` lists the Currencies in use, for their minor-unit factors.
+ * Currency has no rate on or before the booking date. `currencies` lists the Currencies in use,
+ * for their minor-unit factors.
  */
 export function baseCte(
   query: WidgetQuery,

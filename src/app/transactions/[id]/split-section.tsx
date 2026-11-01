@@ -1,8 +1,10 @@
 import { ActionForm } from '@/components/action-form';
 import { BUTTON_CLASS } from '@/components/named-list';
+import { categoryLabel } from '@/lib/classification';
 import type { Formatter } from '@/lib/format';
 import type { CategoryGroup } from '@/server/services/categories';
 import type { TransactionDetail } from '@/server/services/transactions';
+import { splitLabel } from '../transaction-display';
 import { removeSplitAction, splitTransactionAction } from './actions';
 import { SplitForm } from './split-form';
 import { initialSplitDrafts } from './split-lines';
@@ -36,7 +38,7 @@ export function SplitSection({ transaction, groups, fmt }: SplitSectionProps) {
   return (
     <section aria-labelledby="split" className="flex flex-col gap-3">
       <h2 id="split" className="text-lg font-semibold">
-        {isSplit ? `Split (${transaction.splitLines.length})` : 'Split'}
+        {splitLabel(transaction) ?? 'Split'}
       </h2>
       {isSplit ? (
         <>
@@ -85,9 +87,7 @@ function SplitLinesTable({ transaction, fmt }: Omit<SplitSectionProps, 'groups'>
         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {transaction.splitLines.map((line) => (
             <tr key={line.id}>
-              <td className={CELL}>
-                {line.category.groupName} › {line.category.name}
-              </td>
+              <td className={CELL}>{categoryLabel(line.category)}</td>
               <td className={CELL}>{line.tags.map((tag) => tag.name).join(', ') || '—'}</td>
               <td className={CELL}>{line.note ?? '—'}</td>
               <td className={`${CELL} text-right tabular-nums`}>

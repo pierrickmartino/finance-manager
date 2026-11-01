@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { categoryLabel } from '@/lib/classification';
 import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
@@ -124,7 +125,7 @@ async function resolveChanges(
   if (input.categoryId !== undefined) {
     const category = input.categoryId ? await findCategory(scope.tx, input.categoryId) : null;
     changes.categoryId = category?.id ?? null;
-    summary.push(`Category ${category ? `${category.groupName} › ${category.name}` : 'cleared'}`);
+    summary.push(`Category ${category ? categoryLabel(category) : 'cleared'}`);
   }
   if (input.tagNames !== undefined || input.tagIds !== undefined) {
     const tags = input.tagNames

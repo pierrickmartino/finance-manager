@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { parseInput, ValidationError } from '../errors';
@@ -7,7 +8,6 @@ import {
   CLASSIFICATION_FIELDS,
   classificationSnapshot,
   lockTransaction,
-  MAX_NOTES_LENGTH,
   requireClassification,
   type Classification,
 } from './classification';
@@ -48,11 +48,21 @@ const splitLinesInput = z.array(splitLineInput).min(2, 'A Split needs at least t
 export type SplitLineInput = z.input<typeof splitLineInput>;
 type ParsedLine = z.output<typeof splitLineInput>;
 
+/**
+ * Maps `items` one at a time, in order: lookups that may create Tags must not overlap on one
+ * database transaction.
+ */
+async function mapInOrder<T, R>(items: readonly T[], map: (item: T) => Promise<R>): Promise<R[]> {
+  return items.reduce<Promise<R[]>>(
+    async (done, item) => [...(await done), await map(item)],
+    Promise.resolve([]),
+  );
+}
+
 async function resolveLineTagIds(scope: MutationScope, line: ParsedLine): Promise<string[]> {
   if (line.tagNames) return (await findOrCreateTags(scope, line.tagNames)).map((tag) => tag.id);
-  const ids = [];
-  for (const id of line.tagIds ?? []) ids.push((await findTag(scope.tx, id)).id);
-  return [...new Set(ids)];
+  const tags = await mapInOrder(line.tagIds ?? [], (id) => findTag(scope.tx, id));
+  return [...new Set(tags.map((tag) => tag.id))];
 }
 
 /** Replaces the Transaction's Split lines with `lines`, in their order. */
@@ -62,12 +72,11 @@ async function writeLines(
   lines: readonly ParsedLine[],
 ): Promise<void> {
   const { tx } = scope;
-  const categoryIds = [];
-  const tagIds = [];
-  for (const line of lines) {
-    categoryIds.push((await findCategory(tx, line.categoryId)).id);
-    tagIds.push(await resolveLineTagIds(scope, line));
-  }
+  const categoryIds = await mapInOrder(
+    lines,
+    async (line) => (await findCategory(tx, line.categoryId)).id,
+  );
+  const tagIds = await mapInOrder(lines, (line) => resolveLineTagIds(scope, line));
   await tx.query('DELETE FROM split_line WHERE transaction_id = $1', [transactionId]);
   // One INSERT for the whole set: the database checks a Split per statement.
   const inserted = await tx.query<{ id: string; position: number }>(
@@ -80,11 +89,16 @@ async function writeLines(
       transactionId,
       lines.map((line) => line.amountMinor),
       categoryIds,
-      lines.map((l) => l.note ?? null),
+      lines.map((line) => line.note ?? null),
     ],
   );
   const idAt = new Map(inserted.rows.map((row) => [row.position, row.id]));
-  const pairs = tagIds.flatMap((ids, index) => ids.map((tagId) => [idAt.get(index + 1)!, tagId]));
+  const lineIdAt = (position: number): string => {
+    const id = idAt.get(position);
+    if (id === undefined) throw new Error(`Split line ${position} was not inserted`);
+    return id;
+  };
+  const pairs = tagIds.flatMap((ids, index) => ids.map((tagId) => [lineIdAt(index + 1), tagId]));
   if (pairs.length === 0) return;
   await tx.query(
     `INSERT INTO split_line_tag (split_line_id, tag_id)

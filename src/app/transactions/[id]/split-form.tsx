@@ -1,9 +1,10 @@
 'use client';
 
-import { startTransition, useActionState, useState } from 'react';
+import { startTransition, useActionState, useRef, useState } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { BUTTON_CLASS } from '@/components/named-list';
+import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
 import { editableAmount, remainingMinor, type SplitLineDraft } from './split-lines';
@@ -12,6 +13,12 @@ const INPUT =
   'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
 
 const EMPTY_LINE: SplitLineDraft = { amount: '', categoryId: '', tags: '', note: '' };
+
+/** A line being edited, with a key that stays the same while lines are added and removed. */
+interface KeyedLine {
+  key: number;
+  draft: SplitLineDraft;
+}
 
 interface SplitFormProps {
   amountMinor: number;
@@ -31,17 +38,30 @@ interface SplitFormProps {
 export function SplitForm({ amountMinor, currency, initialLines, groups, action }: SplitFormProps) {
   const fmt = useFormatter();
   const [state, formAction, isPending] = useActionState(action, null);
-  const [lines, setLines] = useState<SplitLineDraft[]>(initialLines);
+  const [lines, setLines] = useState<KeyedLine[]>(() =>
+    initialLines.map((draft, index) => ({ key: index, draft })),
+  );
+  const nextKey = useRef(initialLines.length);
+  const drafts = lines.map((line) => line.draft);
   const remaining = remainingMinor(
     amountMinor,
-    lines.map((line) => line.amount),
+    drafts.map((draft) => draft.amount),
     fmt.settings.numberFormat,
     currency,
   );
 
-  const update = (index: number, change: Partial<SplitLineDraft>) =>
-    setLines((current) => current.map((line, n) => (n === index ? { ...line, ...change } : line)));
-  const remove = (index: number) => setLines((current) => current.filter((_, n) => n !== index));
+  const update = (key: number, change: Partial<SplitLineDraft>) =>
+    setLines((current) =>
+      current.map((line) =>
+        line.key === key ? { key, draft: { ...line.draft, ...change } } : line,
+      ),
+    );
+  const remove = (key: number) => setLines((current) => current.filter((line) => line.key !== key));
+  const add = (draft: SplitLineDraft) => {
+    const key = nextKey.current;
+    nextKey.current += 1;
+    setLines((current) => [...current, { key, draft }]);
+  };
 
   return (
     <form
@@ -54,15 +74,17 @@ export function SplitForm({ amountMinor, currency, initialLines, groups, action 
       }}
       className="flex flex-col gap-3"
     >
+      {/* One structured payload: every line's fields together, in order. */}
+      <input type="hidden" name="lines" value={JSON.stringify(drafts)} />
       <ol className="flex flex-col gap-2">
         {lines.map((line, index) => (
           <SplitLineFields
-            key={index}
-            line={line}
+            key={line.key}
+            line={line.draft}
             number={index + 1}
             groups={groups}
-            onChange={(change) => update(index, change)}
-            onRemove={lines.length > 1 ? () => remove(index) : undefined}
+            onChange={(change) => update(line.key, change)}
+            onRemove={lines.length > 1 ? () => remove(line.key) : undefined}
           />
         ))}
       </ol>
@@ -71,17 +93,14 @@ export function SplitForm({ amountMinor, currency, initialLines, groups, action 
           type="button"
           className={BUTTON_CLASS}
           onClick={() =>
-            setLines((current) => [
-              ...current,
-              {
-                ...EMPTY_LINE,
-                // A new line takes what is left, so two lines balance at once.
-                amount:
-                  remaining !== null && remaining !== 0
-                    ? editableAmount(remaining, fmt.settings.numberFormat, currency)
-                    : '',
-              },
-            ])
+            add({
+              ...EMPTY_LINE,
+              // A new line takes what is left, so two lines balance at once.
+              amount:
+                remaining !== null && remaining !== 0
+                  ? editableAmount(remaining, fmt.settings.numberFormat, currency)
+                  : '',
+            })
           }
         >
           Add line
@@ -117,7 +136,6 @@ function SplitLineFields({ line, number, groups, onChange, onRemove }: SplitLine
       <label className="flex flex-col gap-1">
         <span className="text-xs text-zinc-500">Amount</span>
         <input
-          name="amount"
           aria-label={`Amount of line ${number}`}
           value={line.amount}
           onChange={(event) => onChange({ amount: event.target.value })}
@@ -129,7 +147,6 @@ function SplitLineFields({ line, number, groups, onChange, onRemove }: SplitLine
       <label className="flex flex-col gap-1">
         <span className="text-xs text-zinc-500">Category</span>
         <select
-          name="categoryId"
           aria-label={`Category of line ${number}`}
           value={line.categoryId}
           onChange={(event) => onChange({ categoryId: event.target.value })}
@@ -150,7 +167,6 @@ function SplitLineFields({ line, number, groups, onChange, onRemove }: SplitLine
       <label className="flex flex-col gap-1">
         <span className="text-xs text-zinc-500">Tags</span>
         <input
-          name="tags"
           aria-label={`Tags of line ${number}`}
           value={line.tags}
           onChange={(event) => onChange({ tags: event.target.value })}
@@ -162,11 +178,10 @@ function SplitLineFields({ line, number, groups, onChange, onRemove }: SplitLine
       <label className="flex flex-col gap-1">
         <span className="text-xs text-zinc-500">Note</span>
         <input
-          name="note"
           aria-label={`Note of line ${number}`}
           value={line.note}
           onChange={(event) => onChange({ note: event.target.value })}
-          maxLength={2000}
+          maxLength={MAX_NOTES_LENGTH}
           autoComplete="off"
           className={`${INPUT} w-48`}
         />

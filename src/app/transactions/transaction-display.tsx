@@ -21,19 +21,40 @@ export function splitLabel({ splitLines }: Pick<TransactionListItem, 'splitLines
   return splitLines.length > 0 ? `Split (${splitLines.length})` : null;
 }
 
-/** "Groceries", "Transfer", "Split (n)" or "Unclassified" as plain text. */
-export function categoryText(transaction: Classified): string {
-  if (transaction.transferId) return 'Transfer';
-  return splitLabel(transaction) ?? transaction.category?.name ?? 'Unclassified';
+type ClassificationKind = 'transfer' | 'split' | 'category' | 'unclassified';
+
+function classificationKind(transaction: Classified): ClassificationKind {
+  if (transaction.transferId) return 'transfer';
+  if (transaction.splitLines.length > 0) return 'split';
+  return transaction.category ? 'category' : 'unclassified';
 }
 
-/** "Groceries", "Transfer", "Split (n)" or "Unclassified", coloured so Transfer and Unclassified stand out. */
+/** "Groceries", "Transfer", "Split (n)" or "Unclassified" as plain text. */
+export function categoryText(transaction: Classified): string {
+  switch (classificationKind(transaction)) {
+    case 'transfer':
+      return 'Transfer';
+    case 'split':
+      return splitLabel(transaction) ?? 'Split';
+    case 'category':
+      return transaction.category?.name ?? 'Unclassified';
+    case 'unclassified':
+      return 'Unclassified';
+  }
+}
+
+/** Colours that make Transfer and Unclassified stand out; other kinds stay plain. */
+const KIND_CLASS: Partial<Record<ClassificationKind, string>> = {
+  transfer: 'text-sky-700 dark:text-sky-400',
+  unclassified: 'text-amber-700 dark:text-amber-400',
+};
+
+/**
+ * "Groceries", "Transfer", "Split (n)" or "Unclassified", coloured so Transfer and Unclassified
+ * stand out.
+ */
 export function CategoryLabel({ transaction }: { transaction: TransactionListItem }) {
-  if (transaction.transferId) {
-    return <span className="text-sky-700 dark:text-sky-400">Transfer</span>;
-  }
-  if (transaction.category || transaction.splitLines.length > 0) {
-    return <>{categoryText(transaction)}</>;
-  }
-  return <span className="text-amber-700 dark:text-amber-400">Unclassified</span>;
+  const className = KIND_CLASS[classificationKind(transaction)];
+  const text = categoryText(transaction);
+  return className ? <span className={className}>{text}</span> : <>{text}</>;
 }

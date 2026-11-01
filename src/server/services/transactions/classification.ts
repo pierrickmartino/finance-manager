@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { categoryLabel, MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { Queryable } from '@/server/db/client';
 import type { CategoryGroupType } from '../categories';
 import { findCategory } from '../categories/model';
@@ -69,8 +70,6 @@ export interface Classification {
   /** The Split lines in their order; empty when the Transaction is not split. */
   splitLines: SplitLine[];
 }
-
-export const MAX_NOTES_LENGTH = 2000;
 
 const optionalId = z.string().nullable().optional();
 
@@ -167,7 +166,7 @@ export function classificationSnapshot(classification: Classification): HistoryS
     tags: tags.map((tag) => tag.name),
     notes,
     lockedFields: [...lockedFields],
-    // Absent (null) when not split, so unsplit Transactions record exactly as before.
+    // undefined when not split: JSON leaves the key out, so unsplit Transactions record as before.
     split:
       splitLines.length === 0
         ? undefined
@@ -178,13 +177,6 @@ export function classificationSnapshot(classification: Classification): HistoryS
             note: line.note,
           })),
   };
-}
-
-/** A Category as History and messages show it: `Group › Category`. */
-export function categoryLabel(
-  category: Pick<ClassificationCategory, 'groupName' | 'name'>,
-): string {
-  return `${category.groupName} › ${category.name}`;
 }
 
 /**
