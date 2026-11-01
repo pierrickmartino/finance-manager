@@ -5,6 +5,7 @@ import { recordClassificationChanges } from '../transactions/classification';
 import { findTag, insertTag, SELECT_TAG, tagName, uniqueTagName, type Tag } from './model';
 
 export type { Tag } from './model';
+export { getTagActivity, type TagActivity, type TagCurrencyTotal } from './activity';
 
 /** What a merge or delete did: how many Transactions it touched, and its Batch. */
 export interface TagChangeResult {
