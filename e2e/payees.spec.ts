@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { addPayee } from './support/payees';
+import { openTransaction } from './support/transactions';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -41,7 +42,10 @@ test('manages Payees as master / detail, with each Payee’s latest Transactions
   await search.getByLabel('Account').selectOption({ label: accountName });
   await search.getByLabel('Search').fill('telecom');
   await search.getByRole('button', { name: 'Search' }).click();
-  await page.getByRole('table', { name: 'Transactions' }).locator('tbody tr a').first().click();
+  await openTransaction(
+    page,
+    page.getByRole('table', { name: 'Transactions' }).locator('tbody tr').first(),
+  );
   const classification = page.getByRole('form', { name: 'Classification' });
   await classification.getByLabel('Payee').fill(telecom);
   await classification.getByRole('button', { name: 'Save classification' }).click();

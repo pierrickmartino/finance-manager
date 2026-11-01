@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { addCategory, addCategoryGroup } from './support/categories';
+import { openTransaction } from './support/transactions';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -57,7 +58,7 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Unclassified');
-  await rows.first().getByRole('link').click();
+  await openTransaction(page, rows.first());
 
   // Classify it
   const form = page.getByRole('form', { name: 'Classification' });
@@ -87,7 +88,7 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   await expect(rows.first()).toContainText(tagName);
 
   // Deleting it from the detail view goes back to the list
-  await rows.first().getByRole('link').click();
+  await openTransaction(page, rows.first());
   page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Delete Transaction' }).click();
   await expect(page).toHaveURL(/\/transactions$/);

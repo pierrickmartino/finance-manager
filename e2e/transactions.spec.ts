@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { openTransaction } from './support/transactions';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -48,6 +49,9 @@ test('searches imported Transactions and opens one with its bank fields and Hist
   await search.getByRole('button', { name: 'Search' }).click();
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('-64.90');
+  // The first row is previewed beside the list until another is picked
+  const preview = page.getByRole('complementary', { name: 'Transaction preview' });
+  await expect(preview).toContainText('-64.90');
 
   await search.getByLabel('Search').fill('');
   await search.getByLabel('Amount to').fill("-1'000.00");
@@ -65,7 +69,7 @@ test('searches imported Transactions and opens one with its bank fields and Hist
   await search.getByLabel('Amount to').fill('');
   await search.getByLabel('Search').fill('telecom');
   await search.getByRole('button', { name: 'Search' }).click();
-  await rows.first().getByRole('link').click();
+  await openTransaction(page, rows.first());
   const fields = page.getByRole('definition');
   await expect(page.getByRole('heading', { name: 'From the bank' })).toBeVisible();
   await expect(fields.filter({ hasText: 'CH2009000000087654321' })).toBeVisible();
@@ -75,4 +79,12 @@ test('searches imported Transactions and opens one with its bank fields and Hist
   const history = page.getByRole('table', { name: 'Transaction History' }).locator('tbody tr');
   await expect(history.filter({ hasText: 'amountMinor' })).toContainText('import');
   await expect(history.filter({ hasText: 'bankReference' })).toContainText('9930288TI0000107');
+
+  // Too narrow for the preview: a row opens its Transaction straight away
+  const detailUrl = page.url();
+  await page.goBack();
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(preview).toBeHidden();
+  await rows.first().getByRole('link').click();
+  await expect(page).toHaveURL(detailUrl);
 });

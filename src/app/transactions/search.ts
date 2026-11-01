@@ -27,6 +27,8 @@ export type SearchValues = Record<(typeof SEARCH_FIELDS)[number], string>;
 export interface TransactionSearch {
   values: SearchValues;
   page: number;
+  /** The Transaction shown in the preview pane (`?selected=`); blank for the page's first. */
+  selected: string;
   /** The service query, or null when a field can't be read (see `error`). */
   query: TransactionQuery | null;
   error: string | null;
@@ -54,12 +56,13 @@ export function readTransactionSearch(
     }),
   ) as SearchValues;
   const page = readPage(params.page);
+  const selected = typeof params.selected === 'string' ? params.selected.trim() : '';
 
   const amountMin = values.amountMin ? parseAmount(values.amountMin, numberFormat) : undefined;
   const amountMax = values.amountMax ? parseAmount(values.amountMax, numberFormat) : undefined;
   const invalid = (amountMin === null && 'Minimum') || (amountMax === null && 'Maximum');
   if (invalid) {
-    return { values, page, query: null, error: `${invalid} amount must be an amount` };
+    return { values, page, selected, query: null, error: `${invalid} amount must be an amount` };
   }
 
   const query: TransactionQuery = {
@@ -78,20 +81,32 @@ export function readTransactionSearch(
     amountMax: amountMax ?? undefined,
     page,
   };
-  return { values, page, query, error: null };
+  return { values, page, selected, query, error: null };
 }
 
-/** `path` with the non-blank search values (and the page, after the first) as its query. */
-function withSearch(path: string, values: SearchValues, page = 1): string {
+/**
+ * `path` with the non-blank search values (and the page, after the first, and the previewed
+ * Transaction, if any) as its query.
+ */
+function withSearch(path: string, values: SearchValues, page = 1, selected = ''): string {
   const query = new URLSearchParams(Object.entries(values).filter(([, value]) => value));
   if (page > 1) query.set('page', String(page));
+  if (selected) query.set('selected', selected);
   const search = query.toString();
   return search ? `${path}?${search}` : path;
 }
 
-/** The list URL for these search values on a given page. */
-export function transactionsHref(values: SearchValues, page = 1): string {
-  return withSearch('/transactions', values, page);
+/** The list URL for these search values on a given page, optionally previewing a Transaction. */
+export function transactionsHref(values: SearchValues, page = 1, selected = ''): string {
+  return withSearch('/transactions', values, page, selected);
+}
+
+/**
+ * The row the preview pane shows: the selected one when it is on this page, else the first.
+ * Only rows already on the page qualify, so an id in the URL never loads anything by itself.
+ */
+export function pickSelected<T extends { id: string }>(rows: T[], selected: string): T | null {
+  return rows.find((row) => row.id === selected) ?? rows[0] ?? null;
 }
 
 /** The CSV export URL for these search values: the same filters, every page. */
