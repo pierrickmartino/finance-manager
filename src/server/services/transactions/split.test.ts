@@ -12,6 +12,8 @@ import {
 } from '../categories';
 import type { CategoryGroupType } from '../categories';
 import { listHistory } from '../history';
+import { createRule } from '../rules';
+import { applyRulesToExisting } from '../rules/existing';
 import { deleteTag, listTags, mergeTags } from '../tags';
 import { bulkEditClassification } from './bulk-edit';
 import { editClassification } from './classification';
@@ -192,6 +194,22 @@ describe('remove a Split', () => {
     expect(
       (await listTransactions(t.ctx, { unclassified: true })).transactions.map((tx) => tx.id),
     ).toEqual([id]);
+  });
+
+  it('lets Rules applied to existing Transactions classify it again', async () => {
+    const id = await transaction();
+    await splitInTwo(id);
+    const groceries = await category('Supermarket', 'Shopping');
+    await createRule(t.ctx, {
+      name: 'Migros',
+      conditions: [{ type: 'text', field: 'description', operator: 'contains', value: 'MIGROS' }],
+      actions: { payeeId: null, categoryId: groceries.id, tagIds: [] },
+    });
+
+    await removeSplit(t.ctx, id);
+    await applyRulesToExisting(t.ctx, {});
+
+    expect((await getTransaction(t.ctx, id)).category?.id).toBe(groceries.id);
   });
 
   it('refuses a Transaction that is not split, or does not exist', async () => {

@@ -326,7 +326,7 @@ describe('CSV export of split Transactions', () => {
     ]);
   });
 
-  it("adds the Transaction's own Tags and notes to each Split line's", async () => {
+  it("adds the Transaction's own Tags to each Split line's, but writes only the line's note", async () => {
     const ubs = await account('UBS', 'Compte courant');
     const id = await seedOne(ubs, { amountMinor: -10000 });
     const group = await createCategoryGroup(t.ctx, { name: 'Loisirs', type: 'expense' });
@@ -341,8 +341,8 @@ describe('CSV export of split Transactions', () => {
     const rows = await exportRows();
 
     expect(rows.map((row) => [row[15], row[16]])).toEqual([
-      ['Famille; vacances', 'Valais · Nuit'],
-      ['vacances', 'Valais'],
+      ['Famille; vacances', 'Nuit'],
+      ['vacances', ''],
     ]);
   });
 

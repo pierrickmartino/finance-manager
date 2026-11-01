@@ -1,12 +1,17 @@
 import { fractionDigits } from '@/lib/format';
+import type { CategoryGroupType } from '../categories/model';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { BASE_CURRENCY, toChfMinor } from '../fx';
 import {
   filterConditions,
+  splitLineFilter,
   transactionQueryInput,
+  type CategoryFilter,
+  type SqlCondition,
   type TransactionQuery,
 } from '../transactions/query';
+import { IS_SPLIT } from '../transactions/split-guard';
 import { BOM, csvLine, decimalCell, textCell } from './csv';
 
 /** The export's columns, in order. */
@@ -64,13 +69,14 @@ interface ExportRow {
   paymentReference: string | null;
   payee: string | null;
   groupName: string | null;
-  groupType: string | null;
+  groupType: CategoryGroupType | null;
   category: string | null;
   tags: string | null;
   notes: string | null;
   transferAccount: string | null;
   transferTransactionId: string | null;
   importId: string | null;
+  isSplit: boolean;
 }
 
 // The FX rate is looked up exactly like the reporting SQL (#9 handoff): the rate of the booking
@@ -88,7 +94,7 @@ const SELECT_EXPORT = `
           FROM transaction_tag xt JOIN tag tg ON tg.id = xt.tag_id
           WHERE xt.transaction_id = t.id) AS tags,
          t.notes, ob.name || ' · ' || oa.name AS "transferAccount",
-         o.id AS "transferTransactionId", t.import_id AS "importId"
+         o.id AS "transferTransactionId", t.import_id AS "importId", ${IS_SPLIT} AS "isSplit"
   FROM "transaction" t
   JOIN account a ON a.id = t.account_id
   JOIN bank b ON b.id = a.bank_id
@@ -110,7 +116,7 @@ interface ExportLine {
   transactionId: string;
   amountMinor: number;
   groupName: string;
-  groupType: string;
+  groupType: CategoryGroupType;
   category: string;
   tags: string | null;
   note: string | null;
@@ -129,33 +135,33 @@ const SELECT_LINES = `
   FROM split_line sl
   JOIN category c ON c.id = sl.category_id
   JOIN category_group g ON g.id = c.group_id
-  WHERE sl.transaction_id = ANY($1::uuid[])
-  ORDER BY sl.transaction_id, sl.position`;
+  WHERE sl.transaction_id = ANY($1::uuid[])`;
 
-/** The batch's Split lines by Transaction id, in line order. */
+/**
+ * The batch's Split lines by Transaction id, in line order. Under a Category or group type
+ * filter, only the lines that match it: a split Transaction exports the part that matched.
+ */
 async function loadLines(
   ctx: ServiceContext,
   ids: readonly string[],
+  filter: CategoryFilter,
 ): Promise<Map<string, ExportLine[]>> {
-  const result = await ctx.db.query<ExportLine>(SELECT_LINES, [ids]);
-  const byTransaction = new Map<string, ExportLine[]>();
-  for (const line of result.rows) {
-    byTransaction.set(line.transactionId, [...(byTransaction.get(line.transactionId) ?? []), line]);
-  }
-  return byTransaction;
+  const { conditions, params } = splitLineFilter(filter, 2);
+  const result = await ctx.db.query<ExportLine>(
+    `${SELECT_LINES} ${conditions.map((condition) => `AND ${condition}`).join(' ')}
+     ORDER BY sl.transaction_id, sl.position`,
+    [ids, ...params],
+  );
+  return Map.groupBy(result.rows, (line) => line.transactionId);
 }
-
-/** Separates a split Transaction's notes from its Split line's note in the Notes cell. */
-const NOTE_SEPARATOR = ' · ';
 
 /**
  * The rows a Transaction exports as: itself when unsplit, otherwise one per Split line with
- * the Transaction's fields and the line's amount, Category and note. A line's Tags are its own
- * plus the Transaction's (as in reports), and its Notes are the Transaction's notes followed by
- * the line's note, so nothing typed on the Transaction is lost.
+ * the Transaction's fields and the line's amount, Category, Tags and note. A line's Tags are
+ * its own plus the Transaction's (as in reports); its Notes are the line's note only.
  */
-function expandRow(row: ExportRow, lines: readonly ExportLine[] | undefined): ExportRow[] {
-  if (!lines?.length) return [row];
+function expandRow(row: ExportRow, lines: readonly ExportLine[]): ExportRow[] {
+  if (!row.isSplit) return [row];
   return lines.map((line) => ({
     ...row,
     amountMinor: line.amountMinor,
@@ -163,7 +169,7 @@ function expandRow(row: ExportRow, lines: readonly ExportLine[] | undefined): Ex
     groupType: line.groupType,
     category: line.category,
     tags: line.tags,
-    notes: [row.notes, line.note].filter(Boolean).join(NOTE_SEPARATOR) || null,
+    notes: line.note,
   }));
 }
 
@@ -213,12 +219,13 @@ export function exportTransactionsCsv(
   filter: TransactionFilter = {},
 ): AsyncGenerator<string> {
   const input = parseInput(transactionQueryInput, filter);
-  return generateCsv(ctx, filterConditions(input));
+  return generateCsv(ctx, filterConditions(input), input);
 }
 
 async function* generateCsv(
   ctx: ServiceContext,
-  where: ReturnType<typeof filterConditions>,
+  where: SqlCondition,
+  lineFilter: CategoryFilter,
 ): AsyncGenerator<string> {
   yield BOM + csvLine(EXPORT_COLUMNS);
   let after: { bookingDate: string; entryOrder: number } | null = null;
@@ -244,9 +251,10 @@ async function* generateCsv(
       const lines = await loadLines(
         ctx,
         rows.map((row) => row.id),
+        lineFilter,
       );
       yield rows
-        .flatMap((row) => expandRow(row, lines.get(row.id)))
+        .flatMap((row) => expandRow(row, lines.get(row.id) ?? []))
         .map((row) => csvLine(rowCells(row)))
         .join('');
     }

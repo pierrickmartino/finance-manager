@@ -108,7 +108,7 @@ function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
           <div className="text-xs font-normal text-zinc-500">
             of which{' '}
             {fmt.amount(transaction.matchingSplitAmountMinor, { currency: transaction.currency })}{' '}
-            in this Category
+            matches the filter
           </div>
         )}
       </td>

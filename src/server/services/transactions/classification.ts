@@ -9,7 +9,7 @@ import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { refuseBankFieldChanges } from './bank-fields';
 import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from './model';
-import { SPLIT_CATEGORY_REFUSAL } from './transfer-guard';
+import { refuseSplitCategoryChange } from './split-guard';
 
 /**
  * Classification of one Transaction: Payee, Category, Tags and notes (spec 63-65).
@@ -370,7 +370,7 @@ export async function applyClassification(
   const fields = editedFields(values).filter(
     (field) => by === 'manual' || !(locked.has(field) || (field === 'category' && isSplit)),
   );
-  if (isSplit && fields.includes('category')) throw new ValidationError(SPLIT_CATEGORY_REFUSAL);
+  if (fields.includes('category')) await refuseSplitCategoryChange(scope.tx, [id]);
 
   for (const field of fields) await writeField(scope, transaction, field, values, by);
   if (by === 'manual') {

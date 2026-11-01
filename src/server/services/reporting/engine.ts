@@ -56,8 +56,10 @@ export async function currenciesInUse(ctx: ServiceContext): Promise<string[]> {
 }
 
 /**
- * One aggregate SELECT over `report_base`, grouped by the given axes. `count` counts
- * Transactions: a split Transaction counts once in a group however many of its lines fall in.
+ * One aggregate SELECT over `report_base`, grouped by the given axes. `count` counts distinct
+ * Transactions, not reportable rows: a split Transaction counts once in a group however many of
+ * its Split lines fall in. This is deliberate: a cell's drill-down lists the parent
+ * Transactions, so the count a Widget shows must equal the number of rows its drill-down lists.
  */
 function groupedSelect(grouping: Grouping, rows: ReportAxis | null, columns: ReportAxis | null) {
   const rowKey = rows ? axisKey(rows) : 'NULL';

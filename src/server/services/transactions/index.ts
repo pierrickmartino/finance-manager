@@ -3,7 +3,12 @@ import type { ServiceContext } from '../context';
 import { NotFoundError, parseInput } from '../errors';
 import { loadClassifications, type Classification } from './classification';
 import { SELECT_TRANSACTION, type Transaction } from './model';
-import { filterConditions, transactionQueryInput, type TransactionQuery } from './query';
+import {
+  filterConditions,
+  transactionQueryInput,
+  type CategoryFilter,
+  type TransactionQuery,
+} from './query';
 
 export type { Transaction } from './model';
 export {
@@ -29,8 +34,9 @@ export interface TransactionListItem extends Transaction {
   /** Its Split lines in their order; empty when it is not split (then `category` holds it). */
   splitLines: Classification['splitLines'];
   /**
-   * When the list is filtered by a Category and the Transaction is split: the summed amount of
-   * its Split lines in that Category, the part of it that belongs there. Null otherwise.
+   * When the list is filtered by a Category or a Category group type and the Transaction is
+   * split: the summed amount of its Split lines matching the filter, the part of it that
+   * belongs there. Null otherwise.
    */
   matchingSplitAmountMinor: number | null;
 }
@@ -38,24 +44,32 @@ export interface TransactionListItem extends Transaction {
 type ClassificationKey = 'payee' | 'category' | 'tags' | 'splitLines' | 'matchingSplitAmountMinor';
 type TransactionRow = Omit<TransactionListItem, ClassificationKey>;
 
-/** The summed amount of the Split lines in the Category; null when none is in it. */
+/**
+ * The summed amount of the Split lines matching the Category filters; null when no filter is
+ * set or no line matches. Mirrors the filter's Split line conditions.
+ */
 function matchingSplitAmount(
   splitLines: Classification['splitLines'],
-  categoryId: string | undefined,
+  { categoryId, groupType }: CategoryFilter,
 ): number | null {
-  const matching = splitLines.filter((line) => line.category.id === categoryId);
+  if (categoryId === undefined && groupType === undefined) return null;
+  const matching = splitLines.filter(
+    (line) =>
+      (categoryId === undefined || line.category.id === categoryId) &&
+      (groupType === undefined || line.category.groupType === groupType),
+  );
   if (matching.length === 0) return null;
   return matching.reduce((sum, line) => sum + line.amountMinor, 0);
 }
 
 /**
  * Adds the Payee, Category, Tags and Split lines to rows read with SELECT_TRANSACTION, and the
- * amount of the Split lines in `categoryId` (the Category filter) when given.
+ * amount of the Split lines matching the list's Category filters when given.
  */
 async function withClassification<T extends TransactionRow>(
   ctx: ServiceContext,
   rows: T[],
-  categoryId?: string,
+  categoryFilter: CategoryFilter = {},
 ): Promise<(T & Pick<TransactionListItem, ClassificationKey>)[]> {
   const classifications = new Map(
     (
@@ -74,7 +88,7 @@ async function withClassification<T extends TransactionRow>(
       category: classification?.category ?? null,
       tags: classification?.tags ?? [],
       splitLines,
-      matchingSplitAmountMinor: matchingSplitAmount(splitLines, categoryId),
+      matchingSplitAmountMinor: matchingSplitAmount(splitLines, categoryFilter),
     };
   });
 }
@@ -127,7 +141,7 @@ export async function listTransactions(
   ]);
   const total = count.rows[0]?.total ?? 0;
   return {
-    transactions: await withClassification(ctx, rows.rows, input.categoryId),
+    transactions: await withClassification(ctx, rows.rows, input),
     total,
     page,
     pageSize,

@@ -3,7 +3,7 @@ import { setupTestDatabase } from '@test/support/db';
 import { seedTransactions, type SeedTransaction } from '@test/support/transactions';
 import { createAccount } from '../accounts';
 import { createBank } from '../banks';
-import { createCategory, createCategoryGroup } from '../categories';
+import { createCategory, createCategoryGroup, type CategoryGroupType } from '../categories';
 import { exportTransactionsCsv } from '../export';
 import { createPayee } from '../payees';
 import { createRule } from '../rules';
@@ -28,8 +28,8 @@ async function seed(rows: SeedTransaction[]): Promise<string[]> {
   return seedTransactions(t.ctx.db, account, rows);
 }
 
-async function category(name: string, groupName: string) {
-  const group = await createCategoryGroup(t.ctx, { name: groupName, type: 'expense' });
+async function category(name: string, groupName: string, type: CategoryGroupType = 'expense') {
+  const group = await createCategoryGroup(t.ctx, { name: groupName, type });
   return createCategory(t.ctx, { groupId: group.id, name });
 }
 
@@ -104,6 +104,88 @@ describe('filter Transactions by Category with Split lines', () => {
   });
 });
 
+/** The export's data rows as cells (header dropped; no cell in these tests holds a semicolon or quote). */
+async function exportRows(filter: Parameters<typeof exportTransactionsCsv>[1] = {}) {
+  let csv = '';
+  for await (const chunk of exportTransactionsCsv(t.ctx, filter)) csv += chunk;
+  return csv
+    .trim()
+    .split('\r\n')
+    .slice(1)
+    .map((line) => line.split(';'));
+}
+
+describe('filter Transactions by Category group type with Split lines', () => {
+  async function seedLoanRepayment() {
+    const principal = await category('Principal', 'Loan', 'capital');
+    const interest = await category('Interest', 'Bank costs', 'expense');
+    const [repayment, fee] = await seed([
+      { bookingDate: '2025-10-01', amountMinor: -100000, rawDescription: 'LOAN REPAYMENT' },
+      { bookingDate: '2025-10-02', amountMinor: -500, rawDescription: 'ACCOUNT FEE' },
+    ]);
+    await editClassification(t.ctx, fee!, { categoryId: interest.id });
+    await splitTransaction(t.ctx, repayment!, [
+      { amountMinor: -90000, categoryId: principal.id },
+      { amountMinor: -10000, categoryId: interest.id },
+    ]);
+    return { repayment: repayment!, fee: fee! };
+  }
+
+  it('lists split Transactions with a Split line of that group type, with the matching amount', async () => {
+    const { repayment, fee } = await seedLoanRepayment();
+
+    const capital = await listTransactions(t.ctx, { groupType: 'capital' });
+    const expense = await listTransactions(t.ctx, { groupType: 'expense' });
+    const income = await listTransactions(t.ctx, { groupType: 'income' });
+
+    expect(capital.transactions.map((tx) => [tx.id, tx.matchingSplitAmountMinor])).toEqual([
+      [repayment, -90000],
+    ]);
+    expect(expense.transactions.map((tx) => [tx.id, tx.matchingSplitAmountMinor])).toEqual([
+      [fee, null],
+      [repayment, -10000],
+    ]);
+    expect(income.total).toBe(0);
+  });
+
+  it('exports only the Split lines of that group type', async () => {
+    const { repayment, fee } = await seedLoanRepayment();
+
+    const rows = await exportRows({ groupType: 'expense' });
+
+    expect(rows.map((row) => [row[20], row[5], row[13], row[14]])).toEqual([
+      [repayment, '-100.00', 'expense', 'Interest'],
+      [fee, '-5.00', 'expense', 'Interest'],
+    ]);
+  });
+
+  it('matches the Category and the group type on the same Split line', async () => {
+    const { repayment } = await seedLoanRepayment();
+    const interest = (await getClassification(t.ctx, repayment)).splitLines[1]!.category;
+
+    const page = await listTransactions(t.ctx, { categoryId: interest.id, groupType: 'capital' });
+    const rows = await exportRows({ categoryId: interest.id, groupType: 'capital' });
+
+    expect(page.total).toBe(0);
+    expect(rows).toEqual([]);
+  });
+
+  it('selects only Transactions whose own Category has the type when applying Rules', async () => {
+    const { repayment } = await seedLoanRepayment();
+    const bank = await createPayee(t.ctx, 'Bank');
+    await createRule(t.ctx, {
+      name: 'Bank',
+      conditions: [{ type: 'text', field: 'description', operator: 'contains', value: 'LOAN' }],
+      actions: { payeeId: bank.id, categoryId: null, tagIds: [] },
+    });
+
+    const preview = await previewApplyRules(t.ctx, { filter: { groupType: 'capital' } });
+
+    expect(preview).toMatchObject({ examined: 0, changedCount: 0 });
+    expect((await getClassification(t.ctx, repayment)).payee).toBeNull();
+  });
+});
+
 describe('the Category filter outside the list', () => {
   async function seedSplitAndPlain() {
     const groceries = await category('Groceries', 'Food');
@@ -120,15 +202,21 @@ describe('the Category filter outside the list', () => {
     return { groceries, plain: plain!, split: split! };
   }
 
-  it('exports split Transactions with a Split line in the Category', async () => {
+  it('exports only the Split lines in the Category of a split Transaction', async () => {
     const { groceries, plain, split } = await seedSplitAndPlain();
-    let csv = '';
-    for await (const chunk of exportTransactionsCsv(t.ctx, { categoryId: groceries.id })) {
-      csv += chunk;
-    }
 
-    expect(csv).toContain(plain);
-    expect(csv).toContain(split);
+    const filtered = await exportRows({ categoryId: groceries.id });
+    const unfiltered = await exportRows();
+
+    expect(filtered.map((row) => [row[20], row[5], row[14]])).toEqual([
+      [plain, '-45.90', 'Groceries'],
+      [split, '-60.00', 'Groceries'],
+    ]);
+    expect(unfiltered.map((row) => [row[20], row[5], row[14]])).toEqual([
+      [plain, '-45.90', 'Groceries'],
+      [split, '-60.00', 'Groceries'],
+      [split, '-40.00', 'Household'],
+    ]);
   });
 
   it('selects only Transactions with the Category itself when applying Rules, not split ones', async () => {

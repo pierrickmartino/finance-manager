@@ -144,6 +144,12 @@ export async function removeSplit(
     const before = await requireClassification(scope.tx, transactionId);
     if (before.splitLines.length === 0) throw new ValidationError('This Transaction is not split');
     await scope.tx.query('DELETE FROM split_line WHERE transaction_id = $1', [transactionId]);
+    // Truly Unclassified again: the Category lock the Split set goes too, so Rules may classify it.
+    await scope.tx.query(
+      `UPDATE "transaction" SET locked_fields = array_remove(locked_fields, 'category')
+       WHERE id = $1`,
+      [transactionId],
+    );
     const after = await requireClassification(scope.tx, transactionId);
     await scope.history.record(
       'transaction',

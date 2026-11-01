@@ -6,7 +6,8 @@ import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { CLASSIFICATION_FIELDS, recordClassificationChanges } from './classification';
 import { UNCLASSIFIED_CONDITION } from './query';
-import { anyInTransfer, SPLIT_CATEGORY_REFUSAL, splitAmong } from './transfer-guard';
+import { refuseSplitCategoryChange } from './split-guard';
+import { anyInTransfer } from './transfer-guard';
 
 /**
  * Bulk edit (spec 62, 64): sets the Payee, Category or Tags of many Transactions at once, as one
@@ -160,9 +161,7 @@ async function writeAll({ tx }: MutationScope, ids: string[], values: BulkValues
   if (values.categoryId && (await anyInTransfer(tx, ids))) {
     throw new ValidationError("A Transfer can't have a Category");
   }
-  if (values.categoryId !== undefined && (await splitAmong(tx, ids)).size > 0) {
-    throw new ValidationError(SPLIT_CATEGORY_REFUSAL);
-  }
+  if (values.categoryId !== undefined) await refuseSplitCategoryChange(tx, ids);
   // Locks stay in CLASSIFICATION_FIELDS order: the current locks plus the edited fields.
   await tx.query(
     `UPDATE "transaction" t

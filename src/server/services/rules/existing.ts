@@ -7,7 +7,8 @@ import {
   recordClassificationChanges,
   type ClassificationField,
 } from '../transactions/classification';
-import { filterConditions, transactionQueryInput } from '../transactions/query';
+import { ruleFilterConditions, transactionQueryInput } from '../transactions/query';
+import { IS_SPLIT } from '../transactions/split-guard';
 import { transfersAmong } from '../transactions/transfer-guard';
 import {
   compileRules,
@@ -137,7 +138,7 @@ const SELECT_CANDIDATES = `
                WHERE tt.transaction_id = t.id ORDER BY lower(tg.name), tg.id) AS "tagIds",
          ARRAY(SELECT tg.name FROM transaction_tag tt JOIN tag tg ON tg.id = tt.tag_id
                WHERE tt.transaction_id = t.id ORDER BY lower(tg.name), tg.id) AS "tagNames",
-         EXISTS (SELECT 1 FROM split_line sl WHERE sl.transaction_id = t.id) AS "isSplit"
+         ${IS_SPLIT} AS "isSplit"
   FROM "transaction" t
   JOIN account a ON a.id = t.account_id
   LEFT JOIN payee p ON p.id = t.payee_id
@@ -153,7 +154,7 @@ async function loadCandidates(
   const { sql, params } = onlyId
     ? { sql: 'WHERE t.id = $1', params: [onlyId] }
     : filter
-      ? filterConditions(filter, { matchSplitLines: false })
+      ? ruleFilterConditions(filter)
       : { sql: '', params: [] as unknown[] };
   const result = await db.query<Candidate>(
     `${SELECT_CANDIDATES} ${sql} ORDER BY t.booking_date, t.entry_order${lock ? ' FOR UPDATE OF t' : ''}`,
@@ -343,12 +344,7 @@ function writesByRule(changes: readonly PlannedChange[]): Map<string, RuleWrites
 async function writeRule({ tx }: MutationScope, writes: RuleWrites): Promise<void> {
   const columns = [
     ['payee_id', 'payee', writes.payees, ''],
-    [
-      'category_id',
-      'category',
-      writes.categories,
-      'AND NOT EXISTS (SELECT 1 FROM split_line sl WHERE sl.transaction_id = t.id)',
-    ],
+    ['category_id', 'category', writes.categories, `AND NOT ${IS_SPLIT}`],
   ] as const;
   for (const [column, field, rows, guard] of columns) {
     if (rows.length === 0) continue;
