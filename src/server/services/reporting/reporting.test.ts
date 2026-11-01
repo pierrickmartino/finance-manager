@@ -5,7 +5,7 @@ import { seedTransactions, type SeedTransaction } from '@test/support/transactio
 import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
-import { editClassification, type ClassificationChanges } from '../transactions';
+import { editClassification, splitTransaction, type ClassificationChanges } from '../transactions';
 import { linkTransfer } from '../transfers';
 import { listCellTransactions, runWidgetQuery, type CellRef, type WidgetQueryInput } from '.';
 
@@ -402,29 +402,29 @@ describe('date ranges', () => {
   });
 });
 
-describe('drill down into a cell', () => {
-  /** Every cell, row total, column total and the grand total equal the sum of their list. */
-  async function expectDrillDownConsistent(query: WidgetQueryInput): Promise<void> {
-    const report = await runWidgetQuery(t.ctx, query);
-    const listed = async (cell: CellRef) => {
-      const page = await listCellTransactions(t.ctx, query, { ...cell, pageSize: 200 });
-      const sum = page.transactions.reduce((total, item) => total + item.chfMinor, 0);
-      expect(page.sumChfMinor).toBe(page.total === 0 ? null : sum);
-      expect(page.transactions).toHaveLength(page.total);
-      return page.total === 0 ? null : sum;
-    };
-    for (const [r, row] of report.rows.entries()) {
-      for (const [c, column] of report.columns.entries()) {
-        expect(await listed({ row: row.key, column: column.key })).toBe(report.cells[r]![c]);
-      }
-      expect(await listed({ row: row.key })).toBe(report.rowTotals[r]);
-    }
+/** Every cell, row total, column total and the grand total equal the sum of their list. */
+async function expectDrillDownConsistent(query: WidgetQueryInput): Promise<void> {
+  const report = await runWidgetQuery(t.ctx, query);
+  const listed = async (cell: CellRef) => {
+    const page = await listCellTransactions(t.ctx, query, { ...cell, pageSize: 200 });
+    const sum = page.transactions.reduce((total, item) => total + item.chfMinor, 0);
+    expect(page.sumChfMinor).toBe(page.total === 0 ? null : sum);
+    expect(page.transactions).toHaveLength(page.total);
+    return page.total === 0 ? null : sum;
+  };
+  for (const [r, row] of report.rows.entries()) {
     for (const [c, column] of report.columns.entries()) {
-      expect(await listed({ column: column.key })).toBe(report.columnTotals[c]);
+      expect(await listed({ row: row.key, column: column.key })).toBe(report.cells[r]![c]);
     }
-    expect(await listed({})).toBe(report.total);
+    expect(await listed({ row: row.key })).toBe(report.rowTotals[r]);
   }
+  for (const [c, column] of report.columns.entries()) {
+    expect(await listed({ column: column.key })).toBe(report.columnTotals[c]);
+  }
+  expect(await listed({})).toBe(report.total);
+}
 
+describe('drill down into a cell', () => {
   it('lists the Transactions of a cell with their CHF values', async () => {
     const { groceries } = await dataset();
 
@@ -507,5 +507,164 @@ describe('filters', () => {
     expect(await total({ categoryGroupTypes: ['income', 'expense'] })).toBe(567949);
     // Empty lists mean no filter, as an empty form submits them.
     expect(await total({ accountIds: [], currencies: [] })).toBe(564949);
+  });
+});
+
+describe('split Transactions', () => {
+  /**
+   * The reporting dataset plus two split Transactions:
+   * - UBS (CHF) 2025-03-05, -250.00 tagged Vacation: Groceries -150.00 tagged Renovation and
+   *   Vacation again, Restaurants -120.00, and a Salary line of +20.00 (lines may have different signs).
+   * - CA (EUR) 2025-02-10, EUR -30.00 at 0.9301: Groceries EUR -10.00 (CHF -9.301 → -9.30) and
+   *   a Capital Property line EUR -20.00 (CHF -18.602 → -18.60).
+   */
+  async function splitDataset() {
+    const base = await dataset();
+    const { ubs, ca, salary, groceries, restaurants, property } = base;
+    const [shopping] = await seed(ubs, [
+      { bookingDate: '2025-03-05', amountMinor: -25000, classify: { tagNames: ['Vacation'] } },
+    ]);
+    await splitTransaction(t.ctx, shopping!, [
+      { amountMinor: -15000, categoryId: groceries.id, tagNames: ['Renovation', 'Vacation'] },
+      { amountMinor: -12000, categoryId: restaurants.id },
+      { amountMinor: 2000, categoryId: salary.id },
+    ]);
+    const [mixed] = await seed(ca, [{ bookingDate: '2025-02-10', amountMinor: -3000 }]);
+    await splitTransaction(t.ctx, mixed!, [
+      { amountMinor: -1000, categoryId: groceries.id },
+      { amountMinor: -2000, categoryId: property.id },
+    ]);
+    return { ...base, shopping: shopping!, mixed: mixed! };
+  }
+
+  it("distributes a split Transaction's amount across its lines' Categories", async () => {
+    const { salary, groceries, restaurants } = await splitDataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      columns: 'category',
+    });
+
+    expect(keys(report.columns)).toEqual([salary.id, groceries.id, restaurants.id, null]);
+    // January is unchanged. February adds the EUR Groceries line at 0.9301 (-9.30) while its
+    // Capital line stays out. March adds the three CHF lines next to the unclassified -30.00.
+    expect(report.cells).toEqual([
+      [600000, -19400, null, null],
+      [null, -8930, -4651, null],
+      [2000, -15000, -12000, -3000],
+    ]);
+    expect(report.total).toBe(564949 - 930 - 25000);
+  });
+
+  it('counts each line under its own Category group type, leaving Capital lines out', async () => {
+    await splitDataset();
+
+    const byType = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      columns: 'categoryGroupType',
+    });
+    const withCapital = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      columns: 'categoryGroupType',
+      includeCapital: true,
+    });
+
+    expect(keys(byType.columns)).toEqual(['income', 'expense', null]);
+    expect(byType.cells).toEqual([
+      [600000, -19400, null],
+      [null, -13581, null],
+      [2000, -27000, -3000],
+    ]);
+    expect(keys(withCapital.columns)).toEqual(['income', 'expense', 'capital', null]);
+    // February's Capital: the -50 000.00 property purchase and the EUR -20.00 line (-18.60).
+    expect(withCapital.cells[1]).toEqual([null, -13581, -5001860, null]);
+  });
+
+  it("counts a line under its own Tags plus its Transaction's Tags, once each", async () => {
+    await splitDataset();
+    const tagId = async (name: string) =>
+      (await t.ctx.db.query<{ id: string }>('SELECT id FROM tag WHERE name = $1', [name])).rows[0]!
+        .id;
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'tag',
+      columns: 'month',
+    });
+    const taggedTotal = async (name: string) =>
+      (
+        await runWidgetQuery(t.ctx, {
+          dateRange: Q1_2025,
+          filters: { tagIds: [await tagId(name)] },
+        })
+      ).total;
+
+    expect(labels(report.rows)).toEqual([
+      'Family',
+      'Renovation',
+      'Vacation',
+      'Weekly',
+      'Work',
+      'No Tag',
+    ]);
+    // March: Vacation covers every line of the Transaction, the Groceries line once although
+    // it carries Vacation itself; Renovation only that line.
+    expect(report.cells.map((row) => row[2])).toEqual([null, -15000, -25000, null, null, -3000]);
+    expect(report.columnTotals[2]).toBe(-28000);
+    expect(await taggedTotal('Renovation')).toBe(-15000);
+    expect(await taggedTotal('Vacation')).toBe(-25000);
+  });
+
+  it('drills down to the Transactions behind the lines, once each', async () => {
+    const { shopping, groceries } = await splitDataset();
+    const query = { dateRange: Q1_2025, rows: 'month', columns: 'category' } as const;
+
+    const march = await listCellTransactions(t.ctx, query, { row: '2025-03' });
+    const marchGroceries = await listCellTransactions(t.ctx, query, {
+      row: '2025-03',
+      column: groceries.id,
+    });
+
+    // The split Transaction's three lines make one item, at the CHF value the row counted.
+    expect(march).toMatchObject({ total: 2, sumChfMinor: -28000, pageCount: 1 });
+    expect(march.transactions.map((item) => [item.id, item.chfMinor])).toEqual([
+      [shopping, -25000],
+      [expect.any(String), -3000],
+    ]);
+    expect(marchGroceries.transactions.map((item) => [item.id, item.chfMinor])).toEqual([
+      [shopping, -15000],
+    ]);
+  });
+
+  it('adds up, cell by cell, with split Transactions', async () => {
+    await splitDataset();
+    await expectDrillDownConsistent({ dateRange: Q1_2025, rows: 'month', columns: 'category' });
+    await expectDrillDownConsistent({ dateRange: Q1_2025, rows: 'tag', columns: 'payee' });
+    await expectDrillDownConsistent({
+      dateRange: Q1_2025,
+      rows: 'categoryGroupType',
+      columns: 'currency',
+      includeCapital: true,
+    });
+  });
+
+  it('counts a split Transaction once in each cell and total its lines fall in', async () => {
+    await splitDataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      columns: 'category',
+      measure: 'count',
+    });
+
+    expect(report.cells[2]).toEqual([1, 1, 1, 1]);
+    // March: the split Transaction and the unclassified one.
+    expect(report.rowTotals[2]).toBe(2);
+    expect(report.columnTotals).toEqual([2, 6, 2, 1]);
+    expect(report.total).toBe(9);
   });
 });
