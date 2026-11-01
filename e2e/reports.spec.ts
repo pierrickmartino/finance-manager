@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { openAccountPage, openNewAccountForm } from './support/accounts';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -15,13 +16,12 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await page.getByLabel('Bank name').fill(`${name} bank`);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: `${name} bank` })).toBeVisible();
-  await page.goto('/accounts');
-  const newAccount = page.getByRole('region', { name: 'New Account' });
+  const newAccount = await openNewAccountForm(page);
   await newAccount.getByLabel('Bank').selectOption({ label: `${name} bank` });
   await newAccount.getByLabel('Account name').fill(name);
   await newAccount.getByLabel('Import format').selectOption({ label: 'UBS CSV' });
   await newAccount.getByRole('button', { name: 'Add Account' }).click();
-  await page.getByRole('row').filter({ hasText: name }).getByRole('link').click();
+  await openAccountPage(page, name);
   await page.getByLabel('Bank file (UBS CSV)').setInputFiles(UBS_OCTOBER);
   await page.getByRole('button', { name: 'Preview import' }).click();
   await page.getByRole('button', { name: /Commit import/ }).click();

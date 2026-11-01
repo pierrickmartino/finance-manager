@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { accountListEntry, openAccountPage, openNewAccountForm } from './support/accounts';
 
 /** Creates a Bank and a manual Account (no Import format) and opens the Account page. */
 async function openNewManualAccount(page: Page, accountName: string, bankName: string) {
@@ -7,14 +8,13 @@ async function openNewManualAccount(page: Page, accountName: string, bankName: s
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();
 
-  await page.goto('/accounts');
-  const form = page.getByRole('region', { name: 'New Account' });
+  const form = await openNewAccountForm(page);
   await form.getByLabel('Bank').selectOption({ label: bankName });
   await form.getByLabel('Account name').fill(accountName);
   await form.getByLabel('Opening balance').fill('1000');
   await form.getByLabel('Opening date').fill('2025-01-01');
   await form.getByRole('button', { name: 'Add Account' }).click();
-  await page.getByRole('row').filter({ hasText: accountName }).getByRole('link').click();
+  await openAccountPage(page, accountName);
   await expect(page.getByRole('heading', { name: accountName })).toBeVisible();
 }
 
@@ -84,12 +84,10 @@ test('enters several Manual transactions in a row with the keyboard, then checks
       hasText: accountName,
     }),
   ).toContainText("the Balance snapshot says CHF 2'900.00");
-  await expect(page.getByRole('row').filter({ hasText: accountName })).toContainText(
-    'Snapshot mismatch',
-  );
+  await expect(accountListEntry(page, accountName)).toContainText('Snapshot mismatch');
 
   // Enter the missing Transaction: the warning clears
-  await page.getByRole('row').filter({ hasText: accountName }).getByRole('link').click();
+  await openAccountPage(page, accountName);
   await date.fill('2025-03-20');
   await amount.fill('-42.10');
   await entry.getByLabel('Description').fill('Pharmacy');

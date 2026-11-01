@@ -2,6 +2,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { addCategory, addCategoryGroup } from './support/categories';
 import { openTransaction } from './support/transactions';
+import { openAccountPage, openNewAccountForm } from './support/accounts';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -38,13 +39,12 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();
-  await page.goto('/accounts');
-  const accountForm = page.getByRole('region', { name: 'New Account' });
+  const accountForm = await openNewAccountForm(page);
   await accountForm.getByLabel('Bank').selectOption({ label: bankName });
   await accountForm.getByLabel('Account name').fill(accountName);
   await accountForm.getByLabel('Import format').selectOption({ label: 'UBS CSV' });
   await accountForm.getByRole('button', { name: 'Add Account' }).click();
-  await page.getByRole('row').filter({ hasText: accountName }).getByRole('link').click();
+  await openAccountPage(page, accountName);
   await page.getByLabel('Bank file (UBS CSV)').setInputFiles(UBS_OCTOBER);
   await page.getByRole('button', { name: 'Preview import' }).click();
   await page.getByRole('button', { name: 'Commit import (14 new)' }).click();

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { openAccountPage, openNewAccountForm } from './support/accounts';
 
 const BCGE_OCTOBER = path.join(
   import.meta.dirname,
@@ -19,13 +20,12 @@ test('imports a BCGE CAMT.053 file with a bundled entry shown as one Transaction
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();
 
-  await page.goto('/accounts');
-  const form = page.getByRole('region', { name: 'New Account' });
+  const form = await openNewAccountForm(page);
   await form.getByLabel('Bank').selectOption({ label: bankName });
   await form.getByLabel('Account name').fill(accountName);
   await form.getByLabel('Import format').selectOption({ label: 'BCGE CAMT.053' });
   await form.getByRole('button', { name: 'Add Account' }).click();
-  await page.getByRole('row').filter({ hasText: accountName }).getByRole('link').click();
+  await openAccountPage(page, accountName);
   await expect(page.getByRole('heading', { name: accountName })).toBeVisible();
 
   await page.getByLabel('Bank file (BCGE CAMT.053)').setInputFiles(BCGE_OCTOBER);

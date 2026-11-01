@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { openAccountPage, openNewAccountForm } from './support/accounts';
 
 const UBS_DIR = path.join(import.meta.dirname, '../test/fixtures/import/ubs');
 const UBS_OCTOBER = path.join(UBS_DIR, 'ubs-chf-2025-10.csv');
@@ -19,13 +20,12 @@ test('uploads a UBS CSV, previews it, commits it, and skips it when uploaded aga
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();
 
-  await page.goto('/accounts');
-  const form = page.getByRole('region', { name: 'New Account' });
+  const form = await openNewAccountForm(page);
   await form.getByLabel('Bank').selectOption({ label: bankName });
   await form.getByLabel('Account name').fill(accountName);
   await form.getByLabel('Import format').selectOption({ label: 'UBS CSV' });
   await form.getByRole('button', { name: 'Add Account' }).click();
-  await page.getByRole('row').filter({ hasText: accountName }).getByRole('link').click();
+  await openAccountPage(page, accountName);
   await expect(page.getByRole('heading', { name: accountName })).toBeVisible();
   await expect(page.getByText('No Imports yet.')).toBeVisible();
 

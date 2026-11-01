@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { openTransaction } from './support/transactions';
+import { openAccountPage, openNewAccountForm } from './support/accounts';
 
 const FIXTURES = path.join(import.meta.dirname, '../test/fixtures/import');
 const BCGE_OCTOBER = path.join(FIXTURES, 'bcge/bcge-chf-2025-10.xml');
@@ -13,13 +14,12 @@ async function createAccount(page: Page, name: string, format: string): Promise<
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: `${name} bank` })).toBeVisible();
 
-  await page.goto('/accounts');
-  const form = page.getByRole('region', { name: 'New Account' });
+  const form = await openNewAccountForm(page);
   await form.getByLabel('Bank').selectOption({ label: `${name} bank` });
   await form.getByLabel('Account name').fill(name);
   await form.getByLabel('Import format').selectOption({ label: format });
   await form.getByRole('button', { name: 'Add Account' }).click();
-  await page.getByRole('row').filter({ hasText: name }).getByRole('link').click();
+  await openAccountPage(page, name);
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
 
