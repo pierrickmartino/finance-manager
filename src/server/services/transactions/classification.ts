@@ -9,6 +9,7 @@ import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { refuseBankFieldChanges } from './bank-fields';
 import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from './model';
+import { SPLIT_CATEGORY_REFUSAL } from './transfer-guard';
 
 /**
  * Classification of one Transaction: Payee, Category, Tags and notes (spec 63-65).
@@ -34,24 +35,42 @@ export const CLASSIFICATION_FIELD_LABELS: Record<ClassificationField, string> = 
 
 export type TagSource = 'manual' | 'rule';
 
+/** A Category as a classification shows it, with its group. */
+export interface ClassificationCategory {
+  id: string;
+  name: string;
+  groupId: string;
+  groupName: string;
+  groupType: CategoryGroupType;
+}
+
+/**
+ * One part of a split Transaction's classification (ADR-0004): a signed amount in minor units
+ * of the Transaction's Currency, a Category, Tags (by name, ignoring case) and a note.
+ */
+export interface SplitLine {
+  id: string;
+  amountMinor: number;
+  category: ClassificationCategory;
+  tags: { id: string; name: string }[];
+  note: string | null;
+}
+
 export interface Classification {
   transactionId: string;
   payee: { id: string; name: string } | null;
-  category: {
-    id: string;
-    name: string;
-    groupId: string;
-    groupName: string;
-    groupType: CategoryGroupType;
-  } | null;
+  /** Always null for a split Transaction: its Split lines hold the Categories. */
+  category: ClassificationCategory | null;
   /** By name, ignoring case. */
   tags: { id: string; name: string; source: TagSource }[];
   notes: string | null;
   /** Fields Rules may not write, in CLASSIFICATION_FIELDS order. */
   lockedFields: ClassificationField[];
+  /** The Split lines in their order; empty when the Transaction is not split. */
+  splitLines: SplitLine[];
 }
 
-const MAX_NOTES_LENGTH = 2000;
+export const MAX_NOTES_LENGTH = 2000;
 
 const optionalId = z.string().nullable().optional();
 
@@ -109,7 +128,19 @@ const SELECT_CLASSIFICATION = `
                      'source', tt.source) ORDER BY lower(tg.name), tg.id)
                    FROM transaction_tag tt JOIN tag tg ON tg.id = tt.tag_id
                    WHERE tt.transaction_id = t.id), '[]'::json) AS tags,
-         t.notes, t.locked_fields AS "lockedFields"
+         t.notes, t.locked_fields AS "lockedFields",
+         coalesce((SELECT json_agg(json_build_object('id', sl.id, 'amountMinor', sl.amount_minor,
+                     'category', json_build_object('id', sc.id, 'name', sc.name,
+                       'groupId', sg.id, 'groupName', sg.name, 'groupType', sg.type),
+                     'tags', coalesce((SELECT json_agg(json_build_object('id', lt.id,
+                                 'name', lt.name) ORDER BY lower(lt.name), lt.id)
+                               FROM split_line_tag slt JOIN tag lt ON lt.id = slt.tag_id
+                               WHERE slt.split_line_id = sl.id), '[]'::json),
+                     'note', sl.note) ORDER BY sl.position)
+                   FROM split_line sl
+                   JOIN category sc ON sc.id = sl.category_id
+                   JOIN category_group sg ON sg.id = sc.group_id
+                   WHERE sl.transaction_id = t.id), '[]'::json) AS "splitLines"
   FROM "transaction" t
   LEFT JOIN payee p ON p.id = t.payee_id
   LEFT JOIN category c ON c.id = t.category_id
@@ -129,14 +160,31 @@ export async function loadClassifications(
 
 /** What History records about a Transaction's classification: readable names. */
 export function classificationSnapshot(classification: Classification): HistorySnapshot {
-  const { payee, category, tags, notes, lockedFields } = classification;
+  const { payee, category, tags, notes, lockedFields, splitLines } = classification;
   return {
     payee: payee?.name ?? null,
-    category: category ? `${category.groupName} › ${category.name}` : null,
+    category: category ? categoryLabel(category) : null,
     tags: tags.map((tag) => tag.name),
     notes,
     lockedFields: [...lockedFields],
+    // Absent (null) when not split, so unsplit Transactions record exactly as before.
+    split:
+      splitLines.length === 0
+        ? undefined
+        : splitLines.map((line) => ({
+            amountMinor: line.amountMinor,
+            category: categoryLabel(line.category),
+            tags: line.tags.map((tag) => tag.name),
+            note: line.note,
+          })),
   };
+}
+
+/** A Category as History and messages show it: `Group › Category`. */
+export function categoryLabel(
+  category: Pick<ClassificationCategory, 'groupName' | 'name'>,
+): string {
+  return `${category.groupName} › ${category.name}`;
 }
 
 /**
@@ -201,7 +249,8 @@ export async function recordClassificationChanges<T>(
 
 const transactionId = z.uuid();
 
-async function lockTransaction(scope: MutationScope, id: string): Promise<Transaction> {
+/** Locks one Transaction FOR UPDATE inside a mutation; NotFoundError when it doesn't exist. */
+export async function lockTransaction(scope: MutationScope, id: string): Promise<Transaction> {
   const notFound = new NotFoundError('Transaction not found');
   if (!transactionId.safeParse(id).success) throw notFound;
   const result = await scope.tx.query<Transaction>(
@@ -213,7 +262,7 @@ async function lockTransaction(scope: MutationScope, id: string): Promise<Transa
   return transaction;
 }
 
-async function requireClassification(db: Queryable, id: string): Promise<Classification> {
+export async function requireClassification(db: Queryable, id: string): Promise<Classification> {
   const [classification] = await loadClassifications(db, [id]);
   if (!classification) throw new NotFoundError('Transaction not found');
   return classification;
@@ -316,7 +365,12 @@ export async function applyClassification(
   const values = parseInput(changesInput, changes);
   const before = await requireClassification(scope.tx, id);
   const locked = new Set<ClassificationField>(before.lockedFields);
-  const fields = editedFields(values).filter((field) => by === 'manual' || !locked.has(field));
+  const isSplit = before.splitLines.length > 0;
+  // A Rule never writes a locked field, nor a split Transaction's Category (ADR-0004).
+  const fields = editedFields(values).filter(
+    (field) => by === 'manual' || !(locked.has(field) || (field === 'category' && isSplit)),
+  );
+  if (isSplit && fields.includes('category')) throw new ValidationError(SPLIT_CATEGORY_REFUSAL);
 
   for (const field of fields) await writeField(scope, transaction, field, values, by);
   if (by === 'manual') {

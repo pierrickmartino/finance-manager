@@ -15,7 +15,9 @@ export {
   type Classification,
   type ClassificationChanges,
   type ClassificationField,
+  type SplitLine,
 } from './classification';
+export { removeSplit, splitTransaction, type SplitLineInput } from './split';
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type TransactionQuery } from './query';
 
 /** A Transaction as the list shows it: with the name of its Account and its classification. */
@@ -24,15 +26,18 @@ export interface TransactionListItem extends Transaction {
   payee: Classification['payee'];
   category: Classification['category'];
   tags: Classification['tags'];
+  /** Its Split lines in their order; empty when it is not split (then `category` holds it). */
+  splitLines: Classification['splitLines'];
 }
 
-type TransactionRow = Omit<TransactionListItem, 'payee' | 'category' | 'tags'>;
+type ClassificationKey = 'payee' | 'category' | 'tags' | 'splitLines';
+type TransactionRow = Omit<TransactionListItem, ClassificationKey>;
 
 /** Adds the Payee, Category and Tags to rows read with SELECT_TRANSACTION. */
 async function withClassification<T extends TransactionRow>(
   ctx: ServiceContext,
   rows: T[],
-): Promise<(T & Pick<TransactionListItem, 'payee' | 'category' | 'tags'>)[]> {
+): Promise<(T & Pick<TransactionListItem, ClassificationKey>)[]> {
   const classifications = new Map(
     (
       await loadClassifications(
@@ -48,6 +53,7 @@ async function withClassification<T extends TransactionRow>(
       payee: classification?.payee ?? null,
       category: classification?.category ?? null,
       tags: classification?.tags ?? [],
+      splitLines: classification?.splitLines ?? [],
     };
   });
 }
@@ -129,7 +135,7 @@ const transactionId = z.uuid();
 export async function getTransaction(ctx: ServiceContext, id: string): Promise<TransactionDetail> {
   const notFound = new NotFoundError('Transaction not found');
   if (!transactionId.safeParse(id).success) throw notFound;
-  const result = await ctx.db.query<Omit<TransactionDetail, 'payee' | 'category' | 'tags'>>(
+  const result = await ctx.db.query<Omit<TransactionDetail, ClassificationKey>>(
     `${transactionListSql(
       `, CASE WHEN i.id IS NULL THEN NULL ELSE json_build_object(
            'id', i.id, 'fileName', i.file_name, 'importedAt', i.imported_at) END AS "import"`,

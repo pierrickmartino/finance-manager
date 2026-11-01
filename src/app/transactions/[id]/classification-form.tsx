@@ -35,6 +35,7 @@ export function ClassificationForm({
   const [state, formAction, isPending] = useActionState(action, null);
   const locked = new Set(classification.lockedFields);
   const isLocked = (field: Classification['lockedFields'][number]) => locked.has(field) && LOCKED;
+  const splitCount = classification.splitLines.length;
 
   return (
     <form
@@ -68,9 +69,12 @@ export function ClassificationForm({
         <select
           name="categoryId"
           defaultValue={classification.category?.id ?? ''}
-          className={INPUT}
+          // A split Transaction's Split lines hold its Categories (ADR-0004); a disabled field
+          // is not submitted, so saving leaves the Category alone.
+          disabled={splitCount > 0}
+          className={`${INPUT} disabled:opacity-60`}
         >
-          <option value="">Unclassified</option>
+          <option value="">{splitCount > 0 ? `Split (${splitCount})` : 'Unclassified'}</option>
           {groups.map((group) => (
             <optgroup key={group.id} label={group.name}>
               {group.categories.map((category) => (
@@ -81,6 +85,11 @@ export function ClassificationForm({
             </optgroup>
           ))}
         </select>
+        {splitCount > 0 && (
+          <span className="text-xs font-normal text-zinc-500">
+            Edit or remove the Split below to change the Categories.
+          </span>
+        )}
       </label>
       <label className="flex flex-col gap-1 text-sm font-medium">
         <span>Tags {isLocked('tags')}</span>

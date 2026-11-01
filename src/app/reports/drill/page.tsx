@@ -8,6 +8,7 @@ import {
   type UrlParams,
 } from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
+import { splitLabel } from '@/app/transactions/transaction-display';
 import { getFormatter } from '@/server/formatter';
 import { ServiceError } from '@/server/services/errors';
 import {
@@ -107,7 +108,7 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
                     <td className={CELL}>
                       {transaction.category
                         ? `${transaction.category.groupName} › ${transaction.category.name}`
-                        : 'Unclassified'}
+                        : (splitLabel(transaction) ?? 'Unclassified')}
                     </td>
                     <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
                       {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}

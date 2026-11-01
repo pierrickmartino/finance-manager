@@ -40,7 +40,10 @@ export async function renameTag(ctx: ServiceContext, id: string, name: string): 
 
 async function transactionsWithTag(scope: MutationScope, tagId: string): Promise<string[]> {
   const result = await scope.tx.query<{ id: string }>(
-    'SELECT transaction_id AS id FROM transaction_tag WHERE tag_id = $1',
+    `SELECT transaction_id AS id FROM transaction_tag WHERE tag_id = $1
+     UNION
+     SELECT sl.transaction_id FROM split_line_tag slt
+     JOIN split_line sl ON sl.id = slt.split_line_id WHERE slt.tag_id = $1`,
     [tagId],
   );
   return result.rows.map((row) => row.id);
@@ -53,8 +56,8 @@ async function removeTag(scope: MutationScope, tag: Tag): Promise<void> {
 }
 
 /**
- * Merges `sourceId` into `targetId`: every Transaction with the source gets the target instead
- * (once), and the source is deleted. One Batch, with a readable summary.
+ * Merges `sourceId` into `targetId`: every Transaction and Split line with the source gets the
+ * target instead (once), and the source is deleted. One Batch, with a readable summary.
  */
 export async function mergeTags(
   ctx: ServiceContext,
@@ -74,6 +77,13 @@ export async function mergeTags(
         [sourceId, targetId],
       );
       await scope.tx.query('DELETE FROM transaction_tag WHERE tag_id = $1', [sourceId]);
+      await scope.tx.query(
+        `INSERT INTO split_line_tag (split_line_id, tag_id)
+         SELECT split_line_id, $2 FROM split_line_tag WHERE tag_id = $1
+         ON CONFLICT (split_line_id, tag_id) DO NOTHING`,
+        [sourceId, targetId],
+      );
+      await scope.tx.query('DELETE FROM split_line_tag WHERE tag_id = $1', [sourceId]);
     });
     await retargetRules(scope, 'tag', sourceId, targetId);
     await removeTag(scope, source);
@@ -84,14 +94,15 @@ export async function mergeTags(
   });
 }
 
-/** Deletes a Tag, taking it off every Transaction (spec 59). One Batch. */
+/** Deletes a Tag, taking it off every Transaction and Split line (spec 59). One Batch. */
 export async function deleteTag(ctx: ServiceContext, id: string): Promise<TagChangeResult> {
   return mutate(ctx, async (scope) => {
     const tag = await findTag(scope.tx, id, true);
     const transactionIds = await transactionsWithTag(scope, id);
-    await recordClassificationChanges(scope, transactionIds, () =>
-      scope.tx.query('DELETE FROM transaction_tag WHERE tag_id = $1', [id]),
-    );
+    await recordClassificationChanges(scope, transactionIds, async () => {
+      await scope.tx.query('DELETE FROM transaction_tag WHERE tag_id = $1', [id]);
+      await scope.tx.query('DELETE FROM split_line_tag WHERE tag_id = $1', [id]);
+    });
     await removeTagFromRules(scope, id);
     await removeTag(scope, tag);
     await scope.history.summarize(

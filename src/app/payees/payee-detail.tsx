@@ -6,6 +6,7 @@ import { CARD_CLASS, DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/component
 import type { Formatter } from '@/lib/format';
 import type { Payee } from '@/server/services/payees';
 import type { TransactionListItem } from '@/server/services/transactions';
+import { categoryText } from '@/app/transactions/transaction-display';
 import { deletePayeeAction, mergePayeeAction, renamePayeeAction } from './actions';
 
 interface PayeeDetailProps {
@@ -72,9 +73,7 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
 }
 
 function RecentRow({ transaction, fmt }: { transaction: TransactionListItem; fmt: Formatter }) {
-  const classification = transaction.transferId
-    ? 'Transfer'
-    : (transaction.category?.name ?? 'Unclassified');
+  const classification = categoryText(transaction);
   return (
     <li className="flex items-center gap-4 px-4 py-2.5 text-sm">
       <span className="w-24 shrink-0 text-zinc-500 tabular-nums">

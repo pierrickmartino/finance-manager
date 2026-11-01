@@ -6,6 +6,7 @@ import { runRulesOnTransaction } from '../rules/apply';
 import { unlinkTransfers } from '../transfers/link';
 import { refuseBankFieldChanges } from './bank-fields';
 import { deletionSnapshots } from './classification';
+import { splitAmong } from './transfer-guard';
 import {
   SELECT_TRANSACTION,
   TRANSACTION_ORDER,
@@ -170,6 +171,11 @@ export async function updateManualTransaction(
     if (before.transferId && Math.sign(values.amountMinor) !== Math.sign(before.amountMinor)) {
       throw new ValidationError(
         'This Transaction is part of a Transfer. Unlink the Transfer before changing its sign',
+      );
+    }
+    if (values.amountMinor !== before.amountMinor && (await splitAmong(tx, [id])).size > 0) {
+      throw new ValidationError(
+        'This Transaction is split: remove the Split before changing its amount',
       );
     }
     refuseBeforeOpening(await lockOpenAccount(tx, before.accountId), values.bookingDate);

@@ -39,7 +39,10 @@ export const uuid = z.uuid();
 export const SELECT_CATEGORY = `
   SELECT c.id, c.group_id AS "groupId", g.name AS "groupName", g.type AS "groupType", c.name,
          c.sort,
-         (SELECT count(*)::int FROM "transaction" t WHERE t.category_id = c.id)
+         (SELECT count(*)::int FROM (
+            SELECT t.id FROM "transaction" t WHERE t.category_id = c.id
+            UNION
+            SELECT sl.transaction_id FROM split_line sl WHERE sl.category_id = c.id) used)
            AS "transactionCount"
   FROM category c
   JOIN category_group g ON g.id = c.group_id`;

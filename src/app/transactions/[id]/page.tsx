@@ -27,6 +27,7 @@ import {
 } from './actions';
 import { getTransferCounterpart, listLinkOptions } from '@/server/services/transfers';
 import { ClassificationForm } from './classification-form';
+import { SplitSection } from './split-section';
 import { TransferSection } from './transfer-section';
 
 export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
@@ -117,6 +118,8 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
           </Link>
         </p>
       </section>
+
+      <SplitSection transaction={transaction} groups={groups} fmt={fmt} />
 
       <div className="flex items-start gap-3">
         {transaction.isManual && (

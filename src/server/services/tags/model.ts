@@ -20,7 +20,11 @@ export const tagName = z
 
 export const SELECT_TAG = `
   SELECT g.id, g.name,
-         (SELECT count(*)::int FROM transaction_tag tt WHERE tt.tag_id = g.id)
+         (SELECT count(*)::int FROM (
+            SELECT tt.transaction_id FROM transaction_tag tt WHERE tt.tag_id = g.id
+            UNION
+            SELECT sl.transaction_id FROM split_line_tag slt
+            JOIN split_line sl ON sl.id = slt.split_line_id WHERE slt.tag_id = g.id) used)
            AS "transactionCount"
   FROM tag g`;
 

@@ -19,10 +19,12 @@ const MAX_TEXT_LENGTH = 200;
 const MAX_DESCRIPTION_KEY_LENGTH = 2000;
 
 /**
- * SQL condition (alias `t`) for an Unclassified Transaction: no Category and not a Transfer.
+ * SQL condition (alias `t`) for an Unclassified Transaction: no Category, not a Transfer and
+ * not split (a split Transaction is classified by its Split lines, ADR-0004).
  * The filter, the Unclassified groups and the progress figure all use it.
  */
-export const UNCLASSIFIED_CONDITION = 't.category_id IS NULL AND t.transfer_id IS NULL';
+export const UNCLASSIFIED_CONDITION = `t.category_id IS NULL AND t.transfer_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM split_line sl WHERE sl.transaction_id = t.id)`;
 
 /** `only`: Transactions in a Transfer. `exclude`: Transactions not in a Transfer. */
 export const TRANSFER_FILTERS = ['only', 'exclude'] as const;
