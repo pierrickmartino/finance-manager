@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
 import {
@@ -17,6 +18,7 @@ import {
   updateCategoryGroup,
   type CategoryGroupType,
 } from '@/server/services/categories';
+import { shifted, shiftedAmongKind } from './order';
 
 type Result = ActionResult<unknown>;
 
@@ -29,23 +31,16 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   return result;
 }
 
-/** `ids` with `id` moved one place up (-1) or down (+1). */
-function shifted(ids: string[], id: string, delta: -1 | 1): string[] {
-  const from = ids.indexOf(id);
-  const to = from + delta;
-  if (from < 0 || to < 0 || to >= ids.length) return ids;
-  const order = [...ids];
-  [order[from], order[to]] = [order[to]!, order[from]!];
-  return order;
-}
-
+/** Creates a group and opens it, so its first Categories can be added straight away. */
 export async function createGroupAction(_previous: Result | null, formData: FormData) {
-  return run(async () =>
+  const result = await run(async () =>
     createCategoryGroup(await getServiceContext(), {
       name: formText(formData, 'name'),
       type: formText(formData, 'type') as CategoryGroupType,
     }),
   );
+  if (!result.ok) return result;
+  redirect(`/categories?group=${result.data.id}`);
 }
 
 export async function updateGroupAction(id: string, _previous: Result | null, formData: FormData) {
@@ -64,8 +59,12 @@ export async function deleteGroupAction(id: string, _previous: Result | null) {
 export async function shiftGroupAction(id: string, delta: -1 | 1, _previous: Result | null) {
   return run(async () => {
     const ctx = await getServiceContext();
-    const ids = (await listCategoryGroups(ctx)).map((group) => group.id);
-    await reorderCategoryGroups(ctx, shifted(ids, id, delta));
+    // The page lists groups sectioned by type, so a group moves past its own type's neighbours.
+    const groups = (await listCategoryGroups(ctx)).map((group) => ({
+      id: group.id,
+      kind: group.type,
+    }));
+    await reorderCategoryGroups(ctx, shiftedAmongKind(groups, id, delta));
   });
 }
 
