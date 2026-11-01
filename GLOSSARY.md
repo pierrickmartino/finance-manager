@@ -80,7 +80,7 @@ The division of one Transaction's amount into Split lines that sum exactly to it
 _Avoid_: Breakdown, allocation, child transaction
 
 **Split line**:
-One part of a Split: an amount in the Transaction's Currency with its own Category, which may belong to any Category group type.
+One part of a Split: an amount in the Transaction's Currency, of either sign, with its own Category (of any Category group type), Tags and note.
 _Avoid_: Sub-transaction, part, share
 
 **Payee**:
@@ -92,7 +92,7 @@ A free label cutting across Categories, many per Transaction, such as "Vacation 
 _Avoid_: Label, project
 
 **Unclassified**:
-The state of a Transaction that is not a Transfer and has no Category yet.
+The state of a Transaction that is not a Transfer, has no Split and has no Category yet.
 _Avoid_: Uncategorised, inbox
 
 **Rule**:
