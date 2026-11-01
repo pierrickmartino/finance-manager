@@ -122,8 +122,21 @@ export interface SqlCondition {
   params: unknown[];
 }
 
+export interface FilterOptions {
+  /**
+   * Whether the Category filter also selects split Transactions with a Split line in that
+   * Category (the list and the CSV export do). Off, it matches the Transaction's own Category
+   * only, which a split Transaction never has: applying Rules uses that, as Rules never classify
+   * a split Transaction (ADR-0004).
+   */
+  matchSplitLines?: boolean;
+}
+
 /** Turns parsed filters into a parameterised WHERE clause. */
-export function filterConditions(input: ParsedQuery): SqlCondition {
+export function filterConditions(
+  input: ParsedQuery,
+  { matchSplitLines = true }: FilterOptions = {},
+): SqlCondition {
   const conditions: string[] = [];
   const params: unknown[] = [];
   const where = (sql: (param: string) => string, value: unknown): void => {
@@ -143,7 +156,14 @@ export function filterConditions(input: ParsedQuery): SqlCondition {
     input.text && escapeLike(input.text),
   );
   where((p) => `t.payee_id = ${p}::uuid`, input.payeeId);
-  where((p) => `t.category_id = ${p}::uuid`, input.categoryId);
+  where(
+    (p) =>
+      matchSplitLines
+        ? `(t.category_id = ${p}::uuid OR EXISTS (SELECT 1 FROM split_line fsl
+              WHERE fsl.transaction_id = t.id AND fsl.category_id = ${p}::uuid))`
+        : `t.category_id = ${p}::uuid`,
+    input.categoryId,
+  );
   where(
     (p) =>
       `EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = t.id AND tt.tag_id = ${p}::uuid)`,

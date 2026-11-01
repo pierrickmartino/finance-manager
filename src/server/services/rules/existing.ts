@@ -150,7 +150,7 @@ async function loadCandidates(
   const { sql, params } = onlyId
     ? { sql: 'WHERE t.id = $1', params: [onlyId] }
     : filter
-      ? filterConditions(filter)
+      ? filterConditions(filter, { matchSplitLines: false })
       : { sql: '', params: [] as unknown[] };
   const result = await db.query<Candidate>(
     `${SELECT_CANDIDATES} ${sql} ORDER BY t.booking_date, t.entry_order${lock ? ' FOR UPDATE OF t' : ''}`,

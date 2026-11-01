@@ -28,15 +28,34 @@ export interface TransactionListItem extends Transaction {
   tags: Classification['tags'];
   /** Its Split lines in their order; empty when it is not split (then `category` holds it). */
   splitLines: Classification['splitLines'];
+  /**
+   * When the list is filtered by a Category and the Transaction is split: the summed amount of
+   * its Split lines in that Category, the part of it that belongs there. Null otherwise.
+   */
+  matchingSplitAmountMinor: number | null;
 }
 
-type ClassificationKey = 'payee' | 'category' | 'tags' | 'splitLines';
+type ClassificationKey = 'payee' | 'category' | 'tags' | 'splitLines' | 'matchingSplitAmountMinor';
 type TransactionRow = Omit<TransactionListItem, ClassificationKey>;
 
-/** Adds the Payee, Category and Tags to rows read with SELECT_TRANSACTION. */
+/** The summed amount of the Split lines in the Category; null when none is in it. */
+function matchingSplitAmount(
+  splitLines: Classification['splitLines'],
+  categoryId: string | undefined,
+): number | null {
+  const matching = splitLines.filter((line) => line.category.id === categoryId);
+  if (matching.length === 0) return null;
+  return matching.reduce((sum, line) => sum + line.amountMinor, 0);
+}
+
+/**
+ * Adds the Payee, Category, Tags and Split lines to rows read with SELECT_TRANSACTION, and the
+ * amount of the Split lines in `categoryId` (the Category filter) when given.
+ */
 async function withClassification<T extends TransactionRow>(
   ctx: ServiceContext,
   rows: T[],
+  categoryId?: string,
 ): Promise<(T & Pick<TransactionListItem, ClassificationKey>)[]> {
   const classifications = new Map(
     (
@@ -48,12 +67,14 @@ async function withClassification<T extends TransactionRow>(
   );
   return rows.map((row) => {
     const classification = classifications.get(row.id);
+    const splitLines = classification?.splitLines ?? [];
     return {
       ...row,
       payee: classification?.payee ?? null,
       category: classification?.category ?? null,
       tags: classification?.tags ?? [],
-      splitLines: classification?.splitLines ?? [],
+      splitLines,
+      matchingSplitAmountMinor: matchingSplitAmount(splitLines, categoryId),
     };
   });
 }
@@ -106,7 +127,7 @@ export async function listTransactions(
   ]);
   const total = count.rows[0]?.total ?? 0;
   return {
-    transactions: await withClassification(ctx, rows.rows),
+    transactions: await withClassification(ctx, rows.rows, input.categoryId),
     total,
     page,
     pageSize,

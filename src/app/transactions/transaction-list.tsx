@@ -104,6 +104,13 @@ function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
         className={`${CELL} text-right font-medium whitespace-nowrap tabular-nums ${amountClass(transaction.amountMinor)}`}
       >
         {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
+        {transaction.matchingSplitAmountMinor !== null && (
+          <div className="text-xs font-normal text-zinc-500">
+            of which{' '}
+            {fmt.amount(transaction.matchingSplitAmountMinor, { currency: transaction.currency })}{' '}
+            in this Category
+          </div>
+        )}
       </td>
     </tr>
   );
