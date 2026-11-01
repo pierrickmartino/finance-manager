@@ -15,7 +15,7 @@ test('imports a BCGE CAMT.053 file with a bundled entry shown as one Transaction
   const bankName = `BCGE ${suffix}`;
   const accountName = `BCGE current ${suffix}`;
 
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

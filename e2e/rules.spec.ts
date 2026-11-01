@@ -38,7 +38,7 @@ test('creates and orders Rules, and the import preview shows what each Rule sets
   await addPayee(page, payeeName);
   await addNamed(page, '/tags', 'Tag', tagName);
 
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

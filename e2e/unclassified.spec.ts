@@ -5,7 +5,7 @@ import { openAccountPage, openNewAccountForm } from './support/accounts';
 
 /** Creates a Bank and a manual Account (no Import format) and opens the Account page. */
 async function openNewManualAccount(page: Page, accountName: string, bankName: string) {
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

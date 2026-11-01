@@ -15,7 +15,7 @@ test('imports a Crédit Agricole OFX and proposes the opening balance derived fr
   const bankName = `Crédit Agricole ${suffix}`;
   const accountName = `CA compte courant ${suffix}`;
 
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

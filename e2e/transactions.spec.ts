@@ -17,7 +17,7 @@ test('searches imported Transactions and opens one with its bank fields and Hist
   const bankName = `Transactions bank ${suffix}`;
   const accountName = `Transactions account ${suffix}`;
 
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

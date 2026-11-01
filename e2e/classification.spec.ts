@@ -35,7 +35,7 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   await addCategory(page, groupName, categoryName);
 
   // An imported Transaction to classify
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();

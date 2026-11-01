@@ -22,7 +22,7 @@ test('manages Payees as master / detail, with each Payee’s latest Transactions
   page.on('dialog', (dialog) => dialog.accept());
 
   // An imported Transaction gets a new Payee from its detail view
-  await page.goto('/banks');
+  await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
   await page.getByRole('button', { name: 'Add Bank' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: bankName })).toBeVisible();
