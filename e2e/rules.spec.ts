@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { addExpenseCategory } from './support/categories';
+import { addPayee } from './support/payees';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -33,7 +34,7 @@ test('creates and orders Rules, and the import preview shows what each Rule sets
   page.on('dialog', (dialog) => void dialog.accept());
 
   await addExpenseCategory(page, groupName, categoryName);
-  await addNamed(page, '/payees', 'Payee', payeeName);
+  await addPayee(page, payeeName);
   await addNamed(page, '/tags', 'Tag', tagName);
 
   await page.goto('/banks');
