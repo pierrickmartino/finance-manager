@@ -24,16 +24,50 @@ import {
   shiftGroupAction,
   updateGroupAction,
 } from './actions';
+import { PrototypeSwitcher } from '@/components/prototype/prototype-switcher';
+import { VARIANT_A_NAME, VariantA } from './_prototype/variant-a-master-detail';
+import { VARIANT_B_NAME, VariantB } from './_prototype/variant-b-table';
+import { VARIANT_C_NAME, VariantC } from './_prototype/variant-c-board';
 
 export const metadata: Metadata = { title: 'Categories · Finance Manager' };
 
+// PROTOTYPE: three redesigns of this page on the same route, switchable via `?variant=`
+// (current | A | B | C) and a floating bar. Dev only. See ./_prototype/README.md.
+const IS_PROTOTYPE = process.env.NODE_ENV !== 'production';
+const PROTOTYPE_VARIANTS = [
+  { key: 'current', name: 'Current' },
+  { key: 'A', name: VARIANT_A_NAME },
+  { key: 'B', name: VARIANT_B_NAME },
+  { key: 'C', name: VARIANT_C_NAME },
+];
+
+interface CategoriesPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
 /** Category groups and Categories (spec 49-57). */
-export default async function CategoriesPage() {
+export default async function CategoriesPage({ searchParams }: CategoriesPageProps) {
   const ctx = await getServiceContext();
   // First run happens at setup; this covers a database set up before Categories existed.
   await seedStarterCategories(ctx);
   const groups = await listCategoryGroups(ctx);
   const categories = groups.flatMap((group) => group.categories);
+
+  if (IS_PROTOTYPE) {
+    const params = await searchParams;
+    const variant = typeof params.variant === 'string' ? params.variant : 'current';
+    const groupId = typeof params.group === 'string' ? params.group : undefined;
+    if (variant !== 'current') {
+      return (
+        <>
+          {variant === 'A' && <VariantA groups={groups} selectedGroupId={groupId} />}
+          {variant === 'B' && <VariantB groups={groups} />}
+          {variant === 'C' && <VariantC groups={groups} />}
+          <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} />
+        </>
+      );
+    }
+  }
 
   return (
     <section className="flex flex-col gap-6">
@@ -59,6 +93,7 @@ export default async function CategoriesPage() {
           isLast={index === groups.length - 1}
         />
       ))}
+      {IS_PROTOTYPE && <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} />}
     </section>
   );
 }
