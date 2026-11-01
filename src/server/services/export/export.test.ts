@@ -6,7 +6,7 @@ import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
 import { backfillRates, convertToChf, type EcbRateSource } from '../fx';
 import { ValidationError } from '../errors';
-import { editClassification, getTransaction } from '../transactions';
+import { editClassification, getTransaction, splitTransaction } from '../transactions';
 import { createManualTransaction } from '../transactions/manual';
 import { linkTransfer } from '../transfers';
 import { exportTransactionsCsv } from '.';
@@ -293,5 +293,99 @@ describe('CSV export of Transactions', () => {
     expect(row![10]).toBe(`'-2+3`);
     expect(row![16]).toBe(`'@SUM(A1:A9)`);
     expect(row![11]).toBe('Coop');
+  });
+});
+
+describe('CSV export of split Transactions', () => {
+  it('writes one row per Split line with its amount, Category, Tags and note', async () => {
+    const ubs = await account('UBS', 'Compte courant');
+    const id = await seedOne(ubs, {
+      bookingDate: '2025-10-10',
+      amountMinor: -10000,
+      rawDescription: 'COOP CITY',
+    });
+    const food = await createCategoryGroup(t.ctx, { name: 'Courses', type: 'expense' });
+    const groceries = await createCategory(t.ctx, { groupId: food.id, name: 'Alimentation' });
+    const home = await createCategoryGroup(t.ctx, { name: 'Maison', type: 'expense' });
+    const household = await createCategory(t.ctx, { groupId: home.id, name: 'Ménage' });
+    await editClassification(t.ctx, id, { payeeName: 'Coop' });
+    await splitTransaction(t.ctx, id, [
+      { amountMinor: -7000, categoryId: groceries.id, tagNames: ['famille'], note: 'Repas' },
+      { amountMinor: -3000, categoryId: household.id },
+    ]);
+
+    const rows = await exportRows();
+
+    expect(rows.map((row) => [row[3], row[5], row[6], row[7], row[11], row[12]])).toEqual([
+      ['2025-10-10', '-70.00', '-70.00', 'COOP CITY', 'Coop', 'Courses'],
+      ['2025-10-10', '-30.00', '-30.00', 'COOP CITY', 'Coop', 'Maison'],
+    ]);
+    expect(rows.map((row) => [row[13], row[14], row[15], row[16], row[20]])).toEqual([
+      ['expense', 'Alimentation', 'famille', 'Repas', id],
+      ['expense', 'Ménage', '', '', id],
+    ]);
+  });
+
+  it("adds the Transaction's own Tags and notes to each Split line's", async () => {
+    const ubs = await account('UBS', 'Compte courant');
+    const id = await seedOne(ubs, { amountMinor: -10000 });
+    const group = await createCategoryGroup(t.ctx, { name: 'Loisirs', type: 'expense' });
+    const hotel = await createCategory(t.ctx, { groupId: group.id, name: 'Hôtel' });
+    const meals = await createCategory(t.ctx, { groupId: group.id, name: 'Repas' });
+    await editClassification(t.ctx, id, { tagNames: ['vacances'], notes: 'Valais' });
+    await splitTransaction(t.ctx, id, [
+      { amountMinor: -6000, categoryId: hotel.id, tagNames: ['Famille', 'vacances'], note: 'Nuit' },
+      { amountMinor: -4000, categoryId: meals.id },
+    ]);
+
+    const rows = await exportRows();
+
+    expect(rows.map((row) => [row[15], row[16]])).toEqual([
+      ['Famille; vacances', 'Valais · Nuit'],
+      ['vacances', 'Valais'],
+    ]);
+  });
+
+  it('writes line amounts summing to the Transaction, each valued in CHF at its booking-date rate', async () => {
+    const source: EcbRateSource = {
+      async fetchReferenceRates(request) {
+        return [{ date: '2025-10-10', perEur: { CHF: '0.9324' } }].filter(
+          (day) => day.date >= request.from && day.date <= request.to,
+        );
+      },
+    };
+    await backfillRates(t.ctx, source, { from: '2025-10-10', to: '2025-10-10' });
+    const ca = await account('Crédit Agricole', 'Compte EUR', 'EUR');
+    const other = await account('UBS', 'Compte courant');
+    const [split, unsplit] = await seedTransactions(t.ctx.db, ca, [
+      { bookingDate: '2025-10-10', amountMinor: -123456 },
+      { bookingDate: '2025-10-11', amountMinor: -500 },
+    ]);
+    const otherSplit = await seedOne(other, { amountMinor: -2000 });
+    const loan = await createCategoryGroup(t.ctx, { name: 'Prêt', type: 'capital' });
+    const principal = await createCategory(t.ctx, { groupId: loan.id, name: 'Amortissement' });
+    const costs = await createCategoryGroup(t.ctx, { name: 'Frais', type: 'expense' });
+    const interest = await createCategory(t.ctx, { groupId: costs.id, name: 'Intérêts' });
+    await splitTransaction(t.ctx, split!, [
+      { amountMinor: -130000, categoryId: principal.id },
+      { amountMinor: 10000, categoryId: interest.id, note: 'Remboursement' },
+      { amountMinor: -3456, categoryId: interest.id },
+    ]);
+    await splitTransaction(t.ctx, otherSplit, [
+      { amountMinor: -1000, categoryId: interest.id },
+      { amountMinor: -1000, categoryId: principal.id },
+    ]);
+
+    const rows = await exportRows({ accountId: ca.id });
+
+    expect(rows.map((row) => [row[20], row[5], row[6], row[14]])).toEqual([
+      [split, '-1300.00', '-1212.12', 'Amortissement'],
+      [split, '100.00', '93.24', 'Intérêts'],
+      [split, '-34.56', '-32.22', 'Intérêts'], // -32.223744
+      [unsplit, '-5.00', '-4.66', ''], // unsplit: exported as before
+    ]);
+    const splitRows = rows.filter((row) => row[20] === split);
+    const totalMinor = splitRows.reduce((sum, row) => sum + Math.round(Number(row[5]) * 100), 0);
+    expect(totalMinor).toBe(-123456);
   });
 });
