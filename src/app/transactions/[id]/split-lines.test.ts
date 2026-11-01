@@ -3,10 +3,56 @@ import { initialSplitDrafts, remainingMinor } from './split-lines';
 
 const category = { id: 'c1', name: 'Groceries', groupId: 'g', groupName: 'Food' };
 
+function detail(amountMinor: number | null, counterpartyName: string | null) {
+  return { amountMinor, counterpartyName, counterpartyIban: null, paymentReference: null };
+}
+
+function startingLines(amountMinor: number, bundledDetails: ReturnType<typeof detail>[] | null) {
+  return initialSplitDrafts(
+    { amountMinor, currency: 'CHF', splitLines: [], bundledDetails },
+    'apostrophe',
+  );
+}
+
 describe('the split form', () => {
+  it('starts with one line per bundled payment, in the bank order, when their amounts add up', () => {
+    expect(
+      startingLines(-118735, [
+        detail(-14285, 'Services Industriels Exemple'),
+        detail(-38950, 'Assurance Ménage Exemple SA'),
+        detail(-65500, null),
+      ]),
+    ).toEqual([
+      { amount: '-142.85', categoryId: '', tags: '', note: 'Services Industriels Exemple' },
+      { amount: '-389.50', categoryId: '', tags: '', note: 'Assurance Ménage Exemple SA' },
+      { amount: '-655.00', categoryId: '', tags: '', note: '' },
+    ]);
+  });
+
+  it('starts with one line for the full amount when a bundled payment has no amount', () => {
+    expect(startingLines(-10000, [detail(-4000, 'A'), detail(null, 'B')])).toEqual([
+      { amount: '-100.00', categoryId: '', tags: '', note: '' },
+    ]);
+  });
+
+  it("starts with one line for the full amount when the bundled payments don't add up", () => {
+    expect(startingLines(-10000, [detail(-4000, 'A'), detail(-5000, 'B')])).toEqual([
+      { amount: '-100.00', categoryId: '', tags: '', note: '' },
+    ]);
+  });
+
+  it('starts with one line for the full amount when there are no bundled payments', () => {
+    expect(startingLines(-10000, [])).toEqual([
+      { amount: '-100.00', categoryId: '', tags: '', note: '' },
+    ]);
+  });
+
   it('starts with one line for the full amount when the Transaction is not split', () => {
     expect(
-      initialSplitDrafts({ amountMinor: -118735, currency: 'CHF', splitLines: [] }, 'apostrophe'),
+      initialSplitDrafts(
+        { amountMinor: -118735, currency: 'CHF', splitLines: [], bundledDetails: null },
+        'apostrophe',
+      ),
     ).toEqual([{ amount: "-1'187.35", categoryId: '', tags: '', note: '' }]);
   });
 
@@ -15,6 +61,7 @@ describe('the split form', () => {
       {
         amountMinor: -10000,
         currency: 'CHF',
+        bundledDetails: [detail(-4000, 'Ignored'), detail(-6000, 'Also ignored')],
         splitLines: [
           {
             id: 'l1',

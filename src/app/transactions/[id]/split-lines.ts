@@ -1,5 +1,6 @@
 import { formatAmount, type NumberFormat } from '@/lib/format';
 import { parseAmount } from '@/lib/format/parse-amount';
+import type { BundledDetail } from '@/server/services/imports/parsers';
 import type { SplitLine } from '@/server/services/transactions';
 
 /** One Split line as the split form edits it: typed text, not yet validated. */
@@ -25,10 +26,36 @@ interface SplitSource {
   amountMinor: number;
   currency: string;
   splitLines: readonly SplitLine[];
+  bundledDetails: readonly BundledDetail[] | null;
+}
+
+/**
+ * The bundled payments as Split lines, when every one has an amount and together they add up
+ * exactly to the Transaction's amount; otherwise null.
+ */
+function bundledDrafts(
+  transaction: SplitSource,
+  amount: (minor: number) => string,
+): SplitLineDraft[] | null {
+  const details = transaction.bundledDetails ?? [];
+  if (details.length === 0) return null;
+  let total = 0;
+  for (const detail of details) {
+    if (detail.amountMinor === null) return null;
+    total += detail.amountMinor;
+  }
+  if (total !== transaction.amountMinor) return null;
+  return details.map((detail) => ({
+    amount: amount(detail.amountMinor ?? 0),
+    categoryId: '',
+    tags: '',
+    note: detail.counterpartyName ?? '',
+  }));
 }
 
 /**
  * The lines the split form starts with: the saved Split lines when the Transaction is split,
+ * else one line per bundled payment when their amounts add up to the Transaction's (#46),
  * otherwise one line for the full amount.
  */
 export function initialSplitDrafts(
@@ -44,7 +71,11 @@ export function initialSplitDrafts(
       note: line.note ?? '',
     }));
   }
-  return [{ amount: amount(transaction.amountMinor), categoryId: '', tags: '', note: '' }];
+  return (
+    bundledDrafts(transaction, amount) ?? [
+      { amount: amount(transaction.amountMinor), categoryId: '', tags: '', note: '' },
+    ]
+  );
 }
 
 /**
