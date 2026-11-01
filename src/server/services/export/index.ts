@@ -37,7 +37,10 @@ export const EXPORT_COLUMNS = [
 /** The Transaction list's filters (no paging): the export takes the same ones. */
 export type TransactionFilter = Omit<TransactionQuery, 'page' | 'pageSize'>;
 
-/** Rows read per query: the export holds at most this many in memory at once. */
+/**
+ * Transactions read per query (with their Split lines): the export holds at most this many in
+ * memory at once.
+ */
 export const EXPORT_BATCH_SIZE = 500;
 
 /** Separates Tag names in the Tags cell. */
@@ -102,6 +105,68 @@ const SELECT_EXPORT = `
     ORDER BY r.date DESC LIMIT 1
   ) fx ON t.currency <> '${BASE_CURRENCY}'`;
 
+/** A Split line's own classification, which replaces its Transaction's on the line's row. */
+interface ExportLine {
+  transactionId: string;
+  amountMinor: number;
+  groupName: string;
+  groupType: string;
+  category: string;
+  tags: string | null;
+  note: string | null;
+}
+
+const SELECT_LINES = `
+  SELECT sl.transaction_id AS "transactionId", sl.amount_minor AS "amountMinor",
+         g.name AS "groupName", g.type AS "groupType", c.name AS category,
+         (SELECT string_agg(tg.name, '${TAG_SEPARATOR}' ORDER BY lower(tg.name))
+          FROM tag tg
+          WHERE tg.id IN (SELECT lt.tag_id FROM split_line_tag lt WHERE lt.split_line_id = sl.id
+                          UNION
+                          SELECT xt.tag_id FROM transaction_tag xt
+                          WHERE xt.transaction_id = sl.transaction_id)) AS tags,
+         sl.note
+  FROM split_line sl
+  JOIN category c ON c.id = sl.category_id
+  JOIN category_group g ON g.id = c.group_id
+  WHERE sl.transaction_id = ANY($1::uuid[])
+  ORDER BY sl.transaction_id, sl.position`;
+
+/** The batch's Split lines by Transaction id, in line order. */
+async function loadLines(
+  ctx: ServiceContext,
+  ids: readonly string[],
+): Promise<Map<string, ExportLine[]>> {
+  const result = await ctx.db.query<ExportLine>(SELECT_LINES, [ids]);
+  const byTransaction = new Map<string, ExportLine[]>();
+  for (const line of result.rows) {
+    byTransaction.set(line.transactionId, [...(byTransaction.get(line.transactionId) ?? []), line]);
+  }
+  return byTransaction;
+}
+
+/** Separates a split Transaction's notes from its Split line's note in the Notes cell. */
+const NOTE_SEPARATOR = ' · ';
+
+/**
+ * The rows a Transaction exports as: itself when unsplit, otherwise one per Split line with
+ * the Transaction's fields and the line's amount, Category and note. A line's Tags are its own
+ * plus the Transaction's (as in reports), and its Notes are the Transaction's notes followed by
+ * the line's note, so nothing typed on the Transaction is lost.
+ */
+function expandRow(row: ExportRow, lines: readonly ExportLine[] | undefined): ExportRow[] {
+  if (!lines?.length) return [row];
+  return lines.map((line) => ({
+    ...row,
+    amountMinor: line.amountMinor,
+    groupName: line.groupName,
+    groupType: line.groupType,
+    category: line.category,
+    tags: line.tags,
+    notes: [row.notes, line.note].filter(Boolean).join(NOTE_SEPARATOR) || null,
+  }));
+}
+
 /** The CHF value cell: empty when no rate exists on or before the booking date. */
 function chfCell(row: ExportRow): string {
   const digits = fractionDigits(BASE_CURRENCY);
@@ -138,9 +203,10 @@ function rowCells(row: ExportRow): string[] {
 
 /**
  * Every Transaction matching the Transaction list's filters as CSV (UTF-8 with BOM, RFC 4180),
- * oldest booking date first. Filters are checked before anything is returned (ValidationError);
- * the rows are then read in batches of EXPORT_BATCH_SIZE by keyset, one chunk of text per batch,
- * so a large export never sits in memory.
+ * oldest booking date first; a split Transaction as one row per Split line, each carrying the
+ * Transaction id so the lines group back together. Filters are checked before anything is
+ * returned (ValidationError); Transactions are then read in batches of EXPORT_BATCH_SIZE by
+ * keyset, one chunk of text per batch, so a large export never sits in memory.
  */
 export function exportTransactionsCsv(
   ctx: ServiceContext,
@@ -174,7 +240,16 @@ async function* generateCsv(
       params,
     );
     const rows = result.rows;
-    if (rows.length) yield rows.map((row) => csvLine(rowCells(row))).join('');
+    if (rows.length) {
+      const lines = await loadLines(
+        ctx,
+        rows.map((row) => row.id),
+      );
+      yield rows
+        .flatMap((row) => expandRow(row, lines.get(row.id)))
+        .map((row) => csvLine(rowCells(row)))
+        .join('');
+    }
     if (rows.length < EXPORT_BATCH_SIZE) return;
     const last = rows[rows.length - 1]!;
     after = { bookingDate: last.bookingDate, entryOrder: last.entryOrder };
