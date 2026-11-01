@@ -7,7 +7,8 @@ import {
   recordClassificationChanges,
   type ClassificationField,
 } from '../transactions/classification';
-import { filterConditions, transactionQueryInput } from '../transactions/query';
+import { ruleFilterConditions, transactionQueryInput } from '../transactions/query';
+import { IS_SPLIT } from '../transactions/split-guard';
 import { transfersAmong } from '../transactions/transfer-guard';
 import {
   compileRules,
@@ -105,6 +106,8 @@ interface Candidate {
   categoryName: string | null;
   tagIds: string[];
   tagNames: string[];
+  /** Split Transactions keep their Category empty: the Split lines hold the Categories. */
+  isSplit: boolean;
 }
 
 /** What the Rules write on one Transaction: only assignments that change something. */
@@ -134,7 +137,8 @@ const SELECT_CANDIDATES = `
          ARRAY(SELECT tg.id::text FROM transaction_tag tt JOIN tag tg ON tg.id = tt.tag_id
                WHERE tt.transaction_id = t.id ORDER BY lower(tg.name), tg.id) AS "tagIds",
          ARRAY(SELECT tg.name FROM transaction_tag tt JOIN tag tg ON tg.id = tt.tag_id
-               WHERE tt.transaction_id = t.id ORDER BY lower(tg.name), tg.id) AS "tagNames"
+               WHERE tt.transaction_id = t.id ORDER BY lower(tg.name), tg.id) AS "tagNames",
+         ${IS_SPLIT} AS "isSplit"
   FROM "transaction" t
   JOIN account a ON a.id = t.account_id
   LEFT JOIN payee p ON p.id = t.payee_id
@@ -150,7 +154,7 @@ async function loadCandidates(
   const { sql, params } = onlyId
     ? { sql: 'WHERE t.id = $1', params: [onlyId] }
     : filter
-      ? filterConditions(filter)
+      ? ruleFilterConditions(filter)
       : { sql: '', params: [] as unknown[] };
   const result = await db.query<Candidate>(
     `${SELECT_CANDIDATES} ${sql} ORDER BY t.booking_date, t.entry_order${lock ? ' FOR UPDATE OF t' : ''}`,
@@ -180,7 +184,10 @@ async function engineFor(db: Queryable, ruleIds: string[] | undefined): Promise<
   };
 }
 
-/** The Transaction as Rules see it; Rules never touch one in a Transfer. */
+/**
+ * The Transaction as Rules see it; Rules never touch one in a Transfer, and never set a split
+ * Transaction's Category, even once the user unlocked it (ADR-0004).
+ */
 function subjectOf(candidate: Candidate, inTransfer: ReadonlySet<string>): RuleSubject {
   return {
     accountId: candidate.accountId,
@@ -192,7 +199,9 @@ function subjectOf(candidate: Candidate, inTransfer: ReadonlySet<string>): RuleS
       candidate.payeeId && candidate.payeeName
         ? { id: candidate.payeeId, name: candidate.payeeName }
         : null,
-    lockedFields: candidate.lockedFields,
+    lockedFields: candidate.isSplit
+      ? [...new Set([...candidate.lockedFields, 'category' as const])]
+      : candidate.lockedFields,
     isInTransfer: inTransfer.has(candidate.id),
   };
 }
@@ -329,20 +338,20 @@ function writesByRule(changes: readonly PlannedChange[]): Map<string, RuleWrites
 }
 
 /**
- * One Rule's writes, set-based. Locked fields are skipped here too (the plan already left them
- * out; this is the backstop).
+ * One Rule's writes, set-based. Locked fields and a split Transaction's Category are skipped
+ * here too (the plan already left them out; this is the backstop).
  */
 async function writeRule({ tx }: MutationScope, writes: RuleWrites): Promise<void> {
   const columns = [
-    ['payee_id', 'payee', writes.payees],
-    ['category_id', 'category', writes.categories],
+    ['payee_id', 'payee', writes.payees, ''],
+    ['category_id', 'category', writes.categories, `AND NOT ${IS_SPLIT}`],
   ] as const;
-  for (const [column, field, rows] of columns) {
+  for (const [column, field, rows, guard] of columns) {
     if (rows.length === 0) continue;
     await tx.query(
       `UPDATE "transaction" t SET ${column} = v.value
        FROM unnest($1::uuid[], $2::uuid[]) AS v(id, value)
-       WHERE t.id = v.id AND NOT ($3 = ANY(t.locked_fields))`,
+       WHERE t.id = v.id AND NOT ($3 = ANY(t.locked_fields)) ${guard}`,
       [rows.map((row) => row.id), rows.map((row) => row.value), field],
     );
   }

@@ -55,14 +55,19 @@ export async function currenciesInUse(ctx: ServiceContext): Promise<string[]> {
   return result.rows.map((row) => row.currency);
 }
 
-/** One aggregate SELECT over `report_base`, grouped by the given axes. */
+/**
+ * One aggregate SELECT over `report_base`, grouped by the given axes. `count` counts distinct
+ * Transactions, not reportable rows: a split Transaction counts once in a group however many of
+ * its Split lines fall in. This is deliberate: a cell's drill-down lists the parent
+ * Transactions, so the count a Widget shows must equal the number of rows its drill-down lists.
+ */
 function groupedSelect(grouping: Grouping, rows: ReportAxis | null, columns: ReportAxis | null) {
   const rowKey = rows ? axisKey(rows) : 'NULL';
   const columnKey = columns ? axisKey(columns) : 'NULL';
   const groupBy = [rows && rowKey, columns && columnKey].filter(Boolean);
   const join = rows === 'tag' || columns === 'tag' ? TAG_JOIN : '';
   return `SELECT '${grouping}' AS grouping, ${rowKey} AS "rowKey", ${columnKey} AS "columnKey",
-      sum(b.chf_minor)::bigint AS "sumMinor", count(*)::int AS count
+      sum(b.chf_minor)::bigint AS "sumMinor", count(DISTINCT b.id)::int AS count
     FROM report_base b ${join}
     WHERE b.chf_minor IS NOT NULL
     ${groupBy.length ? `GROUP BY ${groupBy.join(', ')}` : ''}`;
@@ -72,8 +77,9 @@ const cellKey = (row: string | null, column: string | null) => JSON.stringify([r
 
 /**
  * Runs a Widget query: compiles it into one SQL statement that converts every amount to CHF at
- * its booking date, and returns the table with row, column and grand totals. A Transaction with
- * two Tags counts under both Tags, but once in every total that isn't split by Tag.
+ * its booking date, and returns the table with row, column and grand totals. A split
+ * Transaction counts by its Split lines (ADR-0004). A Transaction or line with two Tags counts
+ * under both Tags, but once in every total that isn't split by Tag.
  */
 export async function runWidgetQuery(
   ctx: ServiceContext,
@@ -87,7 +93,7 @@ export async function runWidgetQuery(
     UNION ALL ${groupedSelect('row', query.rows, null)}
     UNION ALL ${groupedSelect('column', null, query.columns)}
     UNION ALL ${groupedSelect('all', null, null)}
-    UNION ALL SELECT 'unconverted', NULL, NULL, NULL, count(*)::int
+    UNION ALL SELECT 'unconverted', NULL, NULL, NULL, count(DISTINCT id)::int
       FROM report_base WHERE chf_minor IS NULL`;
   const aggregates =
     range.from <= range.to ? (await ctx.db.query<AggregateRow>(sql, params.values)).rows : [];

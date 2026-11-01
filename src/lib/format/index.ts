@@ -33,6 +33,8 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
 export interface AmountOptions {
   /** ISO code. Sets the number of decimals and, when given, prefixes the result ("CHF 1'234.50"). */
   currency?: string;
+  /** False leaves the Currency's code out but keeps its decimals, e.g. for an editable amount. */
+  hasCurrencyCode?: boolean;
   /** Rounds to whole units (half away from zero) and drops the decimals, e.g. for chart axes. */
   isWhole?: boolean;
 }
@@ -76,6 +78,10 @@ function groupThousands(digits: string, separator: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
 }
 
+function withCode(number: string, { currency, hasCurrencyCode = true }: AmountOptions): string {
+  return currency && hasCurrencyCode ? `${currency} ${number}` : number;
+}
+
 export function formatAmount(
   minor: number,
   numberFormat: NumberFormat,
@@ -91,13 +97,13 @@ export function formatAmount(
   if (options.isWhole) {
     const units = Math.round(abs / scale);
     const number = `${minor < 0 && units > 0 ? '-' : ''}${groupThousands(String(units), group)}`;
-    return options.currency ? `${options.currency} ${number}` : number;
+    return withCode(number, options);
   }
   const whole = groupThousands(String(Math.floor(abs / scale)), group);
   const fraction = digits > 0 ? decimal + String(abs % scale).padStart(digits, '0') : '';
   const sign = minor < 0 ? '-' : '';
   const number = `${sign}${whole}${fraction}`;
-  return options.currency ? `${options.currency} ${number}` : number;
+  return withCode(number, options);
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;

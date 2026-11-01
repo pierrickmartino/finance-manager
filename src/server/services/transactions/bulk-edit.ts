@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { categoryLabel } from '@/lib/classification';
 import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
@@ -6,6 +7,7 @@ import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { CLASSIFICATION_FIELDS, recordClassificationChanges } from './classification';
 import { UNCLASSIFIED_CONDITION } from './query';
+import { refuseSplitCategoryChange } from './split-guard';
 import { anyInTransfer } from './transfer-guard';
 
 /**
@@ -123,7 +125,7 @@ async function resolveChanges(
   if (input.categoryId !== undefined) {
     const category = input.categoryId ? await findCategory(scope.tx, input.categoryId) : null;
     changes.categoryId = category?.id ?? null;
-    summary.push(`Category ${category ? `${category.groupName} › ${category.name}` : 'cleared'}`);
+    summary.push(`Category ${category ? categoryLabel(category) : 'cleared'}`);
   }
   if (input.tagNames !== undefined || input.tagIds !== undefined) {
     const tags = input.tagNames
@@ -160,6 +162,7 @@ async function writeAll({ tx }: MutationScope, ids: string[], values: BulkValues
   if (values.categoryId && (await anyInTransfer(tx, ids))) {
     throw new ValidationError("A Transfer can't have a Category");
   }
+  if (values.categoryId !== undefined) await refuseSplitCategoryChange(tx, ids);
   // Locks stay in CLASSIFICATION_FIELDS order: the current locks plus the edited fields.
   await tx.query(
     `UPDATE "transaction" t
