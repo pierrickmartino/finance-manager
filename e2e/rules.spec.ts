@@ -1,21 +1,14 @@
 import path from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { addExpenseCategory } from './support/categories';
 import { addPayee } from './support/payees';
+import { addTag } from './support/tags';
 import { accountDetail, openAccountPage, openNewAccountForm } from './support/accounts';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
   '../test/fixtures/import/ubs/ubs-chf-2025-10.csv',
 );
-
-async function addNamed(page: Page, route: string, noun: string, name: string): Promise<void> {
-  await page.goto(route);
-  const form = page.getByRole('form', { name: `New ${noun}` });
-  await form.getByLabel(`${noun} name`).fill(name);
-  await form.getByRole('button', { name: `Add ${noun}` }).click();
-  await expect(page.getByLabel(`Name of ${name}`)).toBeVisible();
-}
 
 test('creates and orders Rules, and the import preview shows what each Rule sets', async ({
   page,
@@ -36,7 +29,7 @@ test('creates and orders Rules, and the import preview shows what each Rule sets
 
   await addExpenseCategory(page, groupName, categoryName);
   await addPayee(page, payeeName);
-  await addNamed(page, '/tags', 'Tag', tagName);
+  await addTag(page, tagName);
 
   await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(bankName);
