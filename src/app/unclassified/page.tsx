@@ -13,8 +13,23 @@ import {
   type UnclassifiedGroup,
   type UnclassifiedGroupPage,
 } from '@/server/services/transactions/unclassified';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { bulkEditAction } from './actions';
 import { BulkEditForm } from './bulk-edit-form';
+import type { OpenGroupData } from './_prototype/shared';
+import { VariantA, name as nameA } from './_prototype/variant-a-inbox';
+import { VariantB, name as nameB } from './_prototype/variant-b-focus';
+import { VariantC, name as nameC } from './_prototype/variant-c-impact';
+
+// PROTOTYPE — three Unclassified page layouts on /unclassified, switchable via ?variant= (A, B,
+// C; default "current" is today's page) and a floating bar. The switch and the bar are disabled
+// in production builds. Not for main: fold the winner in, then drop `_prototype/` and the bar.
+const VARIANTS = [
+  { key: 'current', name: 'Today' },
+  { key: 'A', name: nameA },
+  { key: 'B', name: nameB },
+  { key: 'C', name: nameC },
+];
 
 export const metadata: Metadata = { title: 'Unclassified · Finance Manager' };
 
@@ -57,12 +72,45 @@ export default async function UnclassifiedPage({ searchParams }: UnclassifiedPag
     listUnclassifiedGroups(ctx, { page }),
   ]);
 
+  const requested = single(params.variant);
+  const variant =
+    process.env.NODE_ENV !== 'production' && VARIANTS.some((v) => v.key === requested)
+      ? requested!
+      : 'current';
+  if (variant !== 'current') {
+    const keys = groupPage.groups.map((group) => group.key);
+    // A and B always show a group: the one named if it is still listed, else the largest.
+    const key =
+      variant === 'C'
+        ? openKey
+        : openKey !== undefined && keys.includes(openKey)
+          ? openKey
+          : keys[0];
+    const props = {
+      variant,
+      progress,
+      groupPage,
+      openKey: key,
+      open: key === undefined ? null : await loadOpenGroup(key),
+      fmt,
+    };
+    return (
+      <>
+        {variant === 'A' && <VariantA {...props} />}
+        {variant === 'B' && <VariantB {...props} />}
+        {variant === 'C' && <VariantC {...props} />}
+        <PrototypeSwitcher variants={VARIANTS} current={variant} />
+      </>
+    );
+  }
+
   return (
     <section className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Unclassified</h1>
       <Progress progress={progress} fmt={fmt} />
       {openKey !== undefined && <OpenGroup groupKey={openKey} page={page} />}
       <Groups groupPage={groupPage} openKey={openKey} fmt={fmt} />
+      <PrototypeSwitcher variants={VARIANTS} current={variant} />
     </section>
   );
 }
@@ -218,4 +266,22 @@ async function OpenGroup({ groupKey, page }: { groupKey: string; page: number })
       )}
     </section>
   );
+}
+
+/** PROTOTYPE — the open group's data for the variants. */
+async function loadOpenGroup(key: string): Promise<OpenGroupData> {
+  const ctx = await getServiceContext();
+  const [members, categoryGroups, payees] = await Promise.all([
+    listUnclassifiedGroupTransactions(ctx, key),
+    listCategoryGroups(ctx),
+    listPayees(ctx),
+  ]);
+  return {
+    key,
+    description: members.transactions[0]?.rawDescription || key || '(no description)',
+    members,
+    categoryGroups,
+    payeeNames: payees.map((payee) => payee.name),
+    action: bulkEditAction.bind(null, key),
+  };
 }
