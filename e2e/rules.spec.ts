@@ -82,23 +82,56 @@ test('creates and orders Rules, and the import preview shows what each Rule sets
   await form.getByRole('checkbox', { name: tagName }).check();
   await form.getByRole('button', { name: 'Create Rule' }).click();
 
-  const rules = page.getByRole('table', { name: 'Rules' });
-  const migrosRow = rules.getByRole('row').filter({ hasText: migrosRule });
-  const cardRow = rules.getByRole('row').filter({ hasText: cardRule });
-  await expect(migrosRow).toContainText(`Description contains "MIGROS exemple"`);
-  await expect(migrosRow).toContainText(`Account is ${accountLabel}`);
-  await expect(migrosRow).toContainText(
-    `Payee: ${payeeName} · Category: ${groupName} › ${categoryName}`,
+  const rules = page.getByRole('list', { name: 'Rules', exact: true });
+  const migrosRow = rules.getByRole('listitem').filter({ hasText: migrosRule });
+  const cardRow = rules.getByRole('listitem').filter({ hasText: cardRule });
+  const detail = (name: string) => page.getByRole('article', { name });
+
+  // Picking a Rule in the list spells it out in the detail pane
+  await migrosRow.getByRole('link').click();
+  await expect(page).toHaveURL(/[?&]rule=/);
+  await expect(detail(migrosRule)).toContainText(`Description contains "MIGROS exemple"`);
+  await expect(detail(migrosRule)).toContainText(`Account is ${accountLabel}`);
+  await expect(detail(migrosRule).getByRole('list', { name: 'Sets' })).toContainText(
+    `Payee: ${payeeName}Category: ${groupName} › ${categoryName}`,
   );
-  await expect(cardRow).toContainText('Amount between -100.00 and -10.00');
+  await cardRow.getByRole('link').click();
+  await expect(detail(cardRule)).toContainText('Amount between -100.00 and -10.00');
+  await expect(detail(cardRule)).toContainText(`Tag: ${tagName}`);
+
+  // The filter narrows the list to Rules whose name, conditions or actions match
+  await page.getByLabel('Filter Rules').fill('MIGROS exemple');
+  await page.getByLabel('Filter Rules').press('Enter');
+  await expect(migrosRow).toBeVisible();
+  await expect(cardRow).toHaveCount(0);
+  await page.getByRole('link', { name: 'Clear' }).click();
+  await expect(cardRow).toBeVisible();
 
   // Drag the card Rule above the Migros Rule; the new order is saved
   await cardRow.getByRole('img', { name: `Drag ${cardRule}` }).dragTo(migrosRow);
   await expect(rules).toHaveAttribute('aria-busy', 'false');
   await page.reload();
-  const names = await rules.getByRole('row').allTextContents();
-  const position = (name: string) => names.findIndex((text) => text.includes(name));
+  const order = async () => {
+    const names = await rules.getByRole('listitem').allTextContents();
+    return (name: string) => names.findIndex((text) => text.includes(name));
+  };
+  let position = await order();
   expect(position(cardRule)).toBeLessThan(position(migrosRule));
+
+  // The detail pane's move buttons change the order too
+  await cardRow.getByRole('link').click();
+  await detail(cardRule)
+    .getByRole('button', { name: `Move ${cardRule} down` })
+    .click();
+  await expect(rules).toHaveAttribute('aria-busy', 'false');
+  await page.reload();
+  position = await order();
+  expect(position(migrosRule)).toBeLessThan(position(cardRule));
+  await cardRow.getByRole('link').click();
+  await detail(cardRule)
+    .getByRole('button', { name: `Move ${cardRule} up` })
+    .click();
+  await expect(rules).toHaveAttribute('aria-busy', 'false');
 
   // Import: the preview shows what the Rules set and which Rule set each
   await page.goto('/accounts');
@@ -113,19 +146,26 @@ test('creates and orders Rules, and the import preview shows what each Rule sets
   await expect(entries.filter({ hasText: '9930274TI0000101' })).toContainText('No Rule matched');
 
   // Disabling a Rule takes it out of the preview
+  const previewUrl = page.url();
   await page.goto('/rules');
-  await cardRow.getByRole('button', { name: 'Disable' }).click();
-  await expect(cardRow).toContainText('Disabled');
-  await page.goBack();
-  await page.reload();
+  await cardRow.getByRole('link').click();
+  await detail(cardRule).getByRole('switch', { name: 'Enabled' }).click();
+  await expect(detail(cardRule).getByRole('switch', { name: 'Disabled' })).toHaveAttribute(
+    'aria-checked',
+    'false',
+  );
+  await expect(cardRow).toContainText('(Disabled)');
+  await page.goto(previewUrl);
   await expect(migros).not.toContainText(tagName);
   await page.getByRole('button', { name: /Commit import/ }).click();
   await expect(page.getByRole('heading', { name: accountName })).toBeVisible();
 
   // Clean up: Rules are global
   await page.goto('/rules');
-  await migrosRow.getByRole('button', { name: 'Delete' }).click();
+  await migrosRow.getByRole('link').click();
+  await detail(migrosRule).getByRole('button', { name: 'Delete' }).click();
   await expect(migrosRow).toHaveCount(0);
-  await cardRow.getByRole('button', { name: 'Delete' }).click();
+  await cardRow.getByRole('link').click();
+  await detail(cardRule).getByRole('button', { name: 'Delete' }).click();
   await expect(cardRow).toHaveCount(0);
 });

@@ -78,8 +78,14 @@ test('creates a Rule from an Unclassified Transaction and applies it to existing
 
   // The Rule's match count, then clean up: Rules are global
   await page.goto('/rules');
-  const row = page.getByRole('row').filter({ hasText: groupKey });
-  await expect(row.getByRole('cell').nth(5)).toHaveText('2');
-  await row.getByRole('button', { name: 'Delete' }).click();
+  const row = page
+    .getByRole('list', { name: 'Rules', exact: true })
+    .getByRole('listitem')
+    .filter({ hasText: groupKey });
+  await expect(row).toContainText('Matches: 2');
+  await row.getByRole('link').click();
+  const detail = page.getByRole('article');
+  await expect(detail.getByText('Matches now').locator('..')).toContainText('2');
+  await detail.getByRole('button', { name: 'Delete' }).click();
   await expect(row).toHaveCount(0);
 });
