@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { addExpenseCategory } from './support/categories';
 
 /** Creates a Bank and a manual Account (no Import format) and opens the Account page. */
 async function openNewManualAccount(page: Page, accountName: string, bankName: string) {
@@ -35,15 +36,7 @@ test('classifies a whole group and a selected Transaction from the Unclassified 
   const payeeName = `Café Rose ${suffix}`;
   const tagName = `Treats ${suffix}`;
 
-  await page.goto('/categories');
-  const newGroup = page.getByRole('form', { name: 'New Category group' });
-  await newGroup.getByLabel('Group name').fill(groupName);
-  await newGroup.getByLabel('Type').selectOption({ label: 'Expense' });
-  await newGroup.getByRole('button', { name: 'Add group' }).click();
-  const group = page.getByRole('region', { name: `Group ${groupName}` });
-  await group.getByRole('textbox', { name: `New Category in ${groupName}` }).fill(categoryName);
-  await group.getByRole('button', { name: 'Add Category' }).click();
-  await expect(group.getByLabel(`Name of ${categoryName}`)).toBeVisible();
+  await addExpenseCategory(page, groupName, categoryName);
 
   // Two spellings of one description, and one other
   await openNewManualAccount(page, `Unclassified account ${suffix}`, `Unclassified bank ${suffix}`);

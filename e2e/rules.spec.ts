@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { addExpenseCategory } from './support/categories';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -31,15 +32,7 @@ test('creates and orders Rules, and the import preview shows what each Rule sets
   const cardRule = `Card rule ${suffix}`;
   page.on('dialog', (dialog) => void dialog.accept());
 
-  await page.goto('/categories');
-  const newGroup = page.getByRole('form', { name: 'New Category group' });
-  await newGroup.getByLabel('Group name').fill(groupName);
-  await newGroup.getByLabel('Type').selectOption({ label: 'Expense' });
-  await newGroup.getByRole('button', { name: 'Add group' }).click();
-  const group = page.getByRole('region', { name: `Group ${groupName}` });
-  await group.getByRole('textbox', { name: `New Category in ${groupName}` }).fill(categoryName);
-  await group.getByRole('button', { name: 'Add Category' }).click();
-  await expect(group.getByLabel(`Name of ${categoryName}`)).toBeVisible();
+  await addExpenseCategory(page, groupName, categoryName);
   await addNamed(page, '/payees', 'Payee', payeeName);
   await addNamed(page, '/tags', 'Tag', tagName);
 

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { addCategory, addCategoryGroup } from './support/categories';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -20,16 +21,16 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
 
   // The starter set is there, and the user adds a group and a Category of their own
   await page.goto('/categories');
-  await expect(page.getByRole('region', { name: 'Group Capital' })).toBeVisible();
-  await expect(page.getByLabel('Name of Credit card (unitemised)')).toBeVisible();
-  const newGroup = page.getByRole('form', { name: 'New Category group' });
-  await newGroup.getByLabel('Group name').fill(groupName);
-  await newGroup.getByLabel('Type').selectOption({ label: 'Expense' });
-  await newGroup.getByRole('button', { name: 'Add group' }).click();
-  const group = page.getByRole('region', { name: `Group ${groupName}` });
-  await group.getByRole('textbox', { name: `New Category in ${groupName}` }).fill(categoryName);
-  await group.getByRole('button', { name: 'Add Category' }).click();
-  await expect(group.getByLabel(`Name of ${categoryName}`)).toBeVisible();
+  const groupList = page.getByRole('navigation', { name: 'Category groups' });
+  await expect(groupList.getByRole('link', { name: 'Capital' })).toBeVisible();
+  await groupList.getByRole('link', { name: 'Other expenses' }).click();
+  await expect(
+    page
+      .getByRole('region', { name: 'Group Other expenses' })
+      .getByRole('listitem', { name: 'Credit card (unitemised)' }),
+  ).toBeVisible();
+  await addCategoryGroup(page, groupName, 'Expense');
+  await addCategory(page, groupName, categoryName);
 
   // An imported Transaction to classify
   await page.goto('/banks');
