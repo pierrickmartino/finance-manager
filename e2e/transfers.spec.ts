@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { openTransaction } from './support/transactions';
 
 const FIXTURES = path.join(import.meta.dirname, '../test/fixtures/import');
 const BCGE_OCTOBER = path.join(FIXTURES, 'bcge/bcge-chf-2025-10.xml');
@@ -58,7 +59,7 @@ test('confirms a Transfer candidate in the Import preview', async ({ page }) => 
   const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Transfer');
-  await rows.first().getByRole('link').first().click();
+  await openTransaction(page, rows.first());
   await expect(page.getByRole('region', { name: 'Transfer' })).toContainText(
     `Transfer with ${bcge}`,
   );

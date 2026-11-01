@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addExpenseCategory } from './support/categories';
+import { openTransaction } from './support/transactions';
 
 /** Creates a Bank and a manual Account (no Import format) and opens the Account page. */
 async function openNewManualAccount(page: Page, accountName: string, bankName: string) {
@@ -70,7 +71,7 @@ test('classifies a whole group and a selected Transaction from the Unclassified 
   const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
   await expect(rows).toHaveCount(2);
   await expect(rows.filter({ hasText: categoryName })).toHaveCount(2);
-  await rows.first().getByRole('link').click();
+  await openTransaction(page, rows.first());
   await expect(page.getByRole('list', { name: 'Locked fields' }).getByRole('listitem')).toHaveText([
     /Payee/,
     /Category/,
