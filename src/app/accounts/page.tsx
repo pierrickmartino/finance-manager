@@ -15,6 +15,36 @@ import { AccountForm } from './account-form';
 import { createAccountAction } from './actions';
 import { RateStatusNotice } from './rate-status';
 import { SnapshotMismatches } from './snapshot-mismatches';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
+import { shiftDays, yearEnd, type BalancesOn } from './_prototype/shared';
+import { VariantA, name as nameA } from './_prototype/variant-a-net-worth';
+import { VariantB, name as nameB } from './_prototype/variant-b-by-bank';
+import { VariantC, name as nameC } from './_prototype/variant-c-over-time';
+
+// PROTOTYPE — three Accounts page layouts on /accounts, switchable via ?variant= (A, B, C;
+// default "current" is today's page) and a floating bar. The switch and the bar are disabled in
+// production builds. Not for main: fold the winner in, then drop `_prototype/` and the bar.
+const VARIANTS = [
+  { key: 'current', name: 'Today' },
+  { key: 'A', name: nameA },
+  { key: 'B', name: nameB },
+  { key: 'C', name: nameC },
+];
+
+/** PROTOTYPE — balances at earlier dates, for the variants' changes over time. */
+async function loadCompare(ctx: ServiceContext, date: string): Promise<BalancesOn[]> {
+  const dates = [
+    { label: 'End of last year', date: yearEnd(date) },
+    { label: '90 days before', date: shiftDays(date, -90) },
+    { label: '30 days before', date: shiftDays(date, -30) },
+  ];
+  return Promise.all(
+    dates.map(async ({ label, date: on }) => {
+      const balances = await listAccountBalances(ctx, { date: on });
+      return { label, date: on, byAccount: new Map(balances.map((b) => [b.account.id, b])) };
+    }),
+  );
+}
 
 export const metadata: Metadata = { title: 'Accounts · Finance Manager' };
 
@@ -67,6 +97,46 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
   ]);
   const shownDate = balances[0]?.date ?? requestedDate;
   const mismatchedAccounts = new Set(mismatches.map((check) => check.accountId));
+
+  const requestedVariant = typeof params.variant === 'string' ? params.variant : undefined;
+  const variant =
+    process.env.NODE_ENV !== 'production' && VARIANTS.some((v) => v.key === requestedVariant)
+      ? requestedVariant!
+      : 'current';
+  const switcher = (
+    <PrototypeSwitcher
+      variants={VARIANTS}
+      current={variant}
+      resetParams={['account', 'new', 'archived']}
+    />
+  );
+  if (variant !== 'current' && shownDate) {
+    const data = {
+      balances,
+      compare: await loadCompare(ctx, shownDate),
+      rateStatus,
+      mismatches,
+      banks,
+      fmt,
+      shownDate,
+      requestedDate,
+      error,
+      params: Object.fromEntries(
+        Object.entries(params).map(([key, value]) => [
+          key,
+          typeof value === 'string' ? value : undefined,
+        ]),
+      ),
+    };
+    return (
+      <>
+        {variant === 'A' && <VariantA {...data} />}
+        {variant === 'B' && <VariantB {...data} />}
+        {variant === 'C' && <VariantC {...data} />}
+        {switcher}
+      </>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-8">
@@ -174,6 +244,7 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
           <AccountForm banks={banks} action={createAccountAction} submitLabel="Add Account" />
         )}
       </section>
+      {switcher}
     </section>
   );
 }
