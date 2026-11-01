@@ -247,7 +247,7 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 
 ### Domain rules (binding)
 
-- A Transaction is single-sided. A Transfer is two linked Transactions. There are no splits. (ADR-0001)
+- A Transaction is single-sided. A Transfer is two linked Transactions. (ADR-0001) Superseded: v1 had no splits; a Split now divides a Transaction's classification without dividing the Transaction (ADR-0004).
 - Amounts are stored in the Account's Currency as integer minor units and never stored in CHF. (ADR-0002)
 - Each Account has one Import format, fixed once the Account has Transactions. (ADR-0003)
 - Transfers have no Category, and Rules skip them.
@@ -279,7 +279,7 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 - Budgeting of any kind (envelopes, targets, rollover) and forecasting.
 - AI or LLM features of any kind.
 - Itemised credit card Accounts (the first v2 item); card spending stays a lump sum.
-- Split transactions, so loan and leasing interest isn't tracked separately.
+- ~~Split transactions, so loan and leasing interest isn't tracked separately.~~ Now planned (ADR-0004).
 - Investment and securities valuation; 3a Accounts are treated as cash.
 - Currencies other than CHF and EUR in the UI, though the data model allows any ISO code.
 - A display currency per Widget; everything is in CHF.
