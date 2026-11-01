@@ -1,26 +1,38 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { BUTTON_CLASS } from '@/components/named-list';
+import { GHOST_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { countRuleMatches, listRules } from '@/server/services/rules';
 import { deleteRuleAction, reorderRulesAction, setRuleEnabledAction } from './actions';
 import { describeActions, describeCondition } from './describe';
 import { loadRuleOptions } from './load';
-import { RuleList, type RuleRow } from './rule-list';
+import type { RuleDetailRule } from './rule-detail';
+import { RulesWorkbench } from './rules-workbench';
 
 export const metadata: Metadata = { title: 'Rules · Finance Manager' };
 
-/** Classification Rules in run order (spec 69-82). */
-export default async function RulesPage() {
+interface RulesPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+const param = (value: string | string[] | undefined) =>
+  typeof value === 'string' ? value : undefined;
+
+/**
+ * Classification Rules (spec 69-82) as master / detail: the Rules in run order on the left,
+ * filtered by `?q=`, and the selected one (`?rule=`, else the first shown) on the right.
+ */
+export default async function RulesPage({ searchParams }: RulesPageProps) {
   const ctx = await getServiceContext();
-  const [rules, matchCounts, { names }, fmt] = await Promise.all([
+  const [rules, matchCounts, { names }, fmt, params] = await Promise.all([
     listRules(ctx),
     countRuleMatches(ctx),
     loadRuleOptions(ctx),
     getFormatter(),
+    searchParams,
   ]);
-  const rows: RuleRow[] = rules.map((rule) => ({
+  const rows: RuleDetailRule[] = rules.map((rule) => ({
     id: rule.id,
     name: rule.name,
     enabled: rule.enabled,
@@ -30,41 +42,38 @@ export default async function RulesPage() {
     toggle: setRuleEnabledAction.bind(null, rule.id, !rule.enabled),
     remove: deleteRuleAction.bind(null, rule.id),
   }));
+  const enabled = rows.filter((row) => row.enabled).length;
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Rules</h1>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Rules</h1>
+          <p className="max-w-2xl text-sm text-zinc-500">
+            {rows.length} Rule{rows.length === 1 ? '' : 's'}, {enabled} enabled. They run top to
+            bottom on imports and Manual transactions: per field the first match wins, Tags add up,
+            and fields you edited by hand are never changed.
+          </p>
+        </div>
         <div className="flex gap-2">
           {rows.length > 0 && (
-            <Link href="/rules/apply" className={BUTTON_CLASS}>
+            <Link href="/rules/apply" className={GHOST_BUTTON_CLASS}>
               Apply all Rules
             </Link>
           )}
-          <Link
-            href="/rules/new"
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
-          >
+          <Link href="/rules/new" className={PRIMARY_BUTTON_CLASS}>
             New Rule
           </Link>
         </div>
-      </div>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Rules run in this order on imported files (in the preview) and when you save a Manual
-        transaction. For each field, the first matching Rule that sets it wins; Tags add up. Fields
-        you edited by hand are never changed. Editing a Rule doesn’t change past Transactions: use
-        Apply to reclassify them, after a preview. Matches counts the Transactions a Rule’s
-        conditions match now.
-      </p>
-      {rows.length === 0 ? (
-        <p className="text-sm text-zinc-500">No Rules yet.</p>
-      ) : (
-        <RuleList
-          key={rows.map((row) => `${row.id}:${row.enabled}`).join()}
-          rows={rows}
-          reorder={reorderRulesAction}
-        />
-      )}
+      </header>
+      <RulesWorkbench
+        // A new list from the server (added, removed or toggled Rules) resets the run order.
+        key={rows.map((row) => `${row.id}:${row.enabled}`).join()}
+        rules={rows}
+        query={param(params.q) ?? ''}
+        ruleId={param(params.rule)}
+        reorder={reorderRulesAction}
+      />
     </section>
   );
 }

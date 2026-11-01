@@ -1,6 +1,7 @@
 import type { Formatter } from '@/lib/format';
 import type { RuleActions, RuleCondition } from '@/server/services/rules';
 import { CONDITION_KIND_LABELS, OPERATOR_OPTIONS } from './rule-form-model';
+import type { RuleActionPart } from './view';
 
 /** Names the Rules list uses to describe conditions and actions. */
 export interface RuleNames {
@@ -46,14 +47,26 @@ export function describeCondition(
   }
 }
 
-/** The actions in words, e.g. `Payee: Migros · Category: Food › Groceries · Tags: food`. */
-export function describeActions(actions: RuleActions, names: RuleNames): string {
+/**
+ * What the Rule sets, one part each, e.g. `Payee: Migros`, `Category: Food › Groceries`,
+ * `Tag: food`.
+ */
+export function describeActions(actions: RuleActions, names: RuleNames): RuleActionPart[] {
   return [
-    actions.payeeId && `Payee: ${nameOf(names.payees, actions.payeeId)}`,
-    actions.categoryId && `Category: ${nameOf(names.categories, actions.categoryId)}`,
-    actions.tagIds.length > 0 &&
-      `Tags: ${actions.tagIds.map((id) => nameOf(names.tags, id)).join(', ')}`,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+    ...(actions.payeeId
+      ? [{ kind: 'payee' as const, label: `Payee: ${nameOf(names.payees, actions.payeeId)}` }]
+      : []),
+    ...(actions.categoryId
+      ? [
+          {
+            kind: 'category' as const,
+            label: `Category: ${nameOf(names.categories, actions.categoryId)}`,
+          },
+        ]
+      : []),
+    ...actions.tagIds.map((id) => ({
+      kind: 'tag' as const,
+      label: `Tag: ${nameOf(names.tags, id)}`,
+    })),
+  ];
 }
