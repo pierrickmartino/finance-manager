@@ -10,7 +10,8 @@ import { listCellTransactions, runWidgetQuery, type WidgetQueryInput } from '.';
  *
  * Seeds 20 000 Transactions from 2020 to 2025 over two CHF Accounts and one EUR Account
  * (a third of them in EUR, so a third need an FX lookup), 30 Categories in 6 groups (one of them
- * Capital), 5 % Transfers and 10 % unclassified, plus a daily EUR rate on business days.
+ * Capital), 5 % Transfers, 10 % unclassified and 10 % split into two Split lines (ADR-0004),
+ * plus a daily EUR rate on business days.
  *
  * Measured on Postgres 16, 4 vCPU container, warm cache (2026-10-31), same seed:
  * - month × Category, 6 years: ~95 ms end to end (72 rows × 23 columns). EXPLAIN ANALYZE:
@@ -20,6 +21,9 @@ import { listCellTransactions, runWidgetQuery, type WidgetQueryInput } from '.';
  *   (~60 ms, the bulk of the cost). The CTE is materialized once and read by four hash
  *   aggregates (cells, row totals, column totals, grand total) in ~17 ms.
  * - drill-down into one cell: ~72 ms (same CTE, then one page of list items).
+ * With 10 % split Transactions (4 000 Split lines, ticket #41), 2026-11-01, same container under
+ * load from parallel test runs: month × Category ~300 ms, drill-down ~150 ms (the extra hash
+ * join to split_line and count(DISTINCT) per aggregate).
  * Railway's smallest plans run the database on shared vCPUs that are 2–4× slower than this
  * container; the budget below leaves that margin. It catches order-of-magnitude regressions
  * (an N+1, a per-row rate lookup without the index, aggregation in JS).
@@ -81,7 +85,7 @@ async function seedSixYears(): Promise<void> {
        currency, fingerprint, raw_description, category_id, transfer_id)
      SELECT acc.id, imp.id, false, DATE '2020-01-01' + (n % 2190), ((n * 7919) % 200000) - 150000,
             acc.currency, 'perf-' || n, 'Perf ' || n,
-            CASE WHEN n % 10 = 0 OR n % 20 = 1 THEN NULL
+            CASE WHEN n % 10 IN (0, 5) OR n % 20 = 1 THEN NULL
                  ELSE (SELECT id FROM cats WHERE cats.position = n % 30) END,
             CASE WHEN n % 20 = 1 THEN (SELECT id FROM transfer LIMIT 1) END
      FROM generate_series(1, $1::int) AS n
@@ -89,6 +93,20 @@ async function seedSixYears(): Promise<void> {
        ON true
      JOIN import imp ON imp.account_id = acc.id`,
     [TRANSACTION_COUNT - accounts.length],
+  );
+  // Every Transaction ending in 5 is split in two lines: half under the Category it would have
+  // had, the rest under the next one (both already in use, so the Category columns don't change).
+  await t.ctx.db.query(
+    `WITH cats AS (SELECT c.id, row_number() OVER (ORDER BY g.sort, c.sort) - 1 AS position
+                  FROM category c JOIN category_group g ON g.id = c.group_id),
+     split AS (SELECT id, amount_minor, substring(fingerprint FROM 6)::int AS n
+               FROM "transaction" WHERE fingerprint LIKE 'perf-%5')
+     INSERT INTO split_line (transaction_id, position, amount_minor, category_id)
+     SELECT s.id, line.position,
+            CASE line.position WHEN 1 THEN s.amount_minor / 2
+                               ELSE s.amount_minor - s.amount_minor / 2 END,
+            (SELECT id FROM cats WHERE cats.position = (s.n + line.position - 1) % 30)
+     FROM split s CROSS JOIN (VALUES (1), (2)) AS line(position)`,
   );
   await t.ctx.db.query('ANALYZE');
 }

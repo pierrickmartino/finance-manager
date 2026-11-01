@@ -33,7 +33,10 @@ const cellInput = z.object({
     .default(DEFAULT_PAGE_SIZE),
 });
 
-/** A Transaction under a report cell, with the CHF value the report counted. */
+/**
+ * A Transaction under a report cell, with the CHF value the report counted: for a split
+ * Transaction, the sum of its lines in the cell.
+ */
 export interface CellTransaction extends TransactionListItem {
   chfMinor: number;
 }
@@ -88,16 +91,18 @@ export async function listCellTransactions(
   const cte = baseCte(query, range, await currenciesInUse(ctx), params);
   const limit = params.add(pageSize);
   const offset = params.add((page - 1) * pageSize);
-  // The whole cell's count and sum, plus one page of it.
+  // The whole cell's count and sum, plus one page of it. A split Transaction is listed once,
+  // with the CHF sum of its lines in the cell.
   const result = await ctx.db.query<{
     total: number;
     sumMinor: number | null;
     items: { id: string; chfMinor: number }[] | null;
   }>(
     `${cte}, cell AS (
-       SELECT b.id, b.chf_minor, t.booking_date, t.entry_order
+       SELECT b.id, sum(b.chf_minor)::bigint AS chf_minor, t.booking_date, t.entry_order
        FROM report_base b JOIN "transaction" t ON t.id = b.id
        WHERE ${conditions.join(' AND ')}
+       GROUP BY b.id, t.booking_date, t.entry_order
      )
      SELECT (SELECT count(*)::int FROM cell) AS total,
        (SELECT sum(chf_minor)::bigint FROM cell) AS "sumMinor",
