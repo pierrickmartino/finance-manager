@@ -86,7 +86,7 @@ test('classifies a whole group and a selected Transaction from the Unclassified 
   await kiosk.getByRole('button', { name: 'Classify selected (1)' }).click();
   await expect(kiosk.getByRole('status')).toHaveText('Classified 1 Transaction.');
   await expect(kiosk.getByRole('table').locator('tbody tr')).toContainText(`Kiosk ${suffix}`);
-  await expect(kiosk.getByRole('table').locator('tbody tr td').nth(4)).toHaveText(
+  await expect(kiosk.getByRole('table').locator('tbody tr td').nth(3)).toHaveText(
     `Kiosk ${suffix}`,
   );
 });

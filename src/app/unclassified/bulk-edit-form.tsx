@@ -18,7 +18,7 @@ const SECONDARY =
   'rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800';
 
 interface BulkEditFormProps {
-  /** Shown in the form's accessible name. */
+  /** The group's heading: shown in the form's accessible name, and not repeated per row. */
   description: string;
   /** Members of the group shown on this page (the whole group, up to one page). */
   transactions: TransactionListItem[];
@@ -147,7 +147,6 @@ export function BulkEditForm({
               </th>
               <th className={CELL}>Date</th>
               <th className={CELL}>Account</th>
-              <th className={CELL}>Description</th>
               <th className={CELL}>Payee</th>
               <th className={`${CELL} text-right`}>Amount</th>
               <th className={CELL}>
@@ -171,11 +170,13 @@ export function BulkEditForm({
                 <td className={`${CELL} whitespace-nowrap tabular-nums`}>
                   {fmt.date(transaction.bookingDate)}
                 </td>
-                <td className={CELL}>{transaction.accountName}</td>
                 <td className={CELL}>
-                  {transaction.rawDescription || '(no description)'}
-                  {transaction.counterpartyName && (
-                    <div className="text-xs text-zinc-500">{transaction.counterpartyName}</div>
+                  {transaction.accountName}
+                  {/* The heading names the group; only other spellings are worth repeating. */}
+                  {transaction.rawDescription !== description && (
+                    <div className="text-xs text-zinc-500">
+                      {transaction.rawDescription || '(no description)'}
+                    </div>
                   )}
                 </td>
                 <td className={CELL}>{transaction.payee?.name ?? '—'}</td>
