@@ -3,6 +3,7 @@ import type { MutationScope } from '../context';
 import { NotFoundError, ValidationError } from '../errors';
 import { recordClassificationChanges } from '../transactions/classification';
 import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from '../transactions/model';
+import { splitAmong } from '../transactions/transfer-guard';
 
 /**
  * Linking and unlinking inside an open mutation, shared by the Transfers operations, Import
@@ -55,6 +56,11 @@ export async function linkPair(scope: MutationScope, ids: readonly string[]): Pr
   const { tx, history } = scope;
   const before = await lockTransactions(tx, ids);
   checkPair(before, ids);
+  if ((await splitAmong(tx, ids)).size > 0) {
+    throw new ValidationError(
+      'This Transaction is split: remove the Split before linking it as a Transfer',
+    );
+  }
   await recordClassificationChanges(scope, ids, () =>
     tx.query(
       `UPDATE "transaction" SET category_id = NULL

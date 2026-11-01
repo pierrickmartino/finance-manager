@@ -105,6 +105,11 @@ export async function splitTransaction(
   const values = parseInput(splitLinesInput, lines);
   return mutate(ctx, async (scope) => {
     const transaction = await lockTransaction(scope, transactionId);
+    if (transaction.transferId !== null) {
+      throw new ValidationError(
+        'This Transaction is part of a Transfer: unlink the Transfer before splitting it',
+      );
+    }
     const total = values.reduce((sum, line) => sum + line.amountMinor, 0);
     if (total !== transaction.amountMinor) {
       throw new ValidationError("The Split lines must add up exactly to the Transaction's amount");
