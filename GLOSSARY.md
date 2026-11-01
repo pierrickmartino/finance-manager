@@ -75,6 +75,14 @@ _Avoid_: Exceptional, one-off, investment
 The second level of classification, belonging to exactly one Category group. Signed amounts net within it, so a refund reduces spending.
 _Avoid_: Subcategory, class
 
+**Split**:
+The division of one Transaction's amount into Split lines that sum exactly to it, so it can be classified under several Categories while staying one Transaction.
+_Avoid_: Breakdown, allocation, child transaction
+
+**Split line**:
+One part of a Split: an amount in the Transaction's Currency with its own Category, which may belong to any Category group type.
+_Avoid_: Sub-transaction, part, share
+
 **Payee**:
 The clean, user-managed name of the counterparty of a Transaction, as opposed to the raw bank description.
 _Avoid_: Merchant, beneficiary, counterparty
