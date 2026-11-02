@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { FieldError } from '@/components/form';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { listAccounts } from '@/server/services/accounts';
@@ -13,10 +12,12 @@ import {
   type TransactionPage,
   type TransactionQuery,
 } from '@/server/services/transactions';
-import { FilterRail } from './filter-rail';
-import { pickSelected, readTransactionSearch, transactionsHref, type SearchValues } from './search';
-import { TransactionList } from './transaction-list';
-import { TransactionPreview } from './transaction-preview';
+import type { VariantProps } from './_prototype/shared';
+import { VARIANT_A_NAME, VariantA } from './_prototype/variant-a';
+import { VARIANT_B_NAME, VariantB } from './_prototype/variant-b';
+import { VARIANT_C_NAME, VariantC } from './_prototype/variant-c';
+import { VARIANT_D_NAME, VariantD } from './_prototype/variant-d';
+import { pickSelected, readTransactionSearch } from './search';
 
 export const metadata: Metadata = { title: 'Transactions · Finance Manager' };
 
@@ -42,7 +43,8 @@ async function loadPage(
  */
 export default async function TransactionsPage({ searchParams }: TransactionsPageProps) {
   const fmt = await getFormatter();
-  const search = readTransactionSearch(await searchParams, fmt.settings.numberFormat);
+  const params = await searchParams;
+  const search = readTransactionSearch(params, fmt.settings.numberFormat);
   const ctx = await getServiceContext();
   const [{ page, error: queryError }, accounts, groups, payees, tags] = await Promise.all([
     loadPage(search.query),
@@ -52,68 +54,39 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
     listTags(ctx),
   ]);
   const error = search.error ?? queryError;
-  const selected = page && pickSelected(page.transactions, search.selected);
+  const selected = page ? pickSelected(page.transactions, search.selected) : null;
 
+  const variant = typeof params.variant === 'string' ? params.variant : 'A';
+  const props: VariantProps = {
+    fmt,
+    values: search.values,
+    lists: { accounts, groups, payees, tags },
+    page,
+    error,
+    selected,
+    variant,
+  };
+
+  // PROTOTYPE: four layouts of this page, switched with ?variant= (see _prototype/).
   return (
-    <section className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Transactions</h1>
-      <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
-        <FilterRail values={search.values} lists={{ accounts, groups, payees, tags }} />
-
-        <div className="flex min-w-0 flex-col gap-3">
-          {error && <FieldError message={error} />}
-          {page &&
-            (page.transactions.length === 0 ? (
-              <p className="text-sm text-zinc-500">No Transactions match.</p>
-            ) : (
-              <>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {page.total} Transaction{page.total === 1 ? '' : 's'}
-                </p>
-                <TransactionList
-                  fmt={fmt}
-                  transactions={page.transactions}
-                  values={search.values}
-                  page={page.page}
-                  selectedId={selected?.id ?? null}
-                />
-                <Pagination values={search.values} page={page} />
-              </>
-            ))}
-        </div>
-
-        {selected && <TransactionPreview fmt={fmt} transaction={selected} />}
-      </div>
-    </section>
+    <>
+      {variant === 'B' ? (
+        <VariantB {...props} />
+      ) : variant === 'C' ? (
+        <VariantC {...props} />
+      ) : variant === 'D' ? (
+        <VariantD {...props} />
+      ) : (
+        <VariantA {...props} />
+      )}
+      <PrototypeSwitcher variants={VARIANTS} current={variant} />
+    </>
   );
 }
 
-interface PaginationProps {
-  values: SearchValues;
-  page: TransactionPage;
-}
-
-function Pagination({ values, page }: PaginationProps) {
-  if (page.pageCount <= 1) return null;
-  return (
-    <nav aria-label="Pages" className="flex items-center gap-4 text-sm">
-      {page.page > 1 ? (
-        <Link href={transactionsHref(values, page.page - 1)} className="underline">
-          Previous
-        </Link>
-      ) : (
-        <span className="text-zinc-400">Previous</span>
-      )}
-      <span>
-        Page {page.page} of {page.pageCount}
-      </span>
-      {page.page < page.pageCount ? (
-        <Link href={transactionsHref(values, page.page + 1)} className="underline">
-          Next
-        </Link>
-      ) : (
-        <span className="text-zinc-400">Next</span>
-      )}
-    </nav>
-  );
-}
+const VARIANTS = [
+  { key: 'A', name: VARIANT_A_NAME },
+  { key: 'B', name: VARIANT_B_NAME },
+  { key: 'C', name: VARIANT_C_NAME },
+  { key: 'D', name: VARIANT_D_NAME },
+];
