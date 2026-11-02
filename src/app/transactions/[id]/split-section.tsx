@@ -16,13 +16,20 @@ interface SplitSectionProps {
   transaction: TransactionDetail;
   groups: CategoryGroup[];
   fmt: Formatter;
+  /** Classes of the section, e.g. to draw it as a card. */
+  className?: string;
 }
 
 /**
  * The Transaction's Split (ADR-0004): its Split lines, with editing and removing, or the
  * action that splits it. A Transfer can't be split.
  */
-export function SplitSection({ transaction, groups, fmt }: SplitSectionProps) {
+export function SplitSection({
+  transaction,
+  groups,
+  fmt,
+  className = 'flex flex-col gap-3',
+}: SplitSectionProps) {
   const isSplit = transaction.splitLines.length > 0;
   if (!isSplit && transaction.transferId) return null;
   const form = (
@@ -36,7 +43,7 @@ export function SplitSection({ transaction, groups, fmt }: SplitSectionProps) {
   );
 
   return (
-    <section aria-labelledby="split" className="flex flex-col gap-3">
+    <section aria-labelledby="split" className={className}>
       <h2 id="split" className="text-lg font-semibold">
         {splitLabel(transaction) ?? 'Split'}
       </h2>
@@ -72,7 +79,7 @@ export function SplitSection({ transaction, groups, fmt }: SplitSectionProps) {
   );
 }
 
-function SplitLinesTable({ transaction, fmt }: Omit<SplitSectionProps, 'groups'>) {
+function SplitLinesTable({ transaction, fmt }: Pick<SplitSectionProps, 'transaction' | 'fmt'>) {
   return (
     <div className="overflow-x-auto">
       <table aria-label="Split lines" className="w-full text-sm">
@@ -90,7 +97,7 @@ function SplitLinesTable({ transaction, fmt }: Omit<SplitSectionProps, 'groups'>
               <td className={CELL}>{categoryLabel(line.category)}</td>
               <td className={CELL}>{line.tags.map((tag) => tag.name).join(', ') || '—'}</td>
               <td className={CELL}>{line.note ?? '—'}</td>
-              <td className={`${CELL} text-right tabular-nums`}>
+              <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
                 {fmt.amount(line.amountMinor, { currency: transaction.currency })}
               </td>
             </tr>

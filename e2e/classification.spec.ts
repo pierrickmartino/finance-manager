@@ -60,7 +60,9 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   await expect(rows.first()).toContainText('Unclassified');
   await openTransaction(page, rows.first());
 
-  // Classify it
+  // Classify it: the receipt's status says what it is
+  const status = page.getByRole('list', { name: 'Status' });
+  await expect(status).toContainText('Unclassified');
   const form = page.getByRole('form', { name: 'Classification' });
   await form.getByLabel('Payee').fill(payeeName);
   await form.getByLabel('Category').selectOption({ label: categoryName });
@@ -68,7 +70,8 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   await form.getByRole('button', { name: 'Save classification' }).click();
   const locked = page.getByRole('list', { name: 'Locked fields' });
   await expect(locked.getByRole('listitem')).toHaveText([/Payee/, /Category/, /Tags/]);
-  const history = page.getByRole('table', { name: 'Transaction History' }).locator('tbody tr');
+  await expect(status.getByRole('listitem')).toHaveText([categoryName, 'Imported', '3 locked']);
+  const history = page.getByRole('list', { name: 'Transaction History' }).locator(':scope > li');
   await expect(history.filter({ hasText: `${groupName} › ${categoryName}` })).toContainText(
     'manual',
   );
