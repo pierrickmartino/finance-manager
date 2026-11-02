@@ -5,11 +5,29 @@ import type { HistoryEntry, JsonValue } from '@/server/services/history';
 const CELL = 'px-3 py-2 text-left align-top';
 
 /** Renders a recorded value. Fields ending in "Minor" hold amounts in minor units. */
-function renderValue(field: string, value: JsonValue, fmt: Formatter): string {
+export function renderValue(field: string, value: JsonValue, fmt: Formatter): string {
   if (value === null) return '—';
   if (typeof value === 'number' && field.endsWith('Minor')) return fmt.amount(value);
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
+}
+
+/** Who made a change: the actor type, and its id (a Rule's links to the Rule). */
+export function HistoryActor({ actorType, actorId }: Pick<HistoryEntry, 'actorType' | 'actorId'>) {
+  return (
+    <>
+      {actorType}
+      {actorId &&
+        (actorType === 'rule' ? (
+          <Link href={`/rules/${actorId}`} className="text-zinc-500 hover:underline">
+            {' '}
+            {actorId}
+          </Link>
+        ) : (
+          <span className="text-zinc-500"> {actorId}</span>
+        ))}
+    </>
+  );
 }
 
 /** A link to the History page with these filters. */
@@ -55,19 +73,7 @@ export function HistoryTable({
                 {fmt.dateTime(entry.at, { hasSeconds: true })}
               </td>
               <td className={CELL}>
-                {entry.actorType}
-                {entry.actorId &&
-                  (entry.actorType === 'rule' ? (
-                    <Link
-                      href={`/rules/${entry.actorId}`}
-                      className="text-zinc-500 hover:underline"
-                    >
-                      {' '}
-                      {entry.actorId}
-                    </Link>
-                  ) : (
-                    <span className="text-zinc-500"> {entry.actorId}</span>
-                  ))}
+                <HistoryActor actorType={entry.actorType} actorId={entry.actorId} />
               </td>
               <td className={CELL}>
                 <Link

@@ -12,6 +12,8 @@ interface TransferSectionProps {
   /** Transactions it may be linked with, when it is not in a Transfer. */
   options: CandidateTransaction[];
   fmt: Formatter;
+  /** Classes of the section, e.g. to draw it as a card. */
+  className?: string;
 }
 
 const describe = (transaction: CandidateTransaction, fmt: Formatter): string =>
@@ -26,9 +28,10 @@ export function TransferSection({
   counterpart,
   options,
   fmt,
+  className = 'flex flex-col gap-3',
 }: TransferSectionProps) {
   return (
-    <section aria-labelledby="transfer" className="flex flex-col gap-3">
+    <section aria-labelledby="transfer" className={className}>
       <h2 id="transfer" className="text-lg font-semibold">
         Transfer
       </h2>
@@ -62,7 +65,7 @@ export function TransferSection({
             Other side
             <select
               name="otherId"
-              className="rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full min-w-0 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
             >
               {options.map((option) => (
                 <option key={option.id} value={option.id}>

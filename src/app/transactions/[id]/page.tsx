@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { ReactNode } from 'react';
-import type { Formatter } from '@/lib/format';
 import { ActionForm } from '@/components/action-form';
 import { BUTTON_CLASS } from '@/components/named-list';
+import { CARD_CLASS, DANGER_BUTTON_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { NotFoundError } from '@/server/services/errors';
@@ -19,20 +18,23 @@ import {
   type Classification,
   type TransactionDetail,
 } from '@/server/services/transactions';
-import { HistoryTable, historyHref } from '../../history/history-table';
+import { getTransferCounterpart, listLinkOptions } from '@/server/services/transfers';
+import { historyHref } from '../../history/history-table';
+import { HistoryTimeline } from '../../history/history-timeline';
 import {
   deleteTransactionFromDetailAction,
   editClassificationAction,
   unlockFieldAction,
 } from './actions';
-import { getTransferCounterpart, listLinkOptions } from '@/server/services/transfers';
 import { ClassificationForm } from './classification-form';
 import { SplitSection } from './split-section';
+import { transactionBadges } from './transaction-badges';
+import { TransactionReceipt } from './transaction-receipt';
 import { TransferSection } from './transfer-section';
 
 export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
 
-const CELL = 'px-3 py-2 text-left';
+const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
@@ -48,8 +50,10 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
 }
 
 /**
- * One Transaction (spec 38, 48, 63-65, 116): every bank field read-only, where it came from, its
- * classification with the fields locked against Rules, and its History.
+ * One Transaction (spec 38, 48, 63-65, 116), as a receipt and a workbench. On the left, what
+ * happened: the bank fields read-only and the History. On the right, kept in view from `lg`
+ * up, what to do with it: classify (with the fields locked against Rules), split, link as a
+ * Transfer.
  */
 export default async function TransactionPage({ params }: TransactionPageProps) {
   const { id } = await params;
@@ -64,108 +68,103 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
     listTags(ctx),
     getTransferCounterpart(ctx, transaction.id),
   ]);
-  const amount = fmt.amount(transaction.amountMinor, { currency: transaction.currency });
 
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
-          ← Transactions
-        </Link>
-        <h1 className="text-2xl font-semibold">
-          {transaction.rawDescription || '(no description)'}
-        </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          <span className="tabular-nums">{amount}</span> on {fmt.date(transaction.bookingDate)} ·{' '}
-          <Link href={`/accounts/${transaction.accountId}`} className="underline">
-            {transaction.accountName}
-          </Link>
-        </p>
-      </div>
+    <section className="flex flex-col gap-4">
+      <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
+        ← Transactions
+      </Link>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <TransactionReceipt
+            transaction={transaction}
+            badges={transactionBadges(transaction, classification)}
+            fmt={fmt}
+          />
+          <section aria-labelledby="history" className="flex flex-col gap-3">
+            <h2 id="history" className="text-sm font-semibold text-zinc-500">
+              History
+            </h2>
+            {history.length === 0 ? (
+              <p className="text-sm text-zinc-500">No History for this Transaction.</p>
+            ) : (
+              <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
+            )}
+            <Link
+              href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
+              className="text-sm underline"
+            >
+              Open in History
+            </Link>
+          </section>
+        </div>
 
-      <section aria-labelledby="bank-fields" className="flex flex-col gap-3">
-        <h2 id="bank-fields" className="text-lg font-semibold">
-          {transaction.isManual ? 'Details' : 'From the bank'}
-        </h2>
-        <BankFields transaction={transaction} amount={amount} fmt={fmt} />
-        {transaction.bundledDetails && transaction.bundledDetails.length > 0 && (
-          <BundledDetails transaction={transaction} fmt={fmt} />
-        )}
-      </section>
-
-      <TransferSection
-        transactionId={transaction.id}
-        counterpart={counterpart}
-        options={counterpart ? [] : await listLinkOptions(ctx, transaction.id)}
-        fmt={fmt}
-      />
-
-      <section aria-labelledby="classification" className="flex flex-col gap-3">
-        <h2 id="classification" className="text-lg font-semibold">
-          Classification
-        </h2>
-        <ClassificationForm
-          classification={classification}
-          groups={groups}
-          payeeNames={payees.map((payee) => payee.name)}
-          tagNames={tags.map((tag) => tag.name)}
-          action={editClassificationAction.bind(null, transaction.id)}
-        />
-        <LockedFields classification={classification} />
-        <p className="text-sm">
-          <Link href={`/rules/new?fromTransaction=${transaction.id}`} className="underline">
-            Create rule from this Transaction
-          </Link>
-        </p>
-      </section>
-
-      <SplitSection transaction={transaction} groups={groups} fmt={fmt} />
-
-      <div className="flex items-start gap-3">
-        {transaction.isManual && (
-          <Link
-            href={`/accounts/${transaction.accountId}/manual/${transaction.id}`}
-            className={BUTTON_CLASS}
-          >
-            Edit details
-          </Link>
-        )}
-        <ActionForm
-          action={deleteTransactionFromDetailAction.bind(
-            null,
-            transaction.id,
-            transaction.isManual,
-          )}
-          label="Delete Transaction"
-          confirmMessage={
-            transaction.isManual
-              ? 'Delete this Manual transaction?'
-              : 'Delete this Transaction? Importing its file again adds it back.'
-          }
+        <aside
+          aria-label="Work on this Transaction"
+          className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4"
         >
-          <button type="submit" className={BUTTON_CLASS}>
-            Delete Transaction
-          </button>
-        </ActionForm>
+          <section aria-labelledby="classification" className={PANEL}>
+            <h2 id="classification" className="text-lg font-semibold">
+              Classification
+            </h2>
+            <ClassificationForm
+              classification={classification}
+              groups={groups}
+              payeeNames={payees.map((payee) => payee.name)}
+              tagNames={tags.map((tag) => tag.name)}
+              action={editClassificationAction.bind(null, transaction.id)}
+            />
+            <LockedFields classification={classification} />
+            <Link
+              href={`/rules/new?fromTransaction=${transaction.id}`}
+              className="text-sm underline"
+            >
+              Create rule from this Transaction
+            </Link>
+          </section>
+          <SplitSection transaction={transaction} groups={groups} fmt={fmt} className={PANEL} />
+          <TransferSection
+            transactionId={transaction.id}
+            counterpart={counterpart}
+            options={counterpart ? [] : await listLinkOptions(ctx, transaction.id)}
+            fmt={fmt}
+            className={PANEL}
+          />
+          <TransactionActions transaction={transaction} />
+        </aside>
       </div>
-
-      <section aria-labelledby="history" className="flex flex-col gap-3">
-        <h2 id="history" className="text-lg font-semibold">
-          History
-        </h2>
-        {history.length === 0 ? (
-          <p className="text-sm text-zinc-500">No History for this Transaction.</p>
-        ) : (
-          <HistoryTable entries={history} fmt={fmt} label="Transaction History" />
-        )}
-        <Link
-          href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
-          className="text-sm underline"
-        >
-          Open in History
-        </Link>
-      </section>
     </section>
+  );
+}
+
+/** Edit the details of a Manual transaction; delete any Transaction. */
+function TransactionActions({ transaction }: { transaction: TransactionDetail }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-1">
+      {transaction.isManual ? (
+        <Link
+          href={`/accounts/${transaction.accountId}/manual/${transaction.id}`}
+          className={BUTTON_CLASS}
+        >
+          Edit details
+        </Link>
+      ) : (
+        <span />
+      )}
+      <ActionForm
+        action={deleteTransactionFromDetailAction.bind(null, transaction.id, transaction.isManual)}
+        label="Delete Transaction"
+        confirmMessage={
+          transaction.isManual
+            ? 'Delete this Manual transaction?'
+            : 'Delete this Transaction? Importing its file again adds it back.'
+        }
+      >
+        <button type="submit" className={DANGER_BUTTON_CLASS}>
+          Delete Transaction
+        </button>
+      </ActionForm>
+    </div>
   );
 }
 
@@ -198,92 +197,6 @@ function LockedFields({ classification }: { classification: Classification }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-interface BankFieldsProps {
-  transaction: TransactionDetail;
-  amount: string;
-  fmt: Formatter;
-}
-
-function BankFields({ transaction, amount, fmt }: BankFieldsProps) {
-  const source = transaction.import ? (
-    <>
-      Import of {transaction.import.fileName} on {fmt.date(transaction.import.importedAt)}
-    </>
-  ) : (
-    'Manual'
-  );
-  return (
-    <dl
-      aria-label="Bank fields"
-      className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm"
-    >
-      <Item term="Booking date">{fmt.date(transaction.bookingDate)}</Item>
-      <Item term="Value date">{transaction.valueDate && fmt.date(transaction.valueDate)}</Item>
-      <Item term="Amount">
-        <span className="tabular-nums">{amount}</span>
-      </Item>
-      <Item term="Description">
-        <span className="whitespace-pre-wrap">{transaction.rawDescription}</span>
-      </Item>
-      <Item term="Counterparty">{transaction.counterpartyName}</Item>
-      <Item term="Counterparty IBAN">
-        {transaction.counterpartyIban && (
-          <span className="font-mono">{transaction.counterpartyIban}</span>
-        )}
-      </Item>
-      <Item term="Payment reference">{transaction.paymentReference}</Item>
-      <Item term="Bank reference">{transaction.bankReference}</Item>
-      <Item term="Source">{source}</Item>
-    </dl>
-  );
-}
-
-function Item({ term, children }: { term: string; children: ReactNode }) {
-  return (
-    <>
-      <dt className="text-zinc-500">{term}</dt>
-      <dd className="break-words">{children || '—'}</dd>
-    </>
-  );
-}
-
-interface BundledDetailsProps {
-  transaction: TransactionDetail;
-  fmt: Formatter;
-}
-
-/** The payments a bank bundled into this one entry, for information only (spec 28). */
-function BundledDetails({ transaction, fmt }: BundledDetailsProps) {
-  return (
-    <div className="overflow-x-auto">
-      <table aria-label="Bundled details" className="w-full text-sm">
-        <thead className="border-b border-zinc-200 dark:border-zinc-800">
-          <tr>
-            <th className={CELL}>Counterparty</th>
-            <th className={CELL}>IBAN</th>
-            <th className={CELL}>Reference</th>
-            <th className={`${CELL} text-right`}>Amount</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {(transaction.bundledDetails ?? []).map((detail, index) => (
-            <tr key={index}>
-              <td className={CELL}>{detail.counterpartyName ?? '—'}</td>
-              <td className={`${CELL} font-mono`}>{detail.counterpartyIban ?? '—'}</td>
-              <td className={CELL}>{detail.paymentReference ?? '—'}</td>
-              <td className={`${CELL} text-right tabular-nums`}>
-                {detail.amountMinor === null
-                  ? '—'
-                  : fmt.amount(detail.amountMinor, { currency: transaction.currency })}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
