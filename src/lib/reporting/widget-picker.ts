@@ -1,4 +1,4 @@
-/** The "add a saved Widget" picker on a Dashboard (GLOSSARY: Standalone Widget). */
+/** The "Add existing Widget" picker on a Dashboard (GLOSSARY: Standalone Widget). */
 
 export interface PickableWidget {
   id: string;

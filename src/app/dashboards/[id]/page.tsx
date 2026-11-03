@@ -73,7 +73,7 @@ function WidgetHeader({ widget }: { widget: Widget }) {
   );
 }
 
-/** Places a copy of any saved Widget on this Dashboard (GLOSSARY: Standalone Widget). */
+/** Places a copy of any Widget on this Dashboard (GLOSSARY: Standalone Widget). */
 function AddSavedWidget({
   dashboardId,
   options,
@@ -85,10 +85,10 @@ function AddSavedWidget({
   return (
     <ActionForm
       action={copyWidgetToDashboardAction.bind(null, dashboardId)}
-      label="Add a saved Widget"
+      label="Add existing Widget"
       className="flex items-center gap-2"
     >
-      <select name="widgetId" aria-label="Saved Widget" className={INPUT_CLASS}>
+      <select name="widgetId" aria-label="Widget" className={INPUT_CLASS}>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
@@ -148,7 +148,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">{dashboard.name}</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={`/reports/builder?dashboard=${dashboard.id}`} className={LINK_BUTTON}>
+          <Link href={`/widgets/new?dashboard=${dashboard.id}`} className={LINK_BUTTON}>
             Add Widget
           </Link>
           <ActionForm

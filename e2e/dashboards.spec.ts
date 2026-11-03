@@ -33,7 +33,7 @@ test('create a Dashboard, add a stacked bar Widget, move it, and the layout pers
 
   await page.getByRole('link', { name: 'Add Widget' }).click();
   await page.getByLabel('Visualisation').selectOption({ label: 'Stacked bar' });
-  await page.getByRole('button', { name: 'Show report' }).click();
+  await page.getByRole('button', { name: 'Preview' }).click();
   await expect(page.getByLabel('Visualisation')).toHaveValue('stacked_bar');
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
@@ -88,12 +88,12 @@ test('a Widget moves with the arrow keys on its handle, and the move is saved', 
   await expect(page.locator('[data-layout="1,8,6,8"]')).toHaveCount(1);
 });
 
-test('add a saved Widget from the Reports page to a Dashboard as a copy', async ({ page }) => {
+test('add an existing Widget from the Widgets page to a Dashboard as a copy', async ({ page }) => {
   const dashboardName = `Saved ${Date.now()}`;
   const widgetName = `Standalone ${Date.now()}`;
 
-  await page.goto('/reports/builder');
-  await page.getByRole('button', { name: 'Show report' }).click();
+  await page.goto('/widgets/new');
+  await page.getByRole('button', { name: 'Preview' }).click();
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
   await expect(page.getByRole('heading', { name: widgetName, level: 1 })).toBeVisible();
@@ -104,12 +104,12 @@ test('add a saved Widget from the Reports page to a Dashboard as a copy', async 
   await expect(page.getByRole('heading', { name: dashboardName, level: 1 })).toBeVisible();
 
   await page
-    .getByRole('combobox', { name: 'Saved Widget' })
+    .getByRole('combobox', { name: 'Widget', exact: true })
     .selectOption({ label: `${widgetName} (No Dashboard)` });
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
   await expect(layoutOf(page, widgetName)).toHaveAttribute('data-layout', '0,0,6,8');
   await expect(
-    page.getByRole('combobox', { name: 'Saved Widget' }).getByRole('option'),
+    page.getByRole('combobox', { name: 'Widget', exact: true }).getByRole('option'),
   ).toContainText([`${widgetName} (No Dashboard)`, `${widgetName} (${dashboardName})`]);
 });

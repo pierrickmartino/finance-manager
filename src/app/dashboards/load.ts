@@ -4,7 +4,7 @@ import { queryToParams } from '@/lib/reporting/widget-params';
 import type { ServiceContext } from '@/server/services/context';
 import { ServiceError } from '@/server/services/errors';
 import { runSavedWidget, type CellRef, type Widget } from '@/server/services/reporting';
-import { toPivotData } from '../reports/pivot-data';
+import { toPivotData } from '../widgets/pivot-data';
 
 export interface WidgetView {
   data: ChartSource | null;
@@ -38,5 +38,5 @@ export function editWidgetHref(widget: Widget): string {
   const params = queryToParams(widget.query);
   params.set('widget', widget.id);
   params.set('vis', widget.visualisation);
-  return `/reports/builder?${params}`;
+  return `/widgets/new?${params}`;
 }

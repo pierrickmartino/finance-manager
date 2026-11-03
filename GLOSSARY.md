@@ -1,6 +1,6 @@
 # Finance Manager
 
-A self-hosted, single-user app for tracking household income and expenses across several banks and currencies. It records and reports; it does not budget.
+A self-hosted, single-user app for tracking household income and expenses across several banks and currencies. It records and analyses; it does not budget.
 
 ## Language
 
@@ -18,7 +18,7 @@ _Avoid_: Wallet, pocket, own account
 The ISO currency in which an Account holds its amounts (CHF, EUR).
 
 **Base currency**:
-The single currency, CHF, in which all reports are expressed. It never changes.
+The single currency, CHF, in which all amounts are reported and shown. It never changes.
 _Avoid_: Reporting currency, home currency
 
 **FX rate**:
@@ -112,7 +112,7 @@ The group of History entries produced by one user action, such as a bulk edit, a
 
 **Widget**:
 A saved query (filters, date range, axes, measure) together with the way it is visualised.
-_Avoid_: Card, tile, report
+_Avoid_: Card, tile, report, saved Widget
 
 **Standalone Widget**:
 A Widget that sits on no Dashboard. Adding it to a Dashboard places a copy there; the Standalone Widget stays as it is.

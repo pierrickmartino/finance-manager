@@ -23,7 +23,7 @@ import {
 import { loadReport } from '../load';
 import { drillHref } from '../pivot-data';
 
-export const metadata: Metadata = { title: 'Report cell · Finance Manager' };
+export const metadata: Metadata = { title: 'Drill-down · Finance Manager' };
 
 const CELL = 'px-3 py-2 text-left align-top';
 
@@ -69,8 +69,8 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
     <section className="flex flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-2xl font-semibold">Transactions in {describeCell(report, cell)}</h1>
-        <Link href={`/reports/builder?${queryToParams(query)}`} className="text-sm underline">
-          Back to the report
+        <Link href={`/widgets/new?${queryToParams(query)}`} className="text-sm underline">
+          Back to the editor
         </Link>
       </div>
       {error && <FieldError message={error} />}

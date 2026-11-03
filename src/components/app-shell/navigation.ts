@@ -22,7 +22,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Overview',
     links: [
       { href: '/dashboards', label: 'Dashboards', icon: 'dashboard' },
-      { href: '/reports', label: 'Reports', icon: 'reports' },
+      { href: '/widgets', label: 'Widgets', icon: 'widgets' },
     ],
   },
   {
