@@ -1,11 +1,11 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
-import type { Account } from '@/server/services/accounts';
 import {
-  CATEGORY_GROUP_TYPE_LABELS,
-  CATEGORY_GROUP_TYPES,
-  type CategoryGroup,
-} from '@/server/services/categories';
+  activeFilterCount,
+  queryFilterLists,
+  type FilterList,
+} from '@/lib/reporting/query-filters';
+import type { Account } from '@/server/services/accounts';
+import type { CategoryGroup } from '@/server/services/categories';
 import type { Payee } from '@/server/services/payees';
 import {
   AXIS_LABELS,
@@ -16,12 +16,19 @@ import {
   type WidgetQueryInput,
 } from '@/server/services/reporting';
 import type { Tag } from '@/server/services/tags';
+import { AutoSubmitForm } from './auto-submit-form';
+import { PANEL_INPUT, PanelRow, PanelSection } from './editor-panel';
 
-const INPUT =
-  'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
-const MULTI = `${INPUT} min-w-40`;
+const UNIT_LABELS = { month: 'months', quarter: 'quarters', year: 'years' } as const;
 
-const UNIT_LABELS = { month: 'Months', quarter: 'Quarters', year: 'Years' } as const;
+/*
+ * Fields that apply only to some choices stay in the form (so switching keeps their values)
+ * and are shown by CSS from the choice: the date range kind, and the average measure.
+ */
+const WHEN_LAST = 'hidden [[data-period]:has(option[value=last]:checked)_&]:block';
+const WHEN_FIXED = 'hidden [[data-period]:has(option[value=fixed]:checked)_&]:flex';
+const UNLESS_FIXED = '[[data-period]:has(option[value=fixed]:checked)_&]:hidden';
+const WHEN_AVERAGE = 'hidden [[data-measure]:has(option[value=average]:checked)_&]:block';
 
 export interface QueryFormLists {
   accounts: Account[];
@@ -35,70 +42,125 @@ interface QueryFormProps {
   lists: QueryFormLists;
   /** Extra hidden fields to keep (e.g. the Widget being edited). */
   hidden?: Record<string, string>;
-  /** More fields of the same GET form (e.g. the visualisation). */
+  /** The dates the preview covers: what "Fixed dates" starts from when switched to. */
+  shownRange?: { from: string; to: string };
+  /** Sections shown before the query's own (e.g. the visualisation). */
   children?: ReactNode;
 }
 
-function Labelled({ label, children }: { label: string; children: ReactNode }) {
+export function HiddenFields({ fields }: { fields: Record<string, string> }) {
+  return Object.entries(fields).map(([name, value]) => (
+    <input key={name} type="hidden" name={name} value={value} />
+  ));
+}
+
+function AxisSelect({ query, side }: { query: WidgetQueryInput; side: 'rows' | 'columns' }) {
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium">
-      {label}
-      {children}
-    </label>
+    <select name={side} defaultValue={query[side] ?? ''} className={PANEL_INPUT}>
+      <option value="">None</option>
+      {REPORT_AXES.map((axis) => (
+        <option key={axis} value={axis}>
+          {AXIS_LABELS[axis]}
+        </option>
+      ))}
+    </select>
   );
 }
 
-/**
- * The Widget query definition as a GET form (spec 99–103): submitting it shows the report.
- * Fields that don't apply to the chosen date range are ignored.
- */
-export function QueryForm({ query, lists, hidden = {}, children }: QueryFormProps) {
-  const { accounts, groups, payees, tags } = lists;
-  const range = query.dateRange;
-  const filters = query.filters ?? {};
-  const currencies = [...new Set(accounts.map((account) => account.currency))].sort();
+function DataSection({ query }: { query: WidgetQueryInput }) {
   return (
-    <form
-      key={JSON.stringify(query)}
-      method="get"
-      aria-label="Widget query"
-      className="flex flex-col gap-4 rounded-md border border-zinc-200 p-4 dark:border-zinc-800"
-    >
-      {Object.entries(hidden).map(([name, value]) => (
-        <input key={name} type="hidden" name={name} value={value} />
-      ))}
-      <fieldset className="flex flex-wrap items-end gap-3">
-        <legend className="mb-2 text-sm font-semibold">Date range</legend>
-        <Labelled label="Range">
-          <select name="range" defaultValue={range.kind} className={INPUT}>
+    <PanelSection title="Data">
+      <div data-measure className="flex flex-col gap-3">
+        <PanelRow label="Measure">
+          <select name="measure" defaultValue={query.measure ?? 'sum'} className={PANEL_INPUT}>
+            {MEASURES.map((measure) => (
+              <option key={measure} value={measure}>
+                {MEASURE_LABELS[measure]}
+              </option>
+            ))}
+          </select>
+        </PanelRow>
+        <div className={WHEN_AVERAGE}>
+          <PanelRow label="Average per">
+            <select name="per" defaultValue={query.averagePer ?? 'month'} className={PANEL_INPUT}>
+              {TIME_AXES.map((unit) => (
+                <option key={unit} value={unit}>
+                  {AXIS_LABELS[unit]}
+                </option>
+              ))}
+            </select>
+          </PanelRow>
+        </div>
+      </div>
+      <PanelRow label="Rows">
+        <AxisSelect query={query} side="rows" />
+      </PanelRow>
+      <PanelRow label="Columns">
+        <AxisSelect query={query} side="columns" />
+      </PanelRow>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="capital" value="1" defaultChecked={query.includeCapital} />
+        Include Capital (net cash flow)
+      </label>
+    </PanelSection>
+  );
+}
+
+function PeriodSection({
+  query,
+  shownRange,
+}: {
+  query: WidgetQueryInput;
+  shownRange?: { from: string; to: string };
+}) {
+  const range = query.dateRange;
+  const fixed = range.kind === 'fixed' ? range : (shownRange ?? { from: '', to: '' });
+  return (
+    <PanelSection title="Period">
+      <div data-period className="flex flex-col gap-3">
+        <PanelRow label="Range">
+          <select name="range" defaultValue={range.kind} className={PANEL_INPUT}>
             <option value="last">Last complete periods</option>
             <option value="yearToDate">Year to date</option>
             <option value="fixed">Fixed dates</option>
           </select>
-        </Labelled>
-        <Labelled label="Number of periods">
-          <input
-            name="count"
-            type="number"
-            min={1}
-            defaultValue={range.kind === 'last' ? range.count : 12}
-            className={`${INPUT} w-24`}
-          />
-        </Labelled>
-        <Labelled label="Period">
-          <select
-            name="unit"
-            defaultValue={range.kind === 'last' ? range.unit : 'month'}
-            className={INPUT}
-          >
-            {TIME_AXES.map((unit) => (
-              <option key={unit} value={unit}>
-                {UNIT_LABELS[unit]}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <label className="flex items-center gap-2 self-center text-sm font-medium">
+        </PanelRow>
+        <div className={WHEN_LAST}>
+          <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">Last</span>
+            <span className="flex gap-2">
+              <input
+                name="count"
+                type="number"
+                min={1}
+                aria-label="Number of periods"
+                defaultValue={range.kind === 'last' ? range.count : 12}
+                className={`${PANEL_INPUT} w-16`}
+              />
+              <select
+                name="unit"
+                aria-label="Period"
+                defaultValue={range.kind === 'last' ? range.unit : 'month'}
+                className={PANEL_INPUT}
+              >
+                {TIME_AXES.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {UNIT_LABELS[unit]}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </div>
+        </div>
+        <div className={`flex-col gap-3 ${WHEN_FIXED}`}>
+          <PanelRow label="From">
+            <input name="from" type="date" defaultValue={fixed.from} className={PANEL_INPUT} />
+          </PanelRow>
+          <PanelRow label="To">
+            <input name="to" type="date" defaultValue={fixed.to} className={PANEL_INPUT} />
+          </PanelRow>
+        </div>
+        <label className={`flex items-center gap-2 text-sm ${UNLESS_FIXED}`}>
           <input
             type="checkbox"
             name="current"
@@ -107,149 +169,87 @@ export function QueryForm({ query, lists, hidden = {}, children }: QueryFormProp
           />
           Include the current period (partial)
         </label>
-        <Labelled label="From">
-          <input
-            name="from"
-            type="date"
-            defaultValue={range.kind === 'fixed' ? range.from : ''}
-            className={INPUT}
-          />
-        </Labelled>
-        <Labelled label="To">
-          <input
-            name="to"
-            type="date"
-            defaultValue={range.kind === 'fixed' ? range.to : ''}
-            className={INPUT}
-          />
-        </Labelled>
-      </fieldset>
-
-      <fieldset className="flex flex-wrap items-end gap-3">
-        <legend className="mb-2 text-sm font-semibold">Layout and measure</legend>
-        {(['rows', 'columns'] as const).map((side) => (
-          <Labelled key={side} label={side === 'rows' ? 'Rows' : 'Columns'}>
-            <select name={side} defaultValue={query[side] ?? ''} className={INPUT}>
-              <option value="">None</option>
-              {REPORT_AXES.map((axis) => (
-                <option key={axis} value={axis}>
-                  {AXIS_LABELS[axis]}
-                </option>
-              ))}
-            </select>
-          </Labelled>
-        ))}
-        <Labelled label="Measure">
-          <select name="measure" defaultValue={query.measure ?? 'sum'} className={INPUT}>
-            {MEASURES.map((measure) => (
-              <option key={measure} value={measure}>
-                {MEASURE_LABELS[measure]}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <Labelled label="Average per">
-          <select name="per" defaultValue={query.averagePer ?? 'month'} className={INPUT}>
-            {TIME_AXES.map((unit) => (
-              <option key={unit} value={unit}>
-                {AXIS_LABELS[unit]}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <label className="flex items-center gap-2 self-center text-sm font-medium">
-          <input type="checkbox" name="capital" value="1" defaultChecked={query.includeCapital} />
-          Include Capital (net cash flow)
-        </label>
-      </fieldset>
-
-      <fieldset className="flex flex-wrap items-start gap-3">
-        <legend className="mb-2 text-sm font-semibold">Filters (none selected = all)</legend>
-        <Labelled label="Accounts">
-          <select name="account" multiple defaultValue={filters.accountIds} className={MULTI}>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.bankName} · {account.name}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <Labelled label="Category groups">
-          <select name="group" multiple defaultValue={filters.categoryGroupIds} className={MULTI}>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <Labelled label="Categories">
-          <select name="category" multiple defaultValue={filters.categoryIds} className={MULTI}>
-            {groups.map((group) => (
-              <optgroup key={group.id} label={group.name}>
-                {group.categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </Labelled>
-        <Labelled label="Payees">
-          <select name="payee" multiple defaultValue={filters.payeeIds} className={MULTI}>
-            {payees.map((payee) => (
-              <option key={payee.id} value={payee.id}>
-                {payee.name}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <Labelled label="Tags">
-          <select name="tag" multiple defaultValue={filters.tagIds} className={MULTI}>
-            {tags.map((tag) => (
-              <option key={tag.id} value={tag.id}>
-                {tag.name}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <Labelled label="Category group types">
-          <select name="type" multiple defaultValue={filters.categoryGroupTypes} className={MULTI}>
-            {CATEGORY_GROUP_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {CATEGORY_GROUP_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-        <Labelled label="Currencies">
-          <select name="currency" multiple defaultValue={filters.currencies} className={MULTI}>
-            {currencies.map((currency) => (
-              <option key={currency} value={currency}>
-                {currency}
-              </option>
-            ))}
-          </select>
-        </Labelled>
-      </fieldset>
-
-      {children}
-
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          Preview
-        </button>
-        <Link href="/widgets/new" className="text-sm underline">
-          Reset
-        </Link>
-        <p className="text-xs text-zinc-500">
-          All values in CHF. Transfers are always left out; Capital only when included.
-        </p>
       </div>
-    </form>
+    </PanelSection>
+  );
+}
+
+/** One filter as a collapsible checkbox list; open when it already narrows the query. */
+function FilterChecklist({ list }: { list: FilterList }) {
+  const count = list.selected.length;
+  return (
+    <details open={count > 0} className="group/filter">
+      <summary className="flex cursor-pointer list-none items-center justify-between text-sm text-zinc-700 dark:text-zinc-300 [&::-webkit-details-marker]:hidden">
+        {list.label}
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          {count > 0 ? `${count} selected` : 'all'}
+        </span>
+      </summary>
+      <fieldset className="mt-1 flex max-h-48 min-w-0 flex-col gap-0.5 overflow-y-auto rounded-md border border-zinc-200 bg-white p-1.5 dark:border-zinc-800 dark:bg-zinc-900">
+        <legend className="sr-only">{list.label}</legend>
+        {list.options.length === 0 && (
+          <p className="px-1 text-sm text-zinc-500 dark:text-zinc-400">Nothing to choose yet.</p>
+        )}
+        {list.options.map((option, index) => (
+          <div key={option.value}>
+            {option.group && option.group !== list.options[index - 1]?.group && (
+              <p className="mt-1.5 px-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                {option.group}
+              </p>
+            )}
+            <label className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
+              <input
+                type="checkbox"
+                name={list.name}
+                value={option.value}
+                defaultChecked={list.selected.includes(option.value)}
+              />
+              {option.label}
+            </label>
+          </div>
+        ))}
+      </fieldset>
+    </details>
+  );
+}
+
+function FiltersSection({ query, lists }: { query: WidgetQueryInput; lists: QueryFormLists }) {
+  const filterLists = queryFilterLists(query.filters ?? {}, lists);
+  const active = activeFilterCount(filterLists);
+  return (
+    <PanelSection
+      title="Filters"
+      badge={active > 0 ? `${active} active` : 'none'}
+      isOpen={active > 0}
+    >
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Nothing ticked lets everything in.</p>
+      {filterLists.map((list) => (
+        <FilterChecklist key={list.name} list={list} />
+      ))}
+    </PanelSection>
+  );
+}
+
+/**
+ * The Widget query definition (spec 99–103) as the editor's side panel: a GET form that
+ * refreshes the preview on every change. Fields that don't apply to the chosen date range or
+ * measure are hidden but kept.
+ */
+export function QueryForm({ query, lists, hidden = {}, shownRange, children }: QueryFormProps) {
+  return (
+    <AutoSubmitForm action="/widgets/new" label="Widget query">
+      <HiddenFields fields={hidden} />
+      {children}
+      <DataSection query={query} />
+      <PeriodSection query={query} shownRange={shownRange} />
+      <FiltersSection query={query} lists={lists} />
+      <noscript>
+        <div className="p-4">
+          <button type="submit" className="text-sm underline">
+            Update preview
+          </button>
+        </div>
+      </noscript>
+    </AutoSubmitForm>
   );
 }

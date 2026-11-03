@@ -32,9 +32,9 @@ test('create a Dashboard, add a stacked bar Widget, move it, and the layout pers
   await expect(page.getByText('No Widgets yet')).toBeVisible();
 
   await page.getByRole('link', { name: 'Add Widget' }).click();
-  await page.getByLabel('Visualisation').selectOption({ label: 'Stacked bar' });
-  await page.getByRole('button', { name: 'Preview' }).click();
-  await expect(page.getByLabel('Visualisation')).toHaveValue('stacked_bar');
+  await page.getByRole('group', { name: 'Visualisation' }).getByText('Stacked bar').click();
+  await expect(page).toHaveURL(/[?&]vis=stacked_bar/);
+  await expect(page.getByRole('radio', { name: 'Stacked bar' })).toBeChecked();
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
 
@@ -93,7 +93,6 @@ test('add an existing Widget from the Widgets page to a Dashboard as a copy', as
   const widgetName = `Standalone ${Date.now()}`;
 
   await page.goto('/widgets/new');
-  await page.getByRole('button', { name: 'Preview' }).click();
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
   await expect(page.getByRole('heading', { name: widgetName, level: 1 })).toBeVisible();
