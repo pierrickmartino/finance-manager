@@ -114,5 +114,9 @@ The group of History entries produced by one user action, such as a bulk edit, a
 A saved query (filters, date range, axes, measure) together with the way it is visualised.
 _Avoid_: Card, tile, report
 
+**Standalone Widget**:
+A Widget that sits on no Dashboard. Adding it to a Dashboard places a copy there; the Standalone Widget stays as it is.
+_Avoid_: Report, saved report
+
 **Dashboard**:
-A named, user-arranged grid of Widgets.
+A named, user-arranged grid of Widgets. Each Widget sits on at most one Dashboard.
