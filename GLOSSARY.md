@@ -112,7 +112,7 @@ The group of History entries produced by one user action, such as a bulk edit, a
 
 **Widget**:
 A saved query (filters, date range, axes, measure) together with the way it is visualised.
-_Avoid_: Card, tile, report
+_Avoid_: Card, tile, report, saved Widget
 
 **Standalone Widget**:
 A Widget that sits on no Dashboard. Adding it to a Dashboard places a copy there; the Standalone Widget stays as it is.
