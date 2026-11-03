@@ -36,8 +36,11 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await form.getByLabel('To', { exact: true }).fill('2025-10-31');
   await form.getByLabel('Rows').selectOption({ label: 'Month' });
   await form.getByLabel('Columns').selectOption({ label: 'Category' });
-  await form.getByLabel('Accounts').selectOption({ label: `${name} bank · ${name}` });
-  await form.getByRole('button', { name: 'Preview' }).click();
+  await form.locator('summary', { hasText: 'Filters' }).click();
+  await form.locator('summary', { hasText: 'Accounts' }).click();
+  await form.getByRole('checkbox', { name: `${name} bank · ${name}` }).check();
+  // No Preview button: the preview follows every change.
+  await expect(page).toHaveURL(/[?&]account=/);
 
   const pivot = page.getByRole('table', { name: 'Pivot' });
   await expect(pivot.getByRole('columnheader', { name: 'Unclassified' })).toBeVisible();
