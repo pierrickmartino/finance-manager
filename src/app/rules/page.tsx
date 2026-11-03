@@ -9,6 +9,12 @@ import { describeActions, describeCondition } from './describe';
 import { loadRuleOptions } from './load';
 import type { RuleDetailRule } from './rule-detail';
 import { RulesWorkbench } from './rules-workbench';
+// PROTOTYPE — grouped Rules variants, switchable via ?variant=. Remove once decided.
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
+import { VARIANTS, type PrototypeRule } from './_prototype/shared';
+import { VariantB } from './_prototype/variant-b';
+import { VariantC } from './_prototype/variant-c';
+import { VariantD } from './_prototype/variant-d';
 
 export const metadata: Metadata = { title: 'Rules · Finance Manager' };
 
@@ -32,16 +38,28 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
     getFormatter(),
     searchParams,
   ]);
-  const rows: RuleDetailRule[] = rules.map((rule) => ({
-    id: rule.id,
-    name: rule.name,
-    enabled: rule.enabled,
-    conditions: rule.conditions.map((condition) => describeCondition(condition, names, fmt)),
-    actions: describeActions(rule.actions, names),
-    matchCount: matchCounts[rule.id] ?? 0,
-    toggle: setRuleEnabledAction.bind(null, rule.id, !rule.enabled),
-    remove: deleteRuleAction.bind(null, rule.id),
-  }));
+  const rows: PrototypeRule[] = rules.map((rule) => {
+    const categoryLabel = rule.actions.categoryId
+      ? (names.categories.get(rule.actions.categoryId) ?? '(deleted) › (deleted)')
+      : null;
+    const [categoryGroup, ...categoryRest] = categoryLabel?.split(' › ') ?? [];
+    return {
+      payee: rule.actions.payeeId ? (names.payees.get(rule.actions.payeeId) ?? '(deleted)') : null,
+      categoryGroup: categoryGroup ?? null,
+      category: categoryRest.length > 0 ? categoryRest.join(' › ') : null,
+      id: rule.id,
+      name: rule.name,
+      enabled: rule.enabled,
+      conditions: rule.conditions.map((condition) => describeCondition(condition, names, fmt)),
+      actions: describeActions(rule.actions, names),
+      matchCount: matchCounts[rule.id] ?? 0,
+      toggle: setRuleEnabledAction.bind(null, rule.id, !rule.enabled),
+      remove: deleteRuleAction.bind(null, rule.id),
+    } satisfies RuleDetailRule & PrototypeRule;
+  });
+  const variant = param(params.variant) ?? 'A';
+  const groupBy = param(params.group) === 'category' ? 'category' : 'payee';
+  const listKey = rows.map((row) => `${row.id}:${row.enabled}`).join();
   const enabled = rows.filter((row) => row.enabled).length;
 
   return (
@@ -66,14 +84,45 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
           </Link>
         </div>
       </header>
-      <RulesWorkbench
-        // A new list from the server (added, removed or toggled Rules) resets the run order.
-        key={rows.map((row) => `${row.id}:${row.enabled}`).join()}
-        rules={rows}
-        query={param(params.q) ?? ''}
-        ruleId={param(params.rule)}
-        reorder={reorderRulesAction}
-      />
+      {variant === 'A' && (
+        <RulesWorkbench
+          // A new list from the server (added, removed or toggled Rules) resets the run order.
+          key={listKey}
+          rules={rows}
+          query={param(params.q) ?? ''}
+          ruleId={param(params.rule)}
+          reorder={reorderRulesAction}
+        />
+      )}
+      {variant === 'B' && (
+        <VariantB
+          key={listKey}
+          rules={rows}
+          query={param(params.q) ?? ''}
+          ruleId={param(params.rule)}
+          groupBy={groupBy}
+          reorder={reorderRulesAction}
+        />
+      )}
+      {variant === 'C' && (
+        <VariantC
+          key={listKey}
+          rules={rows}
+          ruleId={param(params.rule)}
+          groupBy={groupBy}
+          facet={param(params.facet)}
+          reorder={reorderRulesAction}
+        />
+      )}
+      {variant === 'D' && (
+        <VariantD
+          key={listKey}
+          rules={rows}
+          ruleId={param(params.rule)}
+          reorder={reorderRulesAction}
+        />
+      )}
+      <PrototypeSwitcher variants={VARIANTS} current={variant} />
     </section>
   );
 }
