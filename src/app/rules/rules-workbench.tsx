@@ -4,23 +4,24 @@ import { FieldError } from '@/components/form';
 import { RuleDetail, type RuleDetailRule } from './rule-detail';
 import { RuleList } from './rule-list';
 import { useRuleOrder, type ReorderAction } from './use-rule-order';
-import { filterRules, selectRule } from './view';
+import { filterRules, groupRules, selectRule, type RuleGroupBy } from './view';
 
 interface RulesWorkbenchProps {
   /** Every Rule, in run order. */
   rules: RuleDetailRule[];
   query: string;
+  groupBy: RuleGroupBy;
   /** The Rule the URL names (`?rule=`), if any. */
   ruleId: string | undefined;
   reorder: ReorderAction;
 }
 
 /**
- * Master / detail: the Rules in run order on the left (filtered by `?q=`), the selected one
- * (`?rule=`, else the first shown) on the right. Both sides share the run order, so moving a
- * Rule from the detail pane moves it in the list at once.
+ * Master / detail: the Rules grouped by Payee or Category on the left (`?group=`, filtered by
+ * `?q=`), the selected one (`?rule=`, else the first shown) on the right. Both sides share the
+ * run order, so moving a Rule from the detail pane renumbers it in the list at once.
  */
-export function RulesWorkbench({ rules, query, ruleId, reorder }: RulesWorkbenchProps) {
+export function RulesWorkbench({ rules, query, groupBy, ruleId, reorder }: RulesWorkbenchProps) {
   const ruleOrder = useRuleOrder(
     rules.map((rule) => rule.id),
     reorder,
@@ -29,8 +30,13 @@ export function RulesWorkbench({ rules, query, ruleId, reorder }: RulesWorkbench
   const ordered = ruleOrder.order
     .map((id) => byId.get(id))
     .filter((rule): rule is RuleDetailRule => rule !== undefined);
-  const visible = filterRules(ordered, query);
-  const selected = selectRule(ordered, visible, ruleId);
+  const groups = groupRules(filterRules(ordered, query), groupBy);
+  // The first shown is the top of the first group, not Rule #1.
+  const selected = selectRule(
+    ordered,
+    groups.flatMap((group) => group.rules),
+    ruleId,
+  );
   const positionOf = (id: string) => ruleOrder.order.indexOf(id);
 
   return (
@@ -38,13 +44,17 @@ export function RulesWorkbench({ rules, query, ruleId, reorder }: RulesWorkbench
       <div className="flex flex-col gap-2">
         {ruleOrder.error && <FieldError message={ruleOrder.error} />}
         <RuleList
-          rules={visible.map((rule) => ({
-            id: rule.id,
-            name: rule.name,
-            enabled: rule.enabled,
-            matchCount: rule.matchCount,
-            position: positionOf(rule.id) + 1,
+          groups={groups.map((group) => ({
+            ...group,
+            rules: group.rules.map((rule) => ({
+              id: rule.id,
+              name: rule.name,
+              enabled: rule.enabled,
+              matchCount: rule.matchCount,
+              position: positionOf(rule.id) + 1,
+            })),
           }))}
+          groupBy={groupBy}
           total={rules.length}
           selectedId={selected?.id}
           query={query}

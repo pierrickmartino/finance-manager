@@ -44,6 +44,14 @@ export async function loadRuleOptions(
           group.categories.map((category) => [category.id, `${group.name} › ${category.name}`]),
         ),
       ),
+      categoryParts: new Map(
+        groups.flatMap((group) =>
+          group.categories.map((category) => [
+            category.id,
+            { group: group.name, name: category.name },
+          ]),
+        ),
+      ),
       tags: byId(options.tags),
     },
   };

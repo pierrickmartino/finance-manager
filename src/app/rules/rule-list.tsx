@@ -1,8 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { INPUT_CLASS } from '@/components/named-list';
 import { CARD_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
 import type { RuleOrder } from './use-rule-order';
-import { ruleHref } from './view';
+import { ruleHref, type RuleGroup, type RuleGroupBy } from './view';
 
 export interface RuleListItem {
   id: string;
@@ -14,24 +17,58 @@ export interface RuleListItem {
 }
 
 interface RuleListProps {
-  /** The Rules the filter shows, in run order. */
-  rules: RuleListItem[];
+  /** The Rules the filter shows, grouped, each group in run order. */
+  groups: RuleGroup<RuleListItem>[];
+  groupBy: RuleGroupBy;
   total: number;
   selectedId: string | undefined;
   query: string;
   drag: Pick<RuleOrder, 'dragged' | 'isPending' | 'handleProps' | 'dropProps'>;
 }
 
+const GROUP_BY_LABELS: Record<RuleGroupBy, { option: string; unset: string; plural: string }> = {
+  payee: { option: 'Payee', unset: 'No Payee', plural: 'Payees' },
+  category: { option: 'Category', unset: 'No Category', plural: 'Categories' },
+};
+
 /**
- * The master list: a filter (`?q=`) and the Rules in run order with their status and match
- * counts. Drag a Rule by its handle to move it.
+ * The master list: a filter (`?q=`), the grouping (`?group=`: by the Payee or the Category the
+ * Rules set) and the Rules in collapsible groups, numbered by run order. Only the selected
+ * Rule's group starts open; a filter opens them all. Drag a Rule by its handle to move it.
  */
-export function RuleList({ rules, total, selectedId, query, drag }: RuleListProps) {
+export function RuleList({ groups, groupBy, total, selectedId, query, drag }: RuleListProps) {
+  const labels = GROUP_BY_LABELS[groupBy];
+  const ruleCount = groups.reduce((sum, group) => sum + group.rules.length, 0);
+  const selectedKey = groups.find((group) =>
+    group.rules.some((rule) => rule.id === selectedId),
+  )?.key;
+  const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(
+    () => new Set(selectedKey === undefined ? [] : [selectedKey]),
+  );
+  // The selected Rule's group opens whenever it changes or shows again (e.g. a cleared filter).
+  const [shownSelectedKey, setShownSelectedKey] = useState(selectedKey);
+  if (selectedKey !== shownSelectedKey) {
+    setShownSelectedKey(selectedKey);
+    if (selectedKey !== undefined) setOpenKeys((keys) => new Set(keys).add(selectedKey));
+  }
+  const setOpen = (key: string, isOpen: boolean) =>
+    setOpenKeys((keys) => {
+      const next = new Set(keys);
+      if (isOpen) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
   return (
-    <nav aria-label="Rules list" className={`${CARD_CLASS} flex flex-col gap-3 p-3`}>
-      {/* A GET form: the filter lives in the URL (?q=), like the selected Rule (?rule=). */}
+    <nav
+      aria-label="Rules list"
+      aria-busy={drag.isPending}
+      className={`${CARD_CLASS} flex flex-col gap-3 p-3`}
+    >
+      {/* A GET form: the filter lives in the URL (?q=), like the grouping and the selected Rule. */}
       <form role="search" action="/rules" className="flex items-center gap-1">
         {selectedId && <input type="hidden" name="rule" value={selectedId} />}
+        {groupBy !== 'payee' && <input type="hidden" name="group" value={groupBy} />}
         <input
           type="search"
           name="q"
@@ -41,46 +78,126 @@ export function RuleList({ rules, total, selectedId, query, drag }: RuleListProp
           className={`${INPUT_CLASS} min-w-0 flex-1`}
         />
         {query && (
-          <Link
-            href={selectedId ? ruleHref(selectedId, '') : '/rules'}
-            className={GHOST_BUTTON_CLASS}
-          >
+          <Link href={ruleHref(selectedId, '', groupBy)} className={GHOST_BUTTON_CLASS}>
             Clear
           </Link>
         )}
       </form>
 
-      <ol
-        aria-label="Rules"
-        aria-busy={drag.isPending}
-        className="flex max-h-[65vh] flex-col gap-0.5 overflow-y-auto"
-      >
-        {rules.map((rule) => (
-          <li
-            key={rule.id}
-            data-rule-id={rule.id}
-            {...drag.dropProps(rule.id)}
-            className={`flex items-center gap-1 ${drag.dragged === rule.id ? 'opacity-50' : ''}`}
-          >
-            <span
-              {...drag.handleProps(rule.id)}
-              aria-label={`Drag ${rule.name}`}
-              role="img"
-              title="Drag to change the run order"
-              className="cursor-grab select-none px-1 text-zinc-400"
+      <GroupByToggle groupBy={groupBy} selectedId={selectedId} query={query} />
+
+      <div className="flex max-h-[65vh] flex-col gap-0.5 overflow-y-auto">
+        {groups.map((group) => {
+          const label = group.name ?? labels.unset;
+          return (
+            <details
+              // Switching the grouping starts the sections afresh.
+              key={`${groupBy}:${group.key}`}
+              open={query !== '' || openKeys.has(group.key)}
+              onToggle={(event) => setOpen(group.key, event.currentTarget.open)}
+              className="group"
             >
-              ⠿
-            </span>
-            <RuleLink rule={rule} isActive={rule.id === selectedId} query={query} />
-          </li>
-        ))}
-      </ol>
-      {rules.length === 0 && (
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 [&::-webkit-details-marker]:hidden">
+                <span
+                  aria-hidden
+                  className="w-3 text-zinc-400 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+                >
+                  ›
+                </span>
+                <span
+                  className={`min-w-0 flex-1 break-words font-medium ${group.name === null ? 'italic text-zinc-500' : ''}`}
+                >
+                  {group.parent && (
+                    <span className="font-normal text-zinc-500">{group.parent} › </span>
+                  )}
+                  {label}
+                </span>
+                <span className="rounded-full bg-zinc-100 px-2 text-xs tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {group.rules.length}
+                  <span className="sr-only"> Rules</span>
+                </span>
+              </summary>
+              <ol
+                aria-label={`Rules: ${group.parent ? `${group.parent} › ` : ''}${label}`}
+                className="mb-1 ml-4 flex flex-col gap-0.5 border-l border-zinc-200 pl-1 dark:border-zinc-800"
+              >
+                {group.rules.map((rule) => (
+                  <li
+                    key={rule.id}
+                    data-rule-id={rule.id}
+                    {...drag.dropProps(rule.id)}
+                    className={`flex items-center gap-1 ${drag.dragged === rule.id ? 'opacity-50' : ''}`}
+                  >
+                    <span
+                      {...drag.handleProps(rule.id)}
+                      aria-label={`Drag ${rule.name}`}
+                      role="img"
+                      title="Drag to change the run order"
+                      className="cursor-grab select-none px-1 text-zinc-400"
+                    >
+                      ⠿
+                    </span>
+                    <RuleLink
+                      rule={rule}
+                      isActive={rule.id === selectedId}
+                      query={query}
+                      groupBy={groupBy}
+                    />
+                  </li>
+                ))}
+              </ol>
+            </details>
+          );
+        })}
+      </div>
+      {groups.length === 0 ? (
         <p className="px-2 text-sm text-zinc-400">
           {total === 0 ? 'No Rules yet.' : `No Rule matches "${query}".`}
         </p>
+      ) : (
+        <p className="px-2 text-xs text-zinc-500">
+          {ruleCount} Rule{ruleCount === 1 ? '' : 's'} in {groups.length}{' '}
+          {groups.length === 1 ? labels.option : labels.plural}. #1 runs first.
+        </p>
       )}
     </nav>
+  );
+}
+
+function GroupByToggle({
+  groupBy,
+  selectedId,
+  query,
+}: {
+  groupBy: RuleGroupBy;
+  selectedId: string | undefined;
+  query: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-1 text-xs text-zinc-500">
+      <span id="rules-group-by">Group by</span>
+      <div
+        role="group"
+        aria-labelledby="rules-group-by"
+        className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800"
+      >
+        {(Object.keys(GROUP_BY_LABELS) as RuleGroupBy[]).map((by) => (
+          <Link
+            key={by}
+            href={ruleHref(selectedId, query, by)}
+            scroll={false}
+            aria-current={by === groupBy ? 'true' : undefined}
+            className={`rounded-md px-3 py-1 font-medium ${
+              by === groupBy
+                ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white'
+                : 'hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            {GROUP_BY_LABELS[by].option}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -88,14 +205,16 @@ function RuleLink({
   rule,
   isActive,
   query,
+  groupBy,
 }: {
   rule: RuleListItem;
   isActive: boolean;
   query: string;
+  groupBy: RuleGroupBy;
 }) {
   return (
     <Link
-      href={ruleHref(rule.id, query)}
+      href={ruleHref(rule.id, query, groupBy)}
       scroll={false}
       aria-current={isActive ? 'page' : undefined}
       className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
@@ -104,8 +223,11 @@ function RuleLink({
           : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
       }`}
     >
-      <span className={`w-5 text-right text-xs tabular-nums ${isActive ? '' : 'text-zinc-500'}`}>
-        {rule.position}
+      <span
+        title="Run order"
+        className={`w-8 shrink-0 text-right text-xs tabular-nums ${isActive ? '' : 'text-zinc-500'}`}
+      >
+        #{rule.position}
       </span>
       <span
         aria-hidden

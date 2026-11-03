@@ -5,10 +5,11 @@ import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { countRuleMatches, listRules } from '@/server/services/rules';
 import { deleteRuleAction, reorderRulesAction, setRuleEnabledAction } from './actions';
-import { describeActions, describeCondition } from './describe';
+import { describeActions, describeCondition, describeGrouping } from './describe';
 import { loadRuleOptions } from './load';
 import type { RuleDetailRule } from './rule-detail';
 import { RulesWorkbench } from './rules-workbench';
+import { parseGroupBy } from './view';
 
 export const metadata: Metadata = { title: 'Rules · Finance Manager' };
 
@@ -20,8 +21,9 @@ const param = (value: string | string[] | undefined) =>
   typeof value === 'string' ? value : undefined;
 
 /**
- * Classification Rules (spec 69-82) as master / detail: the Rules in run order on the left,
- * filtered by `?q=`, and the selected one (`?rule=`, else the first shown) on the right.
+ * Classification Rules (spec 69-82) as master / detail: the Rules grouped by Payee or Category
+ * on the left (`?group=`), filtered by `?q=`, and the selected one (`?rule=`, else the first
+ * shown) on the right.
  */
 export default async function RulesPage({ searchParams }: RulesPageProps) {
   const ctx = await getServiceContext();
@@ -38,6 +40,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
     enabled: rule.enabled,
     conditions: rule.conditions.map((condition) => describeCondition(condition, names, fmt)),
     actions: describeActions(rule.actions, names),
+    grouping: describeGrouping(rule.actions, names),
     matchCount: matchCounts[rule.id] ?? 0,
     toggle: setRuleEnabledAction.bind(null, rule.id, !rule.enabled),
     remove: deleteRuleAction.bind(null, rule.id),
@@ -71,6 +74,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
         key={rows.map((row) => `${row.id}:${row.enabled}`).join()}
         rules={rows}
         query={param(params.q) ?? ''}
+        groupBy={parseGroupBy(param(params.group))}
         ruleId={param(params.rule)}
         reorder={reorderRulesAction}
       />

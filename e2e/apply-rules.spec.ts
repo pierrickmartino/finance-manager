@@ -77,9 +77,10 @@ test('creates a Rule from an Unclassified Transaction and applies it to existing
   }
 
   // The Rule's match count, then clean up: Rules are global
-  await page.goto('/rules');
+  // Filtered, so the Rule's group is open
+  await page.goto(`/rules?q=${encodeURIComponent(groupKey)}`);
   const row = page
-    .getByRole('list', { name: 'Rules', exact: true })
+    .getByRole('navigation', { name: 'Rules list' })
     .getByRole('listitem')
     .filter({ hasText: groupKey });
   await expect(row).toContainText('Matches: 2');
