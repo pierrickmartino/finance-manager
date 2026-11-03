@@ -97,6 +97,9 @@ test('creates and orders Rules, and the import preview shows what each Rule sets
       )?.replace('#', ''),
     );
 
+  // Saving lands on the Rules page; navigating before then would cancel the save
+  await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
+
   // The list groups the Rules by the Payee they set, the ones that set none last
   await page.goto(`/rules?q=${suffix}`);
   await expect(groupOf(payeeName).getByRole('listitem')).toHaveText([new RegExp(migrosRule)]);
