@@ -87,3 +87,29 @@ test('a Widget moves with the arrow keys on its handle, and the move is saved', 
   await page.reload();
   await expect(page.locator('[data-layout="1,8,6,8"]')).toHaveCount(1);
 });
+
+test('add a saved Widget from the Reports page to a Dashboard as a copy', async ({ page }) => {
+  const dashboardName = `Saved ${Date.now()}`;
+  const widgetName = `Standalone ${Date.now()}`;
+
+  await page.goto('/reports/builder');
+  await page.getByRole('button', { name: 'Show report' }).click();
+  await page.getByLabel('Widget name').fill(widgetName);
+  await page.getByRole('button', { name: 'Save Widget' }).click();
+  await expect(page.getByRole('heading', { name: widgetName, level: 1 })).toBeVisible();
+
+  await page.goto('/dashboards');
+  await page.getByLabel('Dashboard name').fill(dashboardName);
+  await page.getByRole('button', { name: 'Create Dashboard' }).click();
+  await expect(page.getByRole('heading', { name: dashboardName, level: 1 })).toBeVisible();
+
+  await page
+    .getByRole('combobox', { name: 'Saved Widget' })
+    .selectOption({ label: `${widgetName} (No Dashboard)` });
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+  await expect(layoutOf(page, widgetName)).toHaveAttribute('data-layout', '0,0,6,8');
+  await expect(
+    page.getByRole('combobox', { name: 'Saved Widget' }).getByRole('option'),
+  ).toContainText([`${widgetName} (No Dashboard)`, `${widgetName} (${dashboardName})`]);
+});
