@@ -20,6 +20,11 @@ import { loadQueryFormLists, loadReport } from '../load';
 import { QueryForm } from '../query-form';
 import { WidgetView } from '../widget-view';
 import { toPivotData } from '../pivot-data';
+// PROTOTYPE (widget editor redesign): three variants switchable via `?variant=A|B|C|current`.
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
+import { name as nameA, VariantA } from './prototype/variant-a-studio';
+import { name as nameB, VariantB } from './prototype/variant-b-guided';
+import { name as nameC, VariantC } from './prototype/variant-c-sentence';
 
 export const metadata: Metadata = { title: 'Widget editor · Finance Manager' };
 
@@ -69,6 +74,21 @@ async function runBalancesWidget(widget: Widget): Promise<ReportTable> {
   return runSavedWidget(await getServiceContext(), widget);
 }
 
+/** PROTOTYPE: the variants on offer; `current` is today's page, for comparison. */
+const PROTOTYPE_VARIANTS = [
+  { key: 'A', name: nameA },
+  { key: 'B', name: nameB },
+  { key: 'C', name: nameC },
+  { key: 'current', name: 'Current page' },
+] as const;
+
+/** PROTOTYPE: never switches away from the current page in a production build. */
+function prototypeVariant(params: UrlParams): string {
+  if (process.env.NODE_ENV === 'production') return 'current';
+  const requested = param(params, 'variant');
+  return PROTOTYPE_VARIANTS.some((v) => v.key === requested) ? requested : 'A';
+}
+
 /**
  * The Widget editor: the query form and visualisation, the report as it will show, and saving
  * it as a Widget. `widget=<id>` edits that Widget (its query comes in the URL like any other);
@@ -92,6 +112,40 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   if (widget) hidden.widget = widget.id;
   else if (dashboardId) hidden.dashboard = dashboardId;
   const backHref = dashboardId ? `/dashboards/${dashboardId}` : '/widgets';
+
+  // PROTOTYPE: the redesign variants (the Account balances Widget keeps the current page).
+  const variant = prototypeVariant(params);
+  if (variant !== 'current' && !isBalances) {
+    const Variant = { A: VariantA, B: VariantB, C: VariantC }[variant as 'A' | 'B' | 'C'];
+    const step = Number(param(params, 'step'));
+    return (
+      <>
+        <Variant
+          query={query}
+          lists={lists}
+          visualisation={visualisation}
+          report={report}
+          error={error}
+          widget={widget}
+          hidden={{ ...hidden, variant }}
+          backHref={backHref}
+          backLabel={dashboardId ? 'Back to the Dashboard' : 'All Widgets'}
+          preview={
+            report ? (
+              <WidgetView
+                report={report}
+                title={widget?.name ?? 'New Widget'}
+                visualisation={visualisation}
+              />
+            ) : null
+          }
+          saveAction={saveWidgetAction}
+          step={Number.isSafeInteger(step) && step > 0 ? step : 0}
+        />
+        <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} current={variant} />
+      </>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-6">
@@ -148,6 +202,8 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
           </ActionForm>
         </>
       )}
+      {/* PROTOTYPE */}
+      {!isBalances && <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} current={variant} />}
     </section>
   );
 }
