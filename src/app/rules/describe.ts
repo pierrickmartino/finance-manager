@@ -1,13 +1,16 @@
 import type { Formatter } from '@/lib/format';
 import type { RuleActions, RuleCondition } from '@/server/services/rules';
 import { CONDITION_KIND_LABELS, OPERATOR_OPTIONS } from './rule-form-model';
-import type { RuleActionPart } from './view';
+import type { RuleActionPart, RuleGrouping } from './view';
 
 /** Names the Rules list uses to describe conditions and actions. */
 export interface RuleNames {
   accounts: ReadonlyMap<string, string>;
   payees: ReadonlyMap<string, string>;
+  /** `Category Group › Category`. */
   categories: ReadonlyMap<string, string>;
+  /** The same Categories, Category Group and name apart. */
+  categoryParts: ReadonlyMap<string, { group: string; name: string }>;
   tags: ReadonlyMap<string, string>;
 }
 
@@ -69,4 +72,21 @@ export function describeActions(actions: RuleActions, names: RuleNames): RuleAct
       label: `Tag: ${nameOf(names.tags, id)}`,
     })),
   ];
+}
+
+/** The Payee and the Category the Rule sets, by name, for grouping the Rules list. */
+export function describeGrouping(actions: RuleActions, names: RuleNames): RuleGrouping {
+  const category = actions.categoryId ? names.categoryParts.get(actions.categoryId) : undefined;
+  return {
+    payee: actions.payeeId
+      ? { id: actions.payeeId, name: nameOf(names.payees, actions.payeeId), parent: null }
+      : null,
+    category: actions.categoryId
+      ? {
+          id: actions.categoryId,
+          name: category?.name ?? '(deleted)',
+          parent: category?.group ?? null,
+        }
+      : null,
+  };
 }
