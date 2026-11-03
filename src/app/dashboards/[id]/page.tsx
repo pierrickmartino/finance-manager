@@ -10,10 +10,13 @@ import {
   type DashboardWithWidgets,
 } from '@/server/services/dashboards';
 import { NotFoundError } from '@/server/services/errors';
-import type { Widget } from '@/server/services/reporting';
+import { listWidgets, type Widget } from '@/server/services/reporting';
+import { INPUT_CLASS } from '@/components/named-list';
+import { widgetPickerOptions, type WidgetPickerOption } from '@/lib/reporting/widget-picker';
 import type { ServiceContext } from '@/server/services/context';
 import {
   addBalancesWidgetAction,
+  copyWidgetToDashboardAction,
   deleteDashboardWidgetAction,
   duplicateWidgetAction,
 } from '../actions';
@@ -70,6 +73,35 @@ function WidgetHeader({ widget }: { widget: Widget }) {
   );
 }
 
+/** Places a copy of any saved Widget on this Dashboard (GLOSSARY: Standalone Widget). */
+function AddSavedWidget({
+  dashboardId,
+  options,
+}: {
+  dashboardId: string;
+  options: WidgetPickerOption[];
+}) {
+  if (options.length === 0) return null;
+  return (
+    <ActionForm
+      action={copyWidgetToDashboardAction.bind(null, dashboardId)}
+      label="Add a saved Widget"
+      className="flex items-center gap-2"
+    >
+      <select name="widgetId" aria-label="Saved Widget" className={INPUT_CLASS}>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <button type="submit" className={LINK_BUTTON}>
+        Add
+      </button>
+    </ActionForm>
+  );
+}
+
 async function gridWidget(ctx: ServiceContext, widget: Widget): Promise<GridWidget> {
   const view = await loadWidgetView(ctx, widget);
   return {
@@ -104,9 +136,10 @@ async function gridWidget(ctx: ServiceContext, widget: Widget): Promise<GridWidg
 export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
-  const [dashboards, widgets] = await Promise.all([
+  const [dashboards, widgets, savedWidgets] = await Promise.all([
     listDashboards(ctx),
     Promise.all(dashboard.widgets.map((widget) => gridWidget(ctx, widget))),
+    listWidgets(ctx),
   ]);
 
   return (
@@ -126,6 +159,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
               Add Account balances
             </button>
           </ActionForm>
+          <AddSavedWidget
+            dashboardId={dashboard.id}
+            options={widgetPickerOptions(savedWidgets, dashboards)}
+          />
         </div>
       </div>
       {widgets.length === 0 ? (

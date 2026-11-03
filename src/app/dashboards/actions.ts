@@ -6,6 +6,7 @@ import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
 import {
   addWidget,
+  copyWidgetToDashboard,
   createDashboard,
   deleteDashboard,
   duplicateDashboard,
@@ -84,6 +85,17 @@ export async function addBalancesWidgetAction(dashboardId: string, _previous: Re
       query: { ...DEFAULT_WIDGET_QUERY, rows: 'account', columns: null },
       visualisation: 'table',
     }),
+  );
+}
+
+/** Places a copy of a saved Widget on a Dashboard; the original is left as it is. */
+export async function copyWidgetToDashboardAction(
+  dashboardId: string,
+  _previous: Result | null,
+  formData: FormData,
+) {
+  return run(async () =>
+    copyWidgetToDashboard(await getServiceContext(), formText(formData, 'widgetId'), dashboardId),
   );
 }
 

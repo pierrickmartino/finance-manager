@@ -204,6 +204,31 @@ export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<
   });
 }
 
+/**
+ * Places a copy of a Widget (a Standalone Widget or one from another Dashboard) at the bottom
+ * of a Dashboard, at the original's size if it has one. The original is left as it is
+ * (GLOSSARY: Standalone Widget).
+ */
+export async function copyWidgetToDashboard(
+  ctx: ServiceContext,
+  widgetId: string,
+  dashboardId: string,
+): Promise<Widget> {
+  return mutate(ctx, async (scope) => {
+    const widget = await findWidget(scope.tx, widgetId);
+    await findDashboard(scope.tx, dashboardId, true);
+    const siblings = await findDashboardWidgets(scope.tx, dashboardId);
+    return insertWidget(scope, {
+      ...widget,
+      dashboardId,
+      layout: placeAtBottom(
+        siblings.map((sibling) => sibling.layout),
+        widget.layout ?? undefined,
+      ),
+    });
+  });
+}
+
 const layoutItemsInput = z.array(
   z.object({ widgetId: z.uuid({ error: 'Unknown Widget' }), layout: widgetLayoutInput }).strict(),
 );

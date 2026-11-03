@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { listHistory } from '../history';
-import { deleteWidget, getWidget, updateWidget, type WidgetQueryInput } from '../reporting';
+import {
+  createWidget,
+  deleteWidget,
+  getWidget,
+  updateWidget,
+  type WidgetQueryInput,
+} from '../reporting';
 import {
   addWidget,
+  copyWidgetToDashboard,
   createDashboard,
   deleteDashboard,
   duplicateDashboard,
@@ -241,5 +248,66 @@ describe('Widgets on a Dashboard', () => {
 
     await deleteWidget(t.ctx, widget.id);
     expect((await getDashboard(t.ctx, dashboard.id)).widgets).toEqual([]);
+  });
+  it('copies a Standalone Widget onto a Dashboard, below the others, leaving the original', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    await addWidget(t.ctx, dashboard.id, { name: 'First', query: SPENDING });
+    const standalone = await createWidget(t.ctx, {
+      name: 'Groceries',
+      query: SPENDING,
+      visualisation: 'line',
+    });
+
+    const copy = await copyWidgetToDashboard(t.ctx, standalone.id, dashboard.id);
+
+    expect(copy).toMatchObject({
+      name: 'Groceries',
+      dashboardId: dashboard.id,
+      source: 'query',
+      query: standalone.query,
+      visualisation: 'line',
+      layout: { x: 0, y: 8, w: 6, h: 8 },
+    });
+    expect(copy.id).not.toBe(standalone.id);
+    expect(await getWidget(t.ctx, standalone.id)).toEqual(standalone);
+    expect(await listHistory(t.ctx, { entityType: 'widget', entityId: copy.id })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'name', before: null, after: 'Groceries' }),
+      ]),
+    );
+  });
+
+  it('copies a Widget from another Dashboard with its source and size', async () => {
+    const home = await createDashboard(t.ctx, { name: 'Home' });
+    const travel = await createDashboard(t.ctx, { name: 'Travel' });
+    const balances = await addWidget(t.ctx, home.id, {
+      name: 'Balances',
+      query: SPENDING,
+      source: 'account_balances',
+      layout: { x: 4, y: 0, w: 8, h: 5 },
+    });
+
+    const copy = await copyWidgetToDashboard(t.ctx, balances.id, travel.id);
+
+    expect(copy).toMatchObject({
+      name: 'Balances',
+      dashboardId: travel.id,
+      source: 'account_balances',
+      layout: { x: 0, y: 0, w: 8, h: 5 },
+    });
+    expect((await getDashboard(t.ctx, home.id)).widgets.map((w) => w.id)).toEqual([balances.id]);
+  });
+
+  it('refuses to copy an unknown Widget or onto an unknown Dashboard', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    const widget = await createWidget(t.ctx, { name: 'A', query: SPENDING });
+    const missing = '00000000-0000-4000-8000-000000000000';
+
+    await expect(copyWidgetToDashboard(t.ctx, missing, dashboard.id)).rejects.toThrow(
+      'Widget not found',
+    );
+    await expect(copyWidgetToDashboard(t.ctx, widget.id, missing)).rejects.toThrow(
+      'Dashboard not found',
+    );
   });
 });
