@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import type { Visualisation } from '@/server/services/reporting';
-import { PivotTable } from '../reports/pivot-table';
+import { PivotTable } from '../widgets/pivot-table';
 import {
   DonutWidgetChart,
   LineWidgetChart,

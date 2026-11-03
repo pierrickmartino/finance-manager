@@ -43,7 +43,7 @@ describe('NAV_GROUPS', () => {
     expect(hrefs).toEqual(
       expect.arrayContaining([
         '/dashboards',
-        '/reports',
+        '/widgets',
         '/transactions',
         '/unclassified',
         '/accounts',

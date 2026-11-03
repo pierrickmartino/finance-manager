@@ -241,9 +241,9 @@ export function QueryForm({ query, lists, hidden = {}, children }: QueryFormProp
           type="submit"
           className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
         >
-          Show report
+          Preview
         </button>
-        <Link href="/reports/builder" className="text-sm underline">
+        <Link href="/widgets/new" className="text-sm underline">
           Reset
         </Link>
         <p className="text-xs text-zinc-500">

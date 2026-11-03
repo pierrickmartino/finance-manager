@@ -63,7 +63,7 @@ export function PivotTable({
 
   return (
     <section
-      aria-label="Pivot report"
+      aria-label="Pivot table"
       className={
         isFullScreen
           ? 'fixed inset-0 z-50 flex flex-col gap-3 overflow-auto bg-white p-4 dark:bg-zinc-950'

@@ -10,7 +10,7 @@ import { balanceHref, editWidgetHref } from '../../dashboards/load';
 import { deleteWidgetAction } from '../actions';
 import { loadSavedWidget } from '../load';
 import { toPivotData } from '../pivot-data';
-import { ReportView } from '../report-view';
+import { WidgetView } from '../widget-view';
 
 export const metadata: Metadata = { title: 'Widget · Finance Manager' };
 
@@ -33,7 +33,7 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-2xl font-semibold">{widget.name}</h1>
         <div className="flex items-center gap-4 text-sm">
-          <Link href="/reports" className="underline">
+          <Link href="/widgets" className="underline">
             All Widgets
           </Link>
           <Link href={editWidgetHref(widget)} className="underline">
@@ -55,7 +55,7 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
       </p>
       {error && <FieldError message={error} />}
       {report && (
-        <ReportView
+        <WidgetView
           report={report}
           title={widget.name}
           visualisation={widget.visualisation}

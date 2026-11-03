@@ -39,12 +39,12 @@ export async function saveWidgetAction(_previous: Result | null, formData: FormD
     return dashboardId ? addWidget(ctx, dashboardId, input) : createWidget(ctx, input);
   });
   if (!result.ok) return result;
-  revalidatePath('/reports', 'layout');
+  revalidatePath('/widgets', 'layout');
   revalidatePath('/dashboards', 'layout');
   redirect(
     result.data.dashboardId
       ? `/dashboards/${result.data.dashboardId}`
-      : `/reports/${result.data.id}`,
+      : `/widgets/${result.data.id}`,
   );
 }
 
@@ -55,6 +55,6 @@ export async function deleteWidgetAction(
 ) {
   const result = await runAction(async () => deleteWidget(await getServiceContext(), id));
   if (!result.ok) return result;
-  revalidatePath('/reports', 'layout');
-  redirect('/reports');
+  revalidatePath('/widgets', 'layout');
+  redirect('/widgets');
 }

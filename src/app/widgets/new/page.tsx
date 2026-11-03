@@ -18,7 +18,7 @@ import { balanceHref } from '../../dashboards/load';
 import { saveWidgetAction } from '../actions';
 import { loadQueryFormLists, loadReport } from '../load';
 import { QueryForm } from '../query-form';
-import { ReportView } from '../report-view';
+import { WidgetView } from '../widget-view';
 import { toPivotData } from '../pivot-data';
 
 export const metadata: Metadata = { title: 'Widget editor · Finance Manager' };
@@ -91,7 +91,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const hidden: Record<string, string> = {};
   if (widget) hidden.widget = widget.id;
   else if (dashboardId) hidden.dashboard = dashboardId;
-  const backHref = dashboardId ? `/dashboards/${dashboardId}` : '/reports';
+  const backHref = dashboardId ? `/dashboards/${dashboardId}` : '/widgets';
 
   return (
     <section className="flex flex-col gap-6">
@@ -112,7 +112,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
             type="submit"
             className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
           >
-            Show report
+            Preview
           </button>
         </form>
       ) : (
@@ -125,9 +125,9 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
 
       {report && (
         <>
-          <ReportView
+          <WidgetView
             report={report}
-            title={widget?.name ?? 'Report'}
+            title={widget?.name ?? 'New Widget'}
             visualisation={visualisation}
             data={isBalances ? toPivotData(report, balanceHref) : undefined}
           />

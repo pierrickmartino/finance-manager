@@ -6,7 +6,7 @@ import { WidgetVisualisation } from '../dashboards/widget-visualisation';
 import { toPivotData } from './pivot-data';
 
 /** A report's notes (range, partial period, unconverted amounts) and its visualisation. */
-export async function ReportView({
+export async function WidgetView({
   report,
   title,
   visualisation = 'table',

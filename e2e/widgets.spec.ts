@@ -10,8 +10,8 @@ const UBS_OCTOBER = path.join(
 test('builds a month × Category pivot, drills into a cell and saves it as a Widget', async ({
   page,
 }) => {
-  // An Account of its own, so the report can be filtered to it in the shared E2E database.
-  const name = `Reports ${Date.now()}`;
+  // An Account of its own, so the Widget can be filtered to it in the shared E2E database.
+  const name = `Widgets ${Date.now()}`;
   await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(`${name} bank`);
   await page.getByRole('button', { name: 'Add Bank' }).click();
@@ -28,7 +28,7 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await expect(page.getByRole('heading', { name })).toBeVisible();
 
   // Build the pivot: October 2025, month × Category, this Account only.
-  await page.getByRole('link', { name: 'Reports' }).click();
+  await page.getByRole('link', { name: 'Widgets' }).click();
   await page.getByRole('link', { name: 'New Widget' }).click();
   const form = page.getByRole('form', { name: 'Widget query' });
   await form.getByRole('combobox', { name: 'Range', exact: true }).selectOption('fixed');
@@ -37,7 +37,7 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await form.getByLabel('Rows').selectOption({ label: 'Month' });
   await form.getByLabel('Columns').selectOption({ label: 'Category' });
   await form.getByLabel('Accounts').selectOption({ label: `${name} bank · ${name}` });
-  await form.getByRole('button', { name: 'Show report' }).click();
+  await form.getByRole('button', { name: 'Preview' }).click();
 
   const pivot = page.getByRole('table', { name: 'Pivot' });
   await expect(pivot.getByRole('columnheader', { name: 'Unclassified' })).toBeVisible();
@@ -59,8 +59,8 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
     page.getByRole('table', { name: 'Cell Transactions' }).locator('tbody tr'),
   ).toHaveCount(14);
 
-  // Back to the report, and save it as a standalone Widget.
-  await page.getByRole('link', { name: 'Back to the report' }).click();
+  // Back to the editor, and save it as a standalone Widget.
+  await page.getByRole('link', { name: 'Back to the editor' }).click();
   const widgetName = `October by Category ${Date.now()}`;
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
@@ -68,4 +68,13 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await expect(
     page.getByRole('table', { name: 'Pivot' }).getByRole('rowheader', { name: 'Oct 2025' }),
   ).toBeVisible();
+});
+
+test('old Reports links redirect to the Widgets pages, keeping the query', async ({ page }) => {
+  await page.goto('/reports');
+  await expect(page).toHaveURL(/\/widgets$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Widgets' })).toBeVisible();
+
+  await page.goto('/reports/builder?rows=month');
+  await expect(page).toHaveURL(/\/widgets\/new\?rows=month$/);
 });

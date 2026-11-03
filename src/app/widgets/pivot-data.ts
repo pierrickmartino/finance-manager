@@ -6,7 +6,7 @@ import type { CellRef, ReportHeader, ReportTable } from '@/server/services/repor
 export function drillHref(report: ReportTable, cell: CellRef): string {
   const params = queryToParams(report.query);
   for (const [name, value] of cellToParams(cell)) params.set(name, value);
-  return `/reports/drill?${params}`;
+  return `/widgets/drill?${params}`;
 }
 
 /** The cell key for a header, or undefined (the whole axis) when the report has no such axis. */
