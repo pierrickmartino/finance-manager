@@ -739,7 +739,7 @@ describe('Split lines that are Transfer sides', () => {
 
     await link();
     const linked = await balances();
-    await unlinkTransfer(t.ctx, credit);
+    await unlinkTransfer(t.ctx, transactionSide(credit));
     const unlinked = await balances();
 
     expect(before).toEqual([100000, -150000]);

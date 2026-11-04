@@ -7,7 +7,7 @@ import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { CLASSIFICATION_FIELDS, recordClassificationChanges } from './classification';
 import { UNCLASSIFIED_CONDITION } from './query';
-import { refuseSplitCategoryChange } from './split-guard';
+import { IS_SPLIT, refuseSplitCategoryChange } from './split-guard';
 import { anyInTransfer } from './transfer-guard';
 
 /**
@@ -69,7 +69,9 @@ export interface BulkEditResult {
 
 /**
  * The selected Transaction ids, without repeats: the ones given plus the members of the chosen
- * Unclassified group (locked here, so the group can't change under the edit).
+ * Unclassified group (locked here, so the group can't change under the edit). A split member
+ * (Unclassified while a line has neither a Category nor a Transfer, ADR-0005) is left out of a
+ * group Category edit: only its Split lines can take a Category.
  */
 async function resolveSelectedIds(
   { tx }: MutationScope,
@@ -77,9 +79,10 @@ async function resolveSelectedIds(
 ): Promise<string[]> {
   const ids = [...(input.transactionIds ?? [])];
   if (input.groupKey !== undefined) {
+    const notSplit = input.changes.categoryId === undefined ? '' : `AND NOT ${IS_SPLIT}`;
     const members = await tx.query<{ id: string }>(
       `SELECT t.id FROM "transaction" t
-       WHERE t.description_key = $1 AND ${UNCLASSIFIED_CONDITION}
+       WHERE t.description_key = $1 AND ${UNCLASSIFIED_CONDITION} ${notSplit}
        ORDER BY t.booking_date, t.entry_order
        FOR UPDATE`,
       [input.groupKey],

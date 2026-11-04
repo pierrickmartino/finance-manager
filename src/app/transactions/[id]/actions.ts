@@ -188,12 +188,16 @@ export async function linkTransferAction(
   return result;
 }
 
-/** Unlinks the Transfer this Transaction is in; both sides stay. */
+/**
+ * Unlinks the Transfer a side on this Transaction's page (the Transaction itself or one of its
+ * Split lines) is in; both sides stay.
+ */
 export async function unlinkTransferAction(
   id: string,
+  side: TransferSideRef,
   _previous: ActionResult<unknown> | null,
 ): Promise<ActionResult<unknown>> {
-  const result = await runAction(async () => unlinkTransfer(await getServiceContext(), id));
+  const result = await runAction(async () => unlinkTransfer(await getServiceContext(), side));
   if (result.ok) {
     revalidate(id);
     revalidatePath('/unclassified');

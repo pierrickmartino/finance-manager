@@ -170,7 +170,7 @@ describe('unlink a Transfer', () => {
       sides: [transactionSide(out), transactionSide(into)],
     });
 
-    await unlinkTransfer(t.ctx, into);
+    await unlinkTransfer(t.ctx, transactionSide(into));
 
     expect((await getTransaction(t.ctx, out)).transferId).toBeNull();
     expect((await getTransaction(t.ctx, into)).transferId).toBeNull();
@@ -186,7 +186,9 @@ describe('unlink a Transfer', () => {
   it('refuses a Transaction that is not in a Transfer', async () => {
     const { out } = await pair();
 
-    await expect(unlinkTransfer(t.ctx, out)).rejects.toThrow(/not part of a Transfer/);
+    await expect(unlinkTransfer(t.ctx, transactionSide(out))).rejects.toThrow(
+      /not part of a Transfer/,
+    );
   });
 });
 

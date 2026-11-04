@@ -9,7 +9,7 @@ import { splitLabel } from '../transaction-display';
 import { removeSplitAction, splitTransactionAction } from './actions';
 import { SplitForm } from './split-form';
 import { initialSplitDrafts } from './split-lines';
-import { LinkTransferForm, TransferCounterpart } from './transfer-section';
+import { LinkTransferForm, TransferCounterpart, UnlinkTransferForm } from './transfer-section';
 
 const CELL = 'px-3 py-2 text-left';
 const SUMMARY = `${BUTTON_CLASS} inline-block cursor-pointer list-none`;
@@ -161,9 +161,16 @@ function LineClassification({
 }: LineClassificationProps) {
   if (transfer?.counterpart) {
     return (
-      <span className="text-sky-700 dark:text-sky-400">
-        <TransferCounterpart counterpart={transfer.counterpart} fmt={fmt} />
-      </span>
+      <div className="flex flex-col gap-1">
+        <span className="text-sky-700 dark:text-sky-400">
+          <TransferCounterpart counterpart={transfer.counterpart} fmt={fmt} />
+        </span>
+        <UnlinkTransferForm
+          transactionId={transactionId}
+          side={{ kind: 'splitLine', id: line.id }}
+          label={`Unlink line ${position} Transfer`}
+        />
+      </div>
     );
   }
   const options = transfer?.options ?? [];

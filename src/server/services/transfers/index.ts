@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { mutate, type ServiceContext } from '../context';
-import { NotFoundError, parseInput, ValidationError } from '../errors';
+import { NotFoundError, parseInput } from '../errors';
 import { IS_SPLIT } from '../transactions/split-guard';
-import { linkPair, unlinkTransfers, type Transfer } from './link';
+import { linkPair, unlinkSide, type Transfer } from './link';
 import {
+  sideLabel,
   SPLIT_LINE_SIDE_COLUMNS,
   TRANSACTION_SIDE_COLUMNS,
   toSideViews,
@@ -49,8 +50,6 @@ export async function linkTransfer(
   const { sides } = parseInput(linkInput, input);
   return mutate(ctx, (scope) => linkPair(scope, sides));
 }
-
-const transactionId = z.uuid();
 
 /** Days either side of a Transaction searched for manual link options. */
 export const LINK_OPTION_DAYS = 31;
@@ -123,17 +122,16 @@ export async function listLinkOptions(
   return toSideViews(ctx.db, result.rows);
 }
 
-/** Unlinks the Transfer the Transaction is one side of; both sides stay, unlinked. */
-export async function unlinkTransfer(ctx: ServiceContext, id: string): Promise<void> {
-  if (!transactionId.safeParse(id).success) throw new NotFoundError('Transaction not found');
-  await mutate(ctx, async (scope) => {
-    const found = await scope.tx.query<{ transferId: string | null }>(
-      'SELECT transfer_id AS "transferId" FROM "transaction" WHERE id = $1 FOR UPDATE',
-      [id],
-    );
-    const row = found.rows[0];
-    if (!row) throw new NotFoundError('Transaction not found');
-    if (!row.transferId) throw new ValidationError('This Transaction is not part of a Transfer');
-    await unlinkTransfers(scope, [id]);
-  });
+/**
+ * Unlinks the Transfer this side, a whole Transaction or a Split line, is in; both sides stay,
+ * unlinked. A Split line side is left with neither a Category nor a Transfer, so its
+ * Transaction is Unclassified until the line gets one (ADR-0005). One History Batch.
+ */
+export async function unlinkTransfer(ctx: ServiceContext, side: TransferSideRef): Promise<void> {
+  if (!isSideRef(side)) {
+    // An unknown kind reads as a Transaction, as before Split line sides existed.
+    const kind = side.kind === 'splitLine' ? 'splitLine' : 'transaction';
+    throw new NotFoundError(`${sideLabel(kind)} not found`);
+  }
+  await mutate(ctx, (scope) => unlinkSide(scope, side));
 }

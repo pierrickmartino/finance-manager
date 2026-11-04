@@ -218,8 +218,21 @@ export async function unlinkTransferIds(
 }
 
 /**
- * Unlinks every Transfer the given Transactions are a whole side of. Import undo and
- * Transaction deletes call it before deleting, so the other side stays, unlinked.
+ * Unlinks the Transfer this side, a whole Transaction or a Split line, is in; both sides stay,
+ * unlinked. Refuses a side that doesn't exist or isn't in a Transfer.
+ */
+export async function unlinkSide(scope: Scope, ref: TransferSideRef): Promise<void> {
+  const [side] = await lockSides(scope.tx, [ref]);
+  if (!side) throw new NotFoundError(`${sideLabel(ref.kind)} not found`);
+  if (!side.transferId) {
+    throw new ValidationError(`This ${sideLabel(ref.kind)} is not part of a Transfer`);
+  }
+  await unlinkTransferIds(scope, [side.transferId]);
+}
+
+/**
+ * Unlinks every Transfer the given Transactions, or their Split lines, are a side of. Import
+ * undo and Transaction deletes call it before deleting, so the other side stays, unlinked.
  */
 export async function unlinkTransfers(
   scope: Scope,
@@ -227,8 +240,11 @@ export async function unlinkTransfers(
 ): Promise<void> {
   if (transactionIds.length === 0) return;
   const held = await scope.tx.query<{ transferId: string }>(
-    `SELECT DISTINCT transfer_id AS "transferId" FROM "transaction"
-     WHERE id = ANY($1::uuid[]) AND transfer_id IS NOT NULL`,
+    `SELECT transfer_id AS "transferId" FROM "transaction"
+     WHERE id = ANY($1::uuid[]) AND transfer_id IS NOT NULL
+     UNION
+     SELECT transfer_id FROM split_line
+     WHERE transaction_id = ANY($1::uuid[]) AND transfer_id IS NOT NULL`,
     [transactionIds],
   );
   await unlinkTransferIds(
