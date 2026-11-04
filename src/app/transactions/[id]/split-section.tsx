@@ -45,12 +45,20 @@ export function SplitSection({
 }: SplitSectionProps) {
   const isSplit = transaction.splitLines.length > 0;
   if (!isSplit && transaction.transferId) return null;
+  const transfers = Object.fromEntries(
+    Object.entries(lineTransfers).flatMap(([lineId, { counterpart }]) =>
+      counterpart
+        ? [[lineId, <TransferCounterpart key={lineId} counterpart={counterpart} fmt={fmt} />]]
+        : [],
+    ),
+  );
   const form = (
     <SplitForm
       amountMinor={transaction.amountMinor}
       currency={transaction.currency}
       initialLines={initialSplitDrafts(transaction, fmt.settings.numberFormat)}
       groups={groups}
+      transfers={transfers}
       action={splitTransactionAction.bind(null, transaction.id)}
     />
   );

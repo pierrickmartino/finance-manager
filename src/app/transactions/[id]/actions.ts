@@ -75,6 +75,7 @@ const splitDraftsInput = z.array(
     categoryId: z.string(),
     tags: z.string(),
     note: z.string(),
+    isTransfer: z.literal(true).optional(),
   }),
   { error: 'The Split lines could not be read' },
 );
@@ -100,7 +101,8 @@ async function readSplitLines(formData: FormData, currency: string): Promise<Spl
     return {
       id: draft.id,
       amountMinor,
-      categoryId: draft.categoryId,
+      // A Transfer line has no Category; the service refuses one on it anyway (ADR-0005).
+      categoryId: draft.isTransfer ? null : draft.categoryId,
       tagNames: readTags(draft.tags),
       note: draft.note,
     };
