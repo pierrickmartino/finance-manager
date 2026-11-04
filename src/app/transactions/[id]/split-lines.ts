@@ -9,10 +9,16 @@ export interface SplitLineDraft {
   id?: string;
   /** In the user's number format, e.g. "-70.00". */
   amount: string;
+  /** Empty for a Transfer line, which can't have a Category. */
   categoryId: string;
   /** Comma-separated Tag names. */
   tags: string;
   note: string;
+  /**
+   * The saved line is a Transfer side (ADR-0005): it shows its Transfer instead of a Category
+   * picker, and can't be removed until the Transfer is unlinked.
+   */
+  isTransfer?: true;
 }
 
 /** An amount as the user types it: their number format, the Currency's decimals, no code. */
@@ -69,6 +75,7 @@ export function initialSplitDrafts(
       categoryId: line.category?.id ?? '',
       tags: line.tags.map((tag) => tag.name).join(', '),
       note: line.note ?? '',
+      ...(line.transferId !== null && { isTransfer: true as const }),
     }));
   }
   return (

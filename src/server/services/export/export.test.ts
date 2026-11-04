@@ -8,7 +8,7 @@ import { backfillRates, convertToChf, type EcbRateSource } from '../fx';
 import { ValidationError } from '../errors';
 import { editClassification, getTransaction, splitTransaction } from '../transactions';
 import { createManualTransaction } from '../transactions/manual';
-import { linkTransfer, transactionSide } from '../transfers';
+import { linkTransfer, splitLineSide, transactionSide } from '../transfers';
 import { exportTransactionsCsv } from '.';
 
 const t = setupTestDatabase();
@@ -387,5 +387,50 @@ describe('CSV export of split Transactions', () => {
     const splitRows = rows.filter((row) => row[20] === split);
     const totalMinor = splitRows.reduce((sum, row) => sum + Math.round(Number(row[5]) * 100), 0);
     expect(totalMinor).toBe(-123456);
+  });
+});
+
+describe('CSV export of Split lines that are Transfer sides', () => {
+  /**
+   * The example of spec #56: a BCGE −1,500.00 split into −1,000.00 to savings and −500.00 rent,
+   * the −1,000.00 line linked with a UBS +1,000.00 credit.
+   */
+  async function aggregatedDebit() {
+    const bcge = await account('BCGE', 'Compte privé');
+    const ubs = await account('UBS', 'Épargne');
+    const debit = await seedOne(bcge, { bookingDate: '2025-10-10', amountMinor: -150000 });
+    const credit = await seedOne(ubs, { bookingDate: '2025-10-11', amountMinor: 100000 });
+    const home = await createCategoryGroup(t.ctx, { name: 'Logement', type: 'expense' });
+    const rent = await createCategory(t.ctx, { groupId: home.id, name: 'Loyer' });
+    const split = await splitTransaction(t.ctx, debit, [
+      { amountMinor: -100000, categoryId: rent.id, note: 'Épargne' },
+      { amountMinor: -50000, categoryId: rent.id },
+    ]);
+    await linkTransfer(t.ctx, {
+      sides: [splitLineSide(split.splitLines[0]!.id), transactionSide(credit)],
+    });
+    return { debit, credit, rent };
+  }
+
+  it("writes a Transfer line like a Transfer: no Category, the other side's Account and id", async () => {
+    const { debit, credit } = await aggregatedDebit();
+
+    const rows = await exportRows();
+
+    expect(
+      rows.map((row) => [row[20], row[5], row[12], row[14], row[16], row[17], row[18]]),
+    ).toEqual([
+      [debit, '-1000.00', '', '', 'Épargne', 'UBS · Épargne', credit],
+      [debit, '-500.00', 'Logement', 'Loyer', '', '', ''],
+      [credit, '1000.00', '', '', '', 'BCGE · Compte privé', debit],
+    ]);
+  });
+
+  it('leaves the Transfer line out under a Category filter, keeping the matching lines', async () => {
+    const { debit, rent } = await aggregatedDebit();
+
+    const rows = await exportRows({ categoryId: rent.id });
+
+    expect(rows.map((row) => [row[20], row[5], row[14]])).toEqual([[debit, '-500.00', 'Loyer']]);
   });
 });

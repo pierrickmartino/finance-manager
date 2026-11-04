@@ -160,6 +160,25 @@ test('links one Split line of a Transaction with a Transaction on another Accoun
   await transfer.getByRole('link', { name: new RegExp(bcge) }).click();
   await expect(page.getByRole('heading', { name: 'Split (2)' })).toBeVisible();
 
+  // Editing the Split keeps the Transfer: the linked line shows it, with no Category or Remove
+  await page.getByText('Edit Split').click();
+  await expect(form.getByTestId('transfer of line 1')).toContainText(`Transfer with ${ubs}`);
+  await expect(form.getByLabel('Category of line 1')).toHaveCount(0);
+  await expect(form.getByRole('button', { name: 'Remove line 1' })).toHaveCount(0);
+  await form.getByLabel('Note of line 1').fill('To savings');
+  await form.getByLabel('Category of line 2').selectOption({ label: savings });
+  await form.getByRole('button', { name: 'Save Split' }).click();
+  await expect(form.getByText('Saved.')).toBeVisible();
+  await expect(lines.nth(0)).toContainText(`Transfer with ${ubs}`);
+  await expect(lines.nth(0)).toContainText('To savings');
+  await expect(lines.nth(1)).toContainText(`${group} › ${savings}`);
+
+  // The Split can't be removed while it holds the Transfer
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Remove Split' }).click();
+  await expect(page.getByText('unlink the Transfer first')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Split (2)' })).toBeVisible();
+
   // The list shows the debit once, split, with the Partly Transfer badge
   const row = await openByDescription(page, debit);
   await expect(row).toContainText('Split (2)');

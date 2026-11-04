@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useActionState, useRef, useState } from 'react';
+import { startTransition, useActionState, useRef, useState, type ReactNode } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { BUTTON_CLASS } from '@/components/named-list';
@@ -25,6 +25,8 @@ interface SplitFormProps {
   currency: string;
   initialLines: SplitLineDraft[];
   groups: CategoryGroup[];
+  /** By Split line id: what a Transfer line shows in place of its Category, its other side. */
+  transfers: Record<string, ReactNode>;
   action: (
     previous: ActionResult<unknown> | null,
     formData: FormData,
@@ -34,8 +36,16 @@ interface SplitFormProps {
 /**
  * Divides a Transaction's amount into Split lines (ADR-0004): each line has an amount, a
  * Category, Tags and a note, and the remaining unallocated amount updates as the user types.
+ * A Transfer line (ADR-0005) shows its Transfer instead of a Category and can't be removed.
  */
-export function SplitForm({ amountMinor, currency, initialLines, groups, action }: SplitFormProps) {
+export function SplitForm({
+  amountMinor,
+  currency,
+  initialLines,
+  groups,
+  transfers,
+  action,
+}: SplitFormProps) {
   const fmt = useFormatter();
   const [state, formAction, isPending] = useActionState(action, null);
   const [lines, setLines] = useState<KeyedLine[]>(() =>
@@ -83,8 +93,11 @@ export function SplitForm({ amountMinor, currency, initialLines, groups, action 
             line={line.draft}
             number={index + 1}
             groups={groups}
+            transfer={line.draft.isTransfer && (transfers[line.draft.id ?? ''] ?? 'Transfer')}
             onChange={(change) => update(line.key, change)}
-            onRemove={lines.length > 1 ? () => remove(line.key) : undefined}
+            onRemove={
+              lines.length > 1 && !line.draft.isTransfer ? () => remove(line.key) : undefined
+            }
           />
         ))}
       </ol>
@@ -125,12 +138,21 @@ interface SplitLineFieldsProps {
   line: SplitLineDraft;
   number: number;
   groups: CategoryGroup[];
+  /** What a Transfer line shows in place of its Category picker; falsy for other lines. */
+  transfer: ReactNode;
   onChange: (change: Partial<SplitLineDraft>) => void;
-  /** Absent for the last remaining line. */
+  /** Absent for the last remaining line and for a Transfer line. */
   onRemove?: () => void;
 }
 
-function SplitLineFields({ line, number, groups, onChange, onRemove }: SplitLineFieldsProps) {
+function SplitLineFields({
+  line,
+  number,
+  groups,
+  transfer,
+  onChange,
+  onRemove,
+}: SplitLineFieldsProps) {
   return (
     <li className="flex flex-wrap items-end gap-2 text-sm">
       <label className="flex flex-col gap-1">
@@ -144,26 +166,14 @@ function SplitLineFields({ line, number, groups, onChange, onRemove }: SplitLine
           className={`${INPUT} w-32 text-right tabular-nums`}
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Category</span>
-        <select
-          aria-label={`Category of line ${number}`}
-          value={line.categoryId}
-          onChange={(event) => onChange({ categoryId: event.target.value })}
-          className={INPUT}
-        >
-          <option value="">Choose a Category</option>
-          {groups.map((group) => (
-            <optgroup key={group.id} label={group.name}>
-              {group.categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
+      {transfer ? (
+        <div className="flex flex-col gap-1" data-testid={`transfer of line ${number}`}>
+          <span className="text-xs text-zinc-500">Transfer</span>
+          <span className="py-1.5 text-sky-700 dark:text-sky-400">{transfer}</span>
+        </div>
+      ) : (
+        <CategoryPicker line={line} number={number} groups={groups} onChange={onChange} />
+      )}
       <label className="flex flex-col gap-1">
         <span className="text-xs text-zinc-500">Tags</span>
         <input
@@ -197,5 +207,32 @@ function SplitLineFields({ line, number, groups, onChange, onRemove }: SplitLine
         </button>
       )}
     </li>
+  );
+}
+
+type CategoryPickerProps = Pick<SplitLineFieldsProps, 'line' | 'number' | 'groups' | 'onChange'>;
+
+function CategoryPicker({ line, number, groups, onChange }: CategoryPickerProps) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs text-zinc-500">Category</span>
+      <select
+        aria-label={`Category of line ${number}`}
+        value={line.categoryId}
+        onChange={(event) => onChange({ categoryId: event.target.value })}
+        className={INPUT}
+      >
+        <option value="">Choose a Category</option>
+        {groups.map((group) => (
+          <optgroup key={group.id} label={group.name}>
+            {group.categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </label>
   );
 }

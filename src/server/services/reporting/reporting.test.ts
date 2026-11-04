@@ -6,7 +6,8 @@ import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { editClassification, splitTransaction, type ClassificationChanges } from '../transactions';
-import { linkTransfer, transactionSide } from '../transfers';
+import { listAccountBalances } from '../accounts/balances';
+import { linkTransfer, splitLineSide, transactionSide, unlinkTransfer } from '../transfers';
 import { listCellTransactions, runWidgetQuery, type CellRef, type WidgetQueryInput } from '.';
 
 const t = setupTestDatabase();
@@ -668,5 +669,81 @@ describe('split Transactions', () => {
     expect(report.rowTotals[2]).toBe(2);
     expect(report.columnTotals).toEqual([2, 6, 2, 1]);
     expect(report.total).toBe(9);
+  });
+});
+
+describe('Split lines that are Transfer sides', () => {
+  /**
+   * The example of spec #56: a UBS −1,500.00 split into a −1,000.00 line to savings and
+   * −500.00 rent, and a +1,000.00 credit on the Savings Account.
+   */
+  async function aggregatedDebit() {
+    const home = await createCategoryGroup(t.ctx, { name: 'Home', type: 'expense' });
+    const rent = await createCategory(t.ctx, { groupId: home.id, name: 'Rent' });
+    const savings = await createCategory(t.ctx, { groupId: home.id, name: 'Savings' });
+    const [debit] = await seed(await account('UBS'), [
+      { bookingDate: '2025-02-10', amountMinor: -150000 },
+    ]);
+    const [credit] = await seed(await account('Savings'), [
+      { bookingDate: '2025-02-10', amountMinor: 100000 },
+    ]);
+    const split = await splitTransaction(t.ctx, debit!, [
+      { amountMinor: -100000, categoryId: savings.id },
+      { amountMinor: -50000, categoryId: rent.id },
+    ]);
+    const link = () =>
+      linkTransfer(t.ctx, {
+        sides: [splitLineSide(split.splitLines[0]!.id), transactionSide(credit!)],
+      });
+    return { debit: debit!, credit: credit!, rent, link };
+  }
+
+  it('leaves the Transfer line out and keeps counting the other lines', async () => {
+    const { rent, link } = await aggregatedDebit();
+    await link();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'month',
+      columns: 'category',
+      includeCapital: true,
+    });
+
+    expect(keys(report.columns)).toEqual([rent.id]);
+    expect(report.cells).toEqual([[null], [-50000], [null]]);
+    expect(report.total).toBe(-50000);
+  });
+
+  it('drills down to the split Transaction at the value of its other lines only', async () => {
+    const { debit, link } = await aggregatedDebit();
+    await link();
+    const query = { dateRange: Q1_2025, rows: 'month', columns: 'category' } as const;
+
+    const february = await listCellTransactions(t.ctx, query, { row: '2025-02' });
+    const unclassified = await listCellTransactions(t.ctx, query, {
+      row: '2025-02',
+      column: null,
+    });
+
+    expect(february.transactions.map((item) => [item.id, item.chfMinor])).toEqual([
+      [debit, -50000],
+    ]);
+    expect(unclassified.total).toBe(0);
+  });
+
+  it('leaves Account balances unchanged by linking and unlinking a line', async () => {
+    const { credit, link } = await aggregatedDebit();
+    const balances = async () =>
+      (await listAccountBalances(t.ctx, { date: '2025-03-31' })).map((b) => b.balanceMinor);
+    const before = await balances();
+
+    await link();
+    const linked = await balances();
+    await unlinkTransfer(t.ctx, credit);
+    const unlinked = await balances();
+
+    expect(before).toEqual([100000, -150000]);
+    expect(linked).toEqual(before);
+    expect(unlinked).toEqual(before);
   });
 });
