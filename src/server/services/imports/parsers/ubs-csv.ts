@@ -10,33 +10,51 @@ import { normalizeIban, readCurrency, readDecimalMinor, readIsoDate, textOrNull 
 /**
  * UBS CSV export (French headers): UTF-8 with BOM, `;` separators, a metadata block, an empty
  * line, then the table, newest row first. See test/fixtures/import/README.md for the layout.
+ *
+ * UBS has shipped more than one wording of the same export: the currency is `Monnaie` in one
+ * and `Évaluation en` (metadata) / `Devise` (column) in another. Each label below lists every
+ * known spelling, first match wins.
  */
 
 const SEPARATOR = ';';
 const QUOTE = '"';
 
 const META = {
-  iban: 'IBAN',
-  from: 'Du',
-  to: 'Au',
-  opening: 'Solde initial',
-  closing: 'Solde final',
-  currency: 'Monnaie',
-} as const;
+  iban: ['IBAN'],
+  from: ['Du'],
+  to: ['Au'],
+  opening: ['Solde initial'],
+  closing: ['Solde final'],
+  currency: ['Monnaie', 'Évaluation en'],
+} as const satisfies Record<string, readonly string[]>;
 
 const COLUMNS = {
-  bookingDate: 'Date de comptabilisation',
-  valueDate: 'Date de valeur',
-  currency: 'Monnaie',
-  debit: 'Débit',
-  credit: 'Crédit',
-  balance: 'Solde',
-  reference: 'No de transaction',
-  description1: 'Description1',
-  description2: 'Description2',
-  description3: 'Description3',
-  footnotes: 'Notes de bas de page',
-} as const;
+  bookingDate: ['Date de comptabilisation'],
+  valueDate: ['Date de valeur'],
+  currency: ['Monnaie', 'Devise'],
+  debit: ['Débit'],
+  credit: ['Crédit'],
+  balance: ['Solde'],
+  reference: ['No de transaction'],
+  description1: ['Description1'],
+  description2: ['Description2'],
+  description3: ['Description3'],
+  footnotes: ['Notes de bas de page'],
+} as const satisfies Record<string, readonly string[]>;
+
+/** `Description3` labels of the payment reason and of the counterparty account. */
+const PAYMENT_REFERENCE_LABELS: ReadonlySet<string> = new Set([
+  'Raison du paiement',
+  'Motif du paiement',
+]);
+const ACCOUNT_LABELS: ReadonlySet<string> = new Set([
+  'IBAN',
+  'No de compte',
+  'Account no. IBAN',
+  'Account no.',
+]);
+/** An account label may hold a plain account number: only an IBAN-shaped value is kept. */
+const IBAN_SHAPE = /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/;
 
 type Column = keyof typeof COLUMNS;
 
@@ -81,29 +99,36 @@ function readMetadata(lines: string[]): { meta: Map<string, string>; headerIndex
   return { meta, headerIndex };
 }
 
-function requireMeta(meta: Map<string, string>, key: string): string {
-  const value = meta.get(key);
-  if (!value) throw new UnreadableFileError(`the header has no "${key}"`);
+function requireMeta(meta: Map<string, string>, keys: readonly string[]): string {
+  const value = keys.map((key) => meta.get(key)).find((found) => found);
+  if (!value) throw new UnreadableFileError(`the header has no "${keys.join('" or "')}"`);
   return value;
 }
 
-/** `Description3`: `Raison du paiement: …; IBAN: CH.. ….; Frais: …` (card rows have neither). */
+/**
+ * `Description3`: `Raison du paiement: …; IBAN: CH.. ….; Frais: …` or
+ * `Motif du paiement: …; Account no. IBAN: CH.. ….; Coûts: …` (card rows have neither).
+ */
 function readDescription3(text: string): { paymentReference: string | null; iban: string | null } {
   let paymentReference: string | null = null;
   let iban: string | null = null;
   for (const part of text.split(SEPARATOR)) {
-    const [label = '', ...rest] = part.split(':');
+    const [rawLabel = '', ...rest] = part.split(':');
+    const label = rawLabel.trim();
     const value = rest.join(':').trim();
-    if (label.trim() === 'Raison du paiement') paymentReference = textOrNull(value);
-    if (label.trim() === 'IBAN') iban = value ? normalizeIban(value) : null;
+    if (PAYMENT_REFERENCE_LABELS.has(label)) paymentReference = textOrNull(value);
+    if (ACCOUNT_LABELS.has(label) && iban === null) {
+      const candidate = normalizeIban(value);
+      if (IBAN_SHAPE.test(candidate)) iban = candidate;
+    }
   }
   return { paymentReference, iban };
 }
 
 function columnIndexes(header: string[]): Record<Column, number> {
-  const entries = Object.entries(COLUMNS).map(([key, name]) => {
-    const index = header.indexOf(name);
-    if (index < 0) throw new UnreadableFileError(`the column "${name}" is missing`);
+  const entries = Object.entries(COLUMNS).map(([key, names]) => {
+    const index = header.findIndex((name) => (names as readonly string[]).includes(name));
+    if (index < 0) throw new UnreadableFileError(`the column "${names.join('" or "')}" is missing`);
     return [key, index] as const;
   });
   return Object.fromEntries(entries) as Record<Column, number>;
@@ -159,7 +184,7 @@ function readRow(
 export function parseUbsCsv(content: Uint8Array): ParsedStatement {
   const lines = decodeUtf8(content).split(/\r?\n/);
   const { meta, headerIndex } = readMetadata(lines);
-  const currency = readCurrency(requireMeta(meta, META.currency), 'Monnaie');
+  const currency = readCurrency(requireMeta(meta, META.currency), 'Currency');
   const col = columnIndexes(splitLine(lines[headerIndex]!));
 
   const newestFirst = lines

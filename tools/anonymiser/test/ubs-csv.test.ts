@@ -95,4 +95,38 @@ describe('UBS CSV', () => {
       expect(output, sensitive).not.toContain(sensitive);
     }
   });
+
+  test('reads and anonymises the layout with "Évaluation en" and a "Devise" column', () => {
+    const input = Buffer.from(
+      '\uFEFF' +
+        [
+          'Numéro de compte:;0235 00123456.01;',
+          'IBAN:;CH69 0023 5235 1234 5601 0;',
+          'Du:;2026-09-01;',
+          'Au:;2026-09-30;',
+          'Solde initial:;1000.00;',
+          'Solde final:;485.00;',
+          'Évaluation en:;CHF;',
+          'Nombre de transactions dans cette période:;2;',
+          '',
+          'Date de transaction;Heure de transaction;Date de comptabilisation;Date de valeur;Devise;Débit;Crédit;Sous-montant;Solde;No de transaction;Description1;Description2;Description3;Notes de bas de page;',
+          '2026-09-30;;2026-09-30;2026-09-30;CHF;-15.00;;;485.00;CR01773HJ0000001;Solde décompte des prix prestations;;No de transaction: CR01773HJ0000001;;',
+          '2026-09-25;;2026-09-25;2026-09-25;CHF;-500.00;;;500.00;5179268TO0000002;"Piscines Zéphyrin SA;Route Exemple 1; 1200 Genève; CH";Ordre e-banking;"Motif du paiement: Facture finale; Account no. IBAN: CH78 0900 0000 0123 4567 8; Coûts: E-Banking intérieur";;',
+          '',
+        ].join('\r\n'),
+      'utf8',
+    );
+
+    const output = anonymise('ubs-csv', input, SEED);
+    const text = output.toString('utf8');
+
+    expect(readStatement('ubs-csv', output)).toEqual(readStatement('ubs-csv', input));
+    expect(readStatement('ubs-csv', input).currency).toBe('CHF');
+    expect(reconciles(readStatement('ubs-csv', output))).toBe(true);
+    expect(text).toContain('Évaluation en:;CHF;');
+    expect(text).toContain('Nombre de transactions dans cette période:;2;');
+    expect(text).toMatch(/2026-09-25;;2026-09-25;2026-09-25;CHF;-500\.00;/);
+    expect(text).not.toContain('Zéphyrin');
+    expect(text).not.toContain('CH78 0900 0000 0123 4567 8');
+  });
 });
