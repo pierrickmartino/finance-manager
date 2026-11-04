@@ -21,6 +21,8 @@ import {
 
 const splitLineInput = z
   .object({
+    /** An existing line of the same Transaction, updated in place; absent for a new line. */
+    id: z.string().min(1).optional(),
     /** Signed minor units of the Transaction's Currency. */
     amountMinor: z
       .number({ error: 'Every Split line needs an amount' })
@@ -65,40 +67,86 @@ async function resolveLineTagIds(scope: MutationScope, line: ParsedLine): Promis
   return [...new Set(tags.map((tag) => tag.id))];
 }
 
-/** Replaces the Transaction's Split lines with `lines`, in their order. */
+/**
+ * Refuses line ids that are not lines of this Transaction, or that are given twice: a line can
+ * only be updated in place by its own Split.
+ */
+async function requireOwnLineIds(
+  scope: MutationScope,
+  transactionId: string,
+  lines: readonly ParsedLine[],
+): Promise<void> {
+  const given = lines.flatMap((line) => (line.id === undefined ? [] : [line.id]));
+  if (given.length === 0) return;
+  if (new Set(given).size !== given.length) {
+    throw new ValidationError('A Split line can only be given once');
+  }
+  const existing = await scope.tx.query<{ id: string }>(
+    'SELECT id FROM split_line WHERE transaction_id = $1',
+    [transactionId],
+  );
+  const own = new Set(existing.rows.map((row) => row.id));
+  if (given.some((id) => !own.has(id))) {
+    throw new ValidationError('A Split line can only be edited on its own Transaction');
+  }
+}
+
+/**
+ * Makes `lines`, in their order, the Transaction's Split lines: lines given by id are updated
+ * in place and keep their identity, lines without an id are added, and the others are deleted.
+ */
 async function writeLines(
   scope: MutationScope,
   transactionId: string,
   lines: readonly ParsedLine[],
 ): Promise<void> {
   const { tx } = scope;
+  await requireOwnLineIds(scope, transactionId, lines);
   const categoryIds = await mapInOrder(
     lines,
     async (line) => (await findCategory(tx, line.categoryId)).id,
   );
   const tagIds = await mapInOrder(lines, (line) => resolveLineTagIds(scope, line));
-  await tx.query('DELETE FROM split_line WHERE transaction_id = $1', [transactionId]);
-  // One INSERT for the whole set: the database checks a Split per statement.
-  const inserted = await tx.query<{ id: string; position: number }>(
-    `INSERT INTO split_line (transaction_id, position, amount_minor, category_id, note)
-     SELECT $1, line.n, line.amount, line.category, line.note
-     FROM unnest($2::bigint[], $3::uuid[], $4::text[]) WITH ORDINALITY
-       AS line(amount, category, note, n)
-     RETURNING id, position`,
+  // One statement for the whole set: the database checks a Split per statement.
+  const written = await tx.query<{ id: string; position: number }>(
+    `WITH line AS (
+       SELECT * FROM unnest($2::uuid[], $3::bigint[], $4::uuid[], $5::text[]) WITH ORDINALITY
+         AS line(id, amount, category, note, n)
+     ), removed AS (
+       DELETE FROM split_line sl
+       WHERE sl.transaction_id = $1
+         AND NOT EXISTS (SELECT 1 FROM line WHERE line.id = sl.id)
+     ), updated AS (
+       UPDATE split_line sl
+       SET position = line.n, amount_minor = line.amount, category_id = line.category,
+           note = line.note
+       FROM line
+       WHERE sl.id = line.id AND sl.transaction_id = $1
+       RETURNING sl.id, sl.position
+     ), inserted AS (
+       INSERT INTO split_line (transaction_id, position, amount_minor, category_id, note)
+       SELECT $1, line.n, line.amount, line.category, line.note
+       FROM line WHERE line.id IS NULL
+       RETURNING id, position
+     )
+     SELECT id, position FROM updated UNION ALL SELECT id, position FROM inserted`,
     [
       transactionId,
+      lines.map((line) => line.id ?? null),
       lines.map((line) => line.amountMinor),
       categoryIds,
       lines.map((line) => line.note ?? null),
     ],
   );
-  const idAt = new Map(inserted.rows.map((row) => [row.position, row.id]));
+  const idAt = new Map(written.rows.map((row) => [row.position, row.id]));
   const lineIdAt = (position: number): string => {
     const id = idAt.get(position);
-    if (id === undefined) throw new Error(`Split line ${position} was not inserted`);
+    if (id === undefined) throw new Error(`Split line ${position} was not written`);
     return id;
   };
-  const pairs = tagIds.flatMap((ids, index) => ids.map((tagId) => [lineIdAt(index + 1), tagId]));
+  const lineIds = lines.map((_, index) => lineIdAt(index + 1));
+  await tx.query('DELETE FROM split_line_tag WHERE split_line_id = ANY($1::uuid[])', [lineIds]);
+  const pairs = tagIds.flatMap((ids, index) => ids.map((tagId) => [lineIds[index]!, tagId]));
   if (pairs.length === 0) return;
   await tx.query(
     `INSERT INTO split_line_tag (split_line_id, tag_id)
@@ -108,8 +156,10 @@ async function writeLines(
 }
 
 /**
- * Splits a Transaction into `lines`, replacing any Split it already has. The lines need a
- * Category each and must sum exactly to the Transaction's amount; signs may differ. One Batch.
+ * Splits a Transaction into `lines`, or edits its Split: lines given by the id of one of its
+ * Split lines are updated in place, others are added, and lines not given are deleted. The
+ * lines need a Category each and must sum exactly to the Transaction's amount; signs may
+ * differ. One Batch.
  */
 export async function splitTransaction(
   ctx: ServiceContext,

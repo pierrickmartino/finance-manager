@@ -5,6 +5,8 @@ import type { SplitLine } from '@/server/services/transactions';
 
 /** One Split line as the split form edits it: typed text, not yet validated. */
 export interface SplitLineDraft {
+  /** The saved Split line this draft edits, so it keeps its identity; absent for a new line. */
+  id?: string;
   /** In the user's number format, e.g. "-70.00". */
   amount: string;
   categoryId: string;
@@ -62,6 +64,7 @@ export function initialSplitDrafts(
   const amount = (minor: number) => editableAmount(minor, numberFormat, transaction.currency);
   if (transaction.splitLines.length > 0) {
     return transaction.splitLines.map((line) => ({
+      id: line.id,
       amount: amount(line.amountMinor),
       categoryId: line.category.id,
       tags: line.tags.map((tag) => tag.name).join(', '),

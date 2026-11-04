@@ -64,7 +64,13 @@ function revalidate(id: string): void {
 
 /** The split form's `lines` field: one JSON object per line, as the form edits it. */
 const splitDraftsInput = z.array(
-  z.object({ amount: z.string(), categoryId: z.string(), tags: z.string(), note: z.string() }),
+  z.object({
+    id: z.string().optional(),
+    amount: z.string(),
+    categoryId: z.string(),
+    tags: z.string(),
+    note: z.string(),
+  }),
   { error: 'The Split lines could not be read' },
 );
 
@@ -87,6 +93,7 @@ async function readSplitLines(formData: FormData, currency: string): Promise<Spl
       throw new ValidationError(`Line ${index + 1}: enter a valid amount`);
     }
     return {
+      id: draft.id,
       amountMinor,
       categoryId: draft.categoryId,
       tagNames: readTags(draft.tags),
