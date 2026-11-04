@@ -10,5 +10,5 @@ Bank exports often aggregate several purchases, or principal and interest, into 
 
 - Reports, Widgets and the CSV export count Split lines, not the parent; the transaction list shows the parent once.
 - Every Split line needs a Category, so a split Transaction is never Unclassified; lines may differ in sign and use any Category group type, including Capital (loan principal).
-- A Transaction is either part of a Transfer or split, never both.
+- A Transaction is either part of a Transfer or split, never both. (Superseded by ADR-0005: a Split line can be a Transfer side.)
 - Splitting is a manual classification: Rules never create Splits and never override a split Transaction's Category. Removing a Split returns the Transaction to Unclassified.
