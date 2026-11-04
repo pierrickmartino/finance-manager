@@ -17,4 +17,5 @@ A bank entry sometimes mixes a movement to one of the user's own Accounts with r
 - The pairing checks don't change. The two sides are different, on different Accounts (a line takes its Transaction's Account) and of opposite signs, and amounts aren't checked. Several lines of one Split can each be in their own Transfer.
 - Transfer candidates are only ever whole Transactions. Split lines are made by hand after Import, so a Split-line Transfer is always linked manually.
 - Removing a Split, or dropping a line that is a Transfer side, is refused until the Transfer is unlinked. Deleting a Transaction still unlinks its Transfers automatically.
+- When a line's Transfer is unlinked, by hand, by deleting the other side or by undoing its Import, the line is left with neither a Category nor a Transfer. Its Transaction is then Unclassified until the line gets a Category or a new Transfer, so a split Transaction can be Unclassified, which ADR-0004 ruled out.
 - Reports, Widgets and the CSV export leave out Transfer Split lines, just as they leave out Transfers. The other lines of the same Split still count.

@@ -92,7 +92,7 @@ A free label cutting across Categories, many per Transaction, such as "Vacation 
 _Avoid_: Label, project
 
 **Unclassified**:
-The state of a Transaction that is not a Transfer, has no Split and has no Category yet.
+The state of a Transaction that has neither a Category nor a Transfer, or that has a Split line with neither.
 _Avoid_: Uncategorised, inbox
 
 **Rule**:
