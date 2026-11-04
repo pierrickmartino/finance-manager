@@ -95,7 +95,8 @@ const ELIGIBLE_FOR_ME = `t.account_id <> me.account_id
 /**
  * The sides the user may link with this side by hand (spec 88, ADR-0005): unsplit whole
  * Transactions and Split lines, on another Account, with the opposite sign, not in a Transfer,
- * booked (a line by its Transaction) within a month. Closest amount first, then date.
+ * booked (a line by its Transaction) within a month. Closest amount first, then date, then
+ * whole Transactions before Split lines.
  */
 export async function listLinkOptions(
   ctx: ServiceContext,
@@ -115,7 +116,7 @@ export async function listLinkOptions(
          AND sign(sl.amount_minor) = -sign(me.amount_minor)
      ) option CROSS JOIN me
      ORDER BY abs(option."amountMinor" + me.amount_minor),
-       abs(option.booking_date - me.booking_date), option.kind, option.id
+       abs(option.booking_date - me.booking_date), option.kind = 'splitLine', option.id
      LIMIT $4`,
     [side.kind, side.id, LINK_OPTION_DAYS, MAX_LINK_OPTIONS],
   );

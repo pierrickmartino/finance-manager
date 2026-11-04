@@ -226,6 +226,20 @@ describe('the link picker offers whole Transactions and Split lines', () => {
   });
 });
 
+describe('the link picker on a tie', () => {
+  it('lists a whole Transaction before a Split line of the same amount and date', async () => {
+    const ubs = await account('UBS');
+    const bcge = await account('BCGE');
+    const credit = await seedOne(ubs, { amountMinor: 100000 });
+    const [line] = await split(await seedOne(bcge, { amountMinor: -150000 }), [-100000, -50000]);
+    const whole = await seedOne(bcge, { amountMinor: -100000 });
+
+    const options = await listLinkOptions(t.ctx, transactionSide(credit));
+
+    expect(optionRefs(options).slice(0, 2)).toEqual([transactionSide(whole), splitLineSide(line!)]);
+  });
+});
+
 describe('Transfer candidates at Import', () => {
   it('are never a split Transaction or one of its Split lines', async () => {
     const bcge = await account('BCGE');
