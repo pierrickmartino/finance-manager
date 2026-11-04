@@ -79,6 +79,27 @@ interface ExportRow {
   isSplit: boolean;
 }
 
+/**
+ * `LEFT JOIN LATERAL (...) o`: the other side of a side's Transfer, a whole Transaction or a
+ * Split line (ADR-0005). The side is given by its own Transaction id or Split line id, the other
+ * one `NULL`. `o."transferAccount"` is the other side's Account (a line's is its Transaction's)
+ * and `o."transferTransactionId"` its Transaction id.
+ */
+function otherSide(transferId: string, ownTransactionId: string, ownLineId: string): string {
+  return `LEFT JOIN LATERAL (
+    SELECT ob.name || ' · ' || oa.name AS "transferAccount", ot.id AS "transferTransactionId"
+    FROM (SELECT x.id FROM "transaction" x
+          WHERE x.transfer_id = ${transferId} AND x.id IS DISTINCT FROM ${ownTransactionId}
+          UNION ALL
+          SELECT ol.transaction_id FROM split_line ol
+          WHERE ol.transfer_id = ${transferId} AND ol.id IS DISTINCT FROM ${ownLineId}) side
+    JOIN "transaction" ot ON ot.id = side.id
+    JOIN account oa ON oa.id = ot.account_id
+    JOIN bank ob ON ob.id = oa.bank_id
+    ORDER BY ot.id LIMIT 1
+  ) o ON ${transferId} IS NOT NULL`;
+}
+
 // The FX rate is looked up exactly like the reporting SQL (#9 handoff): the rate of the booking
 // date or the most recent earlier one; the conversion itself is `toChfMinor`, which matches
 // PostgreSQL's `round(numeric)` to the cent.
@@ -93,18 +114,15 @@ const SELECT_EXPORT = `
          (SELECT string_agg(tg.name, '${TAG_SEPARATOR}' ORDER BY lower(tg.name))
           FROM transaction_tag xt JOIN tag tg ON tg.id = xt.tag_id
           WHERE xt.transaction_id = t.id) AS tags,
-         t.notes, ob.name || ' · ' || oa.name AS "transferAccount",
-         o.id AS "transferTransactionId", t.import_id AS "importId", ${IS_SPLIT} AS "isSplit"
+         t.notes, o."transferAccount", o."transferTransactionId", t.import_id AS "importId",
+         ${IS_SPLIT} AS "isSplit"
   FROM "transaction" t
   JOIN account a ON a.id = t.account_id
   JOIN bank b ON b.id = a.bank_id
   LEFT JOIN payee p ON p.id = t.payee_id
   LEFT JOIN category c ON c.id = t.category_id
   LEFT JOIN category_group g ON g.id = c.group_id
-  LEFT JOIN "transaction" o
-    ON t.transfer_id IS NOT NULL AND o.transfer_id = t.transfer_id AND o.id <> t.id
-  LEFT JOIN account oa ON oa.id = o.account_id
-  LEFT JOIN bank ob ON ob.id = oa.bank_id
+  ${otherSide('t.transfer_id', 't.id', 'NULL')}
   LEFT JOIN LATERAL (
     SELECT trim_scale(r.rate_to_chf)::text AS rate FROM fx_rate r
     WHERE r.currency = t.currency AND r.date <= t.booking_date
@@ -115,11 +133,14 @@ const SELECT_EXPORT = `
 interface ExportLine {
   transactionId: string;
   amountMinor: number;
-  groupName: string;
-  groupType: CategoryGroupType;
-  category: string;
+  /** Null, like its group, when the line is a Transfer side. */
+  groupName: string | null;
+  groupType: CategoryGroupType | null;
+  category: string | null;
   tags: string | null;
   note: string | null;
+  transferAccount: string | null;
+  transferTransactionId: string | null;
 }
 
 const SELECT_LINES = `
@@ -131,10 +152,11 @@ const SELECT_LINES = `
                           UNION
                           SELECT xt.tag_id FROM transaction_tag xt
                           WHERE xt.transaction_id = sl.transaction_id)) AS tags,
-         sl.note
+         sl.note, o."transferAccount", o."transferTransactionId"
   FROM split_line sl
-  JOIN category c ON c.id = sl.category_id
-  JOIN category_group g ON g.id = c.group_id
+  LEFT JOIN category c ON c.id = sl.category_id
+  LEFT JOIN category_group g ON g.id = c.group_id
+  ${otherSide('sl.transfer_id', 'NULL', 'sl.id')}
   WHERE sl.transaction_id = ANY($1::uuid[])`;
 
 /**
@@ -157,8 +179,10 @@ async function loadLines(
 
 /**
  * The rows a Transaction exports as: itself when unsplit, otherwise one per Split line with
- * the Transaction's fields and the line's amount, Category, Tags and note. A line's Tags are
- * its own plus the Transaction's (as in reports); its Notes are the line's note only.
+ * the Transaction's fields and the line's amount, Category, Tags, note and Transfer. A line
+ * that is a Transfer side is written like a Transfer: no Category, the other side's Account and
+ * Transaction id. A line's Tags are its own plus the Transaction's (as in reports); its Notes
+ * are the line's note only.
  */
 function expandRow(row: ExportRow, lines: readonly ExportLine[]): ExportRow[] {
   if (!row.isSplit) return [row];
@@ -170,6 +194,8 @@ function expandRow(row: ExportRow, lines: readonly ExportLine[]): ExportRow[] {
     category: line.category,
     tags: line.tags,
     notes: line.note,
+    transferAccount: line.transferAccount,
+    transferTransactionId: line.transferTransactionId,
   }));
 }
 
