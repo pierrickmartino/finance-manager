@@ -124,7 +124,7 @@ describe('the other side of a Split line Transfer', () => {
 });
 
 describe('link options of a Split line', () => {
-  it("offers whole Transactions that can be its other side, closest to the line's amount first", async () => {
+  it("offers whole Transactions and Split lines that can be its other side, closest to the line's amount first", async () => {
     const { bcge, ubs, credit, toSavings } = await aggregatedDebit();
     const nearTotal = await seedOne(ubs, { amountMinor: 150000, bookingDate: '2025-10-11' });
     await seedOne(ubs, { amountMinor: -100000 }); // same sign
@@ -132,16 +132,19 @@ describe('link options of a Split line', () => {
     await seedOne(ubs, { amountMinor: 100000, bookingDate: '2025-12-31' }); // too far away
     const splitCredit = await seedOne(ubs, { amountMinor: 100000 });
     const rent = await category('Elsewhere');
-    await splitTransaction(t.ctx, splitCredit, [
+    const { splitLines } = await splitTransaction(t.ctx, splitCredit, [
       { amountMinor: 60000, categoryId: rent.id },
       { amountMinor: 40000, categoryId: rent.id },
     ]); // split: only its lines can be sides
+    const [big, small] = splitLines.map((line) => line.id) as [string, string];
 
     const options = await listLinkOptions(t.ctx, splitLineSide(toSavings));
 
     expect(options.map(({ kind, id }) => ({ kind, id }))).toEqual([
-      transactionSide(credit),
-      transactionSide(nearTotal),
+      transactionSide(credit), // +1,000
+      splitLineSide(big), // +600
+      transactionSide(nearTotal), // +1,500
+      splitLineSide(small), // +400
     ]);
   });
 

@@ -89,10 +89,14 @@ export async function getTransferCounterpart(
   return (await toSideViews(ctx.db, result.rows))[0] ?? null;
 }
 
+/** SQL: `t` (a Transaction, or a Split line's) is eligible to pair with `me`, bar its sign. */
+const ELIGIBLE_FOR_ME = `t.account_id <> me.account_id
+  AND t.booking_date BETWEEN me.booking_date - $3::int AND me.booking_date + $3::int`;
+
 /**
- * Whole Transactions the user may link with this side by hand (spec 88): on another Account,
- * with the opposite sign, not in a Transfer, not split, booked within a month. Closest amount
- * first, then date.
+ * The sides the user may link with this side by hand (spec 88, ADR-0005): unsplit whole
+ * Transactions and Split lines, on another Account, with the opposite sign, not in a Transfer,
+ * booked (a line by its Transaction) within a month. Closest amount first, then date.
  */
 export async function listLinkOptions(
   ctx: ServiceContext,
@@ -101,11 +105,18 @@ export async function listLinkOptions(
   if (!isSideRef(side)) throw new NotFoundError('Transaction not found');
   const result = await ctx.db.query<SideRow>(
     `${ME}
-     SELECT ${TRANSACTION_SIDE_COLUMNS} FROM "transaction" t CROSS JOIN me
-     WHERE t.account_id <> me.account_id AND t.transfer_id IS NULL AND NOT ${IS_SPLIT}
-       AND sign(t.amount_minor) = -sign(me.amount_minor)
-       AND t.booking_date BETWEEN me.booking_date - $3::int AND me.booking_date + $3::int
-     ORDER BY abs(t.amount_minor + me.amount_minor), abs(t.booking_date - me.booking_date), t.id
+     SELECT kind, id, "transactionId", "amountMinor" FROM (
+       SELECT ${TRANSACTION_SIDE_COLUMNS}, t.booking_date FROM "transaction" t CROSS JOIN me
+       WHERE ${ELIGIBLE_FOR_ME} AND t.transfer_id IS NULL AND NOT ${IS_SPLIT}
+         AND sign(t.amount_minor) = -sign(me.amount_minor)
+       UNION ALL
+       SELECT ${SPLIT_LINE_SIDE_COLUMNS}, t.booking_date
+       FROM split_line sl JOIN "transaction" t ON t.id = sl.transaction_id CROSS JOIN me
+       WHERE ${ELIGIBLE_FOR_ME} AND sl.transfer_id IS NULL
+         AND sign(sl.amount_minor) = -sign(me.amount_minor)
+     ) option CROSS JOIN me
+     ORDER BY abs(option."amountMinor" + me.amount_minor),
+       abs(option.booking_date - me.booking_date), option.kind, option.id
      LIMIT $4`,
     [side.kind, side.id, LINK_OPTION_DAYS, MAX_LINK_OPTIONS],
   );

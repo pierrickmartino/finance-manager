@@ -1,5 +1,6 @@
 import type { Queryable } from '@/server/db/client';
 import { BASE_CURRENCY, loadRateTable } from '../fx';
+import { IS_SPLIT } from '../transactions/split-guard';
 import {
   findTransferCandidates,
   TRANSFER_MAX_DAYS,
@@ -25,7 +26,8 @@ async function loadOtherAccountTransactions(
 ): Promise<CandidateTransaction[]> {
   const result = await db.query<CandidateTransaction>(
     `${SELECT_WITH_ACCOUNT}
-     WHERE t.account_id <> $1 AND t.transfer_id IS NULL AND t.booking_date BETWEEN $2 AND $3`,
+     WHERE t.account_id <> $1 AND t.transfer_id IS NULL AND NOT ${IS_SPLIT}
+       AND t.booking_date BETWEEN $2 AND $3`,
     [accountId, from, to],
   );
   return result.rows;
@@ -56,7 +58,8 @@ async function chfLookup(
 
 /**
  * Transfer candidates for the entries of an Import preview, in the entries' order (spec 83-87),
- * searched among the Transactions of all other Accounts that are not in a Transfer yet. Entries
+ * searched among the unsplit Transactions of all other Accounts that are not in a Transfer yet:
+ * never a split Transaction or a Split line, which are only ever linked by hand (ADR-0005). Entries
  * that will never be added (`skip`) get none.
  */
 export async function findImportTransferCandidates(

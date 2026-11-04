@@ -126,8 +126,8 @@ export function TransferSection({
         </div>
       ) : options.length === 0 ? (
         <p className="text-sm text-zinc-500">
-          Not a Transfer. No Transaction on another Account with the opposite sign is near enough to
-          link.
+          Not a Transfer. No Transaction or Split line on another Account with the opposite sign is
+          near enough to link.
         </p>
       ) : (
         <LinkTransferForm

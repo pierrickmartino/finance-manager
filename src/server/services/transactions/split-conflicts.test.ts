@@ -87,7 +87,7 @@ describe('linking a Transfer refuses a split Transaction', () => {
 });
 
 describe('Transfer decisions at Import commit refuse a split Transaction', () => {
-  it('refuses the whole Import, naming the Split', async () => {
+  it('refuses the whole Import when the candidate was split after the preview', async () => {
     const bcge = await account('BCGE CHF', {
       iban: 'CH3400788000050012345',
       importFormat: 'camt053',
@@ -100,20 +100,24 @@ describe('Transfer decisions at Import commit refuse a split Transaction', () =>
     const out = (await listImportTransactions(t.ctx, bcgeImport.id)).find(
       (transaction) => transaction.bankReference === 'BCGE20251010000342',
     )!;
-    await splitInHalves(out.id, out.amountMinor);
     const ubs = await account('UBS', { iban: 'CH6900235235123456010' });
     const result = await previewImport(t.ctx, {
       accountId: ubs.id,
       ...fixture('ubs/ubs-chf-2025-10.csv'),
     });
     const entry = result.entries.find((e) => e.bankReference === '9930283TI0000105')!;
+    expect(entry.transferCandidates.map((candidate) => candidate.transaction.id)).toEqual([out.id]);
+    await splitInHalves(out.id, out.amountMinor);
 
     await expect(
       commitImport(t.ctx, {
         previewId: result.id,
         transferDecisions: { [entry.fingerprint]: out.id },
       }),
-    ).rejects.toMatchObject({ code: 'validation', message: expect.stringMatching(/Split/) });
+    ).rejects.toMatchObject({
+      code: 'validation',
+      message: expect.stringMatching(/no longer a Transfer candidate/),
+    });
 
     expect((await listTransactions(t.ctx, { accountId: ubs.id })).transactions).toEqual([]);
     expect((await getImportPreview(t.ctx, result.id)).id).toBe(result.id);
