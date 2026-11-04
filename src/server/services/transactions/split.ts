@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Queryable } from '@/server/db/client';
 import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
@@ -137,51 +138,71 @@ async function writeLines(
   transactionId: string,
   lines: readonly ParsedLine[],
 ): Promise<void> {
-  const { tx } = scope;
   const transfers = await lineTransfers(scope, transactionId);
   requireOwnLineIds(transfers, lines);
   const categoryIds = await mapInOrder(lines, (line) =>
     resolveLineCategoryId(scope, transfers, line),
   );
   const tagIds = await mapInOrder(lines, (line) => resolveLineTagIds(scope, line));
-  // One statement for the whole set: the database checks a Split per statement.
-  const written = await tx.query<{ id: string; position: number }>(
-    `WITH line AS (
-       SELECT * FROM unnest($2::uuid[], $3::bigint[], $4::uuid[], $5::text[]) WITH ORDINALITY
-         AS line(id, amount, category, note, n)
-     ), removed AS (
-       DELETE FROM split_line sl
-       WHERE sl.transaction_id = $1
-         AND NOT EXISTS (SELECT 1 FROM line WHERE line.id = sl.id)
-     ), updated AS (
-       UPDATE split_line sl
-       SET position = line.n, amount_minor = line.amount, category_id = line.category,
-           note = line.note
-       FROM line
-       WHERE sl.id = line.id AND sl.transaction_id = $1
-       RETURNING sl.id, sl.position
-     ), inserted AS (
-       INSERT INTO split_line (transaction_id, position, amount_minor, category_id, note)
-       SELECT $1, line.n, line.amount, line.category, line.note
-       FROM line WHERE line.id IS NULL
-       RETURNING id, position
-     )
-     SELECT id, position FROM updated UNION ALL SELECT id, position FROM inserted`,
-    [
-      transactionId,
-      lines.map((line) => line.id ?? null),
-      lines.map((line) => line.amountMinor),
-      categoryIds,
-      lines.map((line) => line.note ?? null),
-    ],
-  );
+  const lineIds = await writeLineRows(scope.tx, transactionId, lines, categoryIds);
+  await writeLineTags(scope.tx, lineIds, tagIds);
+}
+
+/**
+ * SQL: makes the lines `$2`..`$5` (id, amount, Category, note; a null id for a new line) the
+ * Split lines of Transaction `$1`, in one statement for the whole set (the database checks a
+ * Split per statement). Returns each written line's id and position.
+ */
+const WRITE_LINES = `WITH line AS (
+    SELECT * FROM unnest($2::uuid[], $3::bigint[], $4::uuid[], $5::text[]) WITH ORDINALITY
+      AS line(id, amount, category, note, n)
+  ), removed AS (
+    DELETE FROM split_line sl
+    WHERE sl.transaction_id = $1
+      AND NOT EXISTS (SELECT 1 FROM line WHERE line.id = sl.id)
+  ), updated AS (
+    UPDATE split_line sl
+    SET position = line.n, amount_minor = line.amount, category_id = line.category,
+        note = line.note
+    FROM line
+    WHERE sl.id = line.id AND sl.transaction_id = $1
+    RETURNING sl.id, sl.position
+  ), inserted AS (
+    INSERT INTO split_line (transaction_id, position, amount_minor, category_id, note)
+    SELECT $1, line.n, line.amount, line.category, line.note
+    FROM line WHERE line.id IS NULL
+    RETURNING id, position
+  )
+  SELECT id, position FROM updated UNION ALL SELECT id, position FROM inserted`;
+
+/** Writes the lines' rows; returns their ids, in the lines' order. */
+async function writeLineRows(
+  tx: Queryable,
+  transactionId: string,
+  lines: readonly ParsedLine[],
+  categoryIds: readonly (string | null)[],
+): Promise<string[]> {
+  const written = await tx.query<{ id: string; position: number }>(WRITE_LINES, [
+    transactionId,
+    lines.map((line) => line.id ?? null),
+    lines.map((line) => line.amountMinor),
+    categoryIds,
+    lines.map((line) => line.note ?? null),
+  ]);
   const idAt = new Map(written.rows.map((row) => [row.position, row.id]));
-  const lineIdAt = (position: number): string => {
-    const id = idAt.get(position);
-    if (id === undefined) throw new Error(`Split line ${position} was not written`);
+  return lines.map((_, index) => {
+    const id = idAt.get(index + 1);
+    if (id === undefined) throw new Error(`Split line ${index + 1} was not written`);
     return id;
-  };
-  const lineIds = lines.map((_, index) => lineIdAt(index + 1));
+  });
+}
+
+/** Gives each line its Tags (`tagIds[i]` on `lineIds[i]`), replacing the ones it had. */
+async function writeLineTags(
+  tx: Queryable,
+  lineIds: readonly string[],
+  tagIds: readonly (readonly string[])[],
+): Promise<void> {
   await tx.query('DELETE FROM split_line_tag WHERE split_line_id = ANY($1::uuid[])', [lineIds]);
   const pairs = tagIds.flatMap((ids, index) => ids.map((tagId) => [lineIds[index]!, tagId]));
   if (pairs.length === 0) return;

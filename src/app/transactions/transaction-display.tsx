@@ -24,12 +24,18 @@ export function splitLabel({ splitLines }: Pick<TransactionListItem, 'splitLines
 /** The badge of a split Transaction with at least one Transfer line (ADR-0005). */
 export const PARTLY_TRANSFER = 'Partly Transfer';
 
+/** A Split line as far as its Transfer goes: the Transfer it is a side of, if any. */
+export interface TransferSideLine {
+  transferId: string | null;
+}
+
+/** What tells whether a Transaction is partly a Transfer: its Split lines. */
+export interface WithSplitLines {
+  splitLines: readonly TransferSideLine[];
+}
+
 /** Whether a Split line of the Transaction is a Transfer side. */
-export function isPartlyTransfer({
-  splitLines,
-}: {
-  splitLines: readonly { transferId: string | null }[];
-}): boolean {
+export function isPartlyTransfer({ splitLines }: WithSplitLines): boolean {
   return splitLines.some((line) => line.transferId !== null);
 }
 

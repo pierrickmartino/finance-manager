@@ -1,5 +1,5 @@
 import type { Classification, Transaction } from '@/server/services/transactions';
-import { isPartlyTransfer, PARTLY_TRANSFER } from '../transaction-display';
+import { isPartlyTransfer, PARTLY_TRANSFER, type WithSplitLines } from '../transaction-display';
 
 export type BadgeTone = 'warning' | 'info' | 'positive' | 'neutral';
 
@@ -9,9 +9,8 @@ export interface StatusBadge {
 }
 
 /** The parts of a Classification the badges read. */
-export interface BadgeClassification {
+export interface BadgeClassification extends WithSplitLines {
   category: { name: string } | null;
-  splitLines: readonly { transferId: string | null }[];
   lockedFields: Classification['lockedFields'];
 }
 
