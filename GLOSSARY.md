@@ -32,7 +32,7 @@ One movement of money on one Account, dated and signed, in that Account's Curren
 _Avoid_: Entry, posting, operation, line
 
 **Transfer**:
-A pair of linked Transactions moving money between two of the user's own Accounts, possibly in different Currencies. It is neither income nor expense.
+A pair of linked sides moving money between two of the user's own Accounts, possibly in different Currencies. Each side is either a whole Transaction or one Split line of a Transaction. It is neither income nor expense.
 _Avoid_: Internal movement
 
 **Transfer candidate**:
