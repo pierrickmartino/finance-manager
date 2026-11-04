@@ -79,7 +79,8 @@ function minorUnitFactors(currencies: readonly string[]): Record<string, string>
 
 /**
  * `WITH report_base AS (...)`: reportable rows (unsplit Transactions and Split lines) in
- * `range` that pass the filters, never Transfers (spec 89). `id` is always the Transaction's,
+ * `range` that pass the filters, never Transfers (spec 89) nor Split lines that are Transfer
+ * sides (ADR-0005), so a Split's other lines still count. `id` is always the Transaction's,
  * `line_id` the Split line's (NULL for an unsplit Transaction). `chf_minor` is NULL when the
  * Currency has no rate on or before the booking date. `currencies` lists the Currencies in use,
  * for their minor-unit factors.
@@ -93,6 +94,7 @@ export function baseCte(
   const factors = params.add(JSON.stringify(minorUnitFactors(currencies)));
   const conditions = [
     't.transfer_id IS NULL',
+    'sl.transfer_id IS NULL',
     `t.booking_date BETWEEN ${params.add(range.from)}::date AND ${params.add(range.to)}::date`,
     ...filterConditions(query, params),
   ];

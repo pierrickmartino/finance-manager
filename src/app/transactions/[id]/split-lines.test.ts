@@ -90,6 +90,47 @@ describe('the split form', () => {
     ]);
   });
 
+  it('starts a Transfer line as a Transfer, with no Category', () => {
+    const drafts = initialSplitDrafts(
+      {
+        amountMinor: -150000,
+        currency: 'CHF',
+        bundledDetails: null,
+        splitLines: [
+          {
+            id: 'l1',
+            amountMinor: -100000,
+            category: null,
+            tags: [],
+            note: 'To savings',
+            transferId: 'tr1',
+          },
+          {
+            id: 'l2',
+            amountMinor: -50000,
+            category: { ...category, groupType: 'expense' },
+            tags: [],
+            note: null,
+            transferId: null,
+          },
+        ],
+      },
+      'apostrophe',
+    );
+
+    expect(drafts).toEqual([
+      {
+        id: 'l1',
+        amount: "-1'000.00",
+        categoryId: '',
+        tags: '',
+        note: 'To savings',
+        isTransfer: true,
+      },
+      { id: 'l2', amount: '-500.00', categoryId: 'c1', tags: '', note: '' },
+    ]);
+  });
+
   it('shows the remaining amount live, ignoring blank lines, and none while an amount is invalid', () => {
     expect(remainingMinor(-10000, ['-70.00', ''], 'apostrophe', 'CHF')).toBe(-3000);
     expect(remainingMinor(-10000, ['-70.00', '-30'], 'apostrophe', 'CHF')).toBe(0);

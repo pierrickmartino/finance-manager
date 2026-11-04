@@ -28,9 +28,11 @@ const splitLineInput = z
       .number({ error: 'Every Split line needs an amount' })
       .int('Split line amounts must be in minor units')
       .refine((value) => Number.isSafeInteger(value), 'Split line amount is too large'),
+    /** Required, except on a line that is a Transfer side: that one can't have a Category. */
     categoryId: z
       .string({ error: 'Every Split line needs a Category' })
-      .min(1, 'Every Split line needs a Category'),
+      .min(1, 'Every Split line needs a Category')
+      .nullish(),
     tagIds: z.array(z.string()).optional(),
     /** Or Tags by name, creating the missing ones. */
     tagNames: z.array(tagName).optional(),
@@ -67,28 +69,63 @@ async function resolveLineTagIds(scope: MutationScope, line: ParsedLine): Promis
   return [...new Set(tags.map((tag) => tag.id))];
 }
 
+/** Why a Split line that is a Transfer side can't be dropped, nor its Split removed. */
+export const UNLINK_TRANSFER_FIRST = 'This Split holds a Transfer line: unlink the Transfer first';
+
 /**
- * Refuses line ids that are not lines of this Transaction, or that are given twice: a line can
- * only be updated in place by its own Split.
+ * The Transfer each of the Transaction's Split lines is a side of (null when none), by line id.
+ * The Transaction must be locked: linking a line locks its Transaction too.
  */
-async function requireOwnLineIds(
+async function lineTransfers(
   scope: MutationScope,
   transactionId: string,
+): Promise<Map<string, string | null>> {
+  const existing = await scope.tx.query<{ id: string; transferId: string | null }>(
+    'SELECT id, transfer_id AS "transferId" FROM split_line WHERE transaction_id = $1',
+    [transactionId],
+  );
+  return new Map(existing.rows.map((row) => [row.id, row.transferId]));
+}
+
+/**
+ * Refuses line ids that are not lines of this Transaction, or that are given twice: a line can
+ * only be updated in place by its own Split. Also refuses dropping a line that is a Transfer
+ * side (ADR-0005).
+ */
+function requireOwnLineIds(
+  transfers: ReadonlyMap<string, string | null>,
   lines: readonly ParsedLine[],
-): Promise<void> {
+): void {
   const given = lines.flatMap((line) => (line.id === undefined ? [] : [line.id]));
-  if (given.length === 0) return;
   if (new Set(given).size !== given.length) {
     throw new ValidationError('A Split line can only be given once');
   }
-  const existing = await scope.tx.query<{ id: string }>(
-    'SELECT id FROM split_line WHERE transaction_id = $1',
-    [transactionId],
-  );
-  const own = new Set(existing.rows.map((row) => row.id));
-  if (given.some((id) => !own.has(id))) {
+  if (given.some((id) => !transfers.has(id))) {
     throw new ValidationError('A Split line can only be edited on its own Transaction');
   }
+  const kept = new Set(given);
+  const dropsTransferLine = [...transfers].some(([id, transferId]) => transferId && !kept.has(id));
+  if (dropsTransferLine) throw new ValidationError(UNLINK_TRANSFER_FIRST);
+}
+
+/**
+ * The Category id a line gets: its own, or none for a Transfer side, which can't have one.
+ * Every other line needs a Category.
+ */
+async function resolveLineCategoryId(
+  scope: MutationScope,
+  transfers: ReadonlyMap<string, string | null>,
+  line: ParsedLine,
+): Promise<string | null> {
+  const isTransferSide = line.id !== undefined && Boolean(transfers.get(line.id));
+  if (isTransferSide) {
+    if (line.categoryId != null) {
+      throw new ValidationError("This Split line is part of a Transfer: it can't have a Category");
+    }
+    return null;
+  }
+  if (line.categoryId == null) throw new ValidationError('Every Split line needs a Category');
+  return (await findCategory(scope.tx, line.categoryId)).id;
 }
 
 /**
@@ -101,10 +138,10 @@ async function writeLines(
   lines: readonly ParsedLine[],
 ): Promise<void> {
   const { tx } = scope;
-  await requireOwnLineIds(scope, transactionId, lines);
-  const categoryIds = await mapInOrder(
-    lines,
-    async (line) => (await findCategory(tx, line.categoryId)).id,
+  const transfers = await lineTransfers(scope, transactionId);
+  requireOwnLineIds(transfers, lines);
+  const categoryIds = await mapInOrder(lines, (line) =>
+    resolveLineCategoryId(scope, transfers, line),
   );
   const tagIds = await mapInOrder(lines, (line) => resolveLineTagIds(scope, line));
   // One statement for the whole set: the database checks a Split per statement.
@@ -158,8 +195,9 @@ async function writeLines(
 /**
  * Splits a Transaction into `lines`, or edits its Split: lines given by the id of one of its
  * Split lines are updated in place, others are added, and lines not given are deleted. The
- * lines need a Category each and must sum exactly to the Transaction's amount; signs may
- * differ. One Batch.
+ * lines need a Category each, except a line that is a Transfer side (ADR-0005): it keeps its
+ * Transfer, can't get a Category and can't be dropped. The lines must sum exactly to the
+ * Transaction's amount; signs may differ. One Batch.
  */
 export async function splitTransaction(
   ctx: ServiceContext,
@@ -198,7 +236,10 @@ export async function splitTransaction(
   });
 }
 
-/** Removes a Transaction's Split: it goes back to Unclassified. One Batch. */
+/**
+ * Removes a Transaction's Split: it goes back to Unclassified. Refused while a line is a
+ * Transfer side. One Batch.
+ */
 export async function removeSplit(
   ctx: ServiceContext,
   transactionId: string,
@@ -207,6 +248,11 @@ export async function removeSplit(
     await lockTransaction(scope, transactionId);
     const before = await requireClassification(scope.tx, transactionId);
     if (before.splitLines.length === 0) throw new ValidationError('This Transaction is not split');
+    // A Transfer line keeps its Transfer until it is unlinked (ADR-0005). The Transaction is
+    // locked, so no line can be linked under this check.
+    if (before.splitLines.some((line) => line.transferId !== null)) {
+      throw new ValidationError(UNLINK_TRANSFER_FIRST);
+    }
     await scope.tx.query('DELETE FROM split_line WHERE transaction_id = $1', [transactionId]);
     // Truly Unclassified again: the Category lock the Split set goes too, so Rules may classify it.
     await scope.tx.query(
