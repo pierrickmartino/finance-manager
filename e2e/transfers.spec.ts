@@ -66,13 +66,13 @@ test('confirms a Transfer candidate in the Import preview', async ({ page }) => 
   );
 });
 
-/** Creates a Bank and a manual Account, and adds one Manual transaction to it. */
+/** Creates a Bank and a manual Account, and adds one Manual transaction to it; returns its id. */
 async function manualAccountWith(
   page: Page,
   name: string,
   amount: string,
   description: string,
-): Promise<void> {
+): Promise<string> {
   await page.goto('/banks?bank=new');
   await page.getByLabel('Bank name').fill(`${name} bank`);
   await page.getByRole('button', { name: 'Add Bank' }).click();
@@ -93,6 +93,7 @@ async function manualAccountWith(
   await expect(entry.getByRole('table', { name: 'Manual transactions' })).toContainText(
     description,
   );
+  return new URL(page.url()).pathname.split('/').at(-1)!;
 }
 
 /** Opens the one Transaction whose description is `description` from the list. */
@@ -122,8 +123,8 @@ test('links one Split line of a Transaction with a Transaction on another Accoun
   await addCategoryGroup(page, group, 'Expense');
   await addCategory(page, group, rent);
   await addCategory(page, group, savings);
-  await manualAccountWith(page, bcge, "-1'500", debit);
-  await manualAccountWith(page, ubs, "1'000", credit);
+  const bcgeId = await manualAccountWith(page, bcge, "-1'500", debit);
+  const ubsId = await manualAccountWith(page, ubs, "1'000", credit);
 
   // Split the debit into -1,000 and -500
   await openTransaction(page, await openByDescription(page, debit));
@@ -183,6 +184,16 @@ test('links one Split line of a Transaction with a Transaction on another Accoun
   const row = await openByDescription(page, debit);
   await expect(row).toContainText('Split (2)');
   await expect(row).toContainText('Partly Transfer');
+
+  // A report of both Accounts leaves the Transfer out: only the -500 line is counted
+  await page.goto(
+    `/widgets/new?range=fixed&from=2025-10-01&to=2025-10-31&rows=month&columns=category` +
+      `&account=${bcgeId}&account=${ubsId}`,
+  );
+  const pivot = page.getByRole('table', { name: 'Pivot' });
+  const cells = pivot.getByRole('link');
+  await expect(cells).toHaveCount(1);
+  await expect(cells).toHaveAccessibleName(`Oct 2025, ${group} › ${savings}: CHF -500.00`);
 });
 
 interface LineInput {
