@@ -32,11 +32,11 @@ One movement of money on one Account, dated and signed, in that Account's Curren
 _Avoid_: Entry, posting, operation, line
 
 **Transfer**:
-A pair of linked Transactions moving money between two of the user's own Accounts, possibly in different Currencies. It is neither income nor expense.
+A pair of linked sides moving money between two of the user's own Accounts, possibly in different Currencies. Each side is either a whole Transaction or one Split line of a Transaction. It is neither income nor expense.
 _Avoid_: Internal movement
 
 **Transfer candidate**:
-A suggested, not yet confirmed, pairing of two Transactions as a Transfer.
+A suggested, not yet confirmed, pairing of two whole Transactions as a Transfer. Split lines are never suggested.
 
 **Manual transaction**:
 A Transaction entered by hand, for an Account with no usable bank export or for a period its export doesn't cover.
@@ -80,7 +80,7 @@ The division of one Transaction's amount into Split lines that sum exactly to it
 _Avoid_: Breakdown, allocation, child transaction
 
 **Split line**:
-One part of a Split: an amount in the Transaction's Currency, of either sign, with its own Category (of any Category group type), Tags and note.
+One part of a Split: an amount in the Transaction's Currency, of either sign, with its own Tags and note, and either its own Category (of any Category group type) or a Transfer, never both.
 _Avoid_: Sub-transaction, part, share
 
 **Payee**:
@@ -92,7 +92,7 @@ A free label cutting across Categories, many per Transaction, such as "Vacation 
 _Avoid_: Label, project
 
 **Unclassified**:
-The state of a Transaction that is not a Transfer, has no Split and has no Category yet.
+The state of a Transaction that has neither a Category nor a Transfer, or that has a Split line with neither.
 _Avoid_: Uncategorised, inbox
 
 **Rule**:
