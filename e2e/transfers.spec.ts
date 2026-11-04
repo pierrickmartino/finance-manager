@@ -184,3 +184,86 @@ test('links one Split line of a Transaction with a Transaction on another Accoun
   await expect(row).toContainText('Split (2)');
   await expect(row).toContainText('Partly Transfer');
 });
+
+interface LineInput {
+  amount: string;
+  category: string;
+}
+
+/** Splits the open Transaction into these two lines. */
+async function splitInTwo(page: Page, [first, second]: [LineInput, LineInput]): Promise<void> {
+  await page.getByText('Split Transaction').click();
+  const form = page.getByRole('form', { name: 'Split' });
+  await form.getByLabel('Amount of line 1').fill(first.amount);
+  await form.getByLabel('Category of line 1').selectOption({ label: first.category });
+  await form.getByRole('button', { name: 'Add line' }).click();
+  await form.getByLabel('Amount of line 2').fill(second.amount);
+  await form.getByLabel('Category of line 2').selectOption({ label: second.category });
+  await form.getByRole('button', { name: 'Save Split' }).click();
+  await expect(page.getByRole('heading', { name: 'Split (2)' })).toBeVisible();
+}
+
+test('links a Split line with a Split line of a Transaction on another Account', async ({
+  page,
+}) => {
+  // ADR-0005: BCGE -1,500 is -1,000 to UBS and -500 rent; UBS +1,200 is +1,000 from BCGE and
+  // +200 salary.
+  const suffix = Date.now();
+  const bcge = `BCGE lines ${suffix}`;
+  const ubs = `UBS lines ${suffix}`;
+  const debit = `Ordre lignes ${suffix}`;
+  const credit = `Versement lignes ${suffix}`;
+  const group = `Mixed ${suffix}`;
+  const rent = `Rent ${suffix}`;
+  const salary = `Salary ${suffix}`;
+  await page.goto('/categories');
+  await addCategoryGroup(page, group, 'Expense');
+  await addCategory(page, group, rent);
+  await addCategory(page, group, salary);
+  await manualAccountWith(page, bcge, "-1'500", debit);
+  await manualAccountWith(page, ubs, "1'200", credit);
+
+  await openTransaction(page, await openByDescription(page, credit));
+  await splitInTwo(page, [
+    { amount: "1'000", category: salary },
+    { amount: '200', category: salary },
+  ]);
+  await openTransaction(page, await openByDescription(page, debit));
+  await splitInTwo(page, [
+    { amount: "-1'000", category: rent },
+    { amount: '-500', category: rent },
+  ]);
+
+  // The picker of the -1,000 line offers the UBS +1,000 line; link it
+  const lines = page.getByRole('table', { name: 'Split lines' }).locator('tbody tr');
+  await lines.nth(0).locator('summary', { hasText: 'Link as Transfer' }).click();
+  const link = page.getByRole('form', { name: 'Link line 1 as Transfer' });
+  const ubsLine = link
+    .getByRole('option')
+    .filter({ hasText: `a Split line of CHF 1'000.00 of ${ubs}` });
+  await expect(ubsLine).toHaveCount(1);
+  await link.getByLabel('Other side').selectOption((await ubsLine.getAttribute('value'))!);
+  await link.getByRole('button', { name: 'Link as Transfer' }).click();
+  await expect(lines.nth(0)).toContainText(`Transfer with a Split line of CHF 1'000.00 of ${ubs}`);
+  await expect(lines.nth(1)).toContainText(`${group} › ${rent}`);
+
+  // The UBS line shows the BCGE line back, and links to it
+  await lines
+    .nth(0)
+    .getByRole('link', { name: new RegExp(ubs) })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Split (2)' })).toBeVisible();
+  const ubsLines = page.getByRole('table', { name: 'Split lines' }).locator('tbody tr');
+  await expect(ubsLines.nth(0)).toContainText(
+    `Transfer with a Split line of CHF -1'000.00 of ${bcge}`,
+  );
+  await expect(ubsLines.nth(1)).toContainText(`${group} › ${salary}`);
+  await expect(page.getByText('Partly Transfer')).toBeVisible();
+  await ubsLines
+    .nth(0)
+    .getByRole('link', { name: new RegExp(bcge) })
+    .click();
+  await expect(page.getByRole('table', { name: 'Split lines' })).toContainText(
+    `Transfer with a Split line of CHF 1'000.00 of ${ubs}`,
+  );
+});
