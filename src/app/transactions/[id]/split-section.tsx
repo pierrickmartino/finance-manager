@@ -4,7 +4,7 @@ import { categoryLabel } from '@/lib/classification';
 import type { Formatter } from '@/lib/format';
 import type { CategoryGroup } from '@/server/services/categories';
 import type { TransactionDetail } from '@/server/services/transactions';
-import type { TransferSideView } from '@/server/services/transfers';
+import { splitLineSide, type TransferSideView } from '@/server/services/transfers';
 import { splitLabel } from '../transaction-display';
 import { removeSplitAction, splitTransactionAction } from './actions';
 import { SplitForm } from './split-form';
@@ -167,7 +167,7 @@ function LineClassification({
         </span>
         <UnlinkTransferForm
           transactionId={transactionId}
-          side={{ kind: 'splitLine', id: line.id }}
+          side={splitLineSide(line.id)}
           label={`Unlink line ${position} Transfer`}
         />
       </div>
@@ -185,7 +185,7 @@ function LineClassification({
           <div className="pt-2">
             <LinkTransferForm
               transactionId={transactionId}
-              side={{ kind: 'splitLine', id: line.id }}
+              side={splitLineSide(line.id)}
               options={options}
               fmt={fmt}
               label={`Link line ${position} as Transfer`}

@@ -2,7 +2,13 @@ import Link from 'next/link';
 import type { Formatter } from '@/lib/format';
 import { ActionForm } from '@/components/action-form';
 import { BUTTON_CLASS } from '@/components/named-list';
-import type { TransferSideRef, TransferSideView } from '@/server/services/transfers';
+import {
+  sideOptionValue,
+  transactionSide,
+  type TransferSideKind,
+  type TransferSideRef,
+  type TransferSideView,
+} from '@/server/services/transfers';
 import { linkTransferAction, unlinkTransferAction } from './actions';
 
 interface TransferSectionProps {
@@ -33,14 +39,13 @@ export function describeSide(side: TransferSideView, fmt: Formatter): string {
   )} · ${text}`;
 }
 
-/** "Transfer with <the other side>", linking to the other side's Transaction. */
-export function TransferCounterpart({
-  counterpart,
-  fmt,
-}: {
+interface TransferCounterpartProps {
   counterpart: TransferSideView;
   fmt: Formatter;
-}) {
+}
+
+/** "Transfer with <the other side>", linking to the other side's Transaction. */
+export function TransferCounterpart({ counterpart, fmt }: TransferCounterpartProps) {
   return (
     <>
       Transfer with{' '}
@@ -50,9 +55,6 @@ export function TransferCounterpart({
     </>
   );
 }
-
-/** The value of a link option in the picker: `kind:id`. */
-export const sideOptionValue = ({ kind, id }: TransferSideRef): string => `${kind}:${id}`;
 
 interface LinkTransferFormProps {
   /** The Transaction whose page this is. */
@@ -104,17 +106,19 @@ interface UnlinkTransferFormProps {
   label: string;
 }
 
+const UNLINK_CONFIRM: Record<TransferSideKind, string> = {
+  transaction: 'Unlink this Transfer? Both sides stay.',
+  splitLine:
+    'Unlink this Transfer? Both sides stay, and this Split line is left without a Category.',
+};
+
 /** Unlink Transfer, after a confirmation: both sides stay, unlinked (ADR-0005). */
 export function UnlinkTransferForm({ transactionId, side, label }: UnlinkTransferFormProps) {
-  const confirmMessage =
-    side.kind === 'transaction'
-      ? 'Unlink this Transfer? Both sides stay.'
-      : 'Unlink this Transfer? Both sides stay, and this Split line is left without a Category.';
   return (
     <ActionForm
       action={unlinkTransferAction.bind(null, transactionId, side)}
       label={label}
-      confirmMessage={confirmMessage}
+      confirmMessage={UNLINK_CONFIRM[side.kind]}
     >
       <button type="submit" className={BUTTON_CLASS}>
         Unlink Transfer
@@ -144,7 +148,7 @@ export function TransferSection({
           </p>
           <UnlinkTransferForm
             transactionId={transactionId}
-            side={{ kind: 'transaction', id: transactionId }}
+            side={transactionSide(transactionId)}
             label="Unlink Transfer"
           />
         </div>
@@ -156,7 +160,7 @@ export function TransferSection({
       ) : (
         <LinkTransferForm
           transactionId={transactionId}
-          side={{ kind: 'transaction', id: transactionId }}
+          side={transactionSide(transactionId)}
           options={options}
           fmt={fmt}
           label="Link as Transfer"

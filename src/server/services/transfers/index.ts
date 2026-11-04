@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { mutate, type ServiceContext } from '../context';
-import { NotFoundError, parseInput } from '../errors';
+import { parseInput } from '../errors';
 import { IS_SPLIT } from '../transactions/split-guard';
 import { linkPair, unlinkSide, type Transfer } from './link';
 import {
-  sideLabel,
+  sideNotFound,
   SPLIT_LINE_SIDE_COLUMNS,
   TRANSACTION_SIDE_COLUMNS,
   toSideViews,
@@ -17,6 +17,8 @@ import {
 export type { ImportTransferCandidate } from './candidates';
 export type { Transfer } from './link';
 export {
+  parseSideOptionValue,
+  sideOptionValue,
   splitLineSide,
   transactionSide,
   type CandidateTransaction,
@@ -102,7 +104,7 @@ export async function listLinkOptions(
   ctx: ServiceContext,
   side: TransferSideRef,
 ): Promise<TransferSideView[]> {
-  if (!isSideRef(side)) throw new NotFoundError('Transaction not found');
+  if (!isSideRef(side)) throw sideNotFound(side);
   const result = await ctx.db.query<SideRow>(
     `${ME}
      SELECT kind, id, "transactionId", "amountMinor" FROM (
@@ -129,10 +131,6 @@ export async function listLinkOptions(
  * Transaction is Unclassified until the line gets one (ADR-0005). One History Batch.
  */
 export async function unlinkTransfer(ctx: ServiceContext, side: TransferSideRef): Promise<void> {
-  if (!isSideRef(side)) {
-    // An unknown kind reads as a Transaction, as before Split line sides existed.
-    const kind = side.kind === 'splitLine' ? 'splitLine' : 'transaction';
-    throw new NotFoundError(`${sideLabel(kind)} not found`);
-  }
+  if (!isSideRef(side)) throw sideNotFound(side);
   await mutate(ctx, (scope) => unlinkSide(scope, side));
 }

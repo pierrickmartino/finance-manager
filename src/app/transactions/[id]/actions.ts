@@ -11,8 +11,8 @@ import { parseInput, ValidationError } from '@/server/services/errors';
 import { deleteImportedTransaction } from '@/server/services/imports';
 import {
   linkTransfer,
+  parseSideOptionValue,
   unlinkTransfer,
-  type TransferSideKind,
   type TransferSideRef,
 } from '@/server/services/transfers';
 import { deleteManualTransaction } from '@/server/services/transactions/manual';
@@ -176,9 +176,7 @@ export async function linkTransferAction(
   formData: FormData,
 ): Promise<ActionResult<unknown>> {
   const result = await runAction(async () => {
-    const [kind, otherId] = formText(formData, 'otherSide').split(':');
-    if (!kind || !otherId) throw new ValidationError('Choose the other side of the Transfer');
-    const other = { kind: kind as TransferSideKind, id: otherId };
+    const other = parseSideOptionValue(formText(formData, 'otherSide'));
     return linkTransfer(await getServiceContext(), { sides: [side, other] });
   });
   if (result.ok) {

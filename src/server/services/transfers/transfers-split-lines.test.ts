@@ -217,6 +217,32 @@ describe('linking a Split line refuses a pair that is not a Transfer', () => {
     ).rejects.toMatchObject({ code: 'not_found', message: 'Split line not found' });
   });
 
+  it('refuses a side of an unknown kind', async () => {
+    const { credit } = await aggregatedDebit();
+    const unknown = { kind: 'payment', id: credit } as unknown as ReturnType<
+      typeof transactionSide
+    >;
+
+    await expect(
+      linkTransfer(t.ctx, { sides: [unknown, transactionSide(credit)] }),
+    ).rejects.toMatchObject({
+      code: 'validation',
+      message: 'A side is a Transaction or a Split line',
+    });
+  });
+
+  it('names a Split line side with a malformed id as a Split line not found', async () => {
+    const { credit } = await aggregatedDebit();
+
+    await expect(
+      linkTransfer(t.ctx, { sides: [splitLineSide('not-an-id'), transactionSide(credit)] }),
+    ).rejects.toThrow('Split line not found');
+    await expect(listLinkOptions(t.ctx, splitLineSide('not-an-id'))).rejects.toMatchObject({
+      code: 'not_found',
+      message: 'Split line not found',
+    });
+  });
+
   it('links a line and a whole Transaction in different Currencies, whatever the amounts', async () => {
     const { toSavings } = await aggregatedDebit();
     const eur = await account('CA', 'EUR');

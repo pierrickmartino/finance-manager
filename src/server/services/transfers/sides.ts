@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
+import { NotFoundError, ValidationError } from '../errors';
 import { SELECT_TRANSACTION, type Transaction } from '../transactions/model';
 
 /**
@@ -24,12 +25,52 @@ export const splitLineSide = (id: string): TransferSideRef => ({ kind: 'splitLin
 export const sameSide = (a: TransferSideRef, b: TransferSideRef): boolean =>
   a.kind === b.kind && a.id === b.id;
 
-export const transferSideInput = z
-  .object({
-    kind: z.enum(TRANSFER_SIDE_KINDS, { error: 'A side is a Transaction or a Split line' }),
-    id: z.uuid({ error: 'Transaction not found' }),
-  })
-  .strict();
+const SIDE_LABELS: Record<TransferSideKind, string> = {
+  transaction: 'Transaction',
+  splitLine: 'Split line',
+};
+
+export const sideLabel = (kind: TransferSideKind): string => SIDE_LABELS[kind];
+
+const isSideKind = (kind: unknown): kind is TransferSideKind =>
+  (TRANSFER_SIDE_KINDS as readonly unknown[]).includes(kind);
+
+/**
+ * Not found, for a side named by an unknown kind or a malformed id; an unknown kind reads as a
+ * Transaction, as before Split line sides existed.
+ */
+export const sideNotFound = ({ kind }: { kind: unknown }): NotFoundError =>
+  new NotFoundError(`${sideLabel(isSideKind(kind) ? kind : 'transaction')} not found`);
+
+const sideOfKind = <K extends TransferSideKind>(kind: K) =>
+  z
+    .object({ kind: z.literal(kind), id: z.uuid({ error: `${sideLabel(kind)} not found` }) })
+    .strict();
+
+export const transferSideInput = z.discriminatedUnion(
+  'kind',
+  [sideOfKind('transaction'), sideOfKind('splitLine')],
+  { error: 'A side is a Transaction or a Split line' },
+);
+
+const SIDE_OPTION_SEPARATOR = ':';
+
+/** The value of a link option in the picker: `kind:id`. */
+export const sideOptionValue = ({ kind, id }: TransferSideRef): string =>
+  `${kind}${SIDE_OPTION_SEPARATOR}${id}`;
+
+/**
+ * Reads a picker value made by `sideOptionValue`; refuses one that names no side, or a side of
+ * an unknown kind. The id is checked by the service.
+ */
+export function parseSideOptionValue(value: string): TransferSideRef {
+  const [kind, id, ...rest] = value.split(SIDE_OPTION_SEPARATOR);
+  if (!kind || !id || rest.length > 0) {
+    throw new ValidationError('Choose the other side of the Transfer');
+  }
+  if (!isSideKind(kind)) throw new ValidationError('A side is a Transaction or a Split line');
+  return { kind, id };
+}
 
 /** Sorted by kind, then id: the order a Transfer lists and records its sides in. */
 export function sortSides<T extends TransferSideRef>(sides: readonly T[]): T[] {
@@ -37,9 +78,6 @@ export function sortSides<T extends TransferSideRef>(sides: readonly T[]): T[] {
     a.kind === b.kind ? a.id.localeCompare(b.id) : a.kind.localeCompare(b.kind),
   );
 }
-
-export const sideLabel = (kind: TransferSideKind): string =>
-  kind === 'transaction' ? 'Transaction' : 'Split line';
 
 /** An existing Transaction with its Account name, as Transfer options and counterparts show it. */
 export interface CandidateTransaction extends Transaction {
@@ -83,10 +121,9 @@ export async function toSideViews(
     [[...new Set(rows.map((row) => row.transactionId))]],
   );
   const byId = new Map(result.rows.map((transaction) => [transaction.id, transaction]));
-  return rows.map(({ kind, id, transactionId, amountMinor }) => ({
-    kind,
-    id,
-    amountMinor,
-    transaction: byId.get(transactionId)!,
-  }));
+  return rows.map(({ kind, id, transactionId, amountMinor }) => {
+    const transaction = byId.get(transactionId);
+    if (!transaction) throw new Error(`Transaction ${transactionId} of a Transfer side is missing`);
+    return { kind, id, amountMinor, transaction };
+  });
 }
