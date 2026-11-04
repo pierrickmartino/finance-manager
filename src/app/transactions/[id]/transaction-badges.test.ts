@@ -8,7 +8,7 @@ function badges(
     transferId?: string | null;
     isManual?: boolean;
     category?: typeof groceries | null;
-    splitLines?: unknown[];
+    splitLines?: { transferId: string | null }[];
     lockedFields?: ('payee' | 'category' | 'tags' | 'notes')[];
   } = {},
 ) {
@@ -35,10 +35,21 @@ describe('the status badges of a Transaction', () => {
   });
 
   it('counts the Split lines of a split Transaction', () => {
-    expect(badges({ splitLines: [{}, {}, {}] })[0]).toEqual({
+    expect(
+      badges({ splitLines: [{ transferId: null }, { transferId: null }, { transferId: null }] })[0],
+    ).toEqual({
       label: 'Split (3)',
       tone: 'neutral',
     });
+  });
+
+  it('flags a split Transaction with a Transfer line as Partly Transfer (ADR-0005)', () => {
+    expect(badges({ splitLines: [{ transferId: 't1' }, { transferId: null }] })).toEqual([
+      { label: 'Split (2)', tone: 'neutral' },
+      { label: 'Partly Transfer', tone: 'info' },
+      { label: 'Imported', tone: 'neutral' },
+    ]);
+    expect(badges({ splitLines: [{ transferId: null }, { transferId: null }] })).toHaveLength(2);
   });
 
   it('shows a Transfer as a Transfer, whatever else it holds', () => {

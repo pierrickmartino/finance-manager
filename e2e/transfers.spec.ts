@@ -2,6 +2,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { openTransaction } from './support/transactions';
 import { openAccountPage, openNewAccountForm } from './support/accounts';
+import { addCategory, addCategoryGroup } from './support/categories';
 
 const FIXTURES = path.join(import.meta.dirname, '../test/fixtures/import');
 const BCGE_OCTOBER = path.join(FIXTURES, 'bcge/bcge-chf-2025-10.xml');
@@ -63,4 +64,104 @@ test('confirms a Transfer candidate in the Import preview', async ({ page }) => 
   await expect(page.getByRole('region', { name: 'Transfer' })).toContainText(
     `Transfer with ${bcge}`,
   );
+});
+
+/** Creates a Bank and a manual Account, and adds one Manual transaction to it. */
+async function manualAccountWith(
+  page: Page,
+  name: string,
+  amount: string,
+  description: string,
+): Promise<void> {
+  await page.goto('/banks?bank=new');
+  await page.getByLabel('Bank name').fill(`${name} bank`);
+  await page.getByRole('button', { name: 'Add Bank' }).click();
+  await expect(page.getByRole('listitem').filter({ hasText: `${name} bank` })).toBeVisible();
+  const form = await openNewAccountForm(page);
+  await form.getByLabel('Bank').selectOption({ label: `${name} bank` });
+  await form.getByLabel('Account name').fill(name);
+  await form.getByLabel('Opening balance').fill('0');
+  await form.getByLabel('Opening date').fill('2025-01-01');
+  await form.getByRole('button', { name: 'Add Account' }).click();
+  await openAccountPage(page, name);
+
+  const entry = page.getByRole('region', { name: 'Manual transactions' });
+  await entry.getByLabel('Date').fill('2025-10-10');
+  await entry.getByLabel('Amount (CHF)').fill(amount);
+  await entry.getByLabel('Description').fill(description);
+  await entry.getByLabel('Description').press('Enter');
+  await expect(entry.getByRole('table', { name: 'Manual transactions' })).toContainText(
+    description,
+  );
+}
+
+/** Opens the one Transaction whose description is `description` from the list. */
+async function openByDescription(page: Page, description: string) {
+  await page.goto('/transactions');
+  const search = page.getByRole('form', { name: 'Search Transactions' });
+  await search.getByLabel('Search').fill(description);
+  await search.getByRole('button', { name: 'Search' }).click();
+  const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
+  await expect(rows).toHaveCount(1);
+  return rows.first();
+}
+
+test('links one Split line of a Transaction with a Transaction on another Account', async ({
+  page,
+}) => {
+  // ADR-0005: a BCGE -1,500 is -1,000 to UBS savings and -500 rent; UBS shows +1,000.
+  const suffix = Date.now();
+  const bcge = `BCGE aggregate ${suffix}`;
+  const ubs = `UBS savings ${suffix}`;
+  const debit = `Ordre groupé ${suffix}`;
+  const credit = `Versement ${suffix}`;
+  const group = `Housing ${suffix}`;
+  const rent = `Rent ${suffix}`;
+  const savings = `Savings ${suffix}`;
+  await page.goto('/categories');
+  await addCategoryGroup(page, group, 'Expense');
+  await addCategory(page, group, rent);
+  await addCategory(page, group, savings);
+  await manualAccountWith(page, bcge, "-1'500", debit);
+  await manualAccountWith(page, ubs, "1'000", credit);
+
+  // Split the debit into -1,000 and -500
+  await openTransaction(page, await openByDescription(page, debit));
+  await page.getByText('Split Transaction').click();
+  const form = page.getByRole('form', { name: 'Split' });
+  await form.getByLabel('Amount of line 1').fill("-1'000");
+  await form.getByLabel('Category of line 1').selectOption({ label: savings });
+  await form.getByRole('button', { name: 'Add line' }).click();
+  await form.getByLabel('Amount of line 2').fill('-500');
+  await form.getByLabel('Category of line 2').selectOption({ label: rent });
+  await form.getByRole('button', { name: 'Save Split' }).click();
+  await expect(page.getByRole('heading', { name: 'Split (2)' })).toBeVisible();
+  // Linked by its lines, not as a whole
+  await expect(page.getByRole('region', { name: 'Transfer' })).toHaveCount(0);
+
+  // Link the -1,000 line with the UBS +1,000
+  const lines = page.getByRole('table', { name: 'Split lines' }).locator('tbody tr');
+  await lines.nth(0).locator('summary', { hasText: 'Link as Transfer' }).click();
+  const link = page.getByRole('form', { name: 'Link line 1 as Transfer' });
+  await expect(link.getByLabel('Other side')).toContainText(ubs);
+  await link.getByRole('button', { name: 'Link as Transfer' }).click();
+  await expect(lines.nth(0)).toContainText(`Transfer with ${ubs}`);
+  await expect(lines.nth(0)).not.toContainText(savings);
+  await expect(lines.nth(1)).toContainText(`${group} › ${rent}`);
+  await expect(page.getByText('Partly Transfer')).toBeVisible();
+
+  // The other side links back to the line's Transaction
+  await lines
+    .nth(0)
+    .getByRole('link', { name: new RegExp(ubs) })
+    .click();
+  const transfer = page.getByRole('region', { name: 'Transfer' });
+  await expect(transfer).toContainText(`Transfer with a Split line of CHF -1'000.00 of ${bcge}`);
+  await transfer.getByRole('link', { name: new RegExp(bcge) }).click();
+  await expect(page.getByRole('heading', { name: 'Split (2)' })).toBeVisible();
+
+  // The list shows the debit once, split, with the Partly Transfer badge
+  const row = await openByDescription(page, debit);
+  await expect(row).toContainText('Split (2)');
+  await expect(row).toContainText('Partly Transfer');
 });

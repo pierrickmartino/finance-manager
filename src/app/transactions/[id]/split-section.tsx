@@ -4,17 +4,29 @@ import { categoryLabel } from '@/lib/classification';
 import type { Formatter } from '@/lib/format';
 import type { CategoryGroup } from '@/server/services/categories';
 import type { TransactionDetail } from '@/server/services/transactions';
+import type { TransferSideView } from '@/server/services/transfers';
 import { splitLabel } from '../transaction-display';
 import { removeSplitAction, splitTransactionAction } from './actions';
 import { SplitForm } from './split-form';
 import { initialSplitDrafts } from './split-lines';
+import { LinkTransferForm, TransferCounterpart } from './transfer-section';
 
 const CELL = 'px-3 py-2 text-left';
 const SUMMARY = `${BUTTON_CLASS} inline-block cursor-pointer list-none`;
 
+/**
+ * By Split line id: the line's other side when it is a Transfer side (ADR-0005), else the sides
+ * it may be linked with.
+ */
+export type LineTransfers = Record<
+  string,
+  { counterpart: TransferSideView | null; options: TransferSideView[] }
+>;
+
 interface SplitSectionProps {
   transaction: TransactionDetail;
   groups: CategoryGroup[];
+  lineTransfers: LineTransfers;
   fmt: Formatter;
   /** Classes of the section, e.g. to draw it as a card. */
   className?: string;
@@ -27,6 +39,7 @@ interface SplitSectionProps {
 export function SplitSection({
   transaction,
   groups,
+  lineTransfers,
   fmt,
   className = 'flex flex-col gap-3',
 }: SplitSectionProps) {
@@ -49,7 +62,7 @@ export function SplitSection({
       </h2>
       {isSplit ? (
         <>
-          <SplitLinesTable transaction={transaction} fmt={fmt} />
+          <SplitLinesTable transaction={transaction} lineTransfers={lineTransfers} fmt={fmt} />
           <div className="flex flex-wrap items-start gap-3">
             <details className="flex flex-col gap-3">
               <summary className={SUMMARY}>Edit Split</summary>
@@ -79,7 +92,9 @@ export function SplitSection({
   );
 }
 
-function SplitLinesTable({ transaction, fmt }: Pick<SplitSectionProps, 'transaction' | 'fmt'>) {
+type TableProps = Pick<SplitSectionProps, 'transaction' | 'lineTransfers' | 'fmt'>;
+
+function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
   return (
     <div className="overflow-x-auto">
       <table aria-label="Split lines" className="w-full text-sm">
@@ -92,9 +107,17 @@ function SplitLinesTable({ transaction, fmt }: Pick<SplitSectionProps, 'transact
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {transaction.splitLines.map((line) => (
+          {transaction.splitLines.map((line, index) => (
             <tr key={line.id}>
-              <td className={CELL}>{categoryLabel(line.category)}</td>
+              <td className={CELL}>
+                <LineClassification
+                  transactionId={transaction.id}
+                  line={line}
+                  position={index + 1}
+                  transfer={lineTransfers[line.id]}
+                  fmt={fmt}
+                />
+              </td>
               <td className={CELL}>{line.tags.map((tag) => tag.name).join(', ') || '—'}</td>
               <td className={CELL}>{line.note ?? '—'}</td>
               <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
@@ -104,6 +127,57 @@ function SplitLinesTable({ transaction, fmt }: Pick<SplitSectionProps, 'transact
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+interface LineClassificationProps {
+  transactionId: string;
+  line: TransactionDetail['splitLines'][number];
+  /** 1-based, as the Split form numbers lines. */
+  position: number;
+  transfer: LineTransfers[string] | undefined;
+  fmt: Formatter;
+}
+
+/**
+ * A Split line's Category, or its Transfer with the other side (ADR-0005); an unlinked line
+ * offers Link as Transfer when there is a side to link it with.
+ */
+function LineClassification({
+  transactionId,
+  line,
+  position,
+  transfer,
+  fmt,
+}: LineClassificationProps) {
+  if (transfer?.counterpart) {
+    return (
+      <span className="text-sky-700 dark:text-sky-400">
+        <TransferCounterpart counterpart={transfer.counterpart} fmt={fmt} />
+      </span>
+    );
+  }
+  const options = transfer?.options ?? [];
+  return (
+    <div className="flex flex-col gap-1">
+      <span>{line.category ? categoryLabel(line.category) : 'Unclassified'}</span>
+      {options.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-xs text-zinc-500 underline">
+            Link as Transfer
+          </summary>
+          <div className="pt-2">
+            <LinkTransferForm
+              transactionId={transactionId}
+              side={{ kind: 'splitLine', id: line.id }}
+              options={options}
+              fmt={fmt}
+              label={`Link line ${position} as Transfer`}
+            />
+          </div>
+        </details>
+      )}
     </div>
   );
 }

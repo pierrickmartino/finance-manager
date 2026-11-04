@@ -8,7 +8,7 @@ import { backfillRates, convertToChf, type EcbRateSource } from '../fx';
 import { ValidationError } from '../errors';
 import { editClassification, getTransaction, splitTransaction } from '../transactions';
 import { createManualTransaction } from '../transactions/manual';
-import { linkTransfer } from '../transfers';
+import { linkTransfer, transactionSide } from '../transfers';
 import { exportTransactionsCsv } from '.';
 
 const t = setupTestDatabase();
@@ -236,7 +236,7 @@ describe('CSV export of Transactions', () => {
     const bcge = await account('BCGE', 'Épargne');
     const out = await seedOne(ubs, { bookingDate: '2025-10-10', amountMinor: -200000 });
     const into = await seedOne(bcge, { bookingDate: '2025-10-11', amountMinor: 200000 });
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     const rows = await exportRows();
 

@@ -1,6 +1,5 @@
 import type { Queryable } from '@/server/db/client';
 import { BASE_CURRENCY, loadRateTable } from '../fx';
-import { SELECT_TRANSACTION, type Transaction } from '../transactions/model';
 import {
   findTransferCandidates,
   TRANSFER_MAX_DAYS,
@@ -8,11 +7,7 @@ import {
   type ToChf,
   type TransferCandidate,
 } from './matcher';
-
-/** An existing Transaction offered as the other side of a Transfer, with its Account name. */
-export interface CandidateTransaction extends Transaction {
-  accountName: string;
-}
+import { SELECT_WITH_ACCOUNT, type CandidateTransaction } from './sides';
 
 export type ImportTransferCandidate = TransferCandidate<CandidateTransaction>;
 
@@ -29,10 +24,7 @@ async function loadOtherAccountTransactions(
   to: string,
 ): Promise<CandidateTransaction[]> {
   const result = await db.query<CandidateTransaction>(
-    `${SELECT_TRANSACTION.replace(
-      'FROM "transaction" t',
-      `, a.name AS "accountName" FROM "transaction" t JOIN account a ON a.id = t.account_id`,
-    )}
+    `${SELECT_WITH_ACCOUNT}
      WHERE t.account_id <> $1 AND t.transfer_id IS NULL AND t.booking_date BETWEEN $2 AND $3`,
     [accountId, from, to],
   );

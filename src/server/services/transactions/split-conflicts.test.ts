@@ -10,7 +10,7 @@ import { commitImport, getImportPreview, listImportTransactions, previewImport }
 import { createPayee } from '../payees';
 import { createRule } from '../rules';
 import { applyRulesToExisting, previewApplyRules } from '../rules/existing';
-import { linkTransfer } from '../transfers';
+import { linkTransfer, transactionSide } from '../transfers';
 import { getClassification, getTransaction, listTransactions, unlockFields } from '.';
 import { createManualTransaction, updateManualTransaction } from './manual';
 import { splitTransaction } from './split';
@@ -78,7 +78,7 @@ describe('linking a Transfer refuses a split Transaction', () => {
     await splitInHalves(sides[side], side === 'out' ? -200000 : 200000);
 
     await expect(
-      linkTransfer(t.ctx, { transactionIds: [sides.out, sides.into] }),
+      linkTransfer(t.ctx, { sides: [transactionSide(sides.out), transactionSide(sides.into)] }),
     ).rejects.toMatchObject({ code: 'validation', message: expect.stringMatching(/Split/) });
 
     expect((await getTransaction(t.ctx, sides.out)).transferId).toBeNull();
@@ -125,7 +125,9 @@ describe('Transfer decisions at Import commit refuse a split Transaction', () =>
 describe('splitting refuses a Transaction that is part of a Transfer', () => {
   it('refuses with a validation error and leaves the Transfer as it was', async () => {
     const { out, into } = await pair();
-    const transfer = await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    const transfer = await linkTransfer(t.ctx, {
+      sides: [transactionSide(out), transactionSide(into)],
+    });
 
     await expect(splitInHalves(out, -200000)).rejects.toMatchObject({
       code: 'validation',

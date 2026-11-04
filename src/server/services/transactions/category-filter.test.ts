@@ -161,7 +161,7 @@ describe('filter Transactions by Category group type with Split lines', () => {
 
   it('matches the Category and the group type on the same Split line', async () => {
     const { repayment } = await seedLoanRepayment();
-    const interest = (await getClassification(t.ctx, repayment)).splitLines[1]!.category;
+    const interest = (await getClassification(t.ctx, repayment)).splitLines[1]!.category!;
 
     const page = await listTransactions(t.ctx, { categoryId: interest.id, groupType: 'capital' });
     const rows = await exportRows({ categoryId: interest.id, groupType: 'capital' });

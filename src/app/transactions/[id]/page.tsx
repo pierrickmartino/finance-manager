@@ -18,7 +18,13 @@ import {
   type Classification,
   type TransactionDetail,
 } from '@/server/services/transactions';
-import { getTransferCounterpart, listLinkOptions } from '@/server/services/transfers';
+import type { ServiceContext } from '@/server/services/context';
+import {
+  getTransferCounterpart,
+  listLinkOptions,
+  splitLineSide,
+  transactionSide,
+} from '@/server/services/transfers';
 import { historyHref } from '../../history/history-table';
 import { HistoryTimeline } from '../../history/history-timeline';
 import {
@@ -27,7 +33,7 @@ import {
   unlockFieldAction,
 } from './actions';
 import { ClassificationForm } from './classification-form';
-import { SplitSection } from './split-section';
+import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
 import { TransactionReceipt } from './transaction-receipt';
 import { TransferSection } from './transfer-section';
@@ -38,6 +44,22 @@ const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
+}
+
+/** Each Split line's other side when it is a Transfer side, else what it may be linked with. */
+async function loadLineTransfers(
+  ctx: ServiceContext,
+  transaction: TransactionDetail,
+): Promise<LineTransfers> {
+  const entries = await Promise.all(
+    transaction.splitLines.map(async (line) => {
+      const side = splitLineSide(line.id);
+      const counterpart = line.transferId ? await getTransferCounterpart(ctx, side) : null;
+      const options = line.transferId ? [] : await listLinkOptions(ctx, side);
+      return [line.id, { counterpart, options }] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
 }
 
 async function loadTransaction(id: string): Promise<TransactionDetail> {
@@ -59,15 +81,18 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
   const { id } = await params;
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
-  const [history, fmt, classification, groups, payees, tags, counterpart] = await Promise.all([
-    listHistory(ctx, { entityType: 'transaction', entityId: transaction.id }),
-    getFormatter(),
-    getClassification(ctx, transaction.id),
-    listCategoryGroups(ctx),
-    listPayees(ctx),
-    listTags(ctx),
-    getTransferCounterpart(ctx, transaction.id),
-  ]);
+  const isSplit = transaction.splitLines.length > 0;
+  const [history, fmt, classification, groups, payees, tags, counterpart, lineTransfers] =
+    await Promise.all([
+      listHistory(ctx, { entityType: 'transaction', entityId: transaction.id }),
+      getFormatter(),
+      getClassification(ctx, transaction.id),
+      listCategoryGroups(ctx),
+      listPayees(ctx),
+      listTags(ctx),
+      getTransferCounterpart(ctx, transactionSide(transaction.id)),
+      loadLineTransfers(ctx, transaction),
+    ]);
 
   return (
     <section className="flex flex-col gap-4">
@@ -122,14 +147,25 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
               Create rule from this Transaction
             </Link>
           </section>
-          <SplitSection transaction={transaction} groups={groups} fmt={fmt} className={PANEL} />
-          <TransferSection
-            transactionId={transaction.id}
-            counterpart={counterpart}
-            options={counterpart ? [] : await listLinkOptions(ctx, transaction.id)}
+          <SplitSection
+            transaction={transaction}
+            groups={groups}
+            lineTransfers={lineTransfers}
             fmt={fmt}
             className={PANEL}
           />
+          {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
+          {!isSplit && (
+            <TransferSection
+              transactionId={transaction.id}
+              counterpart={counterpart}
+              options={
+                counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))
+              }
+              fmt={fmt}
+              className={PANEL}
+            />
+          )}
           <TransactionActions transaction={transaction} />
         </aside>
       </div>

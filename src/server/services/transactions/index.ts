@@ -55,8 +55,8 @@ function matchingSplitAmount(
   if (categoryId === undefined && groupType === undefined) return null;
   const matching = splitLines.filter(
     (line) =>
-      (categoryId === undefined || line.category.id === categoryId) &&
-      (groupType === undefined || line.category.groupType === groupType),
+      (categoryId === undefined || line.category?.id === categoryId) &&
+      (groupType === undefined || line.category?.groupType === groupType),
   );
   if (matching.length === 0) return null;
   return matching.reduce((sum, line) => sum + line.amountMinor, 0);

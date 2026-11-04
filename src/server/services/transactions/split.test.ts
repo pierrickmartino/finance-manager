@@ -118,7 +118,7 @@ describe('split a Transaction', () => {
     ]);
 
     expect(
-      (await getTransaction(t.ctx, id)).splitLines.map((line) => line.category.groupType),
+      (await getTransaction(t.ctx, id)).splitLines.map((line) => line.category?.groupType),
     ).toEqual(['capital', 'expense', 'income']);
   });
 
@@ -470,7 +470,7 @@ describe('Categories and Tags used by Split lines', () => {
     const result = await mergeCategory(t.ctx, shops.id, groceries.id);
 
     expect(result.transactionCount).toBe(1);
-    expect((await getTransaction(t.ctx, id)).splitLines.map((line) => line.category.id)).toEqual([
+    expect((await getTransaction(t.ctx, id)).splitLines.map((line) => line.category?.id)).toEqual([
       groceries.id,
       household.id,
     ]);

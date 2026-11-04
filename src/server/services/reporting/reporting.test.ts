@@ -6,7 +6,7 @@ import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { editClassification, splitTransaction, type ClassificationChanges } from '../transactions';
-import { linkTransfer } from '../transfers';
+import { linkTransfer, transactionSide } from '../transfers';
 import { listCellTransactions, runWidgetQuery, type CellRef, type WidgetQueryInput } from '.';
 
 const t = setupTestDatabase();
@@ -97,7 +97,9 @@ async function dataset() {
     { bookingDate: '2025-02-22', amountMinor: 106000 },
     { bookingDate: '2025-01-05', amountMinor: -777 },
   ]);
-  await linkTransfer(t.ctx, { transactionIds: [transferOut!, transferIn!] });
+  await linkTransfer(t.ctx, {
+    sides: [transactionSide(transferOut!), transactionSide(transferIn!)],
+  });
 
   return { ubs, ca, income, food, capital, salary, groceries, restaurants, property };
 }

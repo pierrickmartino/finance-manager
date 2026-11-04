@@ -1,12 +1,28 @@
 import { z } from 'zod';
 import { mutate, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
-import { SELECT_TRANSACTION } from '../transactions/model';
-import type { CandidateTransaction } from './candidates';
+import { IS_SPLIT } from '../transactions/split-guard';
 import { linkPair, unlinkTransfers, type Transfer } from './link';
+import {
+  SPLIT_LINE_SIDE_COLUMNS,
+  TRANSACTION_SIDE_COLUMNS,
+  toSideViews,
+  transferSideInput,
+  type SideRow,
+  type TransferSideRef,
+  type TransferSideView,
+} from './sides';
 
-export type { CandidateTransaction, ImportTransferCandidate } from './candidates';
+export type { ImportTransferCandidate } from './candidates';
 export type { Transfer } from './link';
+export {
+  splitLineSide,
+  transactionSide,
+  type CandidateTransaction,
+  type TransferSideKind,
+  type TransferSideRef,
+  type TransferSideView,
+} from './sides';
 export {
   CROSS_CURRENCY_TOLERANCE_PERCENT,
   TRANSFER_MAX_DAYS,
@@ -14,24 +30,24 @@ export {
 } from './matcher';
 
 const linkInput = z.object({
-  transactionIds: z
-    .array(z.uuid({ error: 'Transaction not found' }))
-    .length(2, 'Choose the two Transactions of the Transfer'),
+  sides: z.array(transferSideInput).length(2, 'Choose the two sides of the Transfer'),
 });
 
 export type LinkTransferInput = z.input<typeof linkInput>;
 
 /**
- * Links any two Transactions as a Transfer (spec 88): they must be on different Accounts, have
- * opposite signs and not be in a Transfer yet. Amounts and dates are not checked: this fixes
- * what detection missed. Clears the Category on both sides. One History Batch.
+ * Links two sides as a Transfer (spec 88, ADR-0005), each a whole Transaction or a Split line:
+ * they must be on different Accounts (a line takes its Transaction's), have opposite signs and
+ * not be in a Transfer yet; a split Transaction can only be linked by its lines. Amounts and
+ * dates are not checked: this fixes what detection missed. Clears the Category on both sides.
+ * One History Batch.
  */
 export async function linkTransfer(
   ctx: ServiceContext,
   input: LinkTransferInput,
 ): Promise<Transfer> {
-  const { transactionIds } = parseInput(linkInput, input);
-  return mutate(ctx, (scope) => linkPair(scope, transactionIds));
+  const { sides } = parseInput(linkInput, input);
+  return mutate(ctx, (scope) => linkPair(scope, sides));
 }
 
 const transactionId = z.uuid();
@@ -40,45 +56,60 @@ const transactionId = z.uuid();
 export const LINK_OPTION_DAYS = 31;
 const MAX_LINK_OPTIONS = 50;
 
-const SELECT_WITH_ACCOUNT = SELECT_TRANSACTION.replace(
-  'FROM "transaction" t',
-  `, a.name AS "accountName" FROM "transaction" t JOIN account a ON a.id = t.account_id`,
-);
+/**
+ * SQL `WITH me AS (...)`: the side named by `$1` (kind) and `$2` (id), with its Account,
+ * amount, booking date and Transfer.
+ */
+const ME = `WITH me AS (
+    SELECT t.account_id, t.amount_minor, t.booking_date, t.transfer_id
+    FROM "transaction" t WHERE $1 = 'transaction' AND t.id = $2::uuid
+    UNION ALL
+    SELECT t.account_id, sl.amount_minor, t.booking_date, sl.transfer_id
+    FROM split_line sl JOIN "transaction" t ON t.id = sl.transaction_id
+    WHERE $1 = 'splitLine' AND sl.id = $2::uuid
+  )`;
 
-/** The other side of the Transaction's Transfer, or null when it is not in one. */
+const isSideRef = (side: TransferSideRef): boolean => transferSideInput.safeParse(side).success;
+
+/** The other side of this side's Transfer, a whole Transaction or a Split line; null if none. */
 export async function getTransferCounterpart(
   ctx: ServiceContext,
-  id: string,
-): Promise<CandidateTransaction | null> {
-  if (!transactionId.safeParse(id).success) return null;
-  const result = await ctx.db.query<CandidateTransaction>(
-    `${SELECT_WITH_ACCOUNT}
-     WHERE t.transfer_id = (SELECT transfer_id FROM "transaction" WHERE id = $1) AND t.id <> $1`,
-    [id],
+  side: TransferSideRef,
+): Promise<TransferSideView | null> {
+  if (!isSideRef(side)) return null;
+  const result = await ctx.db.query<SideRow>(
+    `${ME}
+     SELECT * FROM (
+       SELECT ${TRANSACTION_SIDE_COLUMNS} FROM "transaction" t JOIN me USING (transfer_id)
+       UNION ALL
+       SELECT ${SPLIT_LINE_SIDE_COLUMNS} FROM split_line sl JOIN me USING (transfer_id)
+     ) side WHERE NOT (side.kind = $1 AND side.id = $2::uuid)`,
+    [side.kind, side.id],
   );
-  return result.rows[0] ?? null;
+  return (await toSideViews(ctx.db, result.rows))[0] ?? null;
 }
 
 /**
- * Transactions the user may link with this one by hand (spec 88): on another Account, with the
- * opposite sign, not in a Transfer, booked within a month. Closest amount first, then date.
+ * Whole Transactions the user may link with this side by hand (spec 88): on another Account,
+ * with the opposite sign, not in a Transfer, not split, booked within a month. Closest amount
+ * first, then date.
  */
 export async function listLinkOptions(
   ctx: ServiceContext,
-  id: string,
-): Promise<CandidateTransaction[]> {
-  if (!transactionId.safeParse(id).success) throw new NotFoundError('Transaction not found');
-  const result = await ctx.db.query<CandidateTransaction>(
-    `WITH me AS (SELECT * FROM "transaction" WHERE id = $1)
-     ${SELECT_WITH_ACCOUNT} CROSS JOIN me
-     WHERE t.account_id <> me.account_id AND t.transfer_id IS NULL
+  side: TransferSideRef,
+): Promise<TransferSideView[]> {
+  if (!isSideRef(side)) throw new NotFoundError('Transaction not found');
+  const result = await ctx.db.query<SideRow>(
+    `${ME}
+     SELECT ${TRANSACTION_SIDE_COLUMNS} FROM "transaction" t CROSS JOIN me
+     WHERE t.account_id <> me.account_id AND t.transfer_id IS NULL AND NOT ${IS_SPLIT}
        AND sign(t.amount_minor) = -sign(me.amount_minor)
-       AND t.booking_date BETWEEN me.booking_date - $2::int AND me.booking_date + $2::int
+       AND t.booking_date BETWEEN me.booking_date - $3::int AND me.booking_date + $3::int
      ORDER BY abs(t.amount_minor + me.amount_minor), abs(t.booking_date - me.booking_date), t.id
-     LIMIT $3`,
-    [id, LINK_OPTION_DAYS, MAX_LINK_OPTIONS],
+     LIMIT $4`,
+    [side.kind, side.id, LINK_OPTION_DAYS, MAX_LINK_OPTIONS],
   );
-  return result.rows;
+  return toSideViews(ctx.db, result.rows);
 }
 
 /** Unlinks the Transfer the Transaction is one side of; both sides stay, unlinked. */

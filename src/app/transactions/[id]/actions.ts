@@ -9,7 +9,12 @@ import { getServiceContext } from '@/server/app-context';
 import { getRequestDisplaySettings } from '@/server/formatter';
 import { parseInput, ValidationError } from '@/server/services/errors';
 import { deleteImportedTransaction } from '@/server/services/imports';
-import { linkTransfer, unlinkTransfer } from '@/server/services/transfers';
+import {
+  linkTransfer,
+  unlinkTransfer,
+  type TransferSideKind,
+  type TransferSideRef,
+} from '@/server/services/transfers';
 import { deleteManualTransaction } from '@/server/services/transactions/manual';
 import {
   editClassification,
@@ -158,16 +163,21 @@ export async function unlockFieldAction(
   return result;
 }
 
-/** Links this Transaction and the chosen one as a Transfer (spec 88). */
+/**
+ * Links a side on this Transaction's page (the Transaction itself or one of its Split lines)
+ * with the chosen side, `kind:id`, as a Transfer (spec 88, ADR-0005). The service checks both.
+ */
 export async function linkTransferAction(
   id: string,
+  side: TransferSideRef,
   _previous: ActionResult<unknown> | null,
   formData: FormData,
 ): Promise<ActionResult<unknown>> {
   const result = await runAction(async () => {
-    const otherId = formText(formData, 'otherId');
-    if (!otherId) throw new ValidationError('Choose the other side of the Transfer');
-    return linkTransfer(await getServiceContext(), { transactionIds: [id, otherId] });
+    const [kind, otherId] = formText(formData, 'otherSide').split(':');
+    if (!kind || !otherId) throw new ValidationError('Choose the other side of the Transfer');
+    const other = { kind: kind as TransferSideKind, id: otherId };
+    return linkTransfer(await getServiceContext(), { sides: [side, other] });
   });
   if (result.ok) {
     revalidate(id);

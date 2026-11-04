@@ -69,6 +69,7 @@ describe('the split form', () => {
             category: { ...category, groupType: 'expense' },
             tags: [{ id: 't', name: 'Family' }],
             note: 'weekly',
+            transferId: null,
           },
           {
             id: 'l2',
@@ -76,6 +77,7 @@ describe('the split form', () => {
             category: { ...category, id: 'c2', groupType: 'expense' },
             tags: [],
             note: null,
+            transferId: null,
           },
         ],
       },

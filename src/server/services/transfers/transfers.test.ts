@@ -21,7 +21,13 @@ import {
   updateManualTransaction,
 } from '../transactions/manual';
 import { getClassificationProgress, listUnclassifiedGroups } from '../transactions/unclassified';
-import { getTransferCounterpart, linkTransfer, listLinkOptions, unlinkTransfer } from '.';
+import {
+  getTransferCounterpart,
+  linkTransfer,
+  listLinkOptions,
+  transactionSide,
+  unlinkTransfer,
+} from '.';
 
 const t = setupTestDatabase();
 
@@ -58,11 +64,15 @@ describe('link two Transactions as a Transfer', () => {
   it('links both sides to one Transfer and records it in History', async () => {
     const { out, into } = await pair();
 
-    const transfer = await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    const transfer = await linkTransfer(t.ctx, {
+      sides: [transactionSide(out), transactionSide(into)],
+    });
 
     expect((await getTransaction(t.ctx, out)).transferId).toBe(transfer.id);
     expect((await getTransaction(t.ctx, into)).transferId).toBe(transfer.id);
-    expect(transfer.transactionIds.sort()).toEqual([out, into].sort());
+    expect(transfer.sides).toEqual(
+      expect.arrayContaining([transactionSide(out), transactionSide(into)]),
+    );
     const history = await listHistory(t.ctx, { entityType: 'transfer', entityId: transfer.id });
     expect(history).toHaveLength(1);
     expect(await listHistory(t.ctx, { entityId: out })).toEqual(
@@ -82,9 +92,9 @@ describe('link two Transactions as a Transfer', () => {
     const out = await seedOne(ubs, { amountMinor: -500 });
     const into = await seedOne(ubs, { amountMinor: 500 });
 
-    await expect(linkTransfer(t.ctx, { transactionIds: [out, into] })).rejects.toThrow(
-      /different Accounts/,
-    );
+    await expect(
+      linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] }),
+    ).rejects.toThrow(/different Accounts/);
   });
 
   it('refuses two Transactions with the same sign', async () => {
@@ -93,18 +103,20 @@ describe('link two Transactions as a Transfer', () => {
     const a = await seedOne(ubs, { amountMinor: -500 });
     const b = await seedOne(bcge, { amountMinor: -500 });
 
-    await expect(linkTransfer(t.ctx, { transactionIds: [a, b] })).rejects.toThrow(/opposite signs/);
+    await expect(
+      linkTransfer(t.ctx, { sides: [transactionSide(a), transactionSide(b)] }),
+    ).rejects.toThrow(/opposite signs/);
     expect((await getTransaction(t.ctx, a)).transferId).toBeNull();
   });
 
   it('refuses a Transaction already in a Transfer', async () => {
     const { bcge, out, into } = await pair();
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
     const another = await seedOne(bcge, { amountMinor: -200000, bookingDate: '2025-10-11' });
 
-    await expect(linkTransfer(t.ctx, { transactionIds: [another, into] })).rejects.toThrow(
-      /already part of a Transfer/,
-    );
+    await expect(
+      linkTransfer(t.ctx, { sides: [transactionSide(another), transactionSide(into)] }),
+    ).rejects.toThrow(/already part of a Transfer/);
   });
 
   it('links any amounts and dates: the user decides', async () => {
@@ -113,7 +125,9 @@ describe('link two Transactions as a Transfer', () => {
     const out = await seedOne(ubs, { amountMinor: -100000, bookingDate: '2025-01-01' });
     const into = await seedOne(ca, { amountMinor: 50, bookingDate: '2025-06-30' });
 
-    const transfer = await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    const transfer = await linkTransfer(t.ctx, {
+      sides: [transactionSide(out), transactionSide(into)],
+    });
 
     expect((await getTransaction(t.ctx, into)).transferId).toBe(transfer.id);
   });
@@ -123,12 +137,17 @@ describe('the Transfer of a Transaction', () => {
   it('names the other side', async () => {
     const { ubs, out, into } = await pair();
     const alone = await seedOne(ubs, { amountMinor: -1000 });
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
-    const other = await getTransferCounterpart(t.ctx, into);
+    const other = await getTransferCounterpart(t.ctx, transactionSide(into));
 
-    expect(other).toMatchObject({ id: out, accountName: 'BCGE', amountMinor: -200000 });
-    expect(await getTransferCounterpart(t.ctx, alone)).toBeNull();
+    expect(other).toMatchObject({
+      kind: 'transaction',
+      id: out,
+      amountMinor: -200000,
+      transaction: { id: out, accountName: 'BCGE' },
+    });
+    expect(await getTransferCounterpart(t.ctx, transactionSide(alone))).toBeNull();
   });
 
   it('offers opposite, unlinked Transactions on other Accounts, closest amount first', async () => {
@@ -138,7 +157,7 @@ describe('the Transfer of a Transaction', () => {
     await seedOne(ubs, { amountMinor: -200000 }); // same Account
     await seedOne(bcge, { amountMinor: -200000, bookingDate: '2025-12-31' }); // too far away
 
-    const options = await listLinkOptions(t.ctx, into);
+    const options = await listLinkOptions(t.ctx, transactionSide(into));
 
     expect(options.map((option) => option.id)).toEqual([out, far]);
   });
@@ -147,7 +166,9 @@ describe('the Transfer of a Transaction', () => {
 describe('unlink a Transfer', () => {
   it('unlinks both sides and records it in History', async () => {
     const { out, into } = await pair();
-    const transfer = await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    const transfer = await linkTransfer(t.ctx, {
+      sides: [transactionSide(out), transactionSide(into)],
+    });
 
     await unlinkTransfer(t.ctx, into);
 
@@ -180,7 +201,7 @@ describe('Transfers carry no Category', () => {
     const category = await groceries();
     await editClassification(t.ctx, out, { categoryId: category.id });
 
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     expect((await getClassification(t.ctx, out)).category).toBeNull();
     expect(await listHistory(t.ctx, { entityId: out })).toEqual(
@@ -193,7 +214,7 @@ describe('Transfers carry no Category', () => {
   it("a Transfer can't be given a Category, alone or in a bulk edit", async () => {
     const { out, into } = await pair();
     const category = await groceries();
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     await expect(editClassification(t.ctx, out, { categoryId: category.id })).rejects.toThrow(
       "A Transfer can't have a Category",
@@ -209,7 +230,7 @@ describe('Transfers carry no Category', () => {
 
   it('a Transfer can still get a Payee, Tags and notes', async () => {
     const { out, into } = await pair();
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     const result = await editClassification(t.ctx, out, { payeeName: 'Me', notes: 'savings' });
 
@@ -233,7 +254,7 @@ describe('Transfers carry no Category', () => {
     });
     expect((await getClassification(t.ctx, manual.id)).category?.id).toBe(category.id);
     const other = await seedOne(bcge, { amountMinor: -200000 });
-    await linkTransfer(t.ctx, { transactionIds: [manual.id, other] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(manual.id), transactionSide(other)] });
 
     await updateManualTransaction(t.ctx, manual.id, {
       bookingDate: '2025-10-11',
@@ -254,7 +275,7 @@ describe('Rules applied to existing Transactions skip Transfers', () => {
       conditions: [{ type: 'text', field: 'description', operator: 'contains', value: 'ordre' }],
       actions: { categoryId: category.id },
     });
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     await applyRulesToExisting(t.ctx, {});
 
@@ -267,7 +288,7 @@ describe('Unclassified excludes Transfers', () => {
   it('leaves Transfers out of the Unclassified filter, groups and progress', async () => {
     const { ubs, out, into } = await pair();
     await seedOne(ubs, { amountMinor: -1000, rawDescription: 'COOP' });
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     const unclassified = await listTransactions(t.ctx, { unclassified: true });
     const groups = await listUnclassifiedGroups(t.ctx, {});
@@ -283,7 +304,7 @@ describe('Transfer filter on the Transaction list', () => {
   it('lists only Transfers, or everything but Transfers', async () => {
     const { ubs, out, into } = await pair();
     const coop = await seedOne(ubs, { amountMinor: -1000, rawDescription: 'COOP' });
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     const only = await listTransactions(t.ctx, { transfer: 'only' });
     const excluded = await listTransactions(t.ctx, { transfer: 'exclude' });
@@ -304,7 +325,9 @@ describe('deleting a Transaction unlinks its Transfer', () => {
       description: 'From BCGE',
     });
     const other = await seedOne(bcge, { amountMinor: -200000 });
-    const transfer = await linkTransfer(t.ctx, { transactionIds: [manual.id, other] });
+    const transfer = await linkTransfer(t.ctx, {
+      sides: [transactionSide(manual.id), transactionSide(other)],
+    });
 
     await deleteManualTransaction(t.ctx, manual.id);
 
@@ -315,7 +338,7 @@ describe('deleting a Transaction unlinks its Transfer', () => {
 
   it('deleting an imported Transaction leaves the other side unlinked', async () => {
     const { out, into } = await pair();
-    await linkTransfer(t.ctx, { transactionIds: [out, into] });
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
 
     await deleteImportedTransaction(t.ctx, out);
 
@@ -332,7 +355,10 @@ describe('deleting a Transaction unlinks its Transfer', () => {
       description: 'From BCGE',
     });
     await linkTransfer(t.ctx, {
-      transactionIds: [manual.id, await seedOne(bcge, { amountMinor: -200000 })],
+      sides: [
+        transactionSide(manual.id),
+        transactionSide(await seedOne(bcge, { amountMinor: -200000 })),
+      ],
     });
 
     await expect(

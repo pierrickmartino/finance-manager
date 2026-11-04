@@ -66,7 +66,7 @@ export function initialSplitDrafts(
     return transaction.splitLines.map((line) => ({
       id: line.id,
       amount: amount(line.amountMinor),
-      categoryId: line.category.id,
+      categoryId: line.category?.id ?? '',
       tags: line.tags.map((tag) => tag.name).join(', '),
       note: line.note ?? '',
     }));
