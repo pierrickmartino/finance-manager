@@ -95,6 +95,34 @@ export function LinkTransferForm({
   );
 }
 
+interface UnlinkTransferFormProps {
+  /** The Transaction whose page this is. */
+  transactionId: string;
+  /** The linked side: the Transaction itself or one of its Split lines. */
+  side: TransferSideRef;
+  /** Accessible name of the form. */
+  label: string;
+}
+
+/** Unlink Transfer, after a confirmation: both sides stay, unlinked (ADR-0005). */
+export function UnlinkTransferForm({ transactionId, side, label }: UnlinkTransferFormProps) {
+  const confirmMessage =
+    side.kind === 'transaction'
+      ? 'Unlink this Transfer? Both sides stay.'
+      : 'Unlink this Transfer? Both sides stay, and this Split line is left without a Category.';
+  return (
+    <ActionForm
+      action={unlinkTransferAction.bind(null, transactionId, side)}
+      label={label}
+      confirmMessage={confirmMessage}
+    >
+      <button type="submit" className={BUTTON_CLASS}>
+        Unlink Transfer
+      </button>
+    </ActionForm>
+  );
+}
+
 /** The Transfer this Transaction is in, with Unlink; or a form to link it by hand (spec 88). */
 export function TransferSection({
   transactionId,
@@ -114,15 +142,11 @@ export function TransferSection({
             <TransferCounterpart counterpart={counterpart} fmt={fmt} />. A Transfer has no Category
             and is left out of income and expense.
           </p>
-          <ActionForm
-            action={unlinkTransferAction.bind(null, transactionId)}
+          <UnlinkTransferForm
+            transactionId={transactionId}
+            side={{ kind: 'transaction', id: transactionId }}
             label="Unlink Transfer"
-            confirmMessage="Unlink this Transfer? Both Transactions stay."
-          >
-            <button type="submit" className={BUTTON_CLASS}>
-              Unlink Transfer
-            </button>
-          </ActionForm>
+          />
         </div>
       ) : options.length === 0 ? (
         <p className="text-sm text-zinc-500">

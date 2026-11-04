@@ -165,3 +165,50 @@ test('links one Split line of a Transaction with a Transaction on another Accoun
   await expect(row).toContainText('Split (2)');
   await expect(row).toContainText('Partly Transfer');
 });
+
+test('unlinks a Split line Transfer: the line and its Transaction are left Unclassified', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const bcge = `BCGE unlink ${suffix}`;
+  const ubs = `UBS unlink ${suffix}`;
+  const debit = `Ordre à délier ${suffix}`;
+  const group = `Unlink ${suffix}`;
+  const rent = `Rent ${suffix}`;
+  page.on('dialog', (dialog) => void dialog.accept());
+  await page.goto('/categories');
+  await addCategoryGroup(page, group, 'Expense');
+  await addCategory(page, group, rent);
+  await manualAccountWith(page, bcge, "-1'500", debit);
+  await manualAccountWith(page, ubs, "1'000", `Versement ${suffix}`);
+
+  await openTransaction(page, await openByDescription(page, debit));
+  await page.getByText('Split Transaction').click();
+  const form = page.getByRole('form', { name: 'Split' });
+  await form.getByLabel('Amount of line 1').fill("-1'000");
+  await form.getByLabel('Category of line 1').selectOption({ label: rent });
+  await form.getByRole('button', { name: 'Add line' }).click();
+  await form.getByLabel('Amount of line 2').fill('-500');
+  await form.getByLabel('Category of line 2').selectOption({ label: rent });
+  await form.getByRole('button', { name: 'Save Split' }).click();
+  const lines = page.getByRole('table', { name: 'Split lines' }).locator('tbody tr');
+  await lines.nth(0).locator('summary', { hasText: 'Link as Transfer' }).click();
+  await page
+    .getByRole('form', { name: 'Link line 1 as Transfer' })
+    .getByRole('button', { name: 'Link as Transfer' })
+    .click();
+  await expect(lines.nth(0)).toContainText(`Transfer with ${ubs}`);
+
+  await page
+    .getByRole('form', { name: 'Unlink line 1 Transfer' })
+    .getByRole('button', { name: 'Unlink Transfer' })
+    .click();
+  await expect(lines.nth(0)).toContainText('Unclassified');
+  await expect(lines.nth(0)).not.toContainText(`Transfer with ${ubs}`);
+  await expect(page.getByText('Partly Transfer')).toHaveCount(0);
+
+  // The Transaction is in the Unclassified filter
+  await page.goto(`/transactions?unclassified=true&text=${encodeURIComponent(debit)}`);
+  const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
+  await expect(rows).toHaveCount(1);
+});
