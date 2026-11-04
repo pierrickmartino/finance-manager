@@ -59,6 +59,7 @@ The format:
 - `Description1` is the counterparty name and address. `Description2` is the transaction type.
 - `Description3` is quoted when it contains `;`, for example `"Raison du paiement: Loyer octobre 2025; IBAN: CH78 0900 0000 0123 4567 8; Frais: 0.00"`. The counterparty IBAN is the value after `IBAN:` with spaces removed. Card rows have no IBAN.
 - `Sous-montant` is always empty here. Collective orders with sub-amount rows are not modelled.
+- UBS also exports a second wording of the same layout, which the parser accepts too. Its metadata says `Évaluation en` instead of `Monnaie`, and `Nombre de transactions dans cette période` instead of `Nombre de transactions dans la période sélectionnée`. Its currency column is `Devise` instead of `Monnaie`. `Description3` uses `Motif du paiement` for the reason and `Account no. IBAN` for the counterparty IBAN, and may have `Account no.` with a plain account number, which is not read as an IBAN. The fixtures here use the first wording; `src/server/services/imports/parsers/ubs-csv.test.ts` covers the second.
 
 ### `ubs-chf-2025-10.csv`
 

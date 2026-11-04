@@ -51,8 +51,13 @@ const KEPT_METADATA = new Set([
   "Date d'évaluation:",
   'Évaluation en date du:',
   'Monnaie:',
+  'Évaluation en:',
   'Nombre de transactions dans la période sélectionnée:',
+  'Nombre de transactions dans cette période:',
 ]);
+
+/** UBS names the currency `Monnaie` in one export layout and `Évaluation en` / `Devise` in another. */
+const CURRENCY_METADATA_KEYS = ['Monnaie', 'Évaluation en'] as const;
 
 /** Table columns holding dates, times, currency and amounts: kept as is. Every other column is anonymised. */
 const KEPT_COLUMNS = new Set([
@@ -61,6 +66,7 @@ const KEPT_COLUMNS = new Set([
   HEADER_MARKER,
   'Date de valeur',
   'Monnaie',
+  'Devise',
   'Débit',
   'Crédit',
   'Sous-montant',
@@ -115,8 +121,10 @@ export function readUbsCsv(input: Buffer): Statement {
     });
   }
 
-  const currency = metadataValue(file, 'Monnaie');
-  if (!currency) throw new Error('UBS CSV: missing "Monnaie" in the metadata header');
+  const currency = CURRENCY_METADATA_KEYS.map((key) => metadataValue(file, key)).find((v) => v);
+  if (!currency) {
+    throw new Error(`UBS CSV: missing "${CURRENCY_METADATA_KEYS.join('" or "')}" in the metadata header`);
+  }
   return {
     currency,
     openingBalance: optionalMinor(metadataValue(file, 'Solde initial')),
