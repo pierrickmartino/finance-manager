@@ -6,7 +6,7 @@ import { ConflictError, isUniqueViolation, NotFoundError } from '../errors';
 export interface Payee {
   id: string;
   name: string;
-  /** How many Transactions have this Payee. */
+  /** How many Transactions have this Payee, themselves or on a Split line (ADR-0006). */
   transactionCount: number;
 }
 
@@ -20,7 +20,11 @@ export const payeeName = z
 
 export const SELECT_PAYEE = `
   SELECT p.id, p.name,
-         (SELECT count(*)::int FROM "transaction" t WHERE t.payee_id = p.id) AS "transactionCount"
+         (SELECT count(*)::int FROM (
+            SELECT t.id FROM "transaction" t WHERE t.payee_id = p.id
+            UNION
+            SELECT sl.transaction_id FROM split_line sl WHERE sl.payee_id = p.id) used)
+           AS "transactionCount"
   FROM payee p`;
 
 export async function findPayee(db: Queryable, id: string, lock = false): Promise<Payee> {

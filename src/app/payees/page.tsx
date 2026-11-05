@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
-import { listPayees } from '@/server/services/payees';
+import { countTransactionsWithPayee, listPayees } from '@/server/services/payees';
 import { listTransactions } from '@/server/services/transactions';
 import { PayeeDetail } from './payee-detail';
 import { PayeeList } from './payee-list';
@@ -23,7 +23,12 @@ interface PayeesPageProps {
  */
 export default async function PayeesPage({ searchParams }: PayeesPageProps) {
   const ctx = await getServiceContext();
-  const [payees, fmt, params] = await Promise.all([listPayees(ctx), getFormatter(), searchParams]);
+  const [payees, total, fmt, params] = await Promise.all([
+    listPayees(ctx),
+    countTransactionsWithPayee(ctx),
+    getFormatter(),
+    searchParams,
+  ]);
   const query = typeof params.q === 'string' ? params.q : '';
   const visible = filterPayees(payees, query);
   const selected = selectPayee(
@@ -34,7 +39,6 @@ export default async function PayeesPage({ searchParams }: PayeesPageProps) {
   const recent = selected
     ? (await listTransactions(ctx, { payeeId: selected.id, pageSize: RECENT_COUNT })).transactions
     : [];
-  const total = payees.reduce((sum, payee) => sum + payee.transactionCount, 0);
 
   return (
     <section className="flex flex-col gap-6">
