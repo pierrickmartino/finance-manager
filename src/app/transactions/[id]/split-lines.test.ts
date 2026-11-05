@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { initialSplitDrafts, remainingMinor } from './split-lines';
 
 const category = { id: 'c1', name: 'Groceries', groupId: 'g', groupName: 'Food' };
+const coop = { id: 'p1', name: 'Coop' };
+const migros = { id: 'p2', name: 'Migros' };
 
 function detail(amountMinor: number | null, counterpartyName: string | null) {
   return { amountMinor, counterpartyName, counterpartyIban: null, paymentReference: null };
@@ -56,7 +58,7 @@ describe('the split form', () => {
     ).toEqual([{ amount: "-1'187.35", categoryId: '', tags: '', note: '' }]);
   });
 
-  it('starts with the saved Split lines, by id, when the Transaction is split', () => {
+  it('starts with the saved Split lines, by id, with their own Payees, when the Transaction is split', () => {
     const drafts = initialSplitDrafts(
       {
         amountMinor: -10000,
@@ -70,6 +72,8 @@ describe('the split form', () => {
             tags: [{ id: 't', name: 'Family' }],
             note: 'weekly',
             transferId: null,
+            payee: coop,
+            reportedPayee: coop,
           },
           {
             id: 'l2',
@@ -78,6 +82,8 @@ describe('the split form', () => {
             tags: [],
             note: null,
             transferId: null,
+            payee: null,
+            reportedPayee: migros,
           },
         ],
       },
@@ -85,7 +91,14 @@ describe('the split form', () => {
     );
 
     expect(drafts).toEqual([
-      { id: 'l1', amount: '-70,00', categoryId: 'c1', tags: 'Family', note: 'weekly' },
+      {
+        id: 'l1',
+        amount: '-70,00',
+        categoryId: 'c1',
+        payeeId: 'p1',
+        tags: 'Family',
+        note: 'weekly',
+      },
       { id: 'l2', amount: '-30,00', categoryId: 'c2', tags: '', note: '' },
     ]);
   });
@@ -104,6 +117,8 @@ describe('the split form', () => {
             tags: [],
             note: 'To savings',
             transferId: 'tr1',
+            payee: null,
+            reportedPayee: migros,
           },
           {
             id: 'l2',
@@ -112,6 +127,8 @@ describe('the split form', () => {
             tags: [],
             note: null,
             transferId: null,
+            payee: null,
+            reportedPayee: migros,
           },
         ],
       },

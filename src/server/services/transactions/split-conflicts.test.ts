@@ -11,7 +11,13 @@ import { createPayee } from '../payees';
 import { createRule } from '../rules';
 import { applyRulesToExisting, previewApplyRules } from '../rules/existing';
 import { linkTransfer, transactionSide } from '../transfers';
-import { getClassification, getTransaction, listTransactions, unlockFields } from '.';
+import {
+  getClassification,
+  getTransaction,
+  listTransactions,
+  unlockFields,
+  type SplitLine,
+} from '.';
 import { createManualTransaction, updateManualTransaction } from './manual';
 import { splitTransaction } from './split';
 
@@ -143,6 +149,14 @@ describe('splitting refuses a Transaction that is part of a Transfer', () => {
   });
 });
 
+/**
+ * The Split lines as they were, except that each blank line now reports under the Transaction's
+ * new Payee (ADR-0006).
+ */
+function unchangedLinesUnder(lines: readonly SplitLine[], payee: { id: string; name: string }) {
+  return lines.map((line) => ({ ...line, reportedPayee: { id: payee.id, name: payee.name } }));
+}
+
 /** A split Transaction and a Rule matching it that sets a Payee and a Category. */
 async function splitTransactionAndRule() {
   const bcge = await account('BCGE');
@@ -171,7 +185,7 @@ describe('Rules applied to existing Transactions never set a split Transactionâ€
     const after = await getClassification(t.ctx, id);
     expect(after.payee?.id).toBe(landlord.id);
     expect(after.category).toBeNull();
-    expect(after.splitLines).toEqual(lines);
+    expect(after.splitLines).toEqual(unchangedLinesUnder(lines, landlord));
   });
 
   it('still leaves the Category empty after the user unlocked it', async () => {
@@ -185,7 +199,7 @@ describe('Rules applied to existing Transactions never set a split Transactionâ€
     const after = await getClassification(t.ctx, id);
     expect(after.payee?.id).toBe(landlord.id);
     expect(after.category).toBeNull();
-    expect(after.splitLines).toEqual(lines);
+    expect(after.splitLines).toEqual(unchangedLinesUnder(lines, landlord));
   });
 
   it('Rules on saving a split Manual transaction set its Payee, not its Category', async () => {
@@ -217,7 +231,7 @@ describe('Rules applied to existing Transactions never set a split Transactionâ€
     const after = await getClassification(t.ctx, manual.id);
     expect(after.payee?.id).toBe(landlord.id);
     expect(after.category).toBeNull();
-    expect(after.splitLines).toEqual(lines);
+    expect(after.splitLines).toEqual(unchangedLinesUnder(lines, landlord));
   });
 
   it('never creates Split lines', async () => {

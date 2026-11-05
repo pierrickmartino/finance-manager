@@ -73,6 +73,7 @@ const splitDraftsInput = z.array(
     id: z.string().optional(),
     amount: z.string(),
     categoryId: z.string(),
+    payeeId: z.string().optional(),
     tags: z.string(),
     note: z.string(),
     isTransfer: z.literal(true).optional(),
@@ -103,6 +104,8 @@ async function readSplitLines(formData: FormData, currency: string): Promise<Spl
       amountMinor,
       // A Transfer line has no Category; the service refuses one on it anyway (ADR-0005).
       categoryId: draft.isTransfer ? null : draft.categoryId,
+      // Blank: the line takes its Transaction's Payee (ADR-0006).
+      payeeId: draft.payeeId || null,
       tagNames: readTags(draft.tags),
       note: draft.note,
     };

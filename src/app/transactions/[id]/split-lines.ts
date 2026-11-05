@@ -11,6 +11,11 @@ export interface SplitLineDraft {
   amount: string;
   /** Empty for a Transfer line, which can't have a Category. */
   categoryId: string;
+  /**
+   * The line's own Payee (ADR-0006); absent or empty for a line that takes its Transaction's.
+   * A Transfer line has none.
+   */
+  payeeId?: string;
   /** Comma-separated Tag names. */
   tags: string;
   note: string;
@@ -73,6 +78,7 @@ export function initialSplitDrafts(
       id: line.id,
       amount: amount(line.amountMinor),
       categoryId: line.category?.id ?? '',
+      ...(line.payee && { payeeId: line.payee.id }),
       tags: line.tags.map((tag) => tag.name).join(', '),
       note: line.note ?? '',
       ...(line.transferId !== null && { isTransfer: true as const }),

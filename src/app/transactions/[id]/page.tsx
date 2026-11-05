@@ -150,6 +150,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
           <SplitSection
             transaction={transaction}
             groups={groups}
+            payees={payees}
             lineTransfers={lineTransfers}
             fmt={fmt}
             className={PANEL}

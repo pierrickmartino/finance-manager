@@ -14,6 +14,12 @@ const INPUT =
 
 const EMPTY_LINE: SplitLineDraft = { amount: '', categoryId: '', tags: '', note: '' };
 
+/** A Payee a Split line may name. */
+export interface LinePayeeOption {
+  id: string;
+  name: string;
+}
+
 /** A line being edited, with a key that stays the same while lines are added and removed. */
 interface KeyedLine {
   key: number;
@@ -25,6 +31,10 @@ interface SplitFormProps {
   currency: string;
   initialLines: SplitLineDraft[];
   groups: CategoryGroup[];
+  /** The Payees a line may name (ADR-0006). */
+  payees: LinePayeeOption[];
+  /** The Transaction's Payee name: what a line without its own Payee reports under. */
+  transactionPayee: string | null;
   /** By Split line id: what a Transfer line shows in place of its Category, its other side. */
   transfers: Record<string, ReactNode>;
   action: (
@@ -35,7 +45,7 @@ interface SplitFormProps {
 
 /**
  * Divides a Transaction's amount into Split lines (ADR-0004): each line has an amount, a
- * Category, Tags and a note, and the remaining unallocated amount updates as the user types.
+ * Category, a Payee (blank: the Transaction's, ADR-0006), Tags and a note, and the remaining unallocated amount updates as the user types.
  * A Transfer line (ADR-0005) shows its Transfer instead of a Category and can't be removed.
  */
 export function SplitForm({
@@ -43,6 +53,8 @@ export function SplitForm({
   currency,
   initialLines,
   groups,
+  payees,
+  transactionPayee,
   transfers,
   action,
 }: SplitFormProps) {
@@ -93,6 +105,8 @@ export function SplitForm({
             line={line.draft}
             number={index + 1}
             groups={groups}
+            payees={payees}
+            transactionPayee={transactionPayee}
             transfer={line.draft.isTransfer && (transfers[line.draft.id ?? ''] ?? 'Transfer')}
             onChange={(change) => update(line.key, change)}
             onRemove={
@@ -138,6 +152,8 @@ interface SplitLineFieldsProps {
   line: SplitLineDraft;
   number: number;
   groups: CategoryGroup[];
+  payees: LinePayeeOption[];
+  transactionPayee: string | null;
   /** What a Transfer line shows in place of its Category picker; falsy for other lines. */
   transfer: ReactNode;
   onChange: (change: Partial<SplitLineDraft>) => void;
@@ -149,6 +165,8 @@ function SplitLineFields({
   line,
   number,
   groups,
+  payees,
+  transactionPayee,
   transfer,
   onChange,
   onRemove,
@@ -172,7 +190,16 @@ function SplitLineFields({
           <span className="py-1.5 text-sky-700 dark:text-sky-400">{transfer}</span>
         </div>
       ) : (
-        <CategoryPicker line={line} number={number} groups={groups} onChange={onChange} />
+        <>
+          <CategoryPicker line={line} number={number} groups={groups} onChange={onChange} />
+          <PayeePicker
+            line={line}
+            number={number}
+            payees={payees}
+            transactionPayee={transactionPayee}
+            onChange={onChange}
+          />
+        </>
       )}
       <label className="flex flex-col gap-1">
         <span className="text-xs text-zinc-500">Tags</span>
@@ -231,6 +258,37 @@ function CategoryPicker({ line, number, groups, onChange }: CategoryPickerProps)
               </option>
             ))}
           </optgroup>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+type PayeePickerProps = Pick<
+  SplitLineFieldsProps,
+  'line' | 'number' | 'payees' | 'transactionPayee' | 'onChange'
+>;
+
+/**
+ * A line's own Payee (ADR-0006). Blank by default, showing the Transaction's Payee it then
+ * takes; a Payee picked here stays, even when it equals the Transaction's.
+ */
+function PayeePicker({ line, number, payees, transactionPayee, onChange }: PayeePickerProps) {
+  const payeeId = line.payeeId ?? '';
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs text-zinc-500">Payee</span>
+      <select
+        aria-label={`Payee of line ${number}`}
+        value={payeeId}
+        onChange={(event) => onChange({ payeeId: event.target.value })}
+        className={`${INPUT} ${payeeId === '' ? 'text-zinc-500' : ''}`}
+      >
+        <option value="">{transactionPayee ?? 'No Payee'}</option>
+        {payees.map((payee) => (
+          <option key={payee.id} value={payee.id}>
+            {payee.name}
+          </option>
         ))}
       </select>
     </label>

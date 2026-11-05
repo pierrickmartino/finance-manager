@@ -3,7 +3,8 @@ import type { Queryable } from '@/server/db/client';
 import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
-import { parseInput, ValidationError } from '../errors';
+import { NotFoundError, parseInput, ValidationError } from '../errors';
+import { findPayee } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import {
   CLASSIFICATION_FIELDS,
@@ -34,6 +35,8 @@ const splitLineInput = z
       .string({ error: 'Every Split line needs a Category' })
       .min(1, 'Every Split line needs a Category')
       .nullish(),
+    /** The line's own Payee (ADR-0006), an existing one; absent or null: its Transaction's. */
+    payeeId: z.string().min(1).nullish(),
     tagIds: z.array(z.string()).optional(),
     /** Or Tags by name, creating the missing ones. */
     tagNames: z.array(tagName).optional(),
@@ -130,6 +133,30 @@ async function resolveLineCategoryId(
 }
 
 /**
+ * The Payee id a line names (ADR-0006): an existing Payee, or none to take its Transaction's.
+ * A Transfer side can't name one.
+ */
+async function resolveLinePayeeId(
+  scope: MutationScope,
+  transfers: ReadonlyMap<string, string | null>,
+  line: ParsedLine,
+): Promise<string | null> {
+  if (line.payeeId == null) return null;
+  const isTransferSide = line.id !== undefined && Boolean(transfers.get(line.id));
+  if (isTransferSide) {
+    throw new ValidationError("This Split line is part of a Transfer: it can't have a Payee");
+  }
+  try {
+    return (await findPayee(scope.tx, line.payeeId)).id;
+  } catch (error: unknown) {
+    if (error instanceof NotFoundError) {
+      throw new ValidationError('A Split line can only name an existing Payee');
+    }
+    throw error;
+  }
+}
+
+/**
  * Makes `lines`, in their order, the Transaction's Split lines: lines given by id are updated
  * in place and keep their identity, lines without an id are added, and the others are deleted.
  */
@@ -143,19 +170,20 @@ async function writeLines(
   const categoryIds = await mapInOrder(lines, (line) =>
     resolveLineCategoryId(scope, transfers, line),
   );
+  const payeeIds = await mapInOrder(lines, (line) => resolveLinePayeeId(scope, transfers, line));
   const tagIds = await mapInOrder(lines, (line) => resolveLineTagIds(scope, line));
-  const lineIds = await writeLineRows(scope.tx, transactionId, lines, categoryIds);
+  const lineIds = await writeLineRows(scope.tx, transactionId, lines, { categoryIds, payeeIds });
   await writeLineTags(scope.tx, lineIds, tagIds);
 }
 
 /**
- * SQL: makes the lines `$2`..`$5` (id, amount, Category, note; a null id for a new line) the
+ * SQL: makes the lines `$2`..`$6` (id, amount, Category, note, Payee; a null id for a new line) the
  * Split lines of Transaction `$1`, in one statement for the whole set (the database checks a
  * Split per statement). Returns each written line's id and position.
  */
 const WRITE_LINES = `WITH line AS (
-    SELECT * FROM unnest($2::uuid[], $3::bigint[], $4::uuid[], $5::text[]) WITH ORDINALITY
-      AS line(id, amount, category, note, n)
+    SELECT * FROM unnest($2::uuid[], $3::bigint[], $4::uuid[], $5::text[], $6::uuid[])
+      WITH ORDINALITY AS line(id, amount, category, note, payee, n)
   ), removed AS (
     DELETE FROM split_line sl
     WHERE sl.transaction_id = $1
@@ -163,13 +191,13 @@ const WRITE_LINES = `WITH line AS (
   ), updated AS (
     UPDATE split_line sl
     SET position = line.n, amount_minor = line.amount, category_id = line.category,
-        note = line.note
+        note = line.note, payee_id = line.payee
     FROM line
     WHERE sl.id = line.id AND sl.transaction_id = $1
     RETURNING sl.id, sl.position
   ), inserted AS (
-    INSERT INTO split_line (transaction_id, position, amount_minor, category_id, note)
-    SELECT $1, line.n, line.amount, line.category, line.note
+    INSERT INTO split_line (transaction_id, position, amount_minor, category_id, note, payee_id)
+    SELECT $1, line.n, line.amount, line.category, line.note, line.payee
     FROM line WHERE line.id IS NULL
     RETURNING id, position
   )
@@ -180,7 +208,10 @@ async function writeLineRows(
   tx: Queryable,
   transactionId: string,
   lines: readonly ParsedLine[],
-  categoryIds: readonly (string | null)[],
+  {
+    categoryIds,
+    payeeIds,
+  }: { categoryIds: readonly (string | null)[]; payeeIds: readonly (string | null)[] },
 ): Promise<string[]> {
   const written = await tx.query<{ id: string; position: number }>(WRITE_LINES, [
     transactionId,
@@ -188,6 +219,7 @@ async function writeLineRows(
     lines.map((line) => line.amountMinor),
     categoryIds,
     lines.map((line) => line.note ?? null),
+    payeeIds,
   ]);
   const idAt = new Map(written.rows.map((row) => [row.position, row.id]));
   return lines.map((_, index) => {
