@@ -72,12 +72,15 @@ test('searches imported Transactions and opens one with its bank fields and Hist
   await openTransaction(page, rows.first());
   const fields = page.getByRole('definition');
   await expect(page.getByRole('heading', { name: 'From the bank' })).toBeVisible();
+  // Two columns: what to do with it on the left, what is known about it on the right
+  const edits = page.getByRole('complementary', { name: 'Classify and link' });
+  await expect(edits.getByRole('heading', { name: 'Classification' })).toBeVisible();
+  await expect(edits.getByRole('heading', { name: 'Transfer' })).toBeVisible();
   await expect(fields.filter({ hasText: 'CH2009000000087654321' })).toBeVisible();
   await expect(fields.filter({ hasText: '9930288TI0000107' })).toBeVisible();
   await expect(fields.filter({ hasText: 'Import of ubs-chf-2025-10.csv' })).toBeVisible();
   await expect(page.locator('dl[aria-label="Bank fields"]').getByRole('textbox')).toHaveCount(0);
-  // The History is folded below the cards: open it
-  await page.locator('summary', { hasText: /^History \(\d+\)$/ }).click();
+  // The History is open at the foot of the page, no click needed
   const history = page.getByRole('list', { name: 'Transaction History' }).locator(':scope > li');
   await expect(history.filter({ hasText: 'amountMinor' })).toContainText('import');
   await expect(history.filter({ hasText: 'bankReference' })).toContainText('9930288TI0000107');

@@ -43,6 +43,14 @@ export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
 
 const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
+/**
+ * The narrow left column stays in view below the sticky breadcrumb bar (3.5rem) while the wide
+ * one scrolls; if it is taller than the screen, it scrolls on its own so nothing is out of reach.
+ * The padding keeps the cards' shadows from being clipped by the overflow.
+ */
+const EDITS_COLUMN =
+  'flex min-w-0 flex-col gap-5 lg:sticky lg:top-[4.75rem] lg:-m-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:p-1';
+
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
 }
@@ -74,9 +82,9 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
 
 /**
  * One Transaction (spec 38, 48, 63-65, 116). A one-line header says what happened; beneath it,
- * side by side, what to do with it as a whole (classify, with the fields locked against Rules;
- * link as a Transfer) and the bank fields; then its History, folded; and last, across the full
- * width, its Split, which needs the room.
+ * two columns. On the left, narrow and kept in view, what to do with it as a whole: classify
+ * (with the fields locked against Rules) and link as a Transfer. On the right, wide, what is
+ * known about it: the bank fields, its Split (whose table needs the room) and its History.
  */
 export default async function TransactionPage({ params }: TransactionPageProps) {
   const { id } = await params;
@@ -106,66 +114,75 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         fmt={fmt}
         actions={<TransactionActions transaction={transaction} />}
       />
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-3">
-        <section aria-labelledby="classification" className={PANEL}>
-          <h2 id="classification" className="text-lg font-semibold">
-            Classification
-          </h2>
-          <ClassificationForm
-            classification={classification}
-            groups={groups}
-            payeeNames={payees.map((payee) => payee.name)}
-            tagNames={tags.map((tag) => tag.name)}
-            action={editClassificationAction.bind(null, transaction.id)}
-          />
-          <LockedFields classification={classification} />
-          <Link href={`/rules/new?fromTransaction=${transaction.id}`} className="text-sm underline">
-            Create rule from this Transaction
-          </Link>
-        </section>
-        {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
-        {isSplit ? (
-          <div className={PANEL}>
-            <h2 className="text-lg font-semibold">Transfer</h2>
-            <p className="text-sm text-zinc-500">Linked line by line, in the Split below.</p>
-          </div>
-        ) : (
-          <TransferSection
-            transactionId={transaction.id}
-            counterpart={counterpart}
-            options={counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))}
-            fmt={fmt}
-            className={PANEL}
-          />
-        )}
-        <BankDetails transaction={transaction} fmt={fmt} className={PANEL} />
-      </div>
-      <details className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
-        <summary className="cursor-pointer text-sm font-semibold text-zinc-500">
-          History ({history.length})
-        </summary>
-        <div className="flex flex-col gap-3 pt-3">
-          {history.length === 0 ? (
-            <p className="text-sm text-zinc-500">No History for this Transaction.</p>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <aside aria-label="Classify and link" className={EDITS_COLUMN}>
+          <section aria-labelledby="classification" className={PANEL}>
+            <h2 id="classification" className="text-lg font-semibold">
+              Classification
+            </h2>
+            <ClassificationForm
+              classification={classification}
+              groups={groups}
+              payeeNames={payees.map((payee) => payee.name)}
+              tagNames={tags.map((tag) => tag.name)}
+              action={editClassificationAction.bind(null, transaction.id)}
+            />
+            <LockedFields classification={classification} />
+            <Link
+              href={`/rules/new?fromTransaction=${transaction.id}`}
+              className="text-sm underline"
+            >
+              Create rule from this Transaction
+            </Link>
+          </section>
+          {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
+          {isSplit ? (
+            <div className={PANEL}>
+              <h2 className="text-lg font-semibold">Transfer</h2>
+              <p className="text-sm text-zinc-500">Linked line by line, in the Split.</p>
+            </div>
           ) : (
-            <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
+            <TransferSection
+              transactionId={transaction.id}
+              counterpart={counterpart}
+              options={
+                counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))
+              }
+              fmt={fmt}
+              className={PANEL}
+            />
           )}
-          <Link
-            href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
-            className="text-sm underline"
-          >
-            Open in History
-          </Link>
+        </aside>
+        <div className="flex min-w-0 flex-col gap-5">
+          <BankDetails transaction={transaction} fmt={fmt} className={PANEL} />
+          <SplitSection
+            transaction={transaction}
+            groups={groups}
+            payees={payees}
+            lineTransfers={lineTransfers}
+            fmt={fmt}
+            className={`${PANEL} gap-4`}
+          />
+          <details open className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
+            <summary className="cursor-pointer text-sm font-semibold text-zinc-500">
+              History ({history.length})
+            </summary>
+            <div className="flex flex-col gap-3 pt-3">
+              {history.length === 0 ? (
+                <p className="text-sm text-zinc-500">No History for this Transaction.</p>
+              ) : (
+                <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
+              )}
+              <Link
+                href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
+                className="text-sm underline"
+              >
+                Open in History
+              </Link>
+            </div>
+          </details>
         </div>
-      </details>
-      <SplitSection
-        transaction={transaction}
-        groups={groups}
-        payees={payees}
-        lineTransfers={lineTransfers}
-        fmt={fmt}
-        className={`${PANEL} gap-4`}
-      />
+      </div>
     </section>
   );
 }
