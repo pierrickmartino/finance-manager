@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PayeeRef } from '@/server/services/payees';
-import { initialSplitDrafts, remainingMinor } from './split-lines';
+import { initialSplitDrafts, remainingMinor, splitAllocation } from './split-lines';
 
 const category = { id: 'c1', name: 'Groceries', groupId: 'g', groupName: 'Food' };
 const coop = { id: 'p1', name: 'Coop' };
@@ -210,5 +210,42 @@ describe('the split form', () => {
     expect(remainingMinor(-10000, ['-70.00', '-30'], 'apostrophe', 'CHF')).toBe(0);
     expect(remainingMinor(-10000, ['-70.00', '+5'], 'apostrophe', 'CHF')).toBe(-3500);
     expect(remainingMinor(-10000, ['abc'], 'apostrophe', 'CHF')).toBeNull();
+  });
+});
+
+describe('the Split allocation', () => {
+  const allocation = (totalMinor: number, amounts: string[]) =>
+    splitAllocation(totalMinor, amounts, 'apostrophe', 'CHF');
+
+  it('is balanced when the lines add up to the amount, with each line part in order', () => {
+    expect(allocation(-118735, ['-142.85', '-389.50', '-655.00'])).toEqual({
+      parts: [-14285, -38950, -65500],
+      remaining: 0,
+      status: 'balanced',
+    });
+  });
+
+  it('is under while some of the amount is left, counting a blank line as zero', () => {
+    expect(allocation(-10000, ['-30', ''])).toEqual({
+      parts: [-3000, 0],
+      remaining: -7000,
+      status: 'under',
+    });
+  });
+
+  it('is over when the lines take more than the amount', () => {
+    expect(allocation(-10000, ['-80', '-50'])).toMatchObject({ remaining: 3000, status: 'over' });
+  });
+
+  it('is over when a line goes the other way and the rest is beyond the amount', () => {
+    expect(allocation(10000, ['120', '-10'])).toMatchObject({ remaining: -1000, status: 'over' });
+  });
+
+  it('is invalid while a typed amount is not an amount, its part counting as zero', () => {
+    expect(allocation(-10000, ['-30', 'abc'])).toEqual({
+      parts: [-3000, 0],
+      remaining: null,
+      status: 'invalid',
+    });
   });
 });

@@ -76,6 +76,8 @@ test('searches imported Transactions and opens one with its bank fields and Hist
   await expect(fields.filter({ hasText: '9930288TI0000107' })).toBeVisible();
   await expect(fields.filter({ hasText: 'Import of ubs-chf-2025-10.csv' })).toBeVisible();
   await expect(page.locator('dl[aria-label="Bank fields"]').getByRole('textbox')).toHaveCount(0);
+  // The History is folded below the cards: open it
+  await page.locator('summary', { hasText: /^History \(\d+\)$/ }).click();
   const history = page.getByRole('list', { name: 'Transaction History' }).locator(':scope > li');
   await expect(history.filter({ hasText: 'amountMinor' })).toContainText('import');
   await expect(history.filter({ hasText: 'bankReference' })).toContainText('9930288TI0000107');

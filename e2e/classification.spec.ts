@@ -71,6 +71,8 @@ test('categorises a Transaction from its detail view, locking and unlocking the 
   const locked = page.getByRole('list', { name: 'Locked fields' });
   await expect(locked.getByRole('listitem')).toHaveText([/Payee/, /Category/, /Tags/]);
   await expect(status.getByRole('listitem')).toHaveText([categoryName, 'Imported', '3 locked']);
+  // The History is folded below the cards: open it
+  await page.locator('summary', { hasText: /^History \(\d+\)$/ }).click();
   const history = page.getByRole('list', { name: 'Transaction History' }).locator(':scope > li');
   await expect(history.filter({ hasText: `${groupName} › ${categoryName}` })).toContainText(
     'manual',

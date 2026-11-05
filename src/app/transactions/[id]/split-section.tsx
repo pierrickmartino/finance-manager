@@ -71,35 +71,37 @@ export function SplitSection({
 
   return (
     <section aria-labelledby="split" className={className}>
-      <h2 id="split" className="text-lg font-semibold">
-        {splitLabel(transaction) ?? 'Split'}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="split" className="text-lg font-semibold">
+          {splitLabel(transaction) ?? 'Split'}
+        </h2>
+        {isSplit && (
+          <ActionForm
+            action={removeSplitAction.bind(null, transaction.id)}
+            label="Remove Split"
+            confirmMessage="Remove this Split? The Transaction becomes Unclassified."
+          >
+            <button type="submit" className={BUTTON_CLASS}>
+              Remove Split
+            </button>
+          </ActionForm>
+        )}
+      </div>
       {isSplit ? (
         <>
           <SplitLinesTable transaction={transaction} lineTransfers={lineTransfers} fmt={fmt} />
-          <div className="flex flex-wrap items-start gap-3">
-            <details className="flex flex-col gap-3">
-              <summary className={SUMMARY}>Edit Split</summary>
-              <div className="pt-3">{form}</div>
-            </details>
-            <ActionForm
-              action={removeSplitAction.bind(null, transaction.id)}
-              label="Remove Split"
-              confirmMessage="Remove this Split? The Transaction becomes Unclassified."
-            >
-              <button type="submit" className={BUTTON_CLASS}>
-                Remove Split
-              </button>
-            </ActionForm>
-          </div>
+          <details className="w-full">
+            <summary className={SUMMARY}>Edit Split</summary>
+            <div className="pt-4">{form}</div>
+          </details>
         </>
       ) : (
-        <details className="flex flex-col gap-3">
+        <details className="w-full">
           <summary className={SUMMARY}>Split Transaction</summary>
           <p className="pt-3 text-sm text-zinc-600 dark:text-zinc-400">
             Divide the amount into lines that add up to it, each with its own Category.
           </p>
-          <div className="pt-3">{form}</div>
+          <div className="pt-4">{form}</div>
         </details>
       )}
     </section>

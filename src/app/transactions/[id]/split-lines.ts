@@ -133,3 +133,38 @@ export function remainingMinor(
   if (typed.includes(null)) return null;
   return typed.reduce<number>((remaining, minor) => remaining - (minor ?? 0), totalMinor);
 }
+
+/** Whether the lines add up to the amount, leave some of it, or take more than it. */
+export type AllocationStatus = 'balanced' | 'under' | 'over' | 'invalid';
+
+export interface SplitAllocation {
+  /** Each line's amount in minor units, in order; blank or invalid lines count as zero. */
+  parts: number[];
+  /** As {@link remainingMinor}: null while a typed amount is not a valid amount. */
+  remaining: number | null;
+  status: AllocationStatus;
+}
+
+/**
+ * How the typed line amounts divide the Transaction's amount: each line's part, what is left,
+ * and whether that is balanced, short of the amount, or beyond it (the rest has turned to the
+ * other sign).
+ */
+export function splitAllocation(
+  totalMinor: number,
+  amounts: readonly string[],
+  numberFormat: NumberFormat,
+  currency: string,
+): SplitAllocation {
+  const parts = amounts.map((text) =>
+    text.trim() === '' ? 0 : (parseAmount(text, numberFormat, currency) ?? 0),
+  );
+  const remaining = remainingMinor(totalMinor, amounts, numberFormat, currency);
+  return { parts, remaining, status: allocationStatus(totalMinor, remaining) };
+}
+
+function allocationStatus(totalMinor: number, remaining: number | null): AllocationStatus {
+  if (remaining === null) return 'invalid';
+  if (remaining === 0) return 'balanced';
+  return Math.sign(remaining) === Math.sign(totalMinor) ? 'under' : 'over';
+}

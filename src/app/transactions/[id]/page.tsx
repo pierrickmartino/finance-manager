@@ -32,19 +32,12 @@ import {
   editClassificationAction,
   unlockFieldAction,
 } from './actions';
+import { BankDetails } from './bank-details';
 import { ClassificationForm } from './classification-form';
 import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
-import { TransactionReceipt } from './transaction-receipt';
+import { TransactionHeader } from './transaction-header';
 import { TransferSection } from './transfer-section';
-import { PrototypeSwitcher } from '@/components/prototype-switcher';
-import {
-  LAYOUT_VARIANTS,
-  VariantA,
-  VariantB,
-  VariantC,
-  type VariantData,
-} from './layout-variants.prototype';
 
 export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
 
@@ -52,7 +45,6 @@ const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ variant?: string; tab?: string }>;
 }
 
 /** Each Split line's other side when it is a Transfer side, else what it may be linked with. */
@@ -81,12 +73,12 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
 }
 
 /**
- * One Transaction (spec 38, 48, 63-65, 116), as a receipt and a workbench. On the left, what
- * happened: the bank fields read-only and the History. On the right, kept in view from `lg`
- * up, what to do with it: classify (with the fields locked against Rules), split, link as a
- * Transfer.
+ * One Transaction (spec 38, 48, 63-65, 116). A one-line header says what happened; beneath it,
+ * side by side, what to do with it as a whole (classify, with the fields locked against Rules;
+ * link as a Transfer) and the bank fields; then its History, folded; and last, across the full
+ * width, its Split, which needs the room.
  */
-export default async function TransactionPage({ params, searchParams }: TransactionPageProps) {
+export default async function TransactionPage({ params }: TransactionPageProps) {
   const { id } = await params;
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
@@ -103,116 +95,77 @@ export default async function TransactionPage({ params, searchParams }: Transact
       loadLineTransfers(ctx, transaction),
     ]);
 
-  // PROTOTYPE: throwaway layout variants (layout-variants.prototype.tsx), dev builds only.
-  const { variant = 'current', tab } = await searchParams;
-  if (process.env.NODE_ENV !== 'production' && variant !== 'current') {
-    const data: VariantData = {
-      transaction,
-      classification,
-      badges: transactionBadges(transaction, classification),
-      history,
-      groups,
-      payees,
-      tagNames: tags.map((tag) => tag.name),
-      counterpart,
-      linkOptions:
-        isSplit || counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id)),
-      lineTransfers,
-      fmt,
-      tab,
-    };
-    return (
-      <section className="flex flex-col gap-4 pb-16">
-        <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
-          ← Transactions
-        </Link>
-        {variant === 'A' && <VariantA data={data} />}
-        {variant === 'B' && <VariantB data={data} />}
-        {variant === 'C' && <VariantC data={data} />}
-        <PrototypeSwitcher variants={LAYOUT_VARIANTS} current={variant} />
-      </section>
-    );
-  }
-
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-5">
       <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
         ← Transactions
       </Link>
-      {process.env.NODE_ENV !== 'production' && (
-        <PrototypeSwitcher variants={LAYOUT_VARIANTS} current="current" />
-      )}
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <TransactionReceipt
-            transaction={transaction}
-            badges={transactionBadges(transaction, classification)}
-            fmt={fmt}
-          />
-          <section aria-labelledby="history" className="flex flex-col gap-3">
-            <h2 id="history" className="text-sm font-semibold text-zinc-500">
-              History
-            </h2>
-            {history.length === 0 ? (
-              <p className="text-sm text-zinc-500">No History for this Transaction.</p>
-            ) : (
-              <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
-            )}
-            <Link
-              href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
-              className="text-sm underline"
-            >
-              Open in History
-            </Link>
-          </section>
-        </div>
-
-        <aside
-          aria-label="Work on this Transaction"
-          className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4"
-        >
-          <section aria-labelledby="classification" className={PANEL}>
-            <h2 id="classification" className="text-lg font-semibold">
-              Classification
-            </h2>
-            <ClassificationForm
-              classification={classification}
-              groups={groups}
-              payeeNames={payees.map((payee) => payee.name)}
-              tagNames={tags.map((tag) => tag.name)}
-              action={editClassificationAction.bind(null, transaction.id)}
-            />
-            <LockedFields classification={classification} />
-            <Link
-              href={`/rules/new?fromTransaction=${transaction.id}`}
-              className="text-sm underline"
-            >
-              Create rule from this Transaction
-            </Link>
-          </section>
-          <SplitSection
-            transaction={transaction}
+      <TransactionHeader
+        transaction={transaction}
+        badges={transactionBadges(transaction, classification)}
+        fmt={fmt}
+        actions={<TransactionActions transaction={transaction} />}
+      />
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-3">
+        <section aria-labelledby="classification" className={PANEL}>
+          <h2 id="classification" className="text-lg font-semibold">
+            Classification
+          </h2>
+          <ClassificationForm
+            classification={classification}
             groups={groups}
-            payees={payees}
-            lineTransfers={lineTransfers}
+            payeeNames={payees.map((payee) => payee.name)}
+            tagNames={tags.map((tag) => tag.name)}
+            action={editClassificationAction.bind(null, transaction.id)}
+          />
+          <LockedFields classification={classification} />
+          <Link href={`/rules/new?fromTransaction=${transaction.id}`} className="text-sm underline">
+            Create rule from this Transaction
+          </Link>
+        </section>
+        {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
+        {isSplit ? (
+          <div className={PANEL}>
+            <h2 className="text-lg font-semibold">Transfer</h2>
+            <p className="text-sm text-zinc-500">Linked line by line, in the Split below.</p>
+          </div>
+        ) : (
+          <TransferSection
+            transactionId={transaction.id}
+            counterpart={counterpart}
+            options={counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))}
             fmt={fmt}
             className={PANEL}
           />
-          {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
-          {!isSplit && (
-            <TransferSection
-              transactionId={transaction.id}
-              counterpart={counterpart}
-              options={
-                counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))
-              }
-              fmt={fmt}
-              className={PANEL}
-            />
-          )}
-          <TransactionActions transaction={transaction} />
-        </aside>
+        )}
+        <BankDetails transaction={transaction} fmt={fmt} className={PANEL} />
       </div>
+      <details className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
+        <summary className="cursor-pointer text-sm font-semibold text-zinc-500">
+          History ({history.length})
+        </summary>
+        <div className="flex flex-col gap-3 pt-3">
+          {history.length === 0 ? (
+            <p className="text-sm text-zinc-500">No History for this Transaction.</p>
+          ) : (
+            <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
+          )}
+          <Link
+            href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
+            className="text-sm underline"
+          >
+            Open in History
+          </Link>
+        </div>
+      </details>
+      <SplitSection
+        transaction={transaction}
+        groups={groups}
+        payees={payees}
+        lineTransfers={lineTransfers}
+        fmt={fmt}
+        className={`${PANEL} gap-4`}
+      />
     </section>
   );
 }
@@ -220,16 +173,14 @@ export default async function TransactionPage({ params, searchParams }: Transact
 /** Edit the details of a Manual transaction; delete any Transaction. */
 function TransactionActions({ transaction }: { transaction: TransactionDetail }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-1">
-      {transaction.isManual ? (
+    <>
+      {transaction.isManual && (
         <Link
           href={`/accounts/${transaction.accountId}/manual/${transaction.id}`}
           className={BUTTON_CLASS}
         >
           Edit details
         </Link>
-      ) : (
-        <span />
       )}
       <ActionForm
         action={deleteTransactionFromDetailAction.bind(null, transaction.id, transaction.isManual)}
@@ -244,7 +195,7 @@ function TransactionActions({ transaction }: { transaction: TransactionDetail })
           Delete Transaction
         </button>
       </ActionForm>
-    </div>
+    </>
   );
 }
 
