@@ -1,6 +1,6 @@
 # Splits divide a Transaction's classification, not the Transaction
 
-Bank exports often aggregate several purchases, or principal and interest, into one entry, and the user needs to classify the parts separately. We decided that a Split divides one Transaction's amount into Split lines, each with its own Category, Tags and note, that sum exactly to it, while the Transaction itself stays one movement on one Account with its bank fields, Fingerprint and Payee unchanged. This reverses the v1 "no splits" rule and lifts the cost named in ADR-0001, without moving to double-entry.
+Bank exports often aggregate several purchases, or principal and interest, into one entry, and the user needs to classify the parts separately. We decided that a Split divides one Transaction's amount into Split lines, each with its own Category, Tags and note, that sum exactly to it, while the Transaction itself stays one movement on one Account with its bank fields, Fingerprint and Payee unchanged. (Superseded in part by ADR-0006: a Split line may name its own Payee.) This reverses the v1 "no splits" rule and lifts the cost named in ADR-0001, without moving to double-entry.
 
 ## Considered Options
 
