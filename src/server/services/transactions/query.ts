@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CATEGORY_GROUP_TYPES } from '../categories/model';
+import { reportedPayeeIdSql } from './line-payee';
 import { IS_SPLIT, splitLineExists } from './split-guard';
 
 /**
@@ -163,20 +164,33 @@ function categoryPlaceholders(
   };
 }
 
+/** The filters the export applies to each Split line: the Category filters and the Payee. */
+export type SplitLineFilter = Pick<ParsedQuery, 'categoryId' | 'groupType' | 'payeeId'>;
+
 /**
- * The Category filters as conditions on a Split line (alias `sl`), with parameters numbered
- * from `$<firstParam>`: the export writes only the Split lines that match.
+ * The Category and Payee filters as conditions on a Split line (alias `sl`, its Transaction
+ * `t`), with parameters numbered from `$<firstParam>`: the export writes only the Split lines
+ * that match. A line matches the Payee filter by its reported Payee (ADR-0006).
  */
 export function splitLineFilter(
-  input: CategoryFilter,
+  input: SplitLineFilter,
   firstParam: number,
 ): { conditions: string[]; params: unknown[] } {
   const params: unknown[] = [];
-  const placeholders = categoryPlaceholders(input, (value) => {
+  const param = (value: unknown): string => {
     params.push(value);
     return `$${firstParam + params.length - 1}`;
-  });
-  return { conditions: categoryConditions('sl.category_id', placeholders), params };
+  };
+  const placeholders = categoryPlaceholders(input, param);
+  return {
+    conditions: [
+      ...categoryConditions('sl.category_id', placeholders),
+      ...(input.payeeId === undefined
+        ? []
+        : [`${reportedPayeeIdSql('sl', 't')} = ${param(input.payeeId)}::uuid`]),
+    ],
+    params,
+  };
 }
 
 /**
