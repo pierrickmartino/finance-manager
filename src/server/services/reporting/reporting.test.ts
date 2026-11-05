@@ -672,6 +672,82 @@ describe('split Transactions', () => {
   });
 });
 
+describe('Split lines with their own Payee', () => {
+  /**
+   * The reporting dataset plus a UBS (CHF) 2025-03-05 -250.00 at Manor, split into Groceries
+   * -150.00 at Coop, Restaurants -120.00 with no Payee of its own (so Manor's), and a Salary
+   * line of +20.00 from the Employer.
+   */
+  async function linePayeeDataset() {
+    const base = await dataset();
+    const { ubs, salary, groceries, restaurants } = base;
+    const payeeId = async (name: string) =>
+      (await t.ctx.db.query<{ id: string }>('SELECT id FROM payee WHERE name = $1', [name]))
+        .rows[0]!.id;
+    const coop = await payeeId('Coop');
+    const employer = await payeeId('Employer');
+    const [shopping] = await seed(ubs, [
+      { bookingDate: '2025-03-05', amountMinor: -25000, classify: { payeeName: 'Manor' } },
+    ]);
+    await splitTransaction(t.ctx, shopping!, [
+      { amountMinor: -15000, categoryId: groceries.id, payeeId: coop },
+      { amountMinor: -12000, categoryId: restaurants.id },
+      { amountMinor: 2000, categoryId: salary.id, payeeId: employer },
+    ]);
+    return { ...base, shopping: shopping!, coop, employer, manor: await payeeId('Manor') };
+  }
+
+  it("puts each line under its own Payee, else its Transaction's", async () => {
+    await linePayeeDataset();
+
+    const report = await runWidgetQuery(t.ctx, { dateRange: Q1_2025, rows: 'payee' });
+
+    expect(labels(report.rows)).toEqual(['Coop', 'Employer', 'Manor', 'Migros', 'No Payee']);
+    expect(report.rowTotals).toEqual([-23000, 602000, -12000, -10000, -17051]);
+    expect(report.total).toBe(564949 - 25000);
+  });
+
+  it("keeps exactly the lines whose Payee matches, without the Split's other lines", async () => {
+    const { coop, manor, employer } = await linePayeeDataset();
+    const total = async (payeeIds: string[]) =>
+      (await runWidgetQuery(t.ctx, { dateRange: Q1_2025, filters: { payeeIds } })).total;
+
+    expect(await total([coop])).toBe(-23000);
+    expect(await total([manor])).toBe(-12000);
+    expect(await total([employer, manor])).toBe(590000);
+  });
+
+  it('drills down from a Payee cell to the parent Transactions, once each', async () => {
+    const { shopping, coop, manor } = await linePayeeDataset();
+    const query = { dateRange: Q1_2025, rows: 'payee', columns: 'month' } as const;
+
+    const coopCell = await listCellTransactions(t.ctx, query, { row: coop });
+    const manorMarch = await listCellTransactions(t.ctx, query, { row: manor, column: '2025-03' });
+
+    expect(coopCell.transactions.map((item) => [item.id, item.chfMinor])).toEqual([
+      [shopping, -15000],
+      [expect.any(String), -8000],
+    ]);
+    expect(manorMarch.transactions.map((item) => [item.id, item.chfMinor])).toEqual([
+      [shopping, -12000],
+    ]);
+    await expectDrillDownConsistent({ dateRange: Q1_2025, rows: 'payee', columns: 'category' });
+  });
+
+  it('counts a split Transaction once under each Payee its lines report', async () => {
+    await linePayeeDataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: Q1_2025,
+      rows: 'payee',
+      measure: 'count',
+    });
+
+    expect(report.rowTotals).toEqual([2, 2, 1, 2, 3]);
+    expect(report.total).toBe(8);
+  });
+});
+
 describe('Split lines that are Transfer sides', () => {
   /**
    * The example of spec #56: a UBS −1,500.00 split into a −1,000.00 line to savings and

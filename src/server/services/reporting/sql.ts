@@ -1,5 +1,6 @@
 import { fractionDigits } from '@/lib/format';
 import { BASE_CURRENCY } from '../fx/constants';
+import { reportedPayeeIdSql } from '../transactions/line-payee';
 import type { DateSpan } from './periods';
 import type { ReportAxis, WidgetQuery } from './query';
 
@@ -8,7 +9,8 @@ import type { ReportAxis, WidgetQuery } from './query';
  * `report_base` CTE: one reportable row per unsplit Transaction, and one per Split line of a
  * split Transaction (ADR-0004), in the range and passing the filters, with its amount
  * converted to CHF at the Transaction's booking date (ADR-0002). A Split line takes its amount,
- * Category and Tags from the line and everything else from its Transaction. Converting per row
+ * Category and Tags from the line, its Payee from the line when it names one (ADR-0006), and
+ * everything else from its Transaction. Converting per row
  * and then summing is what makes each cell equal the sum of the rows it lists.
  */
 
@@ -27,6 +29,8 @@ export class SqlParams {
 const GROUP_TYPE = 'g.type';
 /** A reportable row's Category: the Split line's, else the Transaction's. */
 const CATEGORY_ID = 'coalesce(sl.category_id, t.category_id)';
+/** A reportable row's Payee: the Split line's, else the Transaction's. */
+const PAYEE_ID = reportedPayeeIdSql('sl', 't');
 
 /**
  * The Tags of a reportable row, as a subquery of distinct `tag_id`s: its Transaction's Tags
@@ -46,7 +50,7 @@ function filterConditions(query: WidgetQuery, params: SqlParams): string[] {
   anyOf(filters.accountIds, (p) => `t.account_id = ANY(${p}::uuid[])`);
   anyOf(filters.categoryGroupIds, (p) => `c.group_id = ANY(${p}::uuid[])`);
   anyOf(filters.categoryIds, (p) => `${CATEGORY_ID} = ANY(${p}::uuid[])`);
-  anyOf(filters.payeeIds, (p) => `t.payee_id = ANY(${p}::uuid[])`);
+  anyOf(filters.payeeIds, (p) => `${PAYEE_ID} = ANY(${p}::uuid[])`);
   anyOf(
     filters.tagIds,
     (p) => `EXISTS (SELECT 1 FROM ${rowTags('t.id', 'sl.id')} ft
@@ -99,7 +103,8 @@ export function baseCte(
     ...filterConditions(query, params),
   ];
   return `WITH report_base AS MATERIALIZED (
-    SELECT t.id, t.booking_date, t.currency::text AS currency, t.account_id, t.payee_id,
+    SELECT t.id, t.booking_date, t.currency::text AS currency, t.account_id,
+      ${PAYEE_ID} AS payee_id,
       sl.id AS line_id, ${CATEGORY_ID} AS category_id, c.group_id, ${GROUP_TYPE} AS group_type,
       round(coalesce(sl.amount_minor, t.amount_minor)
             * CASE WHEN t.currency = '${BASE_CURRENCY}' THEN 1 ELSE fx.rate_to_chf END
