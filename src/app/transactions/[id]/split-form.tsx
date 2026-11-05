@@ -7,18 +7,13 @@ import { BUTTON_CLASS } from '@/components/named-list';
 import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
+import type { PayeeRef } from '@/server/services/payees';
 import { editableAmount, remainingMinor, type SplitLineDraft } from './split-lines';
 
 const INPUT =
   'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
 
 const EMPTY_LINE: SplitLineDraft = { amount: '', categoryId: '', tags: '', note: '' };
-
-/** A Payee a Split line may name. */
-export interface LinePayeeOption {
-  id: string;
-  name: string;
-}
 
 /** A line being edited, with a key that stays the same while lines are added and removed. */
 interface KeyedLine {
@@ -32,7 +27,7 @@ interface SplitFormProps {
   initialLines: SplitLineDraft[];
   groups: CategoryGroup[];
   /** The Payees a line may name (ADR-0006). */
-  payees: LinePayeeOption[];
+  payees: PayeeRef[];
   /** The Transaction's Payee name: what a line without its own Payee reports under. */
   transactionPayee: string | null;
   /** By Split line id: what a Transfer line shows in place of its Category, its other side. */
@@ -45,8 +40,9 @@ interface SplitFormProps {
 
 /**
  * Divides a Transaction's amount into Split lines (ADR-0004): each line has an amount, a
- * Category, a Payee (blank: the Transaction's, ADR-0006), Tags and a note, and the remaining unallocated amount updates as the user types.
- * A Transfer line (ADR-0005) shows its Transfer instead of a Category and can't be removed.
+ * Category, a Payee (blank: the Transaction's, ADR-0006), Tags and a note, and the remaining
+ * unallocated amount updates as the user types. A Transfer line (ADR-0005) shows its Transfer
+ * instead of a Category and can't be removed.
  */
 export function SplitForm({
   amountMinor,
@@ -152,7 +148,7 @@ interface SplitLineFieldsProps {
   line: SplitLineDraft;
   number: number;
   groups: CategoryGroup[];
-  payees: LinePayeeOption[];
+  payees: PayeeRef[];
   transactionPayee: string | null;
   /** What a Transfer line shows in place of its Category picker; falsy for other lines. */
   transfer: ReactNode;

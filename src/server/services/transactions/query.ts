@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CATEGORY_GROUP_TYPES } from '../categories/model';
-import { reportedPayeeIdSql } from './line-payee';
+import { REPORTED_PAYEE_ID } from './line-payee';
 import { IS_SPLIT, splitLineExists } from './split-guard';
 
 /**
@@ -187,7 +187,7 @@ export function splitLineFilter(
       ...categoryConditions('sl.category_id', placeholders),
       ...(input.payeeId === undefined
         ? []
-        : [`${reportedPayeeIdSql('sl', 't')} = ${param(input.payeeId)}::uuid`]),
+        : [`${REPORTED_PAYEE_ID} = ${param(input.payeeId)}::uuid`]),
     ],
     params,
   };
@@ -205,8 +205,8 @@ export function filterConditions(input: ParsedQuery): SqlCondition {
 
 /**
  * The same filters for applying Rules to existing Transactions: the Category and Payee filters
- * match the Transaction's own Category and Payee only. A split Transaction has none, so Rules, which never classify
- * a split Transaction, don't select it by its Split lines (ADR-0004).
+ * match the Transaction's own Category and Payee only. A split Transaction has none, so Rules,
+ * which never classify a split Transaction, don't select it by its Split lines (ADR-0004).
  */
 export function ruleFilterConditions(input: ParsedQuery): SqlCondition {
   return buildConditions(input, false);

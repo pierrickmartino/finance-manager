@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { PayeeRef } from '@/server/services/payees';
 import { initialSplitDrafts, remainingMinor } from './split-lines';
 
 const category = { id: 'c1', name: 'Groceries', groupId: 'g', groupName: 'Food' };
@@ -12,7 +13,7 @@ function detail(amountMinor: number | null, counterpartyName: string | null) {
 function startingLines(
   amountMinor: number,
   bundledDetails: ReturnType<typeof detail>[] | null,
-  payees: readonly { id: string; name: string }[] = [],
+  payees: readonly PayeeRef[] = [],
 ) {
   return initialSplitDrafts(
     { amountMinor, currency: 'CHF', splitLines: [], bundledDetails },

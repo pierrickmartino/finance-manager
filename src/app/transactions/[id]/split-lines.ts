@@ -2,6 +2,7 @@ import { formatAmount, type NumberFormat } from '@/lib/format';
 import { parseAmount } from '@/lib/format/parse-amount';
 import { normalizeText } from '@/lib/text';
 import type { BundledDetail } from '@/server/services/imports/parsers';
+import type { PayeeRef } from '@/server/services/payees';
 import type { SplitLine } from '@/server/services/transactions';
 
 /** One Split line as the split form edits it: typed text, not yet validated. */
@@ -36,12 +37,6 @@ export function editableAmount(
   return formatAmount(minor, numberFormat, { currency, hasCurrencyCode: false });
 }
 
-/** A Payee the pre-fill may suggest for a line. */
-interface PayeeOption {
-  id: string;
-  name: string;
-}
-
 interface SplitSource {
   amountMinor: number;
   currency: string;
@@ -54,7 +49,7 @@ interface SplitSource {
  * conditions compare (normalised). Names two Payees share once normalised (e.g. "Cafe" and
  * "Café") are ambiguous and suggest none.
  */
-function payeeSuggester(payees: readonly PayeeOption[]): (name: string | null) => string | null {
+function suggestPayeeByName(payees: readonly PayeeRef[]): (name: string | null) => string | null {
   const byName = new Map<string, string | null>();
   for (const payee of payees) {
     const key = normalizeText(payee.name);
@@ -73,14 +68,14 @@ function payeeSuggester(payees: readonly PayeeOption[]): (name: string | null) =
 function bundledDrafts(
   transaction: SplitSource,
   amount: (minor: number) => string,
-  payees: readonly PayeeOption[],
+  payees: readonly PayeeRef[],
 ): SplitLineDraft[] | null {
   const details = transaction.bundledDetails ?? [];
   const amounts = details.map((detail) => detail.amountMinor);
   if (amounts.length === 0 || amounts.includes(null)) return null;
   const total = amounts.reduce<number>((sum, minor) => sum + (minor ?? 0), 0);
   if (total !== transaction.amountMinor) return null;
-  const suggestPayee = payeeSuggester(payees);
+  const suggestPayee = suggestPayeeByName(payees);
   return details.map((detail) => {
     const payeeId = suggestPayee(detail.counterpartyName);
     return {
@@ -101,7 +96,7 @@ function bundledDrafts(
 export function initialSplitDrafts(
   transaction: SplitSource,
   numberFormat: NumberFormat,
-  payees: readonly PayeeOption[],
+  payees: readonly PayeeRef[],
 ): SplitLineDraft[] {
   const amount = (minor: number) => editableAmount(minor, numberFormat, transaction.currency);
   if (transaction.splitLines.length > 0) {

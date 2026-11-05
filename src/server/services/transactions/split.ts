@@ -203,15 +203,18 @@ const WRITE_LINES = `WITH line AS (
   )
   SELECT id, position FROM updated UNION ALL SELECT id, position FROM inserted`;
 
+/** The Category and Payee id each line resolved to, in line order; null for none. */
+interface ResolvedLineIds {
+  categoryIds: readonly (string | null)[];
+  payeeIds: readonly (string | null)[];
+}
+
 /** Writes the lines' rows; returns their ids, in the lines' order. */
 async function writeLineRows(
   tx: Queryable,
   transactionId: string,
   lines: readonly ParsedLine[],
-  {
-    categoryIds,
-    payeeIds,
-  }: { categoryIds: readonly (string | null)[]; payeeIds: readonly (string | null)[] },
+  { categoryIds, payeeIds }: ResolvedLineIds,
 ): Promise<string[]> {
   const written = await tx.query<{ id: string; position: number }>(WRITE_LINES, [
     transactionId,

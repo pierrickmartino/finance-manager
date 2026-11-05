@@ -6,10 +6,10 @@ import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import type { HistorySnapshot } from '../history';
-import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
+import { findOrCreatePayee, findPayee, payeeName, type PayeeRef } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { refuseBankFieldChanges } from './bank-fields';
-import { reportedPayeeIdSql } from './line-payee';
+import { REPORTED_PAYEE_ID } from './line-payee';
 import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from './model';
 import { refuseSplitCategoryChange } from './split-guard';
 
@@ -55,9 +55,9 @@ export interface SplitLine {
   id: string;
   amountMinor: number;
   /** The line's own Payee; null when it takes its Transaction's (always null on a Transfer line). */
-  payee: { id: string; name: string } | null;
+  payee: PayeeRef | null;
   /** What the line reports under: its own Payee, else its Transaction's. */
-  reportedPayee: { id: string; name: string } | null;
+  reportedPayee: PayeeRef | null;
   /** Null when the line is a Transfer side (or, once unlinked, has neither). */
   category: ClassificationCategory | null;
   /** The Transfer this line is one side of; null when it is not in a Transfer. */
@@ -68,7 +68,7 @@ export interface SplitLine {
 
 export interface Classification {
   transactionId: string;
-  payee: { id: string; name: string } | null;
+  payee: PayeeRef | null;
   /** Always null for a split Transaction: its Split lines hold the Categories. */
   category: ClassificationCategory | null;
   /** By name, ignoring case. */
@@ -155,7 +155,7 @@ const SELECT_CLASSIFICATION = `
                    LEFT JOIN category sc ON sc.id = sl.category_id
                    LEFT JOIN category_group sg ON sg.id = sc.group_id
                    LEFT JOIN payee lp ON lp.id = sl.payee_id
-                   LEFT JOIN payee rp ON rp.id = ${reportedPayeeIdSql('sl', 't')}
+                   LEFT JOIN payee rp ON rp.id = ${REPORTED_PAYEE_ID}
                    WHERE sl.transaction_id = t.id), '[]'::json) AS "splitLines"
   FROM "transaction" t
   LEFT JOIN payee p ON p.id = t.payee_id

@@ -3,7 +3,7 @@ import { BUTTON_CLASS } from '@/components/named-list';
 import { categoryLabel } from '@/lib/classification';
 import type { Formatter } from '@/lib/format';
 import type { CategoryGroup } from '@/server/services/categories';
-import type { Payee } from '@/server/services/payees';
+import type { PayeeRef } from '@/server/services/payees';
 import type { TransactionDetail } from '@/server/services/transactions';
 import { splitLineSide, type TransferSideView } from '@/server/services/transfers';
 import { splitLabel } from '../transaction-display';
@@ -28,7 +28,7 @@ interface SplitSectionProps {
   transaction: TransactionDetail;
   groups: CategoryGroup[];
   /** The Payees a Split line may name (ADR-0006). */
-  payees: Pick<Payee, 'id' | 'name'>[];
+  payees: PayeeRef[];
   lineTransfers: LineTransfers;
   fmt: Formatter;
   /** Classes of the section, e.g. to draw it as a card. */
@@ -62,7 +62,7 @@ export function SplitSection({
       currency={transaction.currency}
       initialLines={initialSplitDrafts(transaction, fmt.settings.numberFormat, payees)}
       groups={groups}
-      payees={payees.map(({ id, name }) => ({ id, name }))}
+      payees={payees}
       transactionPayee={transaction.payee?.name ?? null}
       transfers={transfers}
       action={splitTransactionAction.bind(null, transaction.id)}
