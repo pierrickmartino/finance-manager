@@ -4,6 +4,7 @@ import { seedTransactions } from '@test/support/transactions';
 import { createAccount } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
+import { createPayee } from '../payees';
 import { EXPORT_BATCH_SIZE, exportTransactionsCsv } from '.';
 
 /**
@@ -39,21 +40,22 @@ async function seedLedger(): Promise<void> {
      FROM generate_series(1, $1::int) AS n, account a JOIN import i ON i.account_id = a.id`,
     [TRANSACTION_COUNT - 1],
   );
-  // Every SPLIT_EVERY-th Transaction is split in two lines (one INSERT: the Split invariants
-  // are checked per statement).
+  // Every SPLIT_EVERY-th Transaction is split in two lines, the first with its own Payee (one
+  // INSERT: the Split invariants are checked per statement).
   const group = await createCategoryGroup(t.ctx, { name: 'Courses', type: 'expense' });
   const category = await createCategory(t.ctx, { groupId: group.id, name: 'Alimentation' });
+  const payee = await createPayee(t.ctx, 'Coop');
   await t.ctx.db.query(
-    `INSERT INTO split_line (transaction_id, position, amount_minor, category_id)
+    `INSERT INTO split_line (transaction_id, position, amount_minor, category_id, payee_id)
      SELECT s.id, p.position,
             CASE p.position WHEN 1 THEN s.amount_minor - s.amount_minor / 2
                             ELSE s.amount_minor / 2 END,
-            $2
+            $2, CASE p.position WHEN 1 THEN $3::uuid END
      FROM (SELECT id, amount_minor FROM "transaction"
            WHERE fingerprint LIKE 'perf-%'
              AND substring(fingerprint FROM 6)::int % $1::int = 0) s,
           (VALUES (1), (2)) AS p(position)`,
-    [SPLIT_EVERY, category.id],
+    [SPLIT_EVERY, category.id, payee.id],
   );
   await t.ctx.db.query('ANALYZE "transaction"');
   await t.ctx.db.query('ANALYZE split_line');

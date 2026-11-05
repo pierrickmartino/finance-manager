@@ -5,6 +5,7 @@ import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
 import { backfillRates, convertToChf, type EcbRateSource } from '../fx';
+import { createPayee } from '../payees';
 import { ValidationError } from '../errors';
 import { editClassification, getTransaction, splitTransaction } from '../transactions';
 import { createManualTransaction } from '../transactions/manual';
@@ -387,6 +388,55 @@ describe('CSV export of split Transactions', () => {
     const splitRows = rows.filter((row) => row[20] === split);
     const totalMinor = splitRows.reduce((sum, row) => sum + Math.round(Number(row[5]) * 100), 0);
     expect(totalMinor).toBe(-123456);
+  });
+});
+
+describe('CSV export of Split lines with their own Payee', () => {
+  it("writes a line's own Payee on its row, and the Transaction's on rows of lines without one", async () => {
+    const ubs = await account('UBS', 'Compte courant');
+    const [split, unsplit] = await seedTransactions(t.ctx.db, ubs, [
+      { bookingDate: '2025-10-10', amountMinor: -10000 },
+      { bookingDate: '2025-10-11', amountMinor: -500 },
+    ]);
+    const group = await createCategoryGroup(t.ctx, { name: 'Courses', type: 'expense' });
+    const groceries = await createCategory(t.ctx, { groupId: group.id, name: 'Alimentation' });
+    const coop = await createPayee(t.ctx, 'Coop');
+    await editClassification(t.ctx, split!, { payeeName: 'Migros' });
+    await editClassification(t.ctx, unsplit!, { payeeName: 'Denner' });
+    await splitTransaction(t.ctx, split!, [
+      { amountMinor: -7000, categoryId: groceries.id, payeeId: coop.id },
+      { amountMinor: -3000, categoryId: groceries.id },
+    ]);
+
+    const rows = await exportRows();
+
+    expect(rows.map((row) => [row[20], row[5], row[11]])).toEqual([
+      [split, '-70.00', 'Coop'],
+      [split, '-30.00', 'Migros'],
+      [unsplit, '-5.00', 'Denner'],
+    ]);
+  });
+
+  it('under a Payee filter, writes only the lines reported under that Payee', async () => {
+    const ubs = await account('UBS', 'Compte courant');
+    const id = await seedOne(ubs, { amountMinor: -10000 });
+    const group = await createCategoryGroup(t.ctx, { name: 'Courses', type: 'expense' });
+    const groceries = await createCategory(t.ctx, { groupId: group.id, name: 'Alimentation' });
+    const coop = await createPayee(t.ctx, 'Coop');
+    const migros = await createPayee(t.ctx, 'Migros');
+    await editClassification(t.ctx, id, { payeeId: migros.id });
+    await splitTransaction(t.ctx, id, [
+      { amountMinor: -7000, categoryId: groceries.id, payeeId: coop.id },
+      { amountMinor: -2000, categoryId: groceries.id },
+      { amountMinor: -1000, categoryId: groceries.id, payeeId: migros.id },
+    ]);
+
+    const rows = await exportRows({ payeeId: migros.id });
+
+    expect(rows.map((row) => [row[20], row[5], row[11]])).toEqual([
+      [id, '-20.00', 'Migros'],
+      [id, '-10.00', 'Migros'],
+    ]);
   });
 });
 
