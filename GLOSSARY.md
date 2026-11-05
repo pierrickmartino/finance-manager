@@ -80,7 +80,7 @@ The division of one Transaction's amount into Split lines that sum exactly to it
 _Avoid_: Breakdown, allocation, child transaction
 
 **Split line**:
-One part of a Split: an amount in the Transaction's Currency, of either sign, with its own Tags and note, and either its own Category (of any Category group type) or a Transfer, never both.
+One part of a Split: an amount in the Transaction's Currency, of either sign, with its own Tags and note, and either its own Category (of any Category group type) or a Transfer, never both. A line with a Category may also name its own Payee; one that doesn't takes its Transaction's Payee. A Transfer line has no Payee.
 _Avoid_: Sub-transaction, part, share
 
 **Payee**:

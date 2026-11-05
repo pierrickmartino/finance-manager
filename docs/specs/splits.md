@@ -76,7 +76,6 @@ I can Split any Transaction: divide its amount into Split lines that sum exactly
 - Rules that create Splits (e.g. fixed interest plus remaining principal).
 - Splitting a Transaction across Transfers, or a Transaction that is both a Transfer and split.
 - Splitting into separate Transactions, or changing an imported Transaction's bank fields.
-- A Payee per Split line.
 - Partially classified Splits or unallocated remainders.
 - Itemised credit card Accounts.
 
