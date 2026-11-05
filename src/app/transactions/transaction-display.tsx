@@ -21,6 +21,24 @@ export function splitLabel({ splitLines }: Pick<TransactionListItem, 'splitLines
   return splitLines.length > 0 ? `Split (${splitLines.length})` : null;
 }
 
+/** The badge of a split Transaction with at least one Transfer line (ADR-0005). */
+export const PARTLY_TRANSFER = 'Partly Transfer';
+
+/** A Split line as far as its Transfer goes: the Transfer it is a side of, if any. */
+export interface TransferSideLine {
+  transferId: string | null;
+}
+
+/** What tells whether a Transaction is partly a Transfer: its Split lines. */
+export interface WithSplitLines {
+  splitLines: readonly TransferSideLine[];
+}
+
+/** Whether a Split line of the Transaction is a Transfer side. */
+export function isPartlyTransfer({ splitLines }: WithSplitLines): boolean {
+  return splitLines.some((line) => line.transferId !== null);
+}
+
 type ClassificationKind = 'transfer' | 'split' | 'category' | 'unclassified';
 
 function classificationKind(transaction: Classified): ClassificationKind {
@@ -51,10 +69,19 @@ const KIND_CLASS: Partial<Record<ClassificationKind, string>> = {
 
 /**
  * "Groceries", "Transfer", "Split (n)" or "Unclassified", coloured so Transfer and Unclassified
- * stand out.
+ * stand out, with a "Partly Transfer" badge on a split Transaction with a Transfer line.
  */
 export function CategoryLabel({ transaction }: { transaction: TransactionListItem }) {
   const className = KIND_CLASS[classificationKind(transaction)];
   const text = categoryText(transaction);
-  return className ? <span className={className}>{text}</span> : <>{text}</>;
+  const label = className ? <span className={className}>{text}</span> : <>{text}</>;
+  if (!isPartlyTransfer(transaction)) return label;
+  return (
+    <>
+      {label}{' '}
+      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs whitespace-nowrap text-sky-700 dark:bg-sky-950 dark:text-sky-400">
+        {PARTLY_TRANSFER}
+      </span>
+    </>
+  );
 }

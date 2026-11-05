@@ -20,14 +20,20 @@ const MAX_TEXT_LENGTH = 200;
 const MAX_DESCRIPTION_KEY_LENGTH = 2000;
 
 /**
- * SQL condition (alias `t`) for an Unclassified Transaction: no Category, not a Transfer and
- * not split (a split Transaction is classified by its Split lines, ADR-0004).
+ * SQL condition (alias `t`) for an Unclassified Transaction: no Category and not a Transfer,
+ * and, when split (classified by its Split lines, ADR-0004), a line with neither a Category
+ * nor a Transfer, as unlinking leaves one (ADR-0005).
  * The filter, the Unclassified groups and the progress figure all use it.
  */
 export const UNCLASSIFIED_CONDITION = `t.category_id IS NULL AND t.transfer_id IS NULL
-  AND NOT ${IS_SPLIT}`;
+  AND (NOT ${IS_SPLIT}
+    OR ${splitLineExists('sl.category_id IS NULL AND sl.transfer_id IS NULL')})`;
 
-/** `only`: Transactions in a Transfer. `exclude`: Transactions not in a Transfer. */
+/**
+ * `only`: Transactions with a Transfer side, themselves or through a Split line (ADR-0005).
+ * `exclude`: Transactions that are not themselves a Transfer side; a split Transaction with a
+ * Transfer line stays, since its other lines are income or expense.
+ */
 export const TRANSFER_FILTERS = ['only', 'exclude'] as const;
 export type TransferFilter = (typeof TRANSFER_FILTERS)[number];
 
@@ -75,7 +81,7 @@ const transactionFilterFields = {
   ),
   /** Only Transactions with no Category that are not in a Transfer. */
   unclassified: optional(z.boolean()),
-  /** Only Transfers, or no Transfers. */
+  /** Only Transactions with a Transfer side, or no whole-Transaction Transfers. */
   transfer: optional(
     z.enum(TRANSFER_FILTERS, { error: 'Transfer filter must be only or exclude' }),
   ),
@@ -228,7 +234,13 @@ function buildConditions(input: ParsedQuery, matchSplitLines: boolean): SqlCondi
   );
   where((p) => `(${UNCLASSIFIED_CONDITION}) = ${p}`, input.unclassified);
   where((p) => `t.description_key = ${p}`, input.descriptionKey);
-  where((p) => `(t.transfer_id IS NOT NULL) = ${p}`, input.transfer && input.transfer === 'only');
+  if (input.transfer === 'only') {
+    conditions.push(
+      `(t.transfer_id IS NOT NULL OR ${splitLineExists('sl.transfer_id IS NOT NULL')})`,
+    );
+  } else if (input.transfer === 'exclude') {
+    conditions.push('t.transfer_id IS NULL');
+  }
 
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }

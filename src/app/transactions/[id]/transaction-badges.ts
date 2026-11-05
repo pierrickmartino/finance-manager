@@ -1,4 +1,5 @@
 import type { Classification, Transaction } from '@/server/services/transactions';
+import { isPartlyTransfer, PARTLY_TRANSFER, type WithSplitLines } from '../transaction-display';
 
 export type BadgeTone = 'warning' | 'info' | 'positive' | 'neutral';
 
@@ -8,9 +9,8 @@ export interface StatusBadge {
 }
 
 /** The parts of a Classification the badges read. */
-export interface BadgeClassification {
+export interface BadgeClassification extends WithSplitLines {
   category: { name: string } | null;
-  splitLines: readonly unknown[];
   lockedFields: Classification['lockedFields'];
 }
 
@@ -33,9 +33,12 @@ export function transactionBadges(
   transaction: Pick<Transaction, 'transferId' | 'isManual'>,
   classification: BadgeClassification,
 ): StatusBadge[] {
-  const badges = [
+  const badges: StatusBadge[] = [
     classificationBadge(transaction, classification),
-    { label: transaction.isManual ? 'Manual' : 'Imported', tone: 'neutral' } as const,
+    ...(isPartlyTransfer(classification)
+      ? [{ label: PARTLY_TRANSFER, tone: 'info' } as const]
+      : []),
+    { label: transaction.isManual ? 'Manual' : 'Imported', tone: 'neutral' },
   ];
   const locked = classification.lockedFields.length;
   return locked > 0 ? [...badges, { label: `${locked} locked`, tone: 'neutral' }] : badges;

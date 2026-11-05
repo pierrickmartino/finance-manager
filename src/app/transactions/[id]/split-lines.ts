@@ -5,12 +5,20 @@ import type { SplitLine } from '@/server/services/transactions';
 
 /** One Split line as the split form edits it: typed text, not yet validated. */
 export interface SplitLineDraft {
+  /** The saved Split line this draft edits, so it keeps its identity; absent for a new line. */
+  id?: string;
   /** In the user's number format, e.g. "-70.00". */
   amount: string;
+  /** Empty for a Transfer line, which can't have a Category. */
   categoryId: string;
   /** Comma-separated Tag names. */
   tags: string;
   note: string;
+  /**
+   * The saved line is a Transfer side (ADR-0005): it shows its Transfer instead of a Category
+   * picker, and can't be removed until the Transfer is unlinked.
+   */
+  isTransfer?: true;
 }
 
 /** An amount as the user types it: their number format, the Currency's decimals, no code. */
@@ -62,10 +70,12 @@ export function initialSplitDrafts(
   const amount = (minor: number) => editableAmount(minor, numberFormat, transaction.currency);
   if (transaction.splitLines.length > 0) {
     return transaction.splitLines.map((line) => ({
+      id: line.id,
       amount: amount(line.amountMinor),
-      categoryId: line.category.id,
+      categoryId: line.category?.id ?? '',
       tags: line.tags.map((tag) => tag.name).join(', '),
       note: line.note ?? '',
+      ...(line.transferId !== null && { isTransfer: true as const }),
     }));
   }
   return (

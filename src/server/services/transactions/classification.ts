@@ -47,12 +47,16 @@ export interface ClassificationCategory {
 
 /**
  * One part of a split Transaction's classification (ADR-0004): a signed amount in minor units
- * of the Transaction's Currency, a Category, Tags (by name, ignoring case) and a note.
+ * of the Transaction's Currency, a Category or a Transfer (ADR-0005), Tags (by name, ignoring
+ * case) and a note.
  */
 export interface SplitLine {
   id: string;
   amountMinor: number;
-  category: ClassificationCategory;
+  /** Null when the line is a Transfer side (or, once unlinked, has neither). */
+  category: ClassificationCategory | null;
+  /** The Transfer this line is one side of; null when it is not in a Transfer. */
+  transferId: string | null;
   tags: { id: string; name: string }[];
   note: string | null;
 }
@@ -129,16 +133,18 @@ const SELECT_CLASSIFICATION = `
                    WHERE tt.transaction_id = t.id), '[]'::json) AS tags,
          t.notes, t.locked_fields AS "lockedFields",
          coalesce((SELECT json_agg(json_build_object('id', sl.id, 'amountMinor', sl.amount_minor,
-                     'category', json_build_object('id', sc.id, 'name', sc.name,
-                       'groupId', sg.id, 'groupName', sg.name, 'groupType', sg.type),
+                     'category', CASE WHEN sc.id IS NULL THEN NULL
+                       ELSE json_build_object('id', sc.id, 'name', sc.name,
+                         'groupId', sg.id, 'groupName', sg.name, 'groupType', sg.type) END,
+                     'transferId', sl.transfer_id,
                      'tags', coalesce((SELECT json_agg(json_build_object('id', lt.id,
                                  'name', lt.name) ORDER BY lower(lt.name), lt.id)
                                FROM split_line_tag slt JOIN tag lt ON lt.id = slt.tag_id
                                WHERE slt.split_line_id = sl.id), '[]'::json),
                      'note', sl.note) ORDER BY sl.position)
                    FROM split_line sl
-                   JOIN category sc ON sc.id = sl.category_id
-                   JOIN category_group sg ON sg.id = sc.group_id
+                   LEFT JOIN category sc ON sc.id = sl.category_id
+                   LEFT JOIN category_group sg ON sg.id = sc.group_id
                    WHERE sl.transaction_id = t.id), '[]'::json) AS "splitLines"
   FROM "transaction" t
   LEFT JOIN payee p ON p.id = t.payee_id
@@ -172,7 +178,9 @@ export function classificationSnapshot(classification: Classification): HistoryS
         ? undefined
         : splitLines.map((line) => ({
             amountMinor: line.amountMinor,
-            category: categoryLabel(line.category),
+            category: line.category ? categoryLabel(line.category) : null,
+            // Left out unless the line is a Transfer side, so other lines record as before.
+            ...(line.transferId === null ? {} : { transferId: line.transferId }),
             tags: line.tags.map((tag) => tag.name),
             note: line.note,
           })),
@@ -213,7 +221,7 @@ export async function deletionSnapshots(
  * deletes of Payees, Categories and Tags use it.
  */
 export async function recordClassificationChanges<T>(
-  scope: MutationScope,
+  scope: Pick<MutationScope, 'tx' | 'history'>,
   transactionIds: readonly string[],
   change: () => Promise<T>,
 ): Promise<T> {

@@ -9,7 +9,12 @@ import { getServiceContext } from '@/server/app-context';
 import { getRequestDisplaySettings } from '@/server/formatter';
 import { parseInput, ValidationError } from '@/server/services/errors';
 import { deleteImportedTransaction } from '@/server/services/imports';
-import { linkTransfer, unlinkTransfer } from '@/server/services/transfers';
+import {
+  linkTransfer,
+  parseSideOptionValue,
+  unlinkTransfer,
+  type TransferSideRef,
+} from '@/server/services/transfers';
 import { deleteManualTransaction } from '@/server/services/transactions/manual';
 import {
   editClassification,
@@ -64,7 +69,14 @@ function revalidate(id: string): void {
 
 /** The split form's `lines` field: one JSON object per line, as the form edits it. */
 const splitDraftsInput = z.array(
-  z.object({ amount: z.string(), categoryId: z.string(), tags: z.string(), note: z.string() }),
+  z.object({
+    id: z.string().optional(),
+    amount: z.string(),
+    categoryId: z.string(),
+    tags: z.string(),
+    note: z.string(),
+    isTransfer: z.literal(true).optional(),
+  }),
   { error: 'The Split lines could not be read' },
 );
 
@@ -87,8 +99,10 @@ async function readSplitLines(formData: FormData, currency: string): Promise<Spl
       throw new ValidationError(`Line ${index + 1}: enter a valid amount`);
     }
     return {
+      id: draft.id,
       amountMinor,
-      categoryId: draft.categoryId,
+      // A Transfer line has no Category; the service refuses one on it anyway (ADR-0005).
+      categoryId: draft.isTransfer ? null : draft.categoryId,
       tagNames: readTags(draft.tags),
       note: draft.note,
     };
@@ -151,16 +165,19 @@ export async function unlockFieldAction(
   return result;
 }
 
-/** Links this Transaction and the chosen one as a Transfer (spec 88). */
+/**
+ * Links a side on this Transaction's page (the Transaction itself or one of its Split lines)
+ * with the chosen side, `kind:id`, as a Transfer (spec 88, ADR-0005). The service checks both.
+ */
 export async function linkTransferAction(
   id: string,
+  side: TransferSideRef,
   _previous: ActionResult<unknown> | null,
   formData: FormData,
 ): Promise<ActionResult<unknown>> {
   const result = await runAction(async () => {
-    const otherId = formText(formData, 'otherId');
-    if (!otherId) throw new ValidationError('Choose the other side of the Transfer');
-    return linkTransfer(await getServiceContext(), { transactionIds: [id, otherId] });
+    const other = parseSideOptionValue(formText(formData, 'otherSide'));
+    return linkTransfer(await getServiceContext(), { sides: [side, other] });
   });
   if (result.ok) {
     revalidate(id);
@@ -169,12 +186,16 @@ export async function linkTransferAction(
   return result;
 }
 
-/** Unlinks the Transfer this Transaction is in; both sides stay. */
+/**
+ * Unlinks the Transfer a side on this Transaction's page (the Transaction itself or one of its
+ * Split lines) is in; both sides stay.
+ */
 export async function unlinkTransferAction(
   id: string,
+  side: TransferSideRef,
   _previous: ActionResult<unknown> | null,
 ): Promise<ActionResult<unknown>> {
-  const result = await runAction(async () => unlinkTransfer(await getServiceContext(), id));
+  const result = await runAction(async () => unlinkTransfer(await getServiceContext(), side));
   if (result.ok) {
     revalidate(id);
     revalidatePath('/unclassified');

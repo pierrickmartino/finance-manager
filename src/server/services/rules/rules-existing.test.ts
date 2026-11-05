@@ -7,7 +7,7 @@ import { createCategory, createCategoryGroup } from '../categories';
 import { getBatchSummaries, listHistory } from '../history';
 import { createPayee } from '../payees';
 import { createTag } from '../tags';
-import { linkTransfer } from '../transfers';
+import { linkTransfer, transactionSide } from '../transfers';
 import { editClassification, getClassification } from '../transactions';
 import { createRule, setRuleEnabled, type RuleInput } from '.';
 import {
@@ -25,7 +25,9 @@ async function makeTransfer(transactionId: string, amountMinor: number): Promise
   const [counterpart] = await seedTransactions(t.ctx.db, other, [
     { bookingDate: '2025-10-02', amountMinor: -amountMinor, rawDescription: 'COUNTERPART' },
   ]);
-  await linkTransfer(t.ctx, { transactionIds: [transactionId, counterpart!] });
+  await linkTransfer(t.ctx, {
+    sides: [transactionSide(transactionId), transactionSide(counterpart!)],
+  });
 }
 
 async function account(name = 'Current'): Promise<Account> {

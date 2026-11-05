@@ -6,6 +6,7 @@ import { mutate, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import { applyRuleAssignments } from '../rules/apply';
 import { linkPair } from '../transfers/link';
+import { transactionSide } from '../transfers/sides';
 import {
   SELECT_TRANSACTION,
   TRANSACTION_ORDER,
@@ -294,7 +295,7 @@ export async function commitImport(ctx: ServiceContext, input: CommitImportInput
       const otherSide = transfers.get(entry.fingerprint);
       if (otherSide) {
         // A Transfer: no Rules, no Category (spec 77).
-        await linkPair(scope, [transaction.id, otherSide]);
+        await linkPair(scope, [transactionSide(transaction.id), transactionSide(otherSide)]);
       } else if (entry.classification) {
         await applyRuleAssignments(scope, transaction.id, entry.classification);
       }

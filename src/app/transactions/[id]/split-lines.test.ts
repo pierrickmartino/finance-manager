@@ -56,7 +56,7 @@ describe('the split form', () => {
     ).toEqual([{ amount: "-1'187.35", categoryId: '', tags: '', note: '' }]);
   });
 
-  it('starts with the saved Split lines when the Transaction is split', () => {
+  it('starts with the saved Split lines, by id, when the Transaction is split', () => {
     const drafts = initialSplitDrafts(
       {
         amountMinor: -10000,
@@ -69,6 +69,7 @@ describe('the split form', () => {
             category: { ...category, groupType: 'expense' },
             tags: [{ id: 't', name: 'Family' }],
             note: 'weekly',
+            transferId: null,
           },
           {
             id: 'l2',
@@ -76,6 +77,7 @@ describe('the split form', () => {
             category: { ...category, id: 'c2', groupType: 'expense' },
             tags: [],
             note: null,
+            transferId: null,
           },
         ],
       },
@@ -83,8 +85,49 @@ describe('the split form', () => {
     );
 
     expect(drafts).toEqual([
-      { amount: '-70,00', categoryId: 'c1', tags: 'Family', note: 'weekly' },
-      { amount: '-30,00', categoryId: 'c2', tags: '', note: '' },
+      { id: 'l1', amount: '-70,00', categoryId: 'c1', tags: 'Family', note: 'weekly' },
+      { id: 'l2', amount: '-30,00', categoryId: 'c2', tags: '', note: '' },
+    ]);
+  });
+
+  it('starts a Transfer line as a Transfer, with no Category', () => {
+    const drafts = initialSplitDrafts(
+      {
+        amountMinor: -150000,
+        currency: 'CHF',
+        bundledDetails: null,
+        splitLines: [
+          {
+            id: 'l1',
+            amountMinor: -100000,
+            category: null,
+            tags: [],
+            note: 'To savings',
+            transferId: 'tr1',
+          },
+          {
+            id: 'l2',
+            amountMinor: -50000,
+            category: { ...category, groupType: 'expense' },
+            tags: [],
+            note: null,
+            transferId: null,
+          },
+        ],
+      },
+      'apostrophe',
+    );
+
+    expect(drafts).toEqual([
+      {
+        id: 'l1',
+        amount: "-1'000.00",
+        categoryId: '',
+        tags: '',
+        note: 'To savings',
+        isTransfer: true,
+      },
+      { id: 'l2', amount: '-500.00', categoryId: 'c1', tags: '', note: '' },
     ]);
   });
 

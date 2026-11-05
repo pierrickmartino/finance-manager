@@ -8,7 +8,7 @@ import { createCategory, createCategoryGroup } from '../categories';
 import { listHistory } from '../history';
 import { runWidget } from '../reporting';
 import { editClassification } from '../transactions';
-import { linkTransfer } from '../transfers';
+import { linkTransfer, transactionSide } from '../transfers';
 import { deleteDashboard, getDashboard, listDashboards, seedStarterDashboard } from '.';
 
 const t = setupTestDatabase();
@@ -74,7 +74,7 @@ async function dataset() {
   for (const [index, category] of categories.entries()) {
     if (category) await editClassification(t.ctx, ids[index]!, { categoryId: category.id });
   }
-  await linkTransfer(t.ctx, { transactionIds: [ids[4]!, transferIn!] });
+  await linkTransfer(t.ctx, { sides: [transactionSide(ids[4]!), transactionSide(transferIn!)] });
   return { current, savings, livret };
 }
 

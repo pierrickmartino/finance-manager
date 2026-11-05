@@ -118,7 +118,7 @@ describe('split a Transaction', () => {
     ]);
 
     expect(
-      (await getTransaction(t.ctx, id)).splitLines.map((line) => line.category.groupType),
+      (await getTransaction(t.ctx, id)).splitLines.map((line) => line.category?.groupType),
     ).toEqual(['capital', 'expense', 'income']);
   });
 
@@ -155,6 +155,119 @@ async function splitInTwo(id: string, amountMinor = -10000): Promise<void> {
     { amountMinor: -2500, categoryId: household.id },
   ]);
 }
+
+describe('edit a Split', () => {
+  it('keeps the identity of every line sent back by id, updating its amount, Category, Tags and note', async () => {
+    const id = await transaction({ amountMinor: -10000 });
+    const groceries = await category('Groceries', 'Food');
+    const household = await category('Household', 'Home');
+    const [first, second] = (
+      await splitTransaction(t.ctx, id, [
+        { amountMinor: -7000, categoryId: groceries.id, tagNames: ['Family'], note: 'weekly' },
+        { amountMinor: -3000, categoryId: household.id },
+      ])
+    ).splitLines;
+
+    const edited = await splitTransaction(t.ctx, id, [
+      { id: second!.id, amountMinor: -6000, categoryId: groceries.id, tagNames: ['Trip'] },
+      { id: first!.id, amountMinor: -4000, categoryId: household.id, note: 'monthly' },
+    ]);
+
+    expect(edited.splitLines).toMatchObject([
+      {
+        id: second!.id,
+        amountMinor: -6000,
+        category: { id: groceries.id },
+        tags: [{ name: 'Trip' }],
+        note: null,
+      },
+      {
+        id: first!.id,
+        amountMinor: -4000,
+        category: { id: household.id },
+        tags: [],
+        note: 'monthly',
+      },
+    ]);
+    expect((await getTransaction(t.ctx, id)).splitLines).toEqual(edited.splitLines);
+  });
+
+  it('adds the lines sent without an id and deletes the lines not sent', async () => {
+    const id = await transaction({ amountMinor: -10000 });
+    const groceries = await category('Groceries', 'Food');
+    const [kept, dropped, alsoDropped] = (
+      await splitTransaction(t.ctx, id, [
+        { amountMinor: -5000, categoryId: groceries.id },
+        { amountMinor: -3000, categoryId: groceries.id, tagNames: ['Family'] },
+        { amountMinor: -2000, categoryId: groceries.id },
+      ])
+    ).splitLines;
+
+    const edited = await splitTransaction(t.ctx, id, [
+      { amountMinor: -1000, categoryId: groceries.id, tagNames: ['Trip'] },
+      { id: kept!.id, amountMinor: -5000, categoryId: groceries.id },
+      { amountMinor: -4000, categoryId: groceries.id },
+    ]);
+
+    const ids = edited.splitLines.map((line) => line.id);
+    expect(ids[1]).toBe(kept!.id);
+    expect(new Set(ids).size).toBe(3);
+    expect(ids).not.toContain(dropped!.id);
+    expect(ids).not.toContain(alsoDropped!.id);
+    expect(edited.splitLines).toMatchObject([
+      { amountMinor: -1000, tags: [{ name: 'Trip' }] },
+      { amountMinor: -5000, tags: [] },
+      { amountMinor: -4000, tags: [] },
+    ]);
+  });
+
+  it('refuses a line id of another Transaction, or the same line twice, and changes nothing', async () => {
+    const id = await transaction({ amountMinor: -10000 });
+    const other = await transaction({ amountMinor: -10000 });
+    const groceries = await category('Groceries', 'Food');
+    const lines = [
+      { amountMinor: -6000, categoryId: groceries.id },
+      { amountMinor: -4000, categoryId: groceries.id },
+    ];
+    const before = await splitTransaction(t.ctx, id, lines);
+    const [foreign] = (await splitTransaction(t.ctx, other, lines)).splitLines;
+    const [own] = before.splitLines;
+
+    await expect(
+      splitTransaction(t.ctx, id, [
+        { id: foreign!.id, amountMinor: -6000, categoryId: groceries.id },
+        { amountMinor: -4000, categoryId: groceries.id },
+      ]),
+    ).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('its own') });
+    await expect(
+      splitTransaction(t.ctx, id, [
+        { id: own!.id, amountMinor: -6000, categoryId: groceries.id },
+        { id: own!.id, amountMinor: -4000, categoryId: groceries.id },
+      ]),
+    ).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('once') });
+
+    expect((await getTransaction(t.ctx, id)).splitLines).toEqual(before.splitLines);
+    expect((await getTransaction(t.ctx, other)).splitLines[0]).toEqual(foreign);
+  });
+
+  it("still refuses lines that don't add up, leaving the lines as they were", async () => {
+    const id = await transaction({ amountMinor: -10000 });
+    const groceries = await category('Groceries', 'Food');
+    const before = await splitTransaction(t.ctx, id, [
+      { amountMinor: -6000, categoryId: groceries.id },
+      { amountMinor: -4000, categoryId: groceries.id },
+    ]);
+    const [first, second] = before.splitLines;
+
+    await expect(
+      splitTransaction(t.ctx, id, [
+        { id: first!.id, amountMinor: -6000, categoryId: groceries.id },
+        { id: second!.id, amountMinor: -3000, categoryId: groceries.id },
+      ]),
+    ).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('add up') });
+    expect((await getTransaction(t.ctx, id)).splitLines).toEqual(before.splitLines);
+  });
+});
 
 describe('a split Transaction', () => {
   it('shows once in the list at its full amount, with its Split lines', async () => {
@@ -357,7 +470,7 @@ describe('Categories and Tags used by Split lines', () => {
     const result = await mergeCategory(t.ctx, shops.id, groceries.id);
 
     expect(result.transactionCount).toBe(1);
-    expect((await getTransaction(t.ctx, id)).splitLines.map((line) => line.category.id)).toEqual([
+    expect((await getTransaction(t.ctx, id)).splitLines.map((line) => line.category?.id)).toEqual([
       groceries.id,
       household.id,
     ]);
