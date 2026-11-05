@@ -60,7 +60,7 @@ export function SplitSection({
     <SplitForm
       amountMinor={transaction.amountMinor}
       currency={transaction.currency}
-      initialLines={initialSplitDrafts(transaction, fmt.settings.numberFormat)}
+      initialLines={initialSplitDrafts(transaction, fmt.settings.numberFormat, payees)}
       groups={groups}
       payees={payees.map(({ id, name }) => ({ id, name }))}
       transactionPayee={transaction.payee?.name ?? null}

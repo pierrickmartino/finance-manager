@@ -1,13 +1,26 @@
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { openAccountPage, openNewAccountForm } from './support/accounts';
 import { addCategory, addCategoryGroup } from './support/categories';
+import { addPayee } from './support/payees';
 import { openTransaction } from './support/transactions';
 
 const BCGE_OCTOBER = path.join(
   import.meta.dirname,
   '../test/fixtures/import/bcge/bcge-chf-2025-10.xml',
 );
+
+// Payee names can't take a suffix: they must match the fixture's counterparty names (#71).
+const SERVICES_PAYEE = 'services industriels exemple';
+const INSURANCE_PAYEE = 'Assurance Menage Exemple SA';
+
+/** Adds a Payee unless the shared E2E database already has it (e.g. on a retry). */
+async function ensurePayee(page: Page, name: string): Promise<void> {
+  await page.goto('/payees');
+  const listed = page.getByRole('navigation', { name: 'Payees' }).getByRole('listitem');
+  if ((await listed.filter({ hasText: new RegExp(`^${name}`, 'i') }).count()) > 0) return;
+  await addPayee(page, name);
+}
 
 test('splits a bundled CAMT entry from its pre-filled bundled payments', async ({ page }) => {
   // Shared E2E database: unique names, and no IBAN (IBANs are unique across the run).
@@ -16,6 +29,11 @@ test('splits a bundled CAMT entry from its pre-filled bundled payments', async (
   const accountName = `Split account ${suffix}`;
   const groupName = `Home ${suffix}`;
   const categories = [`Energy ${suffix}`, `Insurance ${suffix}`, `Childcare ${suffix}`];
+
+  // Existing Payees named like two of the bundled payments' counterparties, ignoring case
+  // and accents; the third payment has none, so its line takes the Transaction's Payee.
+  await ensurePayee(page, SERVICES_PAYEE);
+  await ensurePayee(page, INSURANCE_PAYEE);
 
   await page.goto('/categories');
   await addCategoryGroup(page, groupName, 'Expense');
@@ -55,13 +73,19 @@ test('splits a bundled CAMT entry from its pre-filled bundled payments', async (
   const form = page.getByRole('form', { name: 'Split' });
   await expect(form.getByLabel(/^Amount of line \d+$/)).toHaveCount(3);
   const expected = [
-    ['-142.85', 'Services Industriels Exemple'],
-    ['-389.50', 'Assurance Ménage Exemple SA'],
-    ['-655.00', 'Garderie Les Exemples'],
+    { amount: '-142.85', note: 'Services Industriels Exemple', payee: SERVICES_PAYEE },
+    { amount: '-389.50', note: 'Assurance Ménage Exemple SA', payee: INSURANCE_PAYEE },
+    { amount: '-655.00', note: 'Garderie Les Exemples', payee: null },
   ];
-  for (const [index, [amount, note]] of expected.entries()) {
-    await expect(form.getByLabel(`Amount of line ${index + 1}`)).toHaveValue(amount!);
-    await expect(form.getByLabel(`Note of line ${index + 1}`)).toHaveValue(note!);
+  for (const [index, { amount, note, payee }] of expected.entries()) {
+    const number = index + 1;
+    await expect(form.getByLabel(`Amount of line ${number}`)).toHaveValue(amount);
+    await expect(form.getByLabel(`Note of line ${number}`)).toHaveValue(note);
+    // The suggested Payee, or blank to take the Transaction's
+    const payeePicker = form.getByLabel(`Payee of line ${number}`);
+    if (payee === null) await expect(payeePicker).toHaveValue('');
+    else
+      await expect(payeePicker.locator('option:checked')).toHaveText(new RegExp(`^${payee}$`, 'i'));
   }
   await expect(form.getByTestId('split-remaining')).toHaveText('CHF 0.00');
 
@@ -75,6 +99,11 @@ test('splits a bundled CAMT entry from its pre-filled bundled payments', async (
   await expect(lines).toHaveCount(3);
   await expect(lines.nth(2)).toContainText(`${groupName} › ${categories[2]}`);
   await expect(lines.nth(2)).toContainText('Garderie Les Exemples');
+  // The suggested Payees were saved as the lines' own; the unmatched line has none
+  await expect(lines.nth(0)).toContainText(new RegExp(SERVICES_PAYEE, 'i'));
+  await expect(lines.nth(1)).toContainText(new RegExp(INSURANCE_PAYEE, 'i'));
+  await expect(lines.nth(2)).not.toContainText(new RegExp(SERVICES_PAYEE, 'i'));
+  await expect(lines.nth(2)).not.toContainText(new RegExp(INSURANCE_PAYEE, 'i'));
 
   await expect(await findBundled()).toContainText('Split (3)');
 });
