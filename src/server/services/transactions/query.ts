@@ -182,15 +182,16 @@ export function splitLineFilter(
 /**
  * The Transaction list's filters as a parameterised WHERE clause, used by the list and the CSV
  * export. The Category filters match a Transaction by its own Category or, for a split
- * Transaction, by any one Split line meeting all of them (ADR-0004).
+ * Transaction, by any one Split line meeting all of them (ADR-0004). The Payee filter matches a
+ * Transaction by its own Payee or by any Split line naming that Payee itself (ADR-0006).
  */
 export function filterConditions(input: ParsedQuery): SqlCondition {
   return buildConditions(input, true);
 }
 
 /**
- * The same filters for applying Rules to existing Transactions: the Category filters match the
- * Transaction's own Category only. A split Transaction has none, so Rules, which never classify
+ * The same filters for applying Rules to existing Transactions: the Category and Payee filters
+ * match the Transaction's own Category and Payee only. A split Transaction has none, so Rules, which never classify
  * a split Transaction, don't select it by its Split lines (ADR-0004).
  */
 export function ruleFilterConditions(input: ParsedQuery): SqlCondition {
@@ -218,7 +219,15 @@ function buildConditions(input: ParsedQuery, matchSplitLines: boolean): SqlCondi
     (p) => `t.search_text LIKE '%' || normalize_search_text(${p}) || '%'`,
     input.text && escapeLike(input.text),
   );
-  where((p) => `t.payee_id = ${p}::uuid`, input.payeeId);
+  // A Split line's own Payee also matches (ADR-0006); a line inheriting the Transaction's Payee
+  // adds nothing beyond `t.payee_id`, so only `sl.payee_id` is checked, never the inherited one.
+  where(
+    (p) =>
+      matchSplitLines
+        ? `(t.payee_id = ${p}::uuid OR ${splitLineExists(`sl.payee_id = ${p}::uuid`)})`
+        : `t.payee_id = ${p}::uuid`,
+    input.payeeId,
+  );
   const category = categoryPlaceholders(input, param);
   const own = categoryConditions('t.category_id', category).join(' AND ');
   if (own && matchSplitLines) {
