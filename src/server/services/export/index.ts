@@ -7,7 +7,7 @@ import {
   filterConditions,
   splitLineFilter,
   transactionQueryInput,
-  type CategoryFilter,
+  type SplitLineFilter,
   type SqlCondition,
   type TransactionQuery,
 } from '../transactions/query';
@@ -133,6 +133,8 @@ const SELECT_EXPORT = `
 interface ExportLine {
   transactionId: string;
   amountMinor: number;
+  /** The line's own Payee; null when it reports under its Transaction's. */
+  payee: string | null;
   /** Null, like its group, when the line is a Transfer side. */
   groupName: string | null;
   groupType: CategoryGroupType | null;
@@ -145,7 +147,7 @@ interface ExportLine {
 
 const SELECT_LINES = `
   SELECT sl.transaction_id AS "transactionId", sl.amount_minor AS "amountMinor",
-         g.name AS "groupName", g.type AS "groupType", c.name AS category,
+         lp.name AS payee, g.name AS "groupName", g.type AS "groupType", c.name AS category,
          (SELECT string_agg(tg.name, '${TAG_SEPARATOR}' ORDER BY lower(tg.name))
           FROM tag tg
           WHERE tg.id IN (SELECT lt.tag_id FROM split_line_tag lt WHERE lt.split_line_id = sl.id
@@ -154,19 +156,21 @@ const SELECT_LINES = `
                           WHERE xt.transaction_id = sl.transaction_id)) AS tags,
          sl.note, o."transferAccount", o."transferTransactionId"
   FROM split_line sl
+  JOIN "transaction" t ON t.id = sl.transaction_id
+  LEFT JOIN payee lp ON lp.id = sl.payee_id
   LEFT JOIN category c ON c.id = sl.category_id
   LEFT JOIN category_group g ON g.id = c.group_id
   ${otherSide('sl.transfer_id', 'NULL', 'sl.id')}
   WHERE sl.transaction_id = ANY($1::uuid[])`;
 
 /**
- * The batch's Split lines by Transaction id, in line order. Under a Category or group type
- * filter, only the lines that match it: a split Transaction exports the part that matched.
+ * The batch's Split lines by Transaction id, in line order. Under a Category, group type or
+ * Payee filter, only the lines that match it: a split Transaction exports the part that matched.
  */
 async function loadLines(
   ctx: ServiceContext,
   ids: readonly string[],
-  filter: CategoryFilter,
+  filter: SplitLineFilter,
 ): Promise<Map<string, ExportLine[]>> {
   const { conditions, params } = splitLineFilter(filter, 2);
   const result = await ctx.db.query<ExportLine>(
@@ -179,7 +183,8 @@ async function loadLines(
 
 /**
  * The rows a Transaction exports as: itself when unsplit, otherwise one per Split line with
- * the Transaction's fields and the line's amount, Category, Tags, note and Transfer. A line
+ * the Transaction's fields and the line's amount, Payee, Category, Tags, note and Transfer. A
+ * line's Payee is its own, else its Transaction's (ADR-0006). A line
  * that is a Transfer side is written like a Transfer: no Category, the other side's Account and
  * Transaction id. A line's Tags are its own plus the Transaction's (as in reports); its Notes
  * are the line's note only.
@@ -189,6 +194,7 @@ function expandRow(row: ExportRow, lines: readonly ExportLine[]): ExportRow[] {
   return lines.map((line) => ({
     ...row,
     amountMinor: line.amountMinor,
+    payee: line.payee ?? row.payee,
     groupName: line.groupName,
     groupType: line.groupType,
     category: line.category,
@@ -251,7 +257,7 @@ export function exportTransactionsCsv(
 async function* generateCsv(
   ctx: ServiceContext,
   where: SqlCondition,
-  lineFilter: CategoryFilter,
+  lineFilter: SplitLineFilter,
 ): AsyncGenerator<string> {
   yield BOM + csvLine(EXPORT_COLUMNS);
   let after: { bookingDate: string; entryOrder: number } | null = null;

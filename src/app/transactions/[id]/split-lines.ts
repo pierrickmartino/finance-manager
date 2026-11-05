@@ -1,6 +1,8 @@
 import { formatAmount, type NumberFormat } from '@/lib/format';
 import { parseAmount } from '@/lib/format/parse-amount';
+import { normalizeText } from '@/lib/text';
 import type { BundledDetail } from '@/server/services/imports/parsers';
+import type { PayeeRef } from '@/server/services/payees';
 import type { SplitLine } from '@/server/services/transactions';
 
 /** One Split line as the split form edits it: typed text, not yet validated. */
@@ -11,6 +13,11 @@ export interface SplitLineDraft {
   amount: string;
   /** Empty for a Transfer line, which can't have a Category. */
   categoryId: string;
+  /**
+   * The line's own Payee (ADR-0006); absent or empty for a line that takes its Transaction's.
+   * A Transfer line has none.
+   */
+  payeeId?: string;
   /** Comma-separated Tag names. */
   tags: string;
   note: string;
@@ -38,34 +45,58 @@ interface SplitSource {
 }
 
 /**
+ * A lookup from a counterparty name to the existing Payee of that name, compared as Rule text
+ * conditions compare (normalised). Names two Payees share once normalised (e.g. "Cafe" and
+ * "Café") are ambiguous and suggest none.
+ */
+function suggestPayeeByName(payees: readonly PayeeRef[]): (name: string | null) => string | null {
+  const byName = new Map<string, string | null>();
+  for (const payee of payees) {
+    const key = normalizeText(payee.name);
+    if (key === '') continue;
+    byName.set(key, byName.has(key) ? null : payee.id);
+  }
+  return (name) => (name === null ? null : (byName.get(normalizeText(name)) ?? null));
+}
+
+/**
  * The bundled payments as Split lines, when every one has an amount and together they add up
- * exactly to the Transaction's amount; otherwise null.
+ * exactly to the Transaction's amount; otherwise null. Each line names the existing Payee that
+ * matches its counterparty name, else none so it takes the Transaction's (#71); this never
+ * creates a Payee.
  */
 function bundledDrafts(
   transaction: SplitSource,
   amount: (minor: number) => string,
+  payees: readonly PayeeRef[],
 ): SplitLineDraft[] | null {
   const details = transaction.bundledDetails ?? [];
   const amounts = details.map((detail) => detail.amountMinor);
   if (amounts.length === 0 || amounts.includes(null)) return null;
   const total = amounts.reduce<number>((sum, minor) => sum + (minor ?? 0), 0);
   if (total !== transaction.amountMinor) return null;
-  return details.map((detail) => ({
-    amount: amount(detail.amountMinor ?? 0),
-    categoryId: '',
-    tags: '',
-    note: detail.counterpartyName ?? '',
-  }));
+  const suggestPayee = suggestPayeeByName(payees);
+  return details.map((detail) => {
+    const payeeId = suggestPayee(detail.counterpartyName);
+    return {
+      amount: amount(detail.amountMinor ?? 0),
+      categoryId: '',
+      ...(payeeId !== null && { payeeId }),
+      tags: '',
+      note: detail.counterpartyName ?? '',
+    };
+  });
 }
 
 /**
  * The lines the split form starts with: the saved Split lines when the Transaction is split,
- * else one line per bundled payment when their amounts add up to the Transaction's (#46),
- * otherwise one line for the full amount.
+ * else one line per bundled payment when their amounts add up to the Transaction's (#46), each
+ * suggesting its Payee from `payees` (#71), otherwise one line for the full amount.
  */
 export function initialSplitDrafts(
   transaction: SplitSource,
   numberFormat: NumberFormat,
+  payees: readonly PayeeRef[],
 ): SplitLineDraft[] {
   const amount = (minor: number) => editableAmount(minor, numberFormat, transaction.currency);
   if (transaction.splitLines.length > 0) {
@@ -73,13 +104,14 @@ export function initialSplitDrafts(
       id: line.id,
       amount: amount(line.amountMinor),
       categoryId: line.category?.id ?? '',
+      ...(line.payee && { payeeId: line.payee.id }),
       tags: line.tags.map((tag) => tag.name).join(', '),
       note: line.note ?? '',
       ...(line.transferId !== null && { isTransfer: true as const }),
     }));
   }
   return (
-    bundledDrafts(transaction, amount) ?? [
+    bundledDrafts(transaction, amount, payees) ?? [
       { amount: amount(transaction.amountMinor), categoryId: '', tags: '', note: '' },
     ]
   );

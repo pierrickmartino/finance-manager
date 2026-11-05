@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CATEGORY_GROUP_TYPES } from '../categories/model';
+import { REPORTED_PAYEE_ID } from './line-payee';
 import { IS_SPLIT, splitLineExists } from './split-guard';
 
 /**
@@ -163,35 +164,49 @@ function categoryPlaceholders(
   };
 }
 
+/** The filters the export applies to each Split line: the Category filters and the Payee. */
+export type SplitLineFilter = Pick<ParsedQuery, 'categoryId' | 'groupType' | 'payeeId'>;
+
 /**
- * The Category filters as conditions on a Split line (alias `sl`), with parameters numbered
- * from `$<firstParam>`: the export writes only the Split lines that match.
+ * The Category and Payee filters as conditions on a Split line (alias `sl`, its Transaction
+ * `t`), with parameters numbered from `$<firstParam>`: the export writes only the Split lines
+ * that match. A line matches the Payee filter by its reported Payee (ADR-0006).
  */
 export function splitLineFilter(
-  input: CategoryFilter,
+  input: SplitLineFilter,
   firstParam: number,
 ): { conditions: string[]; params: unknown[] } {
   const params: unknown[] = [];
-  const placeholders = categoryPlaceholders(input, (value) => {
+  const param = (value: unknown): string => {
     params.push(value);
     return `$${firstParam + params.length - 1}`;
-  });
-  return { conditions: categoryConditions('sl.category_id', placeholders), params };
+  };
+  const placeholders = categoryPlaceholders(input, param);
+  return {
+    conditions: [
+      ...categoryConditions('sl.category_id', placeholders),
+      ...(input.payeeId === undefined
+        ? []
+        : [`${REPORTED_PAYEE_ID} = ${param(input.payeeId)}::uuid`]),
+    ],
+    params,
+  };
 }
 
 /**
  * The Transaction list's filters as a parameterised WHERE clause, used by the list and the CSV
  * export. The Category filters match a Transaction by its own Category or, for a split
- * Transaction, by any one Split line meeting all of them (ADR-0004).
+ * Transaction, by any one Split line meeting all of them (ADR-0004). The Payee filter matches a
+ * Transaction by its own Payee or by any Split line naming that Payee itself (ADR-0006).
  */
 export function filterConditions(input: ParsedQuery): SqlCondition {
   return buildConditions(input, true);
 }
 
 /**
- * The same filters for applying Rules to existing Transactions: the Category filters match the
- * Transaction's own Category only. A split Transaction has none, so Rules, which never classify
- * a split Transaction, don't select it by its Split lines (ADR-0004).
+ * The same filters for applying Rules to existing Transactions: the Category and Payee filters
+ * match the Transaction's own Category and Payee only. A split Transaction has none, so Rules,
+ * which never classify a split Transaction, don't select it by its Split lines (ADR-0004).
  */
 export function ruleFilterConditions(input: ParsedQuery): SqlCondition {
   return buildConditions(input, false);
@@ -218,7 +233,15 @@ function buildConditions(input: ParsedQuery, matchSplitLines: boolean): SqlCondi
     (p) => `t.search_text LIKE '%' || normalize_search_text(${p}) || '%'`,
     input.text && escapeLike(input.text),
   );
-  where((p) => `t.payee_id = ${p}::uuid`, input.payeeId);
+  // A Split line's own Payee also matches (ADR-0006); a line inheriting the Transaction's Payee
+  // adds nothing beyond `t.payee_id`, so only `sl.payee_id` is checked, never the inherited one.
+  where(
+    (p) =>
+      matchSplitLines
+        ? `(t.payee_id = ${p}::uuid OR ${splitLineExists(`sl.payee_id = ${p}::uuid`)})`
+        : `t.payee_id = ${p}::uuid`,
+    input.payeeId,
+  );
   const category = categoryPlaceholders(input, param);
   const own = categoryConditions('t.category_id', category).join(' AND ');
   if (own && matchSplitLines) {

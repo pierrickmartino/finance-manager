@@ -3,10 +3,18 @@ import { setupTestDatabase } from '@test/support/db';
 import { seedTransactions } from '@test/support/transactions';
 import { createAccount } from '../accounts';
 import { createBank } from '../banks';
+import { createCategory, createCategoryGroup } from '../categories';
 import { getBatchSummaries, listHistory } from '../history';
-import { listTransactions } from '../transactions';
+import { getTransaction, listTransactions, splitTransaction } from '../transactions';
 import { editClassification, getClassification } from '../transactions/classification';
-import { createPayee, deletePayee, listPayees, mergePayees, renamePayee } from '.';
+import {
+  countTransactionsWithPayee,
+  createPayee,
+  deletePayee,
+  listPayees,
+  mergePayees,
+  renamePayee,
+} from '.';
 
 const t = setupTestDatabase();
 
@@ -30,6 +38,20 @@ async function transactions(count: number): Promise<string[]> {
       rawDescription: `shop ${n}`,
     })),
   );
+}
+
+/** Splits `id` in two Groceries lines, the first (all but 1 minor unit) naming `linePayeeId`. */
+async function splitWithLinePayee(id: string, linePayeeId: string): Promise<void> {
+  const { amountMinor } = await getTransaction(t.ctx, id);
+  const group = await createCategoryGroup(t.ctx, {
+    name: `Food ${Math.random()}`,
+    type: 'expense',
+  });
+  const groceries = await createCategory(t.ctx, { groupId: group.id, name: 'Groceries' });
+  await splitTransaction(t.ctx, id, [
+    { amountMinor: amountMinor + 1, categoryId: groceries.id, payeeId: linePayeeId },
+    { amountMinor: -1, categoryId: groceries.id },
+  ]);
 }
 
 describe('Payees', () => {
@@ -113,5 +135,66 @@ describe('Payees', () => {
     await deletePayee(t.ctx, unused.id);
     await expect(deletePayee(t.ctx, used.id)).rejects.toMatchObject({ code: 'conflict' });
     expect((await listPayees(t.ctx)).map((payee) => payee.name)).toEqual(['Used']);
+  });
+
+  describe('named by Split lines (ADR-0006)', () => {
+    it('count each Transaction with a line naming the Payee once', async () => {
+      const [a, b] = await transactions(2);
+      const coop = await createPayee(t.ctx, 'Coop');
+      const migros = await createPayee(t.ctx, 'Migros');
+      await editClassification(t.ctx, a!, { payeeId: migros.id });
+      await splitWithLinePayee(a!, coop.id);
+      await editClassification(t.ctx, b!, { payeeId: coop.id });
+      await splitWithLinePayee(b!, coop.id);
+
+      expect(await listPayees(t.ctx)).toMatchObject([
+        { name: 'Coop', transactionCount: 2 },
+        { name: 'Migros', transactionCount: 1 },
+      ]);
+      // The Payee list's total counts a Transaction once, under however many Payees it is.
+      expect(await countTransactionsWithPayee(t.ctx)).toBe(2);
+    });
+
+    it('a merge moves the lines naming the source to the target, recorded in its Batch', async () => {
+      const [a, b] = await transactions(2);
+      const source = await createPayee(t.ctx, 'Coop Pronto');
+      const target = await createPayee(t.ctx, 'Coop');
+      const migros = await createPayee(t.ctx, 'Migros');
+      await editClassification(t.ctx, a!, { payeeId: migros.id });
+      await splitWithLinePayee(a!, source.id);
+      await editClassification(t.ctx, b!, { payeeId: source.id });
+
+      const result = await mergePayees(t.ctx, source.id, target.id);
+
+      expect(result.transactionCount).toBe(2);
+      expect((await getTransaction(t.ctx, a!)).splitLines.map((line) => line.payee?.name)).toEqual([
+        'Coop',
+        undefined,
+      ]);
+      expect((await getTransaction(t.ctx, a!)).payee?.name).toBe('Migros');
+      const batch = await listHistory(t.ctx, { batchId: result.batchId });
+      expect(batch.find((entry) => entry.entityId === a && entry.field === 'split')).toMatchObject({
+        before: [expect.objectContaining({ payee: 'Coop Pronto' }), expect.anything()],
+        after: [expect.objectContaining({ payee: 'Coop' }), expect.anything()],
+      });
+      expect(await getBatchSummaries(t.ctx, [result.batchId])).toEqual({
+        [result.batchId]: 'Merged Payee "Coop Pronto" into "Coop" (2 Transactions)',
+      });
+    });
+
+    it('a delete is refused while a line names the Payee, by the service and the database', async () => {
+      const [id] = await transactions(1);
+      const coop = await createPayee(t.ctx, 'Coop');
+      await splitWithLinePayee(id!, coop.id);
+
+      await expect(deletePayee(t.ctx, coop.id)).rejects.toMatchObject({
+        code: 'conflict',
+        message: expect.stringContaining('merge it into another Payee'),
+      });
+      await expect(t.ctx.db.query('DELETE FROM payee WHERE id = $1', [coop.id])).rejects.toThrow(
+        /foreign key/,
+      );
+      expect((await listPayees(t.ctx)).map((payee) => payee.name)).toEqual(['Coop']);
+    });
   });
 });

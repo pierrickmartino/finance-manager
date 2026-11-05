@@ -3,6 +3,7 @@ import { BUTTON_CLASS } from '@/components/named-list';
 import { categoryLabel } from '@/lib/classification';
 import type { Formatter } from '@/lib/format';
 import type { CategoryGroup } from '@/server/services/categories';
+import type { PayeeRef } from '@/server/services/payees';
 import type { TransactionDetail } from '@/server/services/transactions';
 import { splitLineSide, type TransferSideView } from '@/server/services/transfers';
 import { splitLabel } from '../transaction-display';
@@ -26,6 +27,8 @@ export type LineTransfers = Record<
 interface SplitSectionProps {
   transaction: TransactionDetail;
   groups: CategoryGroup[];
+  /** The Payees a Split line may name (ADR-0006). */
+  payees: PayeeRef[];
   lineTransfers: LineTransfers;
   fmt: Formatter;
   /** Classes of the section, e.g. to draw it as a card. */
@@ -39,6 +42,7 @@ interface SplitSectionProps {
 export function SplitSection({
   transaction,
   groups,
+  payees,
   lineTransfers,
   fmt,
   className = 'flex flex-col gap-3',
@@ -56,8 +60,10 @@ export function SplitSection({
     <SplitForm
       amountMinor={transaction.amountMinor}
       currency={transaction.currency}
-      initialLines={initialSplitDrafts(transaction, fmt.settings.numberFormat)}
+      initialLines={initialSplitDrafts(transaction, fmt.settings.numberFormat, payees)}
       groups={groups}
+      payees={payees}
+      transactionPayee={transaction.payee?.name ?? null}
       transfers={transfers}
       action={splitTransactionAction.bind(null, transaction.id)}
     />
@@ -109,6 +115,7 @@ function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
         <thead className="border-b border-zinc-200 dark:border-zinc-800">
           <tr>
             <th className={CELL}>Category</th>
+            <th className={CELL}>Payee</th>
             <th className={CELL}>Tags</th>
             <th className={CELL}>Note</th>
             <th className={`${CELL} text-right`}>Amount</th>
@@ -126,6 +133,9 @@ function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
                   fmt={fmt}
                 />
               </td>
+              <td className={CELL}>
+                <LinePayee line={line} />
+              </td>
               <td className={CELL}>{line.tags.map((tag) => tag.name).join(', ') || '—'}</td>
               <td className={CELL}>{line.note ?? '—'}</td>
               <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
@@ -136,6 +146,21 @@ function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * The Payee a Split line reports under (ADR-0006): its own, or else its Transaction's, shown
+ * muted as inherited. A Transfer line has none.
+ */
+function LinePayee({ line }: { line: TransactionDetail['splitLines'][number] }) {
+  if (line.transferId !== null) return <>—</>;
+  if (line.payee) return <>{line.payee.name}</>;
+  if (!line.reportedPayee) return <>—</>;
+  return (
+    <span className="text-zinc-500" title="The Transaction's Payee">
+      {line.reportedPayee.name}
+    </span>
   );
 }
 

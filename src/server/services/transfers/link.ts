@@ -10,8 +10,8 @@ import { sameSide, sideLabel, sortSides, type TransferSideRef } from './sides';
  * Linking and unlinking inside an open mutation, shared by the Transfers operations, Import
  * commit, Import undo and Transaction deletes. Every change is recorded in the scope's Batch:
  * the Transfer itself (entity `transfer`, with its sides and their kinds), `transferId` on a
- * whole Transaction side, and, for a Split line side, the line's Transfer and Category on its
- * Transaction's classification.
+ * whole Transaction side, and, for a Split line side, the line's Transfer, Category and Payee on
+ * its Transaction's classification.
  */
 
 export interface Transfer {
@@ -115,7 +115,8 @@ function checkPair(sides: readonly LockedSide[], refs: readonly TransferSideRef[
 /**
  * Links two sides, each a whole Transaction or a Split line, as a Transfer. A split Transaction
  * can't be a side as a whole: only its lines can. Transfers carry no Category, so linking clears
- * it on both sides (classification and Rules then refuse to set one while the link holds).
+ * it on both sides (classification and Rules then refuse to set one while the link holds). A
+ * Split line side loses its own Payee too (ADR-0006); a whole Transaction keeps its Payee.
  */
 export async function linkPair(
   scope: MutationScope,
@@ -144,7 +145,8 @@ export async function linkPair(
       [wholeIds],
     );
     await tx.query(
-      'UPDATE split_line SET category_id = NULL, transfer_id = $1 WHERE id = ANY($2::uuid[])',
+      `UPDATE split_line SET category_id = NULL, payee_id = NULL, transfer_id = $1
+       WHERE id = ANY($2::uuid[])`,
       [id, lineIds],
     );
   });

@@ -6,9 +6,10 @@ import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import type { HistorySnapshot } from '../history';
-import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
+import { findOrCreatePayee, findPayee, payeeName, type PayeeRef } from '../payees/model';
 import { findOrCreateTags, findTag, tagName } from '../tags/model';
 import { refuseBankFieldChanges } from './bank-fields';
+import { REPORTED_PAYEE_ID } from './line-payee';
 import { SELECT_TRANSACTION, transactionSnapshot, type Transaction } from './model';
 import { refuseSplitCategoryChange } from './split-guard';
 
@@ -47,12 +48,16 @@ export interface ClassificationCategory {
 
 /**
  * One part of a split Transaction's classification (ADR-0004): a signed amount in minor units
- * of the Transaction's Currency, a Category or a Transfer (ADR-0005), Tags (by name, ignoring
- * case) and a note.
+ * of the Transaction's Currency, a Category or a Transfer (ADR-0005), an optional Payee
+ * (ADR-0006), Tags (by name, ignoring case) and a note.
  */
 export interface SplitLine {
   id: string;
   amountMinor: number;
+  /** The line's own Payee; null when it takes its Transaction's (always null on a Transfer line). */
+  payee: PayeeRef | null;
+  /** What the line reports under: its own Payee, else its Transaction's. */
+  reportedPayee: PayeeRef | null;
   /** Null when the line is a Transfer side (or, once unlinked, has neither). */
   category: ClassificationCategory | null;
   /** The Transfer this line is one side of; null when it is not in a Transfer. */
@@ -63,7 +68,7 @@ export interface SplitLine {
 
 export interface Classification {
   transactionId: string;
-  payee: { id: string; name: string } | null;
+  payee: PayeeRef | null;
   /** Always null for a split Transaction: its Split lines hold the Categories. */
   category: ClassificationCategory | null;
   /** By name, ignoring case. */
@@ -137,6 +142,10 @@ const SELECT_CLASSIFICATION = `
                        ELSE json_build_object('id', sc.id, 'name', sc.name,
                          'groupId', sg.id, 'groupName', sg.name, 'groupType', sg.type) END,
                      'transferId', sl.transfer_id,
+                     'payee', CASE WHEN lp.id IS NULL THEN NULL
+                       ELSE json_build_object('id', lp.id, 'name', lp.name) END,
+                     'reportedPayee', CASE WHEN rp.id IS NULL THEN NULL
+                       ELSE json_build_object('id', rp.id, 'name', rp.name) END,
                      'tags', coalesce((SELECT json_agg(json_build_object('id', lt.id,
                                  'name', lt.name) ORDER BY lower(lt.name), lt.id)
                                FROM split_line_tag slt JOIN tag lt ON lt.id = slt.tag_id
@@ -145,6 +154,8 @@ const SELECT_CLASSIFICATION = `
                    FROM split_line sl
                    LEFT JOIN category sc ON sc.id = sl.category_id
                    LEFT JOIN category_group sg ON sg.id = sc.group_id
+                   LEFT JOIN payee lp ON lp.id = sl.payee_id
+                   LEFT JOIN payee rp ON rp.id = ${REPORTED_PAYEE_ID}
                    WHERE sl.transaction_id = t.id), '[]'::json) AS "splitLines"
   FROM "transaction" t
   LEFT JOIN payee p ON p.id = t.payee_id
@@ -181,6 +192,8 @@ export function classificationSnapshot(classification: Classification): HistoryS
             category: line.category ? categoryLabel(line.category) : null,
             // Left out unless the line is a Transfer side, so other lines record as before.
             ...(line.transferId === null ? {} : { transferId: line.transferId }),
+            // Left out unless the line names its own Payee (ADR-0006), as for transferId.
+            ...(line.payee === null ? {} : { payee: line.payee.name }),
             tags: line.tags.map((tag) => tag.name),
             note: line.note,
           })),

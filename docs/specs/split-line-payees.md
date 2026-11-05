@@ -23,12 +23,13 @@ A Split line that has a Category can name its own Payee. A line without one take
 11. As the user, I want the transaction list to keep showing a split Transaction under its own Payee, so that the list still matches my bank statement.
 12. As the user, I want filtering the transaction list by a Payee to also find split Transactions with a line of that Payee, so that I find everything paid to it.
 13. As the user, I want each Split line row of the CSV export to show its own Payee, or else its Transaction's, so that external analysis sees the detailed counterparty.
-14. As the user, I want a Payee's usage count to include the Split lines that name it, so that I know how much depends on it.
+14. As the user, I want a Payee's usage count to be the number of distinct Transactions using it, directly or via a Split line, so that I know how much depends on it.
 15. As the user, I want merging two Payees to move the lines that name the source too, in the same History Batch, so that the merge is complete and traceable.
-16. As the user, I want deleting a Payee to be refused while a Split line still names it, so that no line loses its Payee silently.
-17. As the user, I want Rules never to set a line's Payee, and Rule Payee conditions to match only the Transaction's own Payee, so that line Payees stay a manual choice.
-18. As the user, I want removing a Split to discard its lines' Payees and keep the Transaction's, so that the Transaction returns to its whole classification.
-19. As the user, I want setting, changing or clearing a line's Payee to be recorded in History, so that I can see what changed.
+16. As the user, I want the transaction page's Split lines table to show each line's Payee, with an inherited one muted, so that I see which Payee each line reports under.
+17. As the user, I want deleting a Payee to be refused while a Split line still names it, so that no line loses its Payee silently.
+18. As the user, I want Rules never to set a line's Payee, and Rule Payee conditions to match only the Transaction's own Payee, so that line Payees stay a manual choice.
+19. As the user, I want removing a Split to discard its lines' Payees and keep the Transaction's, so that the Transaction returns to its whole classification.
+20. As the user, I want setting, changing or clearing a line's Payee to be recorded in History, so that I can see what changed.
 
 ## Implementation Decisions
 
@@ -37,9 +38,10 @@ A Split line that has a Category can name its own Payee. A line without one take
 - **Transactions service.** `splitTransaction` accepts an optional Payee per line, validated as an existing Payee and refused on a Transfer line. Linking a line to a Transfer clears its Payee. `getTransaction` and `listTransactions` expose each line's own Payee. The list's Payee filter matches the Transaction's Payee or any line's.
 - **Classification and bulk edit.** Setting a split Transaction's Payee changes only the Transaction's Payee.
 - **Rules.** Unchanged: Rules read and set only the Transaction's Payee.
-- **Payees service.** The usage count adds the Split lines naming the Payee. A merge moves those lines in the same Batch, with a History entry per line. A delete is refused while any line names the Payee.
+- **Payees service.** The usage count is the number of distinct Transactions using the Payee, directly or via a Split line. A merge moves those lines in the same Batch, recording one History entry per affected Transaction whose snapshot includes its lines' Payees. A delete is refused while any line names the Payee. The Payees page total is likewise a distinct count of Transactions using any Payee.
 - **Reporting.** The report base takes the line's Payee, else the Transaction's, for the Payee axis and filter. Drill-down still lists distinct parent Transactions.
 - **Export.** A Split line row's Payee is the line's own Payee, else its Transaction's.
+- **Transaction page.** The Split lines table shows each line's Payee: its own, or its Transaction's shown muted as inherited. A Transfer line shows none.
 - **Split form.** Each line has a Payee picker, blank by default, with the Transaction's Payee as its placeholder. The bundled pre-fill sets a line's Payee when its counterparty name equals an existing Payee's name, ignoring case and accents with whitespace normalised, as Rule text conditions already compare.
 - **Docs.** The glossary's Split line entry names the optional Payee. ADR-0006 supersedes ADR-0004 for the lines' Payee.
 
