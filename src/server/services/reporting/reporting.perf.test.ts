@@ -11,7 +11,8 @@ import { listCellTransactions, runWidgetQuery, type WidgetQueryInput } from '.';
  * Seeds 20 000 Transactions from 2020 to 2025 over two CHF Accounts and one EUR Account
  * (a third of them in EUR, so a third need an FX lookup), 30 Categories in 6 groups (one of them
  * Capital), 5 % Transfers, 10 % unclassified and 10 % split into two Split lines (ADR-0004),
- * plus a daily EUR rate on business days.
+ * 50 Payees on three in four non-Transfer Transactions and on every second Split line
+ * (ADR-0006), plus a daily EUR rate on business days.
  *
  * Measured on Postgres 16, 4 vCPU container, warm cache (2026-10-31), same seed:
  * - month × Category, 6 years: ~95 ms end to end (72 rows × 23 columns). EXPLAIN ANALYZE:
@@ -108,6 +109,24 @@ async function seedSixYears(): Promise<void> {
             (SELECT id FROM cats WHERE cats.position = (s.n + line.position - 1) % 30)
      FROM split s CROSS JOIN (VALUES (1), (2)) AS line(position)`,
   );
+  // 50 Payees: three in four non-Transfer Transactions name one, and every second Split line
+  // names its own (a different one), so the Payee axis reads both.
+  await t.ctx.db.query(
+    `INSERT INTO payee (name) SELECT 'Payee ' || p FROM generate_series(0, 49) AS p`,
+  );
+  await t.ctx.db.query(
+    `WITH payees AS (SELECT id, row_number() OVER (ORDER BY name) - 1 AS position FROM payee)
+     UPDATE "transaction" tx SET payee_id = (SELECT id FROM payees WHERE position = n % 50)
+     FROM (SELECT id, substring(fingerprint FROM 6)::int AS n FROM "transaction"
+           WHERE fingerprint LIKE 'perf-%' AND transfer_id IS NULL) s
+     WHERE tx.id = s.id AND s.n % 4 <> 0`,
+  );
+  await t.ctx.db.query(
+    `WITH payees AS (SELECT id, row_number() OVER (ORDER BY name) - 1 AS position FROM payee)
+     UPDATE split_line sl SET payee_id = (SELECT id FROM payees WHERE position = (s.n + 7) % 50)
+     FROM (SELECT id, substring(fingerprint FROM 6)::int AS n FROM "transaction") s
+     WHERE sl.transaction_id = s.id AND sl.position = 2 AND sl.transfer_id IS NULL`,
+  );
   await t.ctx.db.query('ANALYZE');
 }
 
@@ -143,6 +162,30 @@ describe('reporting over 6 years and 20k Transactions', () => {
     expect(report.result.unconvertedCount).toBe(0);
     expect(report.ms).toBeLessThan(BUDGET_MS);
     expect(drill.result.sumChfMinor).toBe(report.result.cells[41]![0]);
+    expect(drill.ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it('runs Payee × year, filtered on Payees, and drills into a Payee cell, in under 1 s', async () => {
+    await seedSixYears();
+    const payeeIds = (
+      await t.ctx.db.query<{ id: string }>(`SELECT id FROM payee ORDER BY name LIMIT 10`)
+    ).rows.map((row) => row.id);
+    const query: WidgetQueryInput = {
+      dateRange: SIX_YEARS_MONTH_BY_CATEGORY.dateRange,
+      rows: 'payee',
+      columns: 'year',
+      measure: 'sum',
+      filters: { payeeIds },
+    };
+
+    const report = await timed(() => runWidgetQuery(t.ctx, query));
+    const drill = await timed(() =>
+      listCellTransactions(t.ctx, query, { row: payeeIds[0]!, column: '2023' }),
+    );
+
+    expect(report.result.rows).toHaveLength(10);
+    expect(report.ms).toBeLessThan(BUDGET_MS);
+    expect(drill.result.sumChfMinor).toBe(report.result.cells[0]![3]);
     expect(drill.ms).toBeLessThan(BUDGET_MS);
   });
 });
