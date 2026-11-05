@@ -5,7 +5,12 @@ import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
 import { listHistory } from '../history';
-import { editClassification, getClassification, getTransaction } from '../transactions';
+import {
+  editClassification,
+  getClassification,
+  getTransaction,
+  listTransactions,
+} from '../transactions';
 import { splitTransaction } from '../transactions/split';
 import {
   getTransferCounterpart,
@@ -282,5 +287,18 @@ describe('History of a Split line Transfer', () => {
     expect((split.before as object[])[0]).toMatchObject({ category: 'Group Savings › Savings' });
     expect((split.after as object[])[0]).toMatchObject({ category: null, transferId: transfer.id });
     expect((split.after as object[])[1]).not.toHaveProperty('transferId');
+  });
+});
+
+describe('Transfer filter on the Transaction list with a Split line Transfer', () => {
+  it('counts a split Transaction with a Transfer line as having a Transfer, and keeps it when Transfers are excluded', async () => {
+    const { debit, credit, toSavings } = await aggregatedDebit();
+    await linkTransfer(t.ctx, { sides: [splitLineSide(toSavings), transactionSide(credit)] });
+
+    const only = await listTransactions(t.ctx, { transfer: 'only' });
+    const excluded = await listTransactions(t.ctx, { transfer: 'exclude' });
+
+    expect(only.transactions.map((row) => row.id).sort()).toEqual([debit, credit].sort());
+    expect(excluded.transactions.map((row) => row.id)).toEqual([debit]);
   });
 });
