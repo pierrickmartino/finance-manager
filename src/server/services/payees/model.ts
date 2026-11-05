@@ -10,6 +10,9 @@ export interface Payee {
   transactionCount: number;
 }
 
+/** A Payee by id and name, as a classification or a picker refers to it. */
+export type PayeeRef = Pick<Payee, 'id' | 'name'>;
+
 const MAX_NAME_LENGTH = 100;
 
 export const payeeName = z
@@ -18,12 +21,19 @@ export const payeeName = z
   .min(1, 'Payee name is required')
   .max(MAX_NAME_LENGTH, `Payee name must be at most ${MAX_NAME_LENGTH} characters`);
 
+/**
+ * SQL: the ids of the Transactions using a Payee, directly or via a Split line (ADR-0006), each
+ * once. `payeeMatch` completes `payee_id <payeeMatch>`, e.g. `= $1` or `IS NOT NULL`.
+ */
+export function transactionsUsingPayeeSql(payeeMatch: string): string {
+  return `SELECT t.id FROM "transaction" t WHERE t.payee_id ${payeeMatch}
+          UNION
+          SELECT sl.transaction_id FROM split_line sl WHERE sl.payee_id ${payeeMatch}`;
+}
+
 export const SELECT_PAYEE = `
   SELECT p.id, p.name,
-         (SELECT count(*)::int FROM (
-            SELECT t.id FROM "transaction" t WHERE t.payee_id = p.id
-            UNION
-            SELECT sl.transaction_id FROM split_line sl WHERE sl.payee_id = p.id) used)
+         (SELECT count(*)::int FROM (${transactionsUsingPayeeSql('= p.id')}) used)
            AS "transactionCount"
   FROM payee p`;
 

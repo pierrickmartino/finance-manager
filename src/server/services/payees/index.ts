@@ -7,11 +7,12 @@ import {
   insertPayee,
   payeeName,
   SELECT_PAYEE,
+  transactionsUsingPayeeSql,
   uniquePayeeName,
   type Payee,
 } from './model';
 
-export type { Payee } from './model';
+export type { Payee, PayeeRef } from './model';
 
 /** What a merge did: how many Transactions moved, and its Batch. */
 export interface MergeResult {
@@ -28,10 +29,7 @@ export async function listPayees(ctx: ServiceContext): Promise<Payee[]> {
 /** How many Transactions have a Payee, themselves or on a Split line; each counted once. */
 export async function countTransactionsWithPayee(ctx: ServiceContext): Promise<number> {
   const result = await ctx.db.query<{ count: number }>(
-    `SELECT count(*)::int AS count FROM (
-       SELECT id FROM "transaction" WHERE payee_id IS NOT NULL
-       UNION
-       SELECT transaction_id FROM split_line WHERE payee_id IS NOT NULL) used`,
+    `SELECT count(*)::int AS count FROM (${transactionsUsingPayeeSql('IS NOT NULL')}) used`,
   );
   return result.rows[0]!.count;
 }
@@ -74,11 +72,7 @@ export async function mergePayees(
     const source = await findPayee(tx, sourceId, true);
     const target = await findPayee(tx, targetId, true);
     // Transactions with the source, themselves or on a Split line (ADR-0006).
-    const ids = await tx.query<{ id: string }>(
-      `SELECT id FROM "transaction" WHERE payee_id = $1
-       UNION SELECT transaction_id FROM split_line WHERE payee_id = $1`,
-      [sourceId],
-    );
+    const ids = await tx.query<{ id: string }>(transactionsUsingPayeeSql('= $1'), [sourceId]);
     const transactionIds = ids.rows.map((row) => row.id);
     await recordClassificationChanges(scope, transactionIds, async () => {
       await tx.query('UPDATE "transaction" SET payee_id = $1 WHERE payee_id = $2', [
