@@ -9,10 +9,15 @@ function detail(amountMinor: number | null, counterpartyName: string | null) {
   return { amountMinor, counterpartyName, counterpartyIban: null, paymentReference: null };
 }
 
-function startingLines(amountMinor: number, bundledDetails: ReturnType<typeof detail>[] | null) {
+function startingLines(
+  amountMinor: number,
+  bundledDetails: ReturnType<typeof detail>[] | null,
+  payees: readonly { id: string; name: string }[] = [],
+) {
   return initialSplitDrafts(
     { amountMinor, currency: 'CHF', splitLines: [], bundledDetails },
     'apostrophe',
+    payees,
   );
 }
 
@@ -28,6 +33,54 @@ describe('the split form', () => {
       { amount: '-142.85', categoryId: '', tags: '', note: 'Services Industriels Exemple' },
       { amount: '-389.50', categoryId: '', tags: '', note: 'Assurance Ménage Exemple SA' },
       { amount: '-655.00', categoryId: '', tags: '', note: '' },
+    ]);
+  });
+
+  it("suggests each bundled payment's Payee by name, ignoring case, accents and spacing", () => {
+    const payees = [
+      { id: 'p-sie', name: 'services industriels  exemple' },
+      { id: 'p-ame', name: 'Assurance Menage Exemple SA' },
+    ];
+
+    expect(
+      startingLines(
+        -118735,
+        [
+          detail(-14285, 'Services Industriels Exemple'),
+          detail(-38950, 'Assurance Ménage Exemple SA'),
+          detail(-65500, 'Garderie Les Exemples'),
+        ],
+        payees,
+      ),
+    ).toEqual([
+      {
+        amount: '-142.85',
+        categoryId: '',
+        payeeId: 'p-sie',
+        tags: '',
+        note: 'Services Industriels Exemple',
+      },
+      {
+        amount: '-389.50',
+        categoryId: '',
+        payeeId: 'p-ame',
+        tags: '',
+        note: 'Assurance Ménage Exemple SA',
+      },
+      { amount: '-655.00', categoryId: '', tags: '', note: 'Garderie Les Exemples' },
+    ]);
+  });
+
+  it('leaves a bundled payment without a counterparty name, or with an ambiguous one, on the Transaction Payee', () => {
+    const payees = [
+      { id: 'p-cafe', name: 'Cafe' },
+      { id: 'p-cafe2', name: 'Café' },
+      { id: 'p-empty', name: ' ' },
+    ];
+
+    expect(startingLines(-10000, [detail(-4000, 'CAFÉ'), detail(-6000, null)], payees)).toEqual([
+      { amount: '-40.00', categoryId: '', tags: '', note: 'CAFÉ' },
+      { amount: '-60.00', categoryId: '', tags: '', note: '' },
     ]);
   });
 
@@ -54,6 +107,7 @@ describe('the split form', () => {
       initialSplitDrafts(
         { amountMinor: -118735, currency: 'CHF', splitLines: [], bundledDetails: null },
         'apostrophe',
+        [],
       ),
     ).toEqual([{ amount: "-1'187.35", categoryId: '', tags: '', note: '' }]);
   });
@@ -88,6 +142,7 @@ describe('the split form', () => {
         ],
       },
       'dot',
+      [coop, migros],
     );
 
     expect(drafts).toEqual([
@@ -133,6 +188,7 @@ describe('the split form', () => {
         ],
       },
       'apostrophe',
+      [migros],
     );
 
     expect(drafts).toEqual([
