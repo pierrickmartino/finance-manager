@@ -37,6 +37,14 @@ import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
 import { TransactionReceipt } from './transaction-receipt';
 import { TransferSection } from './transfer-section';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
+import {
+  LAYOUT_VARIANTS,
+  VariantA,
+  VariantB,
+  VariantC,
+  type VariantData,
+} from './layout-variants.prototype';
 
 export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
 
@@ -44,6 +52,7 @@ const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ variant?: string; tab?: string }>;
 }
 
 /** Each Split line's other side when it is a Transfer side, else what it may be linked with. */
@@ -77,7 +86,7 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
  * up, what to do with it: classify (with the fields locked against Rules), split, link as a
  * Transfer.
  */
-export default async function TransactionPage({ params }: TransactionPageProps) {
+export default async function TransactionPage({ params, searchParams }: TransactionPageProps) {
   const { id } = await params;
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
@@ -94,11 +103,45 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
       loadLineTransfers(ctx, transaction),
     ]);
 
+  // PROTOTYPE: throwaway layout variants (layout-variants.prototype.tsx), dev builds only.
+  const { variant = 'current', tab } = await searchParams;
+  if (process.env.NODE_ENV !== 'production' && variant !== 'current') {
+    const data: VariantData = {
+      transaction,
+      classification,
+      badges: transactionBadges(transaction, classification),
+      history,
+      groups,
+      payees,
+      tagNames: tags.map((tag) => tag.name),
+      counterpart,
+      linkOptions:
+        isSplit || counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id)),
+      lineTransfers,
+      fmt,
+      tab,
+    };
+    return (
+      <section className="flex flex-col gap-4 pb-16">
+        <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
+          ← Transactions
+        </Link>
+        {variant === 'A' && <VariantA data={data} />}
+        {variant === 'B' && <VariantB data={data} />}
+        {variant === 'C' && <VariantC data={data} />}
+        <PrototypeSwitcher variants={LAYOUT_VARIANTS} current={variant} />
+      </section>
+    );
+  }
+
   return (
     <section className="flex flex-col gap-4">
       <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
         ← Transactions
       </Link>
+      {process.env.NODE_ENV !== 'production' && (
+        <PrototypeSwitcher variants={LAYOUT_VARIANTS} current="current" />
+      )}
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <TransactionReceipt
