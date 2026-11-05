@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { ActionForm } from '@/components/action-form';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { BUTTON_CLASS } from '@/components/named-list';
 import { CARD_CLASS, DANGER_BUTTON_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
@@ -34,6 +36,12 @@ import {
 } from './actions';
 import { BankDetails } from './bank-details';
 import { ClassificationForm } from './classification-form';
+import {
+  readVariant,
+  TWO_COLUMN_VARIANTS,
+  TwoColumnVariant,
+  type TransactionPanels,
+} from './prototype-two-column-variants';
 import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
 import { TransactionHeader } from './transaction-header';
@@ -45,6 +53,7 @@ const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /** Each Split line's other side when it is a Transfer side, else what it may be linked with. */
@@ -78,8 +87,9 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
  * link as a Transfer) and the bank fields; then its History, folded; and last, across the full
  * width, its Split, which needs the room.
  */
-export default async function TransactionPage({ params }: TransactionPageProps) {
+export default async function TransactionPage({ params, searchParams }: TransactionPageProps) {
   const { id } = await params;
+  const variant = readVariant((await searchParams).variant);
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
   const isSplit = transaction.splitLines.length > 0;
@@ -95,6 +105,76 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
       loadLineTransfers(ctx, transaction),
     ]);
 
+  const historyPanel = (open: boolean) => (
+    <details open={open} className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
+      <summary className="cursor-pointer text-sm font-semibold text-zinc-500">
+        History ({history.length})
+      </summary>
+      <div className="flex flex-col gap-3 pt-3">
+        {history.length === 0 ? (
+          <p className="text-sm text-zinc-500">No History for this Transaction.</p>
+        ) : (
+          <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
+        )}
+        <Link
+          href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
+          className="text-sm underline"
+        >
+          Open in History
+        </Link>
+      </div>
+    </details>
+  );
+
+  const panels: TransactionPanels = {
+    classification: (
+      <section aria-labelledby="classification" className={PANEL}>
+        <h2 id="classification" className="text-lg font-semibold">
+          Classification
+        </h2>
+        <ClassificationForm
+          classification={classification}
+          groups={groups}
+          payeeNames={payees.map((payee) => payee.name)}
+          tagNames={tags.map((tag) => tag.name)}
+          action={editClassificationAction.bind(null, transaction.id)}
+        />
+        <LockedFields classification={classification} />
+        <Link href={`/rules/new?fromTransaction=${transaction.id}`} className="text-sm underline">
+          Create rule from this Transaction
+        </Link>
+      </section>
+    ),
+    // A split Transaction is linked by its Split lines, not as a whole (ADR-0005).
+    transfer: isSplit ? (
+      <div className={PANEL}>
+        <h2 className="text-lg font-semibold">Transfer</h2>
+        <p className="text-sm text-zinc-500">Linked line by line, in the Split below.</p>
+      </div>
+    ) : (
+      <TransferSection
+        transactionId={transaction.id}
+        counterpart={counterpart}
+        options={counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))}
+        fmt={fmt}
+        className={PANEL}
+      />
+    ),
+    bank: <BankDetails transaction={transaction} fmt={fmt} className={PANEL} />,
+    history: historyPanel(false),
+    historyOpen: historyPanel(true),
+    split: (
+      <SplitSection
+        transaction={transaction}
+        groups={groups}
+        payees={payees}
+        lineTransfers={lineTransfers}
+        fmt={fmt}
+        className={`${PANEL} gap-4`}
+      />
+    ),
+  };
+
   return (
     <section className="flex flex-col gap-5">
       <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
@@ -106,66 +186,11 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         fmt={fmt}
         actions={<TransactionActions transaction={transaction} />}
       />
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-3">
-        <section aria-labelledby="classification" className={PANEL}>
-          <h2 id="classification" className="text-lg font-semibold">
-            Classification
-          </h2>
-          <ClassificationForm
-            classification={classification}
-            groups={groups}
-            payeeNames={payees.map((payee) => payee.name)}
-            tagNames={tags.map((tag) => tag.name)}
-            action={editClassificationAction.bind(null, transaction.id)}
-          />
-          <LockedFields classification={classification} />
-          <Link href={`/rules/new?fromTransaction=${transaction.id}`} className="text-sm underline">
-            Create rule from this Transaction
-          </Link>
-        </section>
-        {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
-        {isSplit ? (
-          <div className={PANEL}>
-            <h2 className="text-lg font-semibold">Transfer</h2>
-            <p className="text-sm text-zinc-500">Linked line by line, in the Split below.</p>
-          </div>
-        ) : (
-          <TransferSection
-            transactionId={transaction.id}
-            counterpart={counterpart}
-            options={counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))}
-            fmt={fmt}
-            className={PANEL}
-          />
-        )}
-        <BankDetails transaction={transaction} fmt={fmt} className={PANEL} />
-      </div>
-      <details className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
-        <summary className="cursor-pointer text-sm font-semibold text-zinc-500">
-          History ({history.length})
-        </summary>
-        <div className="flex flex-col gap-3 pt-3">
-          {history.length === 0 ? (
-            <p className="text-sm text-zinc-500">No History for this Transaction.</p>
-          ) : (
-            <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
-          )}
-          <Link
-            href={historyHref({ entityType: 'transaction', entityId: transaction.id })}
-            className="text-sm underline"
-          >
-            Open in History
-          </Link>
-        </div>
-      </details>
-      <SplitSection
-        transaction={transaction}
-        groups={groups}
-        payees={payees}
-        lineTransfers={lineTransfers}
-        fmt={fmt}
-        className={`${PANEL} gap-4`}
-      />
+      {/* PROTOTYPE: 2-column layouts, see prototype-two-column-variants.tsx. */}
+      <TwoColumnVariant variant={variant} panels={panels} />
+      <Suspense>
+        <PrototypeSwitcher variants={TWO_COLUMN_VARIANTS} current={variant} />
+      </Suspense>
     </section>
   );
 }
