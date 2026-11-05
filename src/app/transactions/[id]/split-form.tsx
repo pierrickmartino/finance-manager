@@ -8,10 +8,21 @@ import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
 import type { PayeeRef } from '@/server/services/payees';
-import { editableAmount, remainingMinor, type SplitLineDraft } from './split-lines';
+import { AllocationBar, lineColor } from './allocation-bar';
+import { editableAmount, splitAllocation, type SplitLineDraft } from './split-lines';
 
 const INPUT =
-  'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+  'w-full min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+
+/**
+ * One row per line from `md` up, like a spreadsheet: marker, Category, Payee, Tags, Note,
+ * Amount, actions. Narrower, each line wraps into a two-column card.
+ */
+const ROW =
+  'grid grid-cols-2 items-end gap-2 md:grid-cols-[2rem_minmax(10rem,1.4fr)_minmax(8rem,1fr)_minmax(7rem,1fr)_minmax(8rem,1.3fr)_8rem_6.5rem] md:items-center';
+
+/** A field's visible name, shown above it only where the column headers are hidden. */
+const FIELD_NAME = 'text-xs text-zinc-500 md:sr-only';
 
 const EMPTY_LINE: SplitLineDraft = { amount: '', categoryId: '', tags: '', note: '' };
 
@@ -40,9 +51,10 @@ interface SplitFormProps {
 
 /**
  * Divides a Transaction's amount into Split lines (ADR-0004): each line has an amount, a
- * Category, a Payee (blank: the Transaction's, ADR-0006), Tags and a note, and the remaining
- * unallocated amount updates as the user types. A Transfer line (ADR-0005) shows its Transfer
- * instead of a Category and can't be removed.
+ * Category, a Payee (blank: the Transaction's, ADR-0006), Tags and a note. A bar shows how the
+ * lines divide the amount and what remains, updating as the user types; a line can take what
+ * remains. A Transfer line (ADR-0005) shows its Transfer instead of a Category and can't be
+ * removed.
  */
 export function SplitForm({
   amountMinor,
@@ -55,18 +67,21 @@ export function SplitForm({
   action,
 }: SplitFormProps) {
   const fmt = useFormatter();
+  const numberFormat = fmt.settings.numberFormat;
   const [state, formAction, isPending] = useActionState(action, null);
   const [lines, setLines] = useState<KeyedLine[]>(() =>
     initialLines.map((draft, index) => ({ key: index, draft })),
   );
   const nextKey = useRef(initialLines.length);
   const drafts = lines.map((line) => line.draft);
-  const remaining = remainingMinor(
+  const allocation = splitAllocation(
     amountMinor,
     drafts.map((draft) => draft.amount),
-    fmt.settings.numberFormat,
+    numberFormat,
     currency,
   );
+  const { remaining } = allocation;
+  const asEditable = (minor: number) => editableAmount(minor, numberFormat, currency);
 
   const update = (key: number, change: Partial<SplitLineDraft>) =>
     setLines((current) =>
@@ -90,54 +105,66 @@ export function SplitForm({
         const formData = new FormData(event.currentTarget);
         startTransition(() => formAction(formData));
       }}
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-4"
     >
       {/* One structured payload: every line's fields together, in order. */}
       <input type="hidden" name="lines" value={JSON.stringify(drafts)} />
-      <ol className="flex flex-col gap-2">
-        {lines.map((line, index) => (
-          <SplitLineFields
-            key={line.key}
-            line={line.draft}
-            number={index + 1}
-            groups={groups}
-            payees={payees}
-            transactionPayee={transactionPayee}
-            transfer={line.draft.isTransfer && (transfers[line.draft.id ?? ''] ?? 'Transfer')}
-            onChange={(change) => update(line.key, change)}
-            onRemove={
-              lines.length > 1 && !line.draft.isTransfer ? () => remove(line.key) : undefined
-            }
-          />
-        ))}
-      </ol>
+      <AllocationBar
+        totalMinor={amountMinor}
+        allocation={allocation}
+        formatAmount={(minor) => fmt.amount(minor, { currency })}
+      />
+      <div className="flex flex-col">
+        <div
+          aria-hidden="true"
+          className={`${ROW} hidden border-b border-zinc-200 pb-1.5 text-xs text-zinc-500 md:grid dark:border-zinc-800`}
+        >
+          <span />
+          <span>Category</span>
+          <span>Payee</span>
+          <span>Tags</span>
+          <span>Note</span>
+          <span className="text-right">Amount</span>
+          <span />
+        </div>
+        <ol className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+          {lines.map((line, index) => (
+            <SplitLineFields
+              key={line.key}
+              line={line.draft}
+              index={index}
+              groups={groups}
+              payees={payees}
+              transactionPayee={transactionPayee}
+              transfer={line.draft.isTransfer && (transfers[line.draft.id ?? ''] ?? 'Transfer')}
+              onChange={(change) => update(line.key, change)}
+              onTakeRest={
+                remaining
+                  ? () =>
+                      update(line.key, {
+                        amount: asEditable((allocation.parts[index] ?? 0) + remaining),
+                      })
+                  : undefined
+              }
+              onRemove={
+                lines.length > 1 && !line.draft.isTransfer ? () => remove(line.key) : undefined
+              }
+            />
+          ))}
+        </ol>
+      </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <button
           type="button"
           className={BUTTON_CLASS}
-          onClick={() =>
-            add({
-              ...EMPTY_LINE,
-              // A new line takes what is left, so two lines balance at once.
-              amount:
-                remaining !== null && remaining !== 0
-                  ? editableAmount(remaining, fmt.settings.numberFormat, currency)
-                  : '',
-            })
-          }
+          // A new line takes what is left, so two lines balance at once.
+          onClick={() => add({ ...EMPTY_LINE, amount: remaining ? asEditable(remaining) : '' })}
         >
           Add line
         </button>
-        <p aria-live="polite">
-          Remaining:{' '}
-          <span className="tabular-nums" data-testid="split-remaining">
-            {remaining === null ? '—' : fmt.amount(remaining, { currency })}
-          </span>
-        </p>
-      </div>
-      <div className="flex items-center gap-3">
+        <span className="ml-auto" />
+        {state?.ok && <span className="text-zinc-500">Saved.</span>}
         <SubmitButton isPending={isPending}>Save Split</SubmitButton>
-        {state?.ok && <span className="text-sm text-zinc-500">Saved.</span>}
       </div>
       {state && !state.ok && <FieldError message={state.error} />}
     </form>
@@ -146,44 +173,48 @@ export function SplitForm({
 
 interface SplitLineFieldsProps {
   line: SplitLineDraft;
-  number: number;
+  /** 0-based position; lines are numbered from 1. */
+  index: number;
   groups: CategoryGroup[];
   payees: PayeeRef[];
   transactionPayee: string | null;
-  /** What a Transfer line shows in place of its Category picker; falsy for other lines. */
+  /** What a Transfer line shows in place of its Category and Payee; falsy for other lines. */
   transfer: ReactNode;
   onChange: (change: Partial<SplitLineDraft>) => void;
+  /** Absent while nothing remains to allocate. */
+  onTakeRest?: () => void;
   /** Absent for the last remaining line and for a Transfer line. */
   onRemove?: () => void;
 }
 
 function SplitLineFields({
   line,
-  number,
+  index,
   groups,
   payees,
   transactionPayee,
   transfer,
   onChange,
+  onTakeRest,
   onRemove,
 }: SplitLineFieldsProps) {
+  const number = index + 1;
   return (
-    <li className="flex flex-wrap items-end gap-2 text-sm">
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Amount</span>
-        <input
-          aria-label={`Amount of line ${number}`}
-          value={line.amount}
-          onChange={(event) => onChange({ amount: event.target.value })}
-          inputMode="decimal"
-          autoComplete="off"
-          className={`${INPUT} w-32 text-right tabular-nums`}
+    <li className={`${ROW} py-2 text-sm`}>
+      <span className="col-span-2 flex items-center gap-1.5 text-xs text-zinc-500 md:col-span-1">
+        <span
+          aria-hidden="true"
+          className={`h-2.5 w-2.5 shrink-0 rounded-full ${lineColor(index)}`}
         />
-      </label>
+        <span>
+          <span className="md:sr-only">Line </span>
+          {number}
+        </span>
+      </span>
       {transfer ? (
-        <div className="flex flex-col gap-1" data-testid={`transfer of line ${number}`}>
-          <span className="text-xs text-zinc-500">Transfer</span>
-          <span className="py-1.5 text-sky-700 dark:text-sky-400">{transfer}</span>
+        <div className="col-span-2 flex flex-col gap-1" data-testid={`transfer of line ${number}`}>
+          <span className={FIELD_NAME}>Transfer</span>
+          <span className="text-sky-700 dark:text-sky-400">{transfer}</span>
         </div>
       ) : (
         <>
@@ -198,52 +229,79 @@ function SplitLineFields({
         </>
       )}
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Tags</span>
+        <span className={FIELD_NAME}>Tags</span>
         <input
           aria-label={`Tags of line ${number}`}
           value={line.tags}
           onChange={(event) => onChange({ tags: event.target.value })}
           placeholder="Renovation"
           autoComplete="off"
-          className={`${INPUT} w-40`}
+          className={INPUT}
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Note</span>
+        <span className={FIELD_NAME}>Note</span>
         <input
           aria-label={`Note of line ${number}`}
           value={line.note}
           onChange={(event) => onChange({ note: event.target.value })}
           maxLength={MAX_NOTES_LENGTH}
           autoComplete="off"
-          className={`${INPUT} w-48`}
+          className={INPUT}
         />
       </label>
-      {onRemove && (
-        <button
-          type="button"
-          aria-label={`Remove line ${number}`}
-          onClick={onRemove}
-          className={BUTTON_CLASS}
-        >
-          Remove
-        </button>
-      )}
+      <label className="col-span-2 flex flex-col gap-1 md:col-span-1">
+        <span className={FIELD_NAME}>Amount</span>
+        <input
+          aria-label={`Amount of line ${number}`}
+          value={line.amount}
+          onChange={(event) => onChange({ amount: event.target.value })}
+          inputMode="decimal"
+          autoComplete="off"
+          className={`${INPUT} text-right tabular-nums`}
+        />
+      </label>
+      <span className="col-span-2 flex justify-end gap-1 md:col-span-1">
+        {onTakeRest && (
+          <button
+            type="button"
+            aria-label={`Add what remains to line ${number}`}
+            title="Add what remains to this line"
+            onClick={onTakeRest}
+            className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            + rest
+          </button>
+        )}
+        {onRemove && (
+          <button
+            type="button"
+            aria-label={`Remove line ${number}`}
+            title="Remove this line"
+            onClick={onRemove}
+            className="rounded-md px-2 py-1 text-zinc-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950"
+          >
+            ✕
+          </button>
+        )}
+      </span>
     </li>
   );
 }
 
-type CategoryPickerProps = Pick<SplitLineFieldsProps, 'line' | 'number' | 'groups' | 'onChange'>;
+type CategoryPickerProps = Pick<SplitLineFieldsProps, 'line' | 'groups' | 'onChange'> & {
+  number: number;
+};
 
 function CategoryPicker({ line, number, groups, onChange }: CategoryPickerProps) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-zinc-500">Category</span>
+      <span className={FIELD_NAME}>Category</span>
       <select
         aria-label={`Category of line ${number}`}
         value={line.categoryId}
         onChange={(event) => onChange({ categoryId: event.target.value })}
-        className={INPUT}
+        className={`${INPUT} ${line.categoryId === '' ? 'text-zinc-500' : ''}`}
       >
         <option value="">Choose a Category</option>
         {groups.map((group) => (
@@ -262,8 +320,8 @@ function CategoryPicker({ line, number, groups, onChange }: CategoryPickerProps)
 
 type PayeePickerProps = Pick<
   SplitLineFieldsProps,
-  'line' | 'number' | 'payees' | 'transactionPayee' | 'onChange'
->;
+  'line' | 'payees' | 'transactionPayee' | 'onChange'
+> & { number: number };
 
 /**
  * A line's own Payee (ADR-0006). Blank by default, showing the Transaction's Payee it then
@@ -273,7 +331,7 @@ function PayeePicker({ line, number, payees, transactionPayee, onChange }: Payee
   const payeeId = line.payeeId ?? '';
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-zinc-500">Payee</span>
+      <span className={FIELD_NAME}>Payee</span>
       <select
         aria-label={`Payee of line ${number}`}
         value={payeeId}
