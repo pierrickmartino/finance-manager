@@ -16,6 +16,7 @@ const PATHS = {
   signOut: 'M15 4h4v16h-4M10 17l5-5-5-5M15 12H3',
   menu: 'M4 6h16M4 12h16M4 18h16',
   close: 'M6 6l12 12M18 6L6 18',
+  pin: 'M12 16v6M8 3h8l-1.5 6L18 12v4H6v-4l3.5-3z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

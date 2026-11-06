@@ -2,9 +2,11 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import { DesktopSidebar } from './desktop-sidebar';
 import { Icon } from './icon';
 import { findCurrentPage } from './navigation';
 import { Brand, Sidebar } from './sidebar';
+import type { SidebarMode } from './sidebar-mode';
 
 const ICON_BUTTON =
   'grid h-9 w-9 place-items-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800';
@@ -57,6 +59,8 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
 interface AppShellProps {
   /** Signed out (login, setup), only the page renders: no sidebar, top bar or drawer. */
   showNavigation: boolean;
+  /** The desktop sidebar's saved mode: pinned open, or a rail of icons. */
+  sidebarMode: SidebarMode;
   children: ReactNode;
 }
 
@@ -67,16 +71,12 @@ interface AppShellProps {
  * whose action signs the user in (first-run setup shows its recovery codes afterwards) is not
  * remounted, and loses no state, when the navigation appears.
  */
-export function AppShell({ showNavigation, children }: AppShellProps) {
+export function AppShell({ showNavigation, sidebarMode, children }: AppShellProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      {showNavigation && (
-        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-900">
-          <Sidebar />
-        </aside>
-      )}
+      {showNavigation && <DesktopSidebar initialMode={sidebarMode} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {showNavigation && (
