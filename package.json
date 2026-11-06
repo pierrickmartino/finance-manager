@@ -29,6 +29,9 @@
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
+    "@number-flow/react": "0.6.2",
+    "echarts": "6.1.0",
+    "motion": "14.10.0",
     "next": "16.4.3",
     "node-pg-migrate": "^9.0.0",
     "otpauth": "^9.5.2",

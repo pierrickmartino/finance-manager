@@ -24,6 +24,9 @@ import { editWidgetHref, loadWidgetView } from '../load';
 import { DashboardTabs } from '../tabs';
 import { WidgetVisualisation } from '../widget-visualisation';
 import { DashboardGrid, type GridWidget } from './dashboard-grid';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
+import type { ProtoWidget } from './prototype/data';
+import { PROTOTYPE_VARIANTS, PrototypeVariant } from './prototype/variants';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 
@@ -132,10 +135,49 @@ async function gridWidget(ctx: ServiceContext, widget: Widget): Promise<GridWidg
   };
 }
 
+/** PROTOTYPE (throwaway): the variants' data, read-only. See ./prototype/variants.tsx. */
+async function prototypeWidgets(ctx: ServiceContext, widgets: Widget[]): Promise<ProtoWidget[]> {
+  return Promise.all(
+    widgets.map(async (widget) => {
+      const view = await loadWidgetView(ctx, widget);
+      return {
+        id: widget.id,
+        name: widget.name,
+        source: widget.source,
+        visualisation: widget.visualisation,
+        data: view.data,
+        error: view.error,
+      };
+    }),
+  );
+}
+
 /** A Dashboard: its Widgets on a drag-and-drop grid (spec 104), values in CHF. */
-export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
+  // PROTOTYPE (throwaway): `?variant=A|B|C` swaps the rendering; never in production.
+  const variant = process.env.NODE_ENV === 'production' ? null : (await searchParams).variant;
+  if (typeof variant === 'string' && variant !== 'current') {
+    const dashboards = await listDashboards(ctx);
+    return (
+      <section className="flex flex-col gap-4 pb-24">
+        <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
+        <PrototypeVariant
+          variant={variant}
+          dashboardName={dashboard.name}
+          widgets={await prototypeWidgets(ctx, dashboard.widgets)}
+        />
+        <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} />
+      </section>
+    );
+  }
   const [dashboards, widgets, savedWidgets] = await Promise.all([
     listDashboards(ctx),
     Promise.all(dashboard.widgets.map((widget) => gridWidget(ctx, widget))),
@@ -174,6 +216,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
           widgets={widgets}
         />
       )}
+      {process.env.NODE_ENV !== 'production' && <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} />}
     </section>
   );
 }
