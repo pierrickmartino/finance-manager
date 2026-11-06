@@ -6,6 +6,11 @@ import { getServiceContext } from '@/server/app-context';
 import { listDashboards } from '@/server/services/dashboards';
 import { listWidgets, type Widget } from '@/server/services/reporting';
 import { INPUT_CLASS } from '@/components/named-list';
+import {
+  PAGE_TITLE_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECONDARY_BUTTON_CLASS,
+} from '@/components/surface';
 import { widgetPickerOptions, type WidgetPickerOption } from '@/lib/reporting/widget-picker';
 import type { ServiceContext } from '@/server/services/context';
 import {
@@ -21,9 +26,8 @@ import { DashboardGrid, type GridWidget } from '../dashboard-grid';
 
 export const metadata: Metadata = { title: 'Edit Dashboard · Finance Manager' };
 
-const LINK_BUTTON =
-  'rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900';
-const SMALL_ACTION = 'text-xs text-zinc-600 underline dark:text-zinc-400';
+const LINK_BUTTON = SECONDARY_BUTTON_CLASS;
+const SMALL_ACTION = 'text-xs text-ink-soft underline';
 const DEFAULT_LAYOUT = { x: 0, y: 0, w: 6, h: 8 };
 
 function WidgetHeader({ widget }: { widget: Widget }) {
@@ -50,7 +54,7 @@ function WidgetHeader({ widget }: { widget: Widget }) {
         label={`Delete ${widget.name}`}
         confirmMessage={`Delete the Widget "${widget.name}"?`}
       >
-        <button type="submit" className={`${SMALL_ACTION} text-red-700 dark:text-red-400`}>
+        <button type="submit" className={`${SMALL_ACTION} text-negative`}>
           Delete
         </button>
       </ActionForm>
@@ -98,9 +102,7 @@ async function gridWidget(ctx: ServiceContext, widget: Widget): Promise<GridWidg
       <div className="flex h-full flex-col gap-1">
         {view.error && <FieldError message={view.error} />}
         {view.unconvertedCount > 0 && (
-          <p className="text-xs text-amber-700 dark:text-amber-400">
-            {view.unconvertedCount} left out: no FX rate yet.
-          </p>
+          <p className="text-xs text-warning">{view.unconvertedCount} left out: no FX rate yet.</p>
         )}
         {view.data && (
           <div className="min-h-0 flex-1">
@@ -134,7 +136,7 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
     <section className="flex flex-col gap-4">
       <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{dashboard.name}</h1>
+        <h1 className={PAGE_TITLE_CLASS}>{dashboard.name}</h1>
         <div className="flex flex-wrap items-center gap-2">
           <Link href={`/widgets/new?dashboard=${dashboard.id}`} className={LINK_BUTTON}>
             Add Widget
@@ -151,16 +153,13 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
             dashboardId={dashboard.id}
             options={widgetPickerOptions(savedWidgets, dashboards)}
           />
-          <Link
-            href={`/dashboards/${dashboard.id}`}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
-          >
+          <Link href={`/dashboards/${dashboard.id}`} className={PRIMARY_BUTTON_CLASS}>
             Done
           </Link>
         </div>
       </div>
       {widgets.length === 0 ? (
-        <p className="text-sm text-zinc-500">No Widgets yet. Add one to start.</p>
+        <p className="text-sm text-muted">No Widgets yet. Add one to start.</p>
       ) : (
         <DashboardGrid
           key={widgets.map((widget) => widget.id).join()}

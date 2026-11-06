@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useActionState } from 'react';
 import { FieldError, SubmitButton, TextField } from '@/components/form';
 import { completeSetupAction } from './actions';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 interface SetupFormProps {
   /** The authenticator to enrol; null once setup is complete. */
@@ -20,14 +21,14 @@ export function SetupForm({ enrolment }: SetupFormProps) {
   if (state?.ok) {
     return (
       <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">Recovery codes</h2>
+        <h2 className={SECTION_TITLE_CLASS}>Recovery codes</h2>
         <p className="text-sm">
           Each code signs you in once without the authenticator app. Store them somewhere safe: they
           are not shown again.
         </p>
         <ul
           aria-label="Recovery codes"
-          className="grid grid-cols-2 gap-1 rounded-md border border-zinc-200 p-3 font-mono text-sm dark:border-zinc-800"
+          className="grid grid-cols-2 gap-1 rounded-md border border-rule p-3 font-mono text-sm"
         >
           {state.data.map((code) => (
             <li key={code}>{code}</li>

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { CARD_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
+import { CARD_CLASS, HEADLINE_AMOUNT_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { amountClass, CategoryLabel, transactionName } from './transaction-display';
@@ -18,17 +18,15 @@ export function TransactionPreview({ fmt, transaction }: TransactionPreviewProps
       className={`${CARD_CLASS} hidden h-fit flex-col gap-4 p-4 xl:sticky xl:top-4 xl:flex`}
     >
       <div>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted">
           {fmt.date(transaction.bookingDate)} · {transaction.accountName}
         </p>
-        <p
-          className={`mt-1 text-3xl font-semibold tabular-nums ${amountClass(transaction.amountMinor)}`}
-        >
+        <p className={`mt-1 ${HEADLINE_AMOUNT_CLASS} ${amountClass(transaction.amountMinor)}`}>
           {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
         </p>
         <p className="mt-1 font-medium break-words">{transactionName(transaction)}</p>
       </div>
-      <dl className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
+      <dl className="divide-y divide-rule text-sm">
         <Field label="Category" value={<CategoryLabel transaction={transaction} />} />
         <Field label="Payee" value={transaction.payee?.name} />
         <Field label="Tags" value={transaction.tags.map((tag) => tag.name).join(', ')} />
@@ -44,7 +42,7 @@ export function TransactionPreview({ fmt, transaction }: TransactionPreviewProps
         <Field label="Reference" value={transaction.paymentReference} />
         <Field label="Source" value={transaction.isManual ? 'Manual' : 'Imported'} />
       </dl>
-      <p className="rounded-md bg-zinc-50 p-2 font-mono text-xs break-words text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+      <p className="rounded-md bg-paper p-2 font-mono text-xs break-words text-ink-soft">
         {transaction.rawDescription || '(no description)'}
       </p>
       {transaction.notes && <p className="text-sm whitespace-pre-line">{transaction.notes}</p>}
@@ -61,7 +59,7 @@ export function TransactionPreview({ fmt, transaction }: TransactionPreviewProps
 function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-4 py-1.5">
-      <dt className="text-zinc-500">{label}</dt>
+      <dt className="text-muted">{label}</dt>
       <dd className="min-w-0 text-right break-words">{value || '—'}</dd>
     </div>
   );

@@ -17,6 +17,7 @@ import { FilterRail } from './filter-rail';
 import { pickSelected, readTransactionSearch, transactionsHref, type SearchValues } from './search';
 import { TransactionList } from './transaction-list';
 import { TransactionPreview } from './transaction-preview';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Transactions · Finance Manager' };
 
@@ -56,7 +57,7 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Transactions</h1>
+      <h1 className={PAGE_TITLE_CLASS}>Transactions</h1>
       <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
         <FilterRail values={search.values} lists={{ accounts, groups, payees, tags }} />
 
@@ -64,10 +65,10 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
           {error && <FieldError message={error} />}
           {page &&
             (page.transactions.length === 0 ? (
-              <p className="text-sm text-zinc-500">No Transactions match.</p>
+              <p className="text-sm text-muted">No Transactions match.</p>
             ) : (
               <>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="text-sm text-ink-soft">
                   {page.total} Transaction{page.total === 1 ? '' : 's'}
                 </p>
                 <TransactionList
@@ -102,7 +103,7 @@ function Pagination({ values, page }: PaginationProps) {
           Previous
         </Link>
       ) : (
-        <span className="text-zinc-400">Previous</span>
+        <span className="text-faint">Previous</span>
       )}
       <span>
         Page {page.page} of {page.pageCount}
@@ -112,7 +113,7 @@ function Pagination({ values, page }: PaginationProps) {
           Next
         </Link>
       ) : (
-        <span className="text-zinc-400">Next</span>
+        <span className="text-faint">Next</span>
       )}
     </nav>
   );

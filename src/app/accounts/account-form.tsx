@@ -110,7 +110,7 @@ export function AccountForm({ banks, action, submitLabel, account }: AccountForm
       </div>
       {state && !state.ok && <FieldError message={state.error} />}
       {state?.ok && account && (
-        <p role="status" className="text-sm text-green-700 dark:text-green-400">
+        <p role="status" className="text-sm text-positive">
           Saved.
         </p>
       )}

@@ -17,17 +17,14 @@ interface HistoryTimelineProps {
  */
 export function HistoryTimeline({ entries, fmt, label }: HistoryTimelineProps) {
   return (
-    <ol
-      aria-label={label}
-      className="flex flex-col gap-4 border-l border-zinc-200 pl-5 dark:border-zinc-800"
-    >
+    <ol aria-label={label} className="flex flex-col gap-4 border-l border-rule pl-5">
       {groupHistoryBatches(entries).map((batch, index) => (
         <li key={`${batch.batchId}-${index}`} className="relative">
           <span
             aria-hidden="true"
-            className="absolute top-1.5 -left-[25px] h-2.5 w-2.5 rounded-full bg-zinc-400 ring-4 ring-zinc-50 dark:bg-zinc-500 dark:ring-zinc-950"
+            className="absolute top-1.5 -left-[25px] h-2.5 w-2.5 rounded-full bg-faint ring-4 ring-paper"
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted">
             <Link href={historyHref({ batchId: batch.batchId })} className="hover:underline">
               {fmt.dateTime(batch.at)}
             </Link>{' '}
@@ -36,12 +33,10 @@ export function HistoryTimeline({ entries, fmt, label }: HistoryTimelineProps) {
           <ul className="mt-1 flex flex-col gap-0.5 text-sm">
             {batch.entries.map((entry) => (
               <li key={entry.id} className="break-words">
-                <span className="text-zinc-500">{entry.field}</span>{' '}
+                <span className="text-muted">{entry.field}</span>{' '}
                 {entry.before !== null && (
                   <>
-                    <del className="text-zinc-400">
-                      {renderValue(entry.field, entry.before, fmt)}
-                    </del>{' '}
+                    <del className="text-faint">{renderValue(entry.field, entry.before, fmt)}</del>{' '}
                     →{' '}
                   </>
                 )}

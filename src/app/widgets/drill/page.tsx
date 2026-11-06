@@ -22,6 +22,7 @@ import {
 } from '@/server/services/reporting';
 import { loadReport } from '../load';
 import { drillHref } from '../pivot-data';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Drill-down · Finance Manager' };
 
@@ -68,7 +69,7 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Transactions in {describeCell(report, cell)}</h1>
+        <h1 className={PAGE_TITLE_CLASS}>Transactions in {describeCell(report, cell)}</h1>
         <Link href={`/widgets/new?${queryToParams(query)}`} className="text-sm underline">
           Back to the editor
         </Link>
@@ -76,13 +77,13 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
       {error && <FieldError message={error} />}
       {page && (
         <>
-          <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p role="status" className="text-sm text-ink-soft">
             {page.total} Transaction{page.total === 1 ? '' : 's'}, total{' '}
             {fmt.amount(page.sumChfMinor ?? 0, { currency: 'CHF' })}
           </p>
           <div className="overflow-x-auto">
             <table aria-label="Cell Transactions" className="w-full text-sm">
-              <thead className="border-b border-zinc-200 dark:border-zinc-800">
+              <thead className="border-b border-rule">
                 <tr>
                   <th className={CELL}>Date</th>
                   <th className={CELL}>Account</th>
@@ -93,7 +94,7 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
                   <th className={`${CELL} text-right`}>CHF</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <tbody className="divide-y divide-rule">
                 {page.transactions.map((transaction) => (
                   <tr key={transaction.id}>
                     <td className={`${CELL} whitespace-nowrap tabular-nums`}>

@@ -102,7 +102,7 @@ export function ManualTransactionForm({
       </div>
       {state && !state.ok && <FieldError message={state.error} />}
       {state?.ok && (
-        <p role="status" className="text-sm text-green-700 dark:text-green-400">
+        <p role="status" className="text-sm text-positive">
           {isQuickEntry
             ? `Added ${state.data.rawDescription} (${fmt.amount(state.data.amountMinor, { currency })}).`
             : 'Saved.'}

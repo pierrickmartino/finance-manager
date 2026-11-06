@@ -39,7 +39,7 @@ export function Menu({ trigger, label, triggerClassName, children }: MenuProps) 
       <summary aria-label={label} className={`cursor-pointer list-none ${triggerClassName}`}>
         {trigger}
       </summary>
-      <div className="absolute right-0 z-10 mt-1 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="absolute right-0 z-10 mt-1 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-xl border border-rule bg-surface p-3 shadow-lg">
         {children}
       </div>
     </details>

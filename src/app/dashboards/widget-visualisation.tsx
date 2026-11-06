@@ -46,7 +46,7 @@ export function WidgetVisualisation({
         <button
           type="button"
           onClick={() => setTable(!isTable)}
-          className="text-xs text-zinc-600 underline dark:text-zinc-400"
+          className="text-xs text-ink-soft underline"
         >
           {isTable ? 'Show chart' : 'Show table'}
         </button>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getServiceContext } from '@/server/app-context';
 import { listDashboards } from '@/server/services/dashboards';
 import { AXIS_LABELS, listWidgets, MEASURE_LABELS } from '@/server/services/reporting';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Widgets · Finance Manager' };
 
@@ -16,21 +17,21 @@ export default async function WidgetsPage() {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Widgets</h1>
+        <h1 className={PAGE_TITLE_CLASS}>Widgets</h1>
         <Link
           href="/widgets/new"
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-hover"
         >
           New Widget
         </Link>
       </div>
       {widgets.length === 0 ? (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           No Widgets yet. Create one with New Widget, or add one from a Dashboard.
         </p>
       ) : (
         <table aria-label="Widgets" className="w-full text-sm">
-          <thead className="border-b border-zinc-200 dark:border-zinc-800">
+          <thead className="border-b border-rule">
             <tr>
               <th className={CELL}>Name</th>
               <th className={CELL}>Rows</th>
@@ -39,7 +40,7 @@ export default async function WidgetsPage() {
               <th className={CELL}>Dashboard</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {widgets.map((widget) => (
               <tr key={widget.id}>
                 <td className={CELL}>

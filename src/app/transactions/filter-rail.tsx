@@ -10,9 +10,8 @@ import type { Payee } from '@/server/services/payees';
 import type { Tag } from '@/server/services/tags';
 import { transactionsExportHref, type SearchValues } from './search';
 
-const INPUT =
-  'w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
-const LABEL = 'flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400';
+const INPUT = 'w-full rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm';
+const LABEL = 'flex flex-col gap-1 text-xs font-medium text-ink-soft';
 
 export interface FilterLists {
   accounts: Account[];
@@ -102,7 +101,7 @@ export function FilterRail({ values, lists }: FilterRailProps) {
           Unclassified only
         </label>
       </div>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-muted">
         Amounts are signed: expenses are negative, so &quot;Amount to&quot; 0 lists only expenses.
       </p>
       <button type="submit" className={PRIMARY_BUTTON_CLASS}>

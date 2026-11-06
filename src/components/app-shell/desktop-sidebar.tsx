@@ -8,10 +8,9 @@ import { sidebarModeCookie, type SidebarMode } from './sidebar-mode';
 /** Long enough that sweeping the pointer across the rail on the way elsewhere doesn't open it. */
 const PEEK_DELAY_MS = 150;
 
-const PIN_BUTTON =
-  'grid h-8 w-8 shrink-0 place-items-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800';
-const PIN_ON = 'text-emerald-600 dark:text-emerald-400';
-const PIN_OFF = 'text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100';
+const PIN_BUTTON = 'grid h-8 w-8 shrink-0 place-items-center rounded-lg hover:bg-sunken';
+const PIN_ON = 'text-accent-ink';
+const PIN_OFF = 'text-faint hover:text-ink';
 
 interface DesktopSidebarProps {
   /** The mode saved in the sidebar cookie, read by the server so the first paint is right. */
@@ -81,7 +80,7 @@ export function DesktopSidebar({ initialMode }: DesktopSidebarProps) {
         onFocus={onFocus}
         onBlur={onBlur}
         onKeyDown={onKeyDown}
-        className={`absolute inset-y-0 left-0 overflow-hidden border-r border-zinc-200 bg-white motion-safe:transition-[width,box-shadow] motion-safe:duration-200 dark:border-zinc-800 dark:bg-zinc-900 ${isOpen ? 'w-64' : 'w-16'} ${isPeeking && !isPinned ? 'shadow-2xl' : ''}`}
+        className={`absolute inset-y-0 left-0 overflow-hidden border-r border-rule bg-surface motion-safe:transition-[width,box-shadow] motion-safe:duration-200 ${isOpen ? 'w-64' : 'w-16'} ${isPeeking && !isPinned ? 'shadow-2xl' : ''}`}
       >
         <div className="h-full w-64">
           <Sidebar

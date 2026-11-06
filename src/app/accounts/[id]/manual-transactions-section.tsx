@@ -4,6 +4,7 @@ import type { Account } from '@/server/services/accounts';
 import type { Transaction } from '@/server/services/transactions/model';
 import { createManualTransactionAction } from './actions';
 import { ManualTransactionForm } from './manual-transaction-form';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 const CELL = 'px-3 py-2 text-left';
 
@@ -25,7 +26,7 @@ export function ManualTransactionsSection({
   const { currency } = account;
   return (
     <section aria-labelledby="manual-transactions" className="flex flex-col gap-3">
-      <h2 id="manual-transactions" className="text-lg font-semibold">
+      <h2 id="manual-transactions" className={SECTION_TITLE_CLASS}>
         Manual transactions
       </h2>
       {!account.archivedAt && (
@@ -37,11 +38,11 @@ export function ManualTransactionsSection({
         />
       )}
       {transactions.length === 0 ? (
-        <p className="text-sm text-zinc-500">No Manual transactions yet.</p>
+        <p className="text-sm text-muted">No Manual transactions yet.</p>
       ) : (
         <div className="overflow-x-auto">
           <table aria-label="Manual transactions" className="w-full text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800">
+            <thead className="border-b border-rule">
               <tr>
                 <th className={CELL}>Date</th>
                 <th className={CELL}>Description</th>
@@ -52,7 +53,7 @@ export function ManualTransactionsSection({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <tbody className="divide-y divide-rule">
               {transactions.map((transaction) => (
                 <tr key={transaction.id}>
                   <td className={CELL}>{fmt.date(transaction.bookingDate)}</td>

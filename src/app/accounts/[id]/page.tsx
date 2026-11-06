@@ -19,6 +19,7 @@ import { SnapshotMismatches } from '../snapshot-mismatches';
 import { ArchiveAccountButton } from './archive-account-button';
 import { BalanceSnapshotsSection } from './balance-snapshots-section';
 import { ManualTransactionsSection } from './manual-transactions-section';
+import { PAGE_TITLE_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Account · Finance Manager' };
 
@@ -52,11 +53,11 @@ export default async function AccountPage({ params }: AccountPageProps) {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <Link href="/accounts" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/accounts" className="text-sm text-muted hover:underline">
           ← Accounts
         </Link>
-        <h1 className="text-2xl font-semibold">{account.name}</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <h1 className={PAGE_TITLE_CLASS}>{account.name}</h1>
+        <p className="text-sm text-ink-soft">
           {account.bankName} · Balance{' '}
           <span className="tabular-nums">
             {fmt.amount(account.balanceMinor, { currency: account.currency })}
@@ -75,7 +76,7 @@ export default async function AccountPage({ params }: AccountPageProps) {
 
       {account.importFormat && !account.archivedAt && (
         <section aria-labelledby="import-file" className="flex flex-col gap-3">
-          <h2 id="import-file" className="text-lg font-semibold">
+          <h2 id="import-file" className={SECTION_TITLE_CLASS}>
             Import a file
           </h2>
           <ImportFileForm
@@ -86,7 +87,7 @@ export default async function AccountPage({ params }: AccountPageProps) {
       )}
 
       <section aria-labelledby="imports" className="flex flex-col gap-3">
-        <h2 id="imports" className="text-lg font-semibold">
+        <h2 id="imports" className={SECTION_TITLE_CLASS}>
           Imports
         </h2>
         <ImportsTable imports={imports} fmt={fmt} />

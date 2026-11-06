@@ -14,6 +14,7 @@ import {
   DANGER_BUTTON_CLASS,
   GHOST_BUTTON_CLASS,
   PRIMARY_BUTTON_CLASS,
+  SECTION_TITLE_CLASS,
 } from '@/components/surface';
 import { TypeBadge, TypeSelect } from './styles';
 import { transactionTotal } from './view';
@@ -39,11 +40,11 @@ export function GroupDetail({
   const maxCount = Math.max(0, ...group.categories.map((category) => category.transactionCount));
   return (
     <section aria-label={`Group ${group.name}`} className={`${CARD_CLASS} flex min-w-0 flex-col`}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 p-4 dark:border-zinc-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-semibold">{group.name}</h2>
+          <h2 className={SECTION_TITLE_CLASS}>{group.name}</h2>
           <TypeBadge type={group.type} />
-          <span className="text-sm text-zinc-400">
+          <span className="text-sm text-faint">
             {total} Transaction{total === 1 ? '' : 's'}
           </span>
         </div>
@@ -96,7 +97,7 @@ export function GroupDetail({
               </button>
             </ActionForm>
             {group.categories.length === 0 && (
-              <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              <div className="border-t border-rule pt-3">
                 <ActionForm
                   action={deleteGroupAction.bind(null, group.id)}
                   label={`Delete group ${group.name}`}
@@ -112,10 +113,7 @@ export function GroupDetail({
         </div>
       </div>
 
-      <ul
-        aria-label={`Categories of ${group.name}`}
-        className="divide-y divide-zinc-100 dark:divide-zinc-800"
-      >
+      <ul aria-label={`Categories of ${group.name}`} className="divide-y divide-rule">
         {group.categories.map((category, index) => (
           <CategoryRow
             key={category.id}
@@ -129,7 +127,7 @@ export function GroupDetail({
         ))}
       </ul>
       {group.categories.length === 0 && (
-        <p className="px-4 py-6 text-center text-sm text-zinc-400">
+        <p className="px-4 py-6 text-center text-sm text-faint">
           No Categories yet. An empty group can be deleted from Edit group.
         </p>
       )}
@@ -137,7 +135,7 @@ export function GroupDetail({
       <ActionForm
         action={createCategoryAction.bind(null, group.id)}
         label={`New Category in ${group.name}`}
-        className="flex gap-2 border-t border-zinc-100 p-3 dark:border-zinc-800"
+        className="flex gap-2 border-t border-rule p-3"
       >
         <input
           name="name"

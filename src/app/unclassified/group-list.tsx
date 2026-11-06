@@ -18,7 +18,7 @@ export function GroupList({ groupPage, selectedKey, fmt }: GroupListProps) {
 
   return (
     <nav aria-label="Unclassified groups" className={`${CARD_CLASS} overflow-hidden`}>
-      <ul className="max-h-[70vh] divide-y divide-zinc-100 overflow-y-auto dark:divide-zinc-800">
+      <ul className="max-h-[70vh] divide-y divide-rule overflow-y-auto">
         {groups.map((group) => {
           const isSelected = group.key === selectedKey;
           return (
@@ -27,9 +27,7 @@ export function GroupList({ groupPage, selectedKey, fmt }: GroupListProps) {
                 href={unclassifiedHref({ page, group: group.key })}
                 aria-current={isSelected ? 'true' : undefined}
                 className={`flex flex-col gap-1 px-4 py-2.5 ${
-                  isSelected
-                    ? 'bg-zinc-100 dark:bg-zinc-800'
-                    : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                  isSelected ? 'bg-sunken' : 'hover:bg-paper'
                 }`}
               >
                 <span className="flex items-baseline justify-between gap-3">
@@ -39,16 +37,13 @@ export function GroupList({ groupPage, selectedKey, fmt }: GroupListProps) {
                   <span className="text-sm tabular-nums">{group.count}</span>
                 </span>
                 <span className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="h-1 flex-1 rounded-full bg-zinc-100 dark:bg-zinc-800"
-                  >
+                  <span aria-hidden className="h-1 flex-1 rounded-full bg-sunken">
                     <span
-                      className="block h-1 rounded-full bg-zinc-400"
+                      className="block h-1 rounded-full bg-faint"
                       style={{ width: `${(group.count / largest) * 100}%` }}
                     />
                   </span>
-                  <span className="text-xs text-zinc-500 tabular-nums">
+                  <span className="text-xs text-muted tabular-nums">
                     {fmt.date(group.latestBookingDate)}
                   </span>
                 </span>
@@ -61,7 +56,7 @@ export function GroupList({ groupPage, selectedKey, fmt }: GroupListProps) {
         <div
           role="navigation"
           aria-label="Pages"
-          className="flex items-center justify-between border-t border-zinc-100 px-4 py-2 text-xs dark:border-zinc-800"
+          className="flex items-center justify-between border-t border-rule px-4 py-2 text-xs"
         >
           {page > 1 ? (
             <Link href={unclassifiedHref({ page: page - 1 })}>← Previous</Link>

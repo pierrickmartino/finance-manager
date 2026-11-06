@@ -70,7 +70,7 @@ export function RulesWorkbench({ rules, query, groupBy, ruleId, reorder }: Rules
           moveBy={ruleOrder.moveBy}
         />
       ) : (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           {rules.length === 0 ? 'No Rules yet. Create one to classify imports.' : 'Pick a Rule.'}
         </p>
       )}

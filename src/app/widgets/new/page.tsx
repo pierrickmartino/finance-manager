@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ActionForm } from '@/components/action-form';
 import { FieldError } from '@/components/form';
-import { CARD_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
+import { CARD_CLASS, PAGE_TITLE_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
 import { queryFromParams, type UrlParams } from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
 import {
@@ -92,7 +92,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-pretty">
+        <h1 className={PAGE_TITLE_CLASS}>
           {widget ? `Edit Widget: ${widget.name}` : 'New Widget'}
         </h1>
         <Link href={backHref} className="text-sm underline">
@@ -104,13 +104,10 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
         <aside
           className={`${CARD_CLASS} lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto`}
         >
-          <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <div className="flex items-center justify-between border-b border-rule px-4 py-3">
             <h2 className="text-sm font-semibold">Settings</h2>
             {/* A full page load, so every field goes back to its default. */}
-            <a
-              href={resetHref(hidden)}
-              className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
-            >
+            <a href={resetHref(hidden)} className="text-xs text-muted hover:underline">
               Reset
             </a>
           </div>
@@ -130,7 +127,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
           <ActionForm
             action={saveWidgetAction}
             label="Save Widget"
-            className="flex flex-wrap items-center gap-3 border-b border-zinc-200 px-5 py-3 dark:border-zinc-800"
+            className="flex flex-wrap items-center gap-3 border-b border-rule px-5 py-3"
           >
             {report && <input type="hidden" name="query" value={JSON.stringify(report.query)} />}
             <input type="hidden" name="visualisation" value={visualisation} />
@@ -144,7 +141,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
               aria-label="Widget name"
               placeholder="Name this Widget"
               defaultValue={widget?.name ?? ''}
-              className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-lg font-semibold placeholder:text-zinc-400 hover:border-zinc-200 focus:border-zinc-300 dark:hover:border-zinc-700 dark:focus:border-zinc-600"
+              className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-lg font-semibold placeholder:text-faint hover:border-rule focus:border-rule-strong"
             />
             <button type="submit" disabled={!report} className={PRIMARY_BUTTON_CLASS}>
               {widget ? 'Update Widget' : 'Save Widget'}
@@ -160,7 +157,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
                 data={isBalances ? toPivotData(report, balanceHref) : undefined}
               />
             )}
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-muted">
               The preview follows every change. All values in CHF. Transfers are always left out;
               Capital only when included.
             </p>

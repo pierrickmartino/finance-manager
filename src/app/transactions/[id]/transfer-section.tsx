@@ -10,6 +10,7 @@ import {
   type TransferSideView,
 } from '@/server/services/transfers';
 import { linkTransferAction, unlinkTransferAction } from './actions';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 interface TransferSectionProps {
   transactionId: string;
@@ -81,7 +82,7 @@ export function LinkTransferForm({
         Other side
         <select
           name="otherSide"
-          className="w-full min-w-0 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full min-w-0 rounded-md border border-rule-strong px-2 py-1.5"
         >
           {options.map((option) => (
             <option key={sideOptionValue(option)} value={sideOptionValue(option)}>
@@ -137,7 +138,7 @@ export function TransferSection({
 }: TransferSectionProps) {
   return (
     <section aria-labelledby="transfer" className={className}>
-      <h2 id="transfer" className="text-lg font-semibold">
+      <h2 id="transfer" className={SECTION_TITLE_CLASS}>
         Transfer
       </h2>
       {counterpart ? (
@@ -153,7 +154,7 @@ export function TransferSection({
           />
         </div>
       ) : options.length === 0 ? (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           Not a Transfer. No Transaction or Split line on another Account with the opposite sign is
           near enough to link.
         </p>

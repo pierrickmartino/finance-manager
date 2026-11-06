@@ -42,7 +42,7 @@ export function PayeeList({ payees, selectedId, query }: PayeeListProps) {
       <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto">
         {payeesByInitial(payees).map(({ initial, payees: ofInitial }) => (
           <div key={initial} className="flex flex-col gap-0.5">
-            <h2 className="px-2 text-xs font-semibold tracking-wide text-zinc-400">{initial}</h2>
+            <h2 className="px-2 text-xs font-semibold tracking-wide text-faint">{initial}</h2>
             <ul className="flex flex-col gap-0.5">
               {ofInitial.map((payee) => (
                 <li key={payee.id}>
@@ -53,13 +53,13 @@ export function PayeeList({ payees, selectedId, query }: PayeeListProps) {
           </div>
         ))}
         {payees.length === 0 && (
-          <p className="px-2 text-sm text-zinc-400">
+          <p className="px-2 text-sm text-faint">
             {query ? `No Payee matches "${query}".` : 'No Payees yet.'}
           </p>
         )}
       </div>
 
-      <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <div className="border-t border-rule pt-3">
         <Menu trigger="+ New Payee" triggerClassName={`${GHOST_BUTTON_CLASS} inline-block`}>
           <ActionForm action={createPayeeAction} label="New Payee" className="flex flex-col gap-2">
             <label className="flex flex-col gap-1 text-sm font-medium">
@@ -83,13 +83,11 @@ function PayeeLink({ payee, isActive, query }: { payee: Payee; isActive: boolean
       scroll={false}
       aria-current={isActive ? 'page' : undefined}
       className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm ${
-        isActive
-          ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+        isActive ? 'bg-ink text-white' : 'hover:bg-sunken'
       }`}
     >
       <span className="truncate">{payee.name}</span>
-      <span className={`text-xs tabular-nums ${isActive ? 'opacity-70' : 'text-zinc-400'}`}>
+      <span className={`text-xs tabular-nums ${isActive ? 'opacity-70' : 'text-faint'}`}>
         {payee.transactionCount}
       </span>
     </Link>

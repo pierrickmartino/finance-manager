@@ -22,20 +22,19 @@ export function TypeSelect({ value }: { value?: CategoryGroupType }) {
 
 const TYPE_TONE: Record<CategoryGroupType, { dot: string; badge: string; bar: string }> = {
   income: {
-    dot: 'bg-emerald-500',
-    badge:
-      'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950 dark:text-emerald-300',
-    bar: 'bg-emerald-500/70',
+    dot: 'bg-positive',
+    badge: 'bg-positive-tint text-positive ring-positive/20',
+    bar: 'bg-positive/70',
   },
   expense: {
-    dot: 'bg-rose-500',
-    badge: 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-950 dark:text-rose-300',
-    bar: 'bg-rose-500/70',
+    dot: 'bg-negative',
+    badge: 'bg-negative-tint text-negative ring-negative/20',
+    bar: 'bg-negative/70',
   },
   capital: {
-    dot: 'bg-sky-500',
-    badge: 'bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-950 dark:text-sky-300',
-    bar: 'bg-sky-500/70',
+    dot: 'bg-info',
+    badge: 'bg-info-tint text-info ring-info/20',
+    bar: 'bg-info/70',
   },
 };
 

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useId } from 'react';
-import { CARD_CLASS } from '@/components/surface';
+import { CARD_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 import type { ActionResult } from '@/server/actions';
 import type { Account } from '@/server/services/accounts';
 import type { Bank } from '@/server/services/banks';
@@ -26,7 +26,7 @@ export function NewAccountPanel({ banks, date }: { banks: Bank[]; date: string }
 
   return (
     <section aria-labelledby={headingId} className={`${CARD_CLASS} flex flex-col gap-3 p-5`}>
-      <h2 id={headingId} className="text-lg font-semibold">
+      <h2 id={headingId} className={SECTION_TITLE_CLASS}>
         New Account
       </h2>
       <AccountForm banks={banks} action={create} submitLabel="Add Account" />

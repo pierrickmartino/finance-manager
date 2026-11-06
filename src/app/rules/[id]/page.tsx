@@ -11,6 +11,7 @@ import { saveRuleAction } from '../actions';
 import { loadRuleOptions } from '../load';
 import { ruleToDraft } from '../rule-draft';
 import { RuleForm } from '../rule-form';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Edit Rule · Finance Manager' };
 
@@ -33,11 +34,11 @@ export default async function EditRulePage({ params }: { params: Promise<{ id: s
   ]);
   return (
     <section className="flex flex-col gap-6">
-      <Link href="/rules" className="text-sm text-zinc-500 hover:underline">
+      <Link href="/rules" className="text-sm text-muted hover:underline">
         ← Rules
       </Link>
-      <h1 className="text-2xl font-semibold">{rule.name}</h1>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <h1 className={PAGE_TITLE_CLASS}>{rule.name}</h1>
+      <p className="text-sm text-ink-soft">
         Saving changes this Rule for future imports and Manual transactions only.{' '}
         <Link href={historyHref({ entityType: 'rule', entityId: rule.id })} className="underline">
           Rule History

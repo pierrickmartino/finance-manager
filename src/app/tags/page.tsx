@@ -6,6 +6,7 @@ import { listTransactions } from '@/server/services/transactions';
 import { TagDetail } from './tag-detail';
 import { TagList } from './tag-list';
 import { filterTags, selectTag } from './view';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Tags · Finance Manager' };
 
@@ -41,8 +42,8 @@ export default async function TagsPage({ searchParams }: TagsPageProps) {
   return (
     <section className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold">Tags</h1>
-        <p className="text-sm text-zinc-500">
+        <h1 className={PAGE_TITLE_CLASS}>Tags</h1>
+        <p className="text-sm text-muted">
           {tags.length} Tag{tags.length === 1 ? '' : 's'}
         </p>
       </header>
@@ -57,7 +58,7 @@ export default async function TagsPage({ searchParams }: TagsPageProps) {
             fmt={fmt}
           />
         ) : (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted">
             {tags.length === 0
               ? 'No Tags yet. Add one here, or type a new one on a Transaction.'
               : 'Pick a Tag.'}

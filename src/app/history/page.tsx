@@ -14,6 +14,7 @@ import {
   type HistoryFilter,
 } from '@/server/services/history';
 import { HistoryTable } from './history-table';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'History · Finance Manager' };
 
@@ -28,8 +29,7 @@ const FILTER_FIELDS = [
 ] as const;
 type FilterValues = Record<(typeof FILTER_FIELDS)[number], string>;
 
-const INPUT =
-  'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+const INPUT = 'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm';
 
 interface HistoryPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -63,7 +63,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">History</h1>
+      <h1 className={PAGE_TITLE_CLASS}>History</h1>
 
       {/* Keyed on the filter so the fields follow client-side navigation between filters. */}
       <form
@@ -92,7 +92,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
         <FilterInput label="Batch" name="batchId" value={filter.batchId} />
         <button
           type="submit"
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-hover"
         >
           Filter
         </button>
@@ -104,12 +104,12 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
       {error && <FieldError message={error} />}
 
       {entries.length === 0 ? (
-        !error && <p className="text-sm text-zinc-500">No History entries match.</p>
+        !error && <p className="text-sm text-muted">No History entries match.</p>
       ) : (
         <div>
           <HistoryTable entries={entries} fmt={fmt} summaries={summaries} />
           {entries.length === DEFAULT_HISTORY_LIMIT && (
-            <p className="mt-2 text-sm text-zinc-500">
+            <p className="mt-2 text-sm text-muted">
               Showing the newest {DEFAULT_HISTORY_LIMIT} entries. Narrow the filters to see older
               ones.
             </p>

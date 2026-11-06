@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { BundledDetails } from '@/components/bundled-details';
 import type { Formatter } from '@/lib/format';
 import type { TransactionDetail } from '@/server/services/transactions';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 interface BankDetailsProps {
   transaction: TransactionDetail;
@@ -21,7 +22,7 @@ export function BankDetails({ transaction, fmt, className }: BankDetailsProps) {
     : 'Manual';
   return (
     <section aria-labelledby="bank-fields" className={className}>
-      <h2 id="bank-fields" className="text-lg font-semibold">
+      <h2 id="bank-fields" className={SECTION_TITLE_CLASS}>
         {transaction.isManual ? 'Details' : 'From the bank'}
       </h2>
       <dl
@@ -57,7 +58,7 @@ export function BankDetails({ transaction, fmt, className }: BankDetailsProps) {
 function Item({ term, children }: { term: string; children: ReactNode }) {
   return (
     <>
-      <dt className="text-zinc-500">{term}</dt>
+      <dt className="text-muted">{term}</dt>
       <dd className="break-words [overflow-wrap:anywhere]">{children || '—'}</dd>
     </>
   );

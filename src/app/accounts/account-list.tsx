@@ -29,7 +29,7 @@ export function AccountList({
     <nav aria-label="Account list" className={`${CARD_CLASS} flex flex-col p-2`}>
       {groupByBank(balances).map(({ bankName, rows }) => (
         <section key={bankName} aria-label={bankName} className="flex flex-col">
-          <h2 className="flex justify-between gap-3 px-2 pt-3 pb-1 text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+          <h2 className="flex justify-between gap-3 px-2 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted uppercase">
             <span className="truncate">{bankName}</span>
             <span className="tabular-nums">
               {fmt.amount(totalChfMinor(rows).amountMinor, { currency: 'CHF' })}
@@ -45,16 +45,14 @@ export function AccountList({
                     scroll={false}
                     aria-current={isSelected ? 'true' : undefined}
                     className={`flex items-center justify-between gap-3 rounded-md px-2 py-2 text-sm ${
-                      isSelected
-                        ? 'bg-zinc-100 font-medium dark:bg-zinc-800'
-                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-                    } ${account.archivedAt ? 'text-zinc-400 dark:text-zinc-500' : ''}`}
+                      isSelected ? 'bg-sunken font-medium' : 'hover:bg-paper'
+                    } ${account.archivedAt ? 'text-faint' : ''}`}
                   >
                     <span className="flex min-w-0 items-center gap-1.5">
                       {mismatchedAccounts.has(account.id) && (
                         <span
                           title="Snapshot mismatch"
-                          className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
+                          className="h-2 w-2 shrink-0 rounded-full bg-warning"
                         >
                           <span className="sr-only">Snapshot mismatch</span>
                         </span>
@@ -76,10 +74,8 @@ export function AccountList({
         href={accountsHref({ account: NEW_ACCOUNT, date })}
         scroll={false}
         aria-current={selected === NEW_ACCOUNT ? 'true' : undefined}
-        className={`mt-3 rounded-md border border-dashed border-zinc-300 px-2 py-2 text-center text-sm dark:border-zinc-700 ${
-          selected === NEW_ACCOUNT
-            ? 'bg-zinc-100 font-medium dark:bg-zinc-800'
-            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+        className={`mt-3 rounded-md border border-dashed border-rule-strong px-2 py-2 text-center text-sm ${
+          selected === NEW_ACCOUNT ? 'bg-sunken font-medium' : 'hover:bg-paper'
         }`}
       >
         + New Account

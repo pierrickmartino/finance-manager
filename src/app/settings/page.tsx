@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getRequestDisplaySettings } from '@/server/formatter';
 import { DisplaySection } from './display-section';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Settings · Finance Manager' };
 
@@ -12,7 +13,7 @@ export default async function SettingsPage() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <h1 className={PAGE_TITLE_CLASS}>Settings</h1>
       <div className="grid gap-6 md:grid-cols-[12rem_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="flex gap-1 md:flex-col">
           {SECTIONS.map((section, index) => (
@@ -20,7 +21,7 @@ export default async function SettingsPage() {
               key={section.id}
               href={`#${section.id}`}
               aria-current={index === 0 ? 'location' : undefined}
-              className="rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100 aria-[current]:bg-zinc-200 aria-[current]:font-medium aria-[current]:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:aria-[current]:bg-zinc-800 dark:aria-[current]:text-zinc-100"
+              className="rounded-md px-3 py-2 text-sm text-ink-soft hover:bg-sunken aria-[current]:bg-rule aria-[current]:font-medium aria-[current]:text-ink"
             >
               {section.label}
             </a>

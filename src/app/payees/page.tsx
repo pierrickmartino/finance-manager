@@ -6,6 +6,7 @@ import { listTransactions } from '@/server/services/transactions';
 import { PayeeDetail } from './payee-detail';
 import { PayeeList } from './payee-list';
 import { filterPayees, selectPayee } from './view';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Payees · Finance Manager' };
 
@@ -43,8 +44,8 @@ export default async function PayeesPage({ searchParams }: PayeesPageProps) {
   return (
     <section className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold">Payees</h1>
-        <p className="text-sm text-zinc-500">
+        <h1 className={PAGE_TITLE_CLASS}>Payees</h1>
+        <p className="text-sm text-muted">
           {payees.length} Payee{payees.length === 1 ? '' : 's'} · {total} Transaction
           {total === 1 ? '' : 's'}
         </p>
@@ -54,7 +55,7 @@ export default async function PayeesPage({ searchParams }: PayeesPageProps) {
         {selected ? (
           <PayeeDetail payee={selected} payees={payees} recent={recent} fmt={fmt} />
         ) : (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted">
             {payees.length === 0
               ? 'No Payees yet. Add one here, or type a new one on a Transaction.'
               : 'Pick a Payee.'}

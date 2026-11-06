@@ -13,6 +13,7 @@ import { CommitImportForm } from './commit-import-form';
 import { NearDuplicates } from './near-duplicates';
 import { RuleClassificationCell } from './rule-classification';
 import { TransferCandidates } from './transfer-candidates';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Import preview · Finance Manager' };
 
@@ -26,8 +27,8 @@ const STATUS_LABELS: Record<EntryStatus, string> = {
 
 const STATUS_CLASSES: Record<EntryStatus, string | undefined> = {
   new: undefined,
-  duplicate: 'text-zinc-500',
-  near_duplicate: 'bg-amber-50 dark:bg-amber-950',
+  duplicate: 'text-muted',
+  near_duplicate: 'bg-warning-tint',
 };
 
 interface PreviewPageProps {
@@ -57,11 +58,11 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <Link href={`/accounts/${account.id}`} className="text-sm text-zinc-500 hover:underline">
+        <Link href={`/accounts/${account.id}`} className="text-sm text-muted hover:underline">
           ← {account.name}
         </Link>
-        <h1 className="text-2xl font-semibold">Import preview</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <h1 className={PAGE_TITLE_CLASS}>Import preview</h1>
+        <p className="text-sm text-ink-soft">
           {preview.fileName} into {account.name}
           {statement.from && statement.to && (
             <>
@@ -73,19 +74,19 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
       </div>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-        <dt className="text-zinc-500">
+        <dt className="text-muted">
           {preview.isOpeningBalanceDerived
             ? 'Opening balance (derived from the closing balance)'
             : 'Opening balance'}
         </dt>
         <dd className="tabular-nums">{money(statement.openingBalanceMinor)}</dd>
-        <dt className="text-zinc-500">Closing balance</dt>
+        <dt className="text-muted">Closing balance</dt>
         <dd className="tabular-nums">{money(statement.closingBalanceMinor)}</dd>
-        <dt className="text-zinc-500">New</dt>
+        <dt className="text-muted">New</dt>
         <dd>{counts.new}</dd>
-        <dt className="text-zinc-500">Already imported (skipped)</dt>
+        <dt className="text-muted">Already imported (skipped)</dt>
         <dd>{counts.duplicate}</dd>
-        <dt className="text-zinc-500">Possible duplicates</dt>
+        <dt className="text-muted">Possible duplicates</dt>
         <dd>{counts.nearDuplicate}</dd>
       </dl>
 
@@ -98,7 +99,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
 
       <div className="overflow-x-auto">
         <table aria-label="Entries" className="w-full text-sm">
-          <thead className="border-b border-zinc-200 dark:border-zinc-800">
+          <thead className="border-b border-rule">
             <tr>
               <th className={CELL}>Booking date</th>
               <th className={CELL}>Counterparty</th>
@@ -108,17 +109,17 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
               <th className={CELL}>Classification (Rules)</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {preview.entries.map((entry) => (
               <tr key={entry.fingerprint} className={STATUS_CLASSES[entry.status]}>
                 <td className={CELL}>{fmt.date(entry.bookingDate)}</td>
                 <td className={CELL}>
                   {entry.counterpartyName ?? '—'}
                   {entry.paymentReference && (
-                    <div className="text-xs text-zinc-500">{entry.paymentReference}</div>
+                    <div className="text-xs text-muted">{entry.paymentReference}</div>
                   )}
                   {entry.counterpartyIban && (
-                    <div className="font-mono text-xs text-zinc-500">{entry.counterpartyIban}</div>
+                    <div className="font-mono text-xs text-muted">{entry.counterpartyIban}</div>
                   )}
                   {entry.bundledDetails && (
                     <BundledDetails details={entry.bundledDetails} formatAmount={money} />
@@ -129,7 +130,7 @@ export default async function ImportPreviewPage({ params }: PreviewPageProps) {
                 <td className={CELL}>
                   {STATUS_LABELS[entry.status]}
                   {entry.transferCandidates.length > 0 && (
-                    <div className="text-xs text-sky-700">Possible Transfer</div>
+                    <div className="text-xs text-info">Possible Transfer</div>
                   )}
                 </td>
                 <td className={CELL}>

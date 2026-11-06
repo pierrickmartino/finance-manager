@@ -10,6 +10,7 @@ import {
 import { GroupDetail } from './group-detail';
 import { GroupList } from './group-list';
 import { selectedGroupKey } from './view';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Unclassified · Finance Manager' };
 
@@ -47,20 +48,20 @@ export default async function UnclassifiedPage({ searchParams }: UnclassifiedPag
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Unclassified</h1>
+          <h1 className={PAGE_TITLE_CLASS}>Unclassified</h1>
           <Progress progress={progress} groupCount={groupPage.totalGroups} fmt={fmt} />
         </div>
         <TargetBadge isTargetMet={progress.isTargetMet} />
       </header>
 
       {selectedKey === undefined ? (
-        <p className="text-sm text-zinc-500">Nothing left to classify.</p>
+        <p className="text-sm text-muted">Nothing left to classify.</p>
       ) : (
         <div className="grid items-start gap-6 md:grid-cols-[18rem_minmax(0,1fr)] lg:grid-cols-[22rem_minmax(0,1fr)]">
           {groupPage.totalGroups > 0 ? (
             <GroupList groupPage={groupPage} selectedKey={selectedKey} fmt={fmt} />
           ) : (
-            <p className="text-sm text-zinc-500">Nothing left to classify.</p>
+            <p className="text-sm text-muted">Nothing left to classify.</p>
           )}
           <GroupDetail key={selectedKey} groupKey={selectedKey} fmt={fmt} />
         </div>
@@ -78,12 +79,10 @@ interface ProgressProps {
 function Progress({ progress, groupCount, fmt }: ProgressProps) {
   const { total, unclassified, share, target } = progress;
   return (
-    <section aria-label="Classification progress" className="text-sm text-zinc-500">
+    <section aria-label="Classification progress" className="text-sm text-muted">
       <p>
-        <span className="font-semibold text-zinc-900 tabular-nums dark:text-zinc-100">
-          {fmt.percent(share)}
-        </span>{' '}
-        of Transactions Unclassified{' '}
+        <span className="font-semibold text-ink tabular-nums">{fmt.percent(share)}</span> of
+        Transactions Unclassified{' '}
         <span className="tabular-nums">
           ({unclassified} of {total}, in {groupCount} group{groupCount === 1 ? '' : 's'})
         </span>
@@ -97,9 +96,7 @@ function TargetBadge({ isTargetMet }: { isTargetMet: boolean }) {
   return (
     <span
       className={`rounded-full px-3 py-1 text-xs font-medium ${
-        isTargetMet
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-          : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+        isTargetMet ? 'bg-positive-tint text-positive' : 'bg-warning-tint text-warning'
       }`}
     >
       {isTargetMet ? 'Target met' : 'Above target · classify the largest groups first'}

@@ -9,6 +9,7 @@ import { getManualTransaction } from '@/server/services/transactions/manual';
 import { deleteManualTransactionAction, updateManualTransactionAction } from '../../actions';
 import { ConfirmActionButton } from '@/app/imports/confirm-action-button';
 import { ManualTransactionForm } from '../../manual-transaction-form';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Manual transaction · Finance Manager' };
 
@@ -34,11 +35,11 @@ export default async function ManualTransactionPage({ params }: ManualTransactio
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <Link href={`/accounts/${account.id}`} className="text-sm text-zinc-500 hover:underline">
+        <Link href={`/accounts/${account.id}`} className="text-sm text-muted hover:underline">
           ← {account.name}
         </Link>
-        <h1 className="text-2xl font-semibold">Manual transaction</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <h1 className={PAGE_TITLE_CLASS}>Manual transaction</h1>
+        <p className="text-sm text-ink-soft">
           {transaction.rawDescription} · {fmt.date(transaction.bookingDate)} ·{' '}
           <span className="tabular-nums">
             {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
@@ -56,7 +57,7 @@ export default async function ManualTransactionPage({ params }: ManualTransactio
         transaction={transaction}
       />
 
-      <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
+      <div className="border-t border-rule pt-4">
         <ConfirmActionButton
           label="Delete Manual transaction"
           ariaLabel="Delete this Manual transaction"

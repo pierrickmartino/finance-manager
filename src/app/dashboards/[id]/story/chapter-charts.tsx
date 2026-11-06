@@ -224,7 +224,7 @@ export function RankedBars({ data, title }: { data: ChartSource; title: string }
     <ol ref={ref} aria-label={`${title}, ranked`} className="flex flex-col gap-4">
       {items.map((item, index) => {
         const name = (
-          <span className="font-serif text-2xl md:text-3xl">
+          <span className="font-display text-2xl md:text-3xl">
             {item.name}
             {item.group !== item.name && (
               <span className="ml-2 text-sm" style={{ color: STORY.muted }}>
@@ -238,7 +238,7 @@ export function RankedBars({ data, title }: { data: ChartSource; title: string }
             key={`${item.group}/${item.name}`}
             className="grid grid-cols-[2.5rem_1fr] items-center gap-3"
           >
-            <span className="font-serif text-2xl italic" style={{ color: STORY.muted }}>
+            <span className="font-display text-2xl italic" style={{ color: STORY.muted }}>
               {index + 1}
             </span>
             <div>
@@ -309,7 +309,7 @@ export function ShareBand({ data, title }: { data: ChartSource; title: string })
                 part.label
               )}
             </dt>
-            <dd className="mt-1 font-serif text-3xl">{Math.round(part.share * 100)}%</dd>
+            <dd className="mt-1 font-display text-3xl">{Math.round(part.share * 100)}%</dd>
             <dd className="text-sm tabular-nums">{money.full(part.value)}</dd>
           </div>
         ))}

@@ -1,20 +1,22 @@
 import type { SplitAllocation } from './split-lines';
 
+/** The chart palette's categorical order (../../dashboards/chart-palette.ts). */
 const LINE_COLORS = [
-  'bg-sky-500',
-  'bg-emerald-500',
-  'bg-amber-500',
-  'bg-violet-500',
-  'bg-rose-500',
-  'bg-teal-500',
-  'bg-orange-500',
+  'bg-[#2a78d6]',
+  'bg-[#eb6834]',
+  'bg-[#1baf7a]',
+  'bg-[#eda100]',
+  'bg-[#e87ba4]',
+  'bg-[#008300]',
+  'bg-[#6250d6]',
+  'bg-[#e34948]',
 ];
 
 const STATUS_CLASS: Record<SplitAllocation['status'], string> = {
-  balanced: 'text-emerald-700 dark:text-emerald-400',
-  under: 'text-amber-700 dark:text-amber-400',
-  over: 'text-rose-600 dark:text-rose-400',
-  invalid: 'text-rose-600 dark:text-rose-400',
+  balanced: 'text-positive',
+  under: 'text-warning',
+  over: 'text-negative',
+  invalid: 'text-negative',
 };
 
 const STATUS_LABEL: Record<SplitAllocation['status'], string> = {
@@ -26,7 +28,7 @@ const STATUS_LABEL: Record<SplitAllocation['status'], string> = {
 
 /** The colour a Split line has in the bar, so the line and its segment match. */
 export function lineColor(index: number): string {
-  return LINE_COLORS[index % LINE_COLORS.length] ?? 'bg-sky-500';
+  return LINE_COLORS[index % LINE_COLORS.length] ?? 'bg-[#2a78d6]';
 }
 
 interface AllocationBarProps {
@@ -49,7 +51,7 @@ export function AllocationBar({ totalMinor, allocation, formatAmount }: Allocati
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
         <span className="tabular-nums">
           {formatAmount(allocated)}{' '}
-          <span className="text-zinc-500">of {formatAmount(totalMinor)}</span>
+          <span className="text-muted">of {formatAmount(totalMinor)}</span>
         </span>
         <p aria-live="polite" className={`font-medium ${STATUS_CLASS[status]}`}>
           Remaining:{' '}
@@ -59,14 +61,11 @@ export function AllocationBar({ totalMinor, allocation, formatAmount }: Allocati
           <span className="font-normal">({STATUS_LABEL[status]})</span>
         </p>
       </div>
-      <div
-        aria-hidden="true"
-        className="flex h-2.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
-      >
+      <div aria-hidden="true" className="flex h-2.5 overflow-hidden rounded-full bg-sunken">
         {parts.map((minor, index) => (
           <div
             key={index}
-            className={`${lineColor(index)} border-r-2 border-white last:border-r-0 dark:border-zinc-900`}
+            className={`${lineColor(index)} border-r-2 border-surface last:border-r-0`}
             style={{ width: `${(Math.abs(minor) / scale) * 100}%` }}
           />
         ))}

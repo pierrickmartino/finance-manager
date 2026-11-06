@@ -4,6 +4,7 @@ import { listCategoryGroups, seedStarterCategories } from '@/server/services/cat
 import { GroupDetail } from './group-detail';
 import { GroupList } from './group-list';
 import { selectGroup } from './view';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Categories · Finance Manager' };
 
@@ -28,8 +29,8 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
   return (
     <section className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold">Categories</h1>
-        <p className="text-sm text-zinc-500">
+        <h1 className={PAGE_TITLE_CLASS}>Categories</h1>
+        <p className="text-sm text-muted">
           {groups.length} group{groups.length === 1 ? '' : 's'} · {categories.length}{' '}
           {categories.length === 1 ? 'Category' : 'Categories'}
         </p>
@@ -45,7 +46,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
             isLastOfType={sameType.at(-1)?.id === selected.id}
           />
         ) : (
-          <p className="text-sm text-zinc-500">No Category groups yet.</p>
+          <p className="text-sm text-muted">No Category groups yet.</p>
         )}
       </div>
     </section>

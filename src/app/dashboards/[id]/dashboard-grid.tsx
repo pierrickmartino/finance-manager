@@ -90,10 +90,10 @@ export function DashboardGrid({
       key={widget.id}
       aria-label={widget.title}
       data-layout={`${widget.layout.x},${widget.layout.y},${widget.layout.w},${widget.layout.h}`}
-      className="flex flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+      className="flex flex-col overflow-hidden rounded-lg border border-rule bg-surface"
       style={isStacked ? { height: Math.max(widget.layout.h, 6) * ROW_HEIGHT } : undefined}
     >
-      <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+      <div className="flex items-center gap-2 border-b border-rule px-3 py-2">
         {isDraggable && (
           <button
             type="button"
@@ -103,7 +103,7 @@ export function DashboardGrid({
             onKeyDown={(event) => {
               if (moveByKey(widget.id, event.key)) event.preventDefault();
             }}
-            className="widget-drag-handle cursor-grab touch-none text-zinc-400 active:cursor-grabbing"
+            className="widget-drag-handle cursor-grab touch-none text-faint active:cursor-grabbing"
           >
             ⠿
           </button>

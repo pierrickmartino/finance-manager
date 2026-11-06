@@ -30,14 +30,14 @@ export function TransactionList({
   return (
     <div className={`${CARD_CLASS} overflow-x-auto`}>
       <table aria-label="Transactions" className="w-full text-sm">
-        <thead className="border-b border-zinc-200 text-xs text-zinc-500 dark:border-zinc-800">
+        <thead className="border-b border-rule text-xs text-muted">
           <tr>
             <th className={`${CELL} text-left font-medium`}>Date</th>
             <th className={`${CELL} text-left font-medium`}>Transaction</th>
             <th className={`${CELL} text-right font-medium`}>Amount</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        <tbody className="divide-y divide-rule">
           {transactions.map((transaction) => (
             <Row
               key={transaction.id}
@@ -63,14 +63,8 @@ interface RowProps {
 function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
   const name = transactionName(transaction);
   return (
-    <tr
-      className={
-        isSelected
-          ? 'xl:bg-zinc-100 xl:dark:bg-zinc-800'
-          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-      }
-    >
-      <td className={`${CELL} whitespace-nowrap text-zinc-500 tabular-nums`}>
+    <tr className={isSelected ? 'xl:bg-sunken' : 'hover:bg-paper'}>
+      <td className={`${CELL} whitespace-nowrap text-muted tabular-nums`}>
         {fmt.date(transaction.bookingDate)}
       </td>
       <td className={`${CELL} max-w-0 w-full`}>
@@ -88,7 +82,7 @@ function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
         >
           {name}
         </Link>
-        <div className="truncate text-xs text-zinc-500">
+        <div className="truncate text-xs text-muted">
           <CategoryLabel transaction={transaction} />
           {' · '}
           {transaction.accountName}
@@ -105,7 +99,7 @@ function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
       >
         {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
         {transaction.matchingSplitAmountMinor !== null && (
-          <div className="text-xs font-normal text-zinc-500">
+          <div className="text-xs font-normal text-muted">
             of which{' '}
             {fmt.amount(transaction.matchingSplitAmountMinor, { currency: transaction.currency })}{' '}
             matches the filter

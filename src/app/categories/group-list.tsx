@@ -19,7 +19,7 @@ export function GroupList({ groups, selectedId }: GroupListProps) {
     <nav aria-label="Category groups" className={`${CARD_CLASS} flex flex-col gap-4 p-3`}>
       {groupsByType(groups).map(({ type, groups: ofType }) => (
         <div key={type} className="flex flex-col gap-1">
-          <h2 className="flex items-center gap-2 px-2 text-xs font-semibold tracking-wide text-zinc-400 uppercase">
+          <h2 className="flex items-center gap-2 px-2 text-xs font-semibold tracking-wide text-faint uppercase">
             <TypeDot type={type} />
             {CATEGORY_GROUP_TYPE_LABELS[type]}
           </h2>
@@ -32,7 +32,7 @@ export function GroupList({ groups, selectedId }: GroupListProps) {
           </ul>
         </div>
       ))}
-      <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <div className="border-t border-rule pt-3">
         <Menu trigger="+ New group" triggerClassName={`${GHOST_BUTTON_CLASS} inline-block`}>
           <ActionForm
             action={createGroupAction}
@@ -62,13 +62,11 @@ function GroupLink({ group, isActive }: { group: CategoryGroup; isActive: boolea
       scroll={false}
       aria-current={isActive ? 'page' : undefined}
       className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm ${
-        isActive
-          ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+        isActive ? 'bg-ink text-white' : 'hover:bg-sunken'
       }`}
     >
       <span className="truncate">{group.name}</span>
-      <span className={`text-xs tabular-nums ${isActive ? 'opacity-70' : 'text-zinc-400'}`}>
+      <span className={`text-xs tabular-nums ${isActive ? 'opacity-70' : 'text-faint'}`}>
         {count}
       </span>
     </Link>

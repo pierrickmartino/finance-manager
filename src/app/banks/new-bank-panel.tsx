@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useId } from 'react';
-import { CARD_CLASS } from '@/components/surface';
+import { CARD_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 import { CreateBankForm } from './create-bank-form';
 import { banksHref } from './view';
 
@@ -13,10 +13,10 @@ export function NewBankPanel() {
 
   return (
     <section aria-labelledby={headingId} className={`${CARD_CLASS} flex flex-col gap-3 p-5`}>
-      <h2 id={headingId} className="text-lg font-semibold">
+      <h2 id={headingId} className={SECTION_TITLE_CLASS}>
         New Bank
       </h2>
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-muted">
         The institution holding one or more Accounts. Add its Accounts once it exists.
       </p>
       <CreateBankForm onCreated={(bank) => router.push(banksHref(bank.id), { scroll: false })} />
