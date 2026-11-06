@@ -5,6 +5,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useFormatter } from '@/components/formatter-provider';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import type { ReportHeader } from '@/server/services/reporting';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 /** What the pivot shows: the engine's table, plus where each value drills down to. */
 export type PivotData = ChartSource;
@@ -48,12 +49,12 @@ export function PivotTable({
   const valueCell = (value: number | null, href: string, where: string, isTotal = false) => (
     <td className={`${CELL} ${isTotal ? 'font-semibold' : ''}`}>
       {value === null ? (
-        <span className="text-zinc-400">—</span>
+        <span className="text-faint">—</span>
       ) : (
         <Link
           href={href}
           aria-label={`${where}: ${format(value)}`}
-          className={`hover:underline ${value < 0 ? 'text-red-700 dark:text-red-400' : ''}`}
+          className={`hover:underline ${value < 0 ? 'text-negative' : ''}`}
         >
           {format(value)}
         </Link>
@@ -66,22 +67,22 @@ export function PivotTable({
       aria-label="Pivot table"
       className={
         isFullScreen
-          ? 'fixed inset-0 z-50 flex flex-col gap-3 overflow-auto bg-white p-4 dark:bg-zinc-950'
+          ? 'fixed inset-0 z-50 flex flex-col gap-3 overflow-auto bg-surface p-4'
           : `flex flex-col gap-3 ${isCompact ? 'h-full' : ''}`
       }
     >
       <div className="flex items-center justify-between gap-3">
-        {isCompact && !isFullScreen ? <span /> : <h2 className="text-lg font-semibold">{title}</h2>}
+        {isCompact && !isFullScreen ? <span /> : <h2 className={SECTION_TITLE_CLASS}>{title}</h2>}
         <button
           type="button"
           onClick={() => setFullScreen(!isFullScreen)}
-          className="rounded-md border border-zinc-300 px-3 py-1 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          className="rounded-md border border-rule-strong px-3 py-1 text-sm hover:bg-sunken"
         >
           {isFullScreen ? 'Exit full screen' : 'Full screen'}
         </button>
       </div>
       {data.rows.length === 0 ? (
-        <p className="text-sm text-zinc-500">No complete period in this date range yet.</p>
+        <p className="text-sm text-muted">No complete period in this date range yet.</p>
       ) : (
         <div
           className={
@@ -89,7 +90,7 @@ export function PivotTable({
           }
         >
           <table aria-label="Pivot" className="text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800">
+            <thead className="border-b border-rule">
               <tr>
                 <th className={`${HEAD} text-left`}></th>
                 {data.columns.map((column) => (
@@ -104,7 +105,7 @@ export function PivotTable({
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <tbody className="divide-y divide-rule">
               {data.rows.map((row, r) => (
                 <tr key={row.key ?? 'none'}>
                   <th
@@ -134,7 +135,7 @@ export function PivotTable({
               ))}
             </tbody>
             {data.rows.length > 1 && (
-              <tfoot className="border-t-2 border-zinc-300 dark:border-zinc-700">
+              <tfoot className="border-t-2 border-rule-strong">
                 <tr>
                   <th scope="row" className={`${HEAD} text-left`}>
                     Total

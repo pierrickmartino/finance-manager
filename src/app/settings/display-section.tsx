@@ -25,9 +25,9 @@ const ROW_CLASS = 'flex w-full items-center justify-between gap-4 px-4 py-3.5 te
 /** One sentence, written through the shared formatter, of how amounts and dates look now. */
 function Summary() {
   const fmt = useFormatter();
-  const strong = 'font-semibold text-zinc-900 tabular-nums dark:text-zinc-100';
+  const strong = 'font-semibold text-ink tabular-nums';
   return (
-    <section aria-label="Summary" className="text-sm text-zinc-500">
+    <section aria-label="Summary" className="text-sm text-muted">
       Amounts look like{' '}
       <strong className={strong}>{fmt.amount(SAMPLE_AMOUNT_MINOR, { currency: 'CHF' })}</strong> and
       dates like <strong className={strong}>{fmt.date(SAMPLE_DATE)}</strong>. A choice saves as soon
@@ -64,16 +64,16 @@ function ChoiceRow<T extends string>({
   const otherField: Field = field === 'numberFormat' ? 'dateFormat' : 'numberFormat';
 
   return (
-    <div className="border-t border-zinc-100 first:border-t-0 dark:border-zinc-800">
+    <div className="border-t border-rule first:border-t-0">
       <button
         type="button"
         aria-expanded={isOpen}
         aria-controls={panelId}
         onClick={onToggle}
-        className={`${ROW_CLASS} hover:bg-zinc-50 dark:hover:bg-zinc-800/50`}
+        className={`${ROW_CLASS} hover:bg-paper`}
       >
         <span className="font-medium">{label}</span>
-        <span className="flex items-center gap-2 text-zinc-500 tabular-nums">
+        <span className="flex items-center gap-2 text-muted tabular-nums">
           {savedLabel}
           <span aria-hidden="true" className={`transition ${isOpen ? 'rotate-90' : ''}`}>
             ›
@@ -84,7 +84,7 @@ function ChoiceRow<T extends string>({
         <form id={panelId} action={formAction} className="px-4 pb-4">
           {/* The action saves both formats; the row only changes its own. */}
           <input type="hidden" name={otherField} value={settings[otherField]} />
-          <ul className="flex flex-col divide-y divide-zinc-100 rounded-lg bg-zinc-50 dark:divide-zinc-800 dark:bg-zinc-950">
+          <ul className="flex flex-col divide-y divide-rule rounded-lg bg-paper">
             {choices.map((choice) => {
               const isSaved = choice.value === saved;
               return (
@@ -96,12 +96,12 @@ function ChoiceRow<T extends string>({
                     disabled={isPending}
                     aria-pressed={isSaved}
                     aria-label={`${choice.label} (${choice.hint})`}
-                    className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+                    className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-sunken disabled:opacity-50"
                   >
                     <span className="tabular-nums">{choice.label}</span>
-                    <span className="flex items-center gap-3 text-zinc-500">
+                    <span className="flex items-center gap-3 text-muted">
                       {choice.hint}
-                      <span aria-hidden="true" className="w-4 text-emerald-600">
+                      <span aria-hidden="true" className="w-4 text-positive">
                         {isSaved ? '✓' : ''}
                       </span>
                     </span>
@@ -118,9 +118,9 @@ function ChoiceRow<T extends string>({
 
 function StaticRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={`${ROW_CLASS} border-t border-zinc-100 dark:border-zinc-800`}>
+    <div className={`${ROW_CLASS} border-t border-rule`}>
       <span className="font-medium">{label}</span>
-      <span className="text-zinc-500">{children}</span>
+      <span className="text-muted">{children}</span>
     </div>
   );
 }

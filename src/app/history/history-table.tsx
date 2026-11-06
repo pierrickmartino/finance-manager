@@ -19,12 +19,12 @@ export function HistoryActor({ actorType, actorId }: Pick<HistoryEntry, 'actorTy
       {actorType}
       {actorId &&
         (actorType === 'rule' ? (
-          <Link href={`/rules/${actorId}`} className="text-zinc-500 hover:underline">
+          <Link href={`/rules/${actorId}`} className="text-muted hover:underline">
             {' '}
             {actorId}
           </Link>
         ) : (
-          <span className="text-zinc-500"> {actorId}</span>
+          <span className="text-muted"> {actorId}</span>
         ))}
     </>
   );
@@ -55,7 +55,7 @@ export function HistoryTable({
   return (
     <div className="overflow-x-auto">
       <table aria-label={label} className="w-full text-sm">
-        <thead className="border-b border-zinc-200 dark:border-zinc-800">
+        <thead className="border-b border-rule">
           <tr>
             <th className={CELL}>When</th>
             <th className={CELL}>Actor</th>
@@ -66,7 +66,7 @@ export function HistoryTable({
             <th className={CELL}>Batch</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <tbody className="divide-y divide-rule">
           {entries.map((entry) => (
             <tr key={entry.id}>
               <td className={`${CELL} whitespace-nowrap tabular-nums`}>
@@ -82,7 +82,7 @@ export function HistoryTable({
                 >
                   {entry.entityType}
                 </Link>
-                <div className="font-mono text-xs text-zinc-500">{entry.entityId}</div>
+                <div className="font-mono text-xs text-muted">{entry.entityId}</div>
               </td>
               <td className={CELL}>{entry.field}</td>
               <td className={`${CELL} break-all`}>{renderValue(entry.field, entry.before, fmt)}</td>
@@ -96,7 +96,7 @@ export function HistoryTable({
                   {entry.batchId.slice(0, 8)}
                 </Link>
                 {summaries[entry.batchId] && (
-                  <div className="text-xs text-zinc-500">{summaries[entry.batchId]}</div>
+                  <div className="text-xs text-muted">{summaries[entry.batchId]}</div>
                 )}
               </td>
             </tr>

@@ -1,6 +1,7 @@
 import type { Formatter } from '@/lib/format';
 import type { PreviewEntry } from '@/server/services/imports';
 import { NEAR_DUPLICATE_FIELD_PREFIX } from '../near-duplicate-decisions';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 const CELL = 'px-3 py-2 text-left align-top';
 
@@ -25,12 +26,8 @@ function SideCells({ side, currency, fmt }: { side: Side; currency: string; fmt:
       <td className={CELL}>{fmt.date(side.bookingDate)}</td>
       <td className={CELL}>
         {side.counterpartyName ?? side.rawDescription}
-        {side.paymentReference && (
-          <div className="text-xs text-zinc-500">{side.paymentReference}</div>
-        )}
-        <div className="font-mono text-xs text-zinc-500">
-          {side.bankReference ?? 'No reference'}
-        </div>
+        {side.paymentReference && <div className="text-xs text-muted">{side.paymentReference}</div>}
+        <div className="font-mono text-xs text-muted">{side.bankReference ?? 'No reference'}</div>
       </td>
       <td className={`${CELL} text-right tabular-nums`}>
         {fmt.amount(side.amountMinor, { currency })}
@@ -48,10 +45,10 @@ export function NearDuplicates({ entries, currency, fmt }: NearDuplicatesProps) 
   if (entries.length === 0) return null;
   return (
     <section aria-labelledby="near-duplicates" className="flex flex-col gap-2">
-      <h2 id="near-duplicates" className="text-lg font-semibold">
+      <h2 id="near-duplicates" className={SECTION_TITLE_CLASS}>
         Possible duplicates
       </h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-ink-soft">
         These entries have the same date and amount as a Transaction already on this Account, but a
         different reference. Keep the ones that are really new. Skipped ones are not imported. The
         reconciliation above counts them as skipped.
@@ -59,7 +56,7 @@ export function NearDuplicates({ entries, currency, fmt }: NearDuplicatesProps) 
       {entries.map((entry) => (
         <fieldset
           key={entry.fingerprint}
-          className="flex flex-col gap-2 rounded-md border border-amber-300 p-3 dark:border-amber-700"
+          className="flex flex-col gap-2 rounded-md border border-warning-rule p-3"
         >
           <legend className="px-1 text-sm font-medium">
             {entry.bankReference ?? entry.counterpartyName ?? fmt.date(entry.bookingDate)}
@@ -69,7 +66,7 @@ export function NearDuplicates({ entries, currency, fmt }: NearDuplicatesProps) 
               aria-label={`Possible duplicate ${entry.fingerprint}`}
               className="w-full text-sm"
             >
-              <thead className="border-b border-zinc-200 dark:border-zinc-800">
+              <thead className="border-b border-rule">
                 <tr>
                   <th className={CELL}></th>
                   <th className={CELL}>Booking date</th>
@@ -77,7 +74,7 @@ export function NearDuplicates({ entries, currency, fmt }: NearDuplicatesProps) 
                   <th className={`${CELL} text-right`}>Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <tbody className="divide-y divide-rule">
                 <tr>
                   <th scope="row" className={`${CELL} font-medium`}>
                     In this file
@@ -85,7 +82,7 @@ export function NearDuplicates({ entries, currency, fmt }: NearDuplicatesProps) 
                   <SideCells side={entry} currency={currency} fmt={fmt} />
                 </tr>
                 {entry.nearDuplicates.map((existing) => (
-                  <tr key={existing.id} className="text-zinc-600 dark:text-zinc-400">
+                  <tr key={existing.id} className="text-ink-soft">
                     <th scope="row" className={`${CELL} font-medium`}>
                       {existing.isManual ? 'Manual transaction' : 'Already on the Account'}
                     </th>

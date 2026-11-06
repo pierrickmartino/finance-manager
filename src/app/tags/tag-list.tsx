@@ -46,13 +46,13 @@ export function TagList({ tags, selectedId, query }: TagListProps) {
           </li>
         ))}
         {tags.length === 0 && (
-          <li className="px-2 text-sm text-zinc-400">
+          <li className="px-2 text-sm text-faint">
             {query ? `No Tag matches "${query}".` : 'No Tags yet.'}
           </li>
         )}
       </ul>
 
-      <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <div className="border-t border-rule pt-3">
         <Menu trigger="+ New Tag" triggerClassName={`${GHOST_BUTTON_CLASS} inline-block`}>
           <ActionForm action={createTagAction} label="New Tag" className="flex flex-col gap-2">
             <label className="flex flex-col gap-1 text-sm font-medium">
@@ -76,18 +76,16 @@ function TagLink({ tag, isActive, query }: { tag: Tag; isActive: boolean; query:
       scroll={false}
       aria-current={isActive ? 'page' : undefined}
       className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm ${
-        isActive
-          ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+        isActive ? 'bg-ink text-white' : 'hover:bg-sunken'
       }`}
     >
       <span className="truncate">
-        <span aria-hidden="true" className={isActive ? 'opacity-60' : 'text-zinc-400'}>
+        <span aria-hidden="true" className={isActive ? 'opacity-60' : 'text-faint'}>
           #{' '}
         </span>
         {tag.name}
       </span>
-      <span className={`text-xs tabular-nums ${isActive ? 'opacity-70' : 'text-zinc-400'}`}>
+      <span className={`text-xs tabular-nums ${isActive ? 'opacity-70' : 'text-faint'}`}>
         {tag.transactionCount}
       </span>
     </Link>

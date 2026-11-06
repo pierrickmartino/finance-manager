@@ -1,9 +1,61 @@
 @import 'tailwindcss';
 
+/*
+ * Finance Manager design system: the Dashboard Story's style, app-wide (docs/design-system.md).
+ * Ink and one vermilion accent on paper, a serif for display, a sans for everything read
+ * and operated. Light only, by choice: no dark theme, whatever the system setting.
+ *
+ * Tokens become Tailwind utilities: bg-paper, text-ink, border-rule, text-accent-ink, font-display…
+ * Use these, never raw palette classes (zinc-*, emerald-*…), so the look stays in one place.
+ */
+@theme {
+  /* Neutrals: the page, what sits on it, and the ink written on both. */
+  --color-paper: #fafafa; /* page background */
+  --color-surface: #ffffff; /* cards, inputs, menus */
+  --color-sunken: #f4f4f5; /* hover, selected rows, tracks */
+  --color-rule: #e4e4e7; /* borders and dividers */
+  --color-rule-strong: #d4d4d8; /* control borders */
+  --color-faint: #a1a1aa; /* placeholders, disabled, decorative marks (not body text) */
+  --color-muted: #71717a; /* secondary text: labels, hints, metadata */
+  --color-ink-soft: #52525b; /* tertiary headings, quiet controls */
+  --color-ink: #18181b; /* text and primary buttons */
+  --color-ink-hover: #3f3f46; /* primary button hover */
+
+  /* The accent: vermilion. Fill for marks and large numbers; accent-ink for text and links. */
+  --color-accent: #ff4f1f;
+  --color-accent-ink: #c93a10; /* AA on paper, surface and accent-tint */
+  --color-accent-tint: #fff1ec; /* selected navigation, highlighted rows */
+
+  /* Meaning, kept apart from the accent: never use these for decoration. */
+  --color-positive: #047857;
+  --color-positive-tint: #ecfdf5;
+  --color-negative: #be123c;
+  --color-negative-tint: #fff1f2;
+  --color-warning: #b45309;
+  --color-warning-tint: #fffbeb;
+  --color-warning-rule: #fcd34d;
+  --color-info: #0369a1;
+  --color-info-tint: #f0f9ff;
+
+  /* Type: a serif for display (page titles, headline amounts), a sans for the rest. */
+  --font-display: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
-  @apply bg-white text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+  @apply bg-paper text-ink antialiased;
+}
+
+/* One visible focus style everywhere, in the accent. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-accent-tint);
+  color: var(--color-ink);
 }

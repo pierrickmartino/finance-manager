@@ -11,7 +11,7 @@ export function transactionName(transaction: TransactionListItem): string {
 
 /** Income stands out; expenses stay neutral (they are most rows). */
 export function amountClass(amountMinor: number): string {
-  return amountMinor > 0 ? 'text-emerald-700 dark:text-emerald-400' : '';
+  return amountMinor > 0 ? 'text-positive' : '';
 }
 
 type Classified = Pick<TransactionListItem, 'transferId' | 'category' | 'splitLines'>;
@@ -63,8 +63,8 @@ export function categoryText(transaction: Classified): string {
 
 /** Colours that make Transfer and Unclassified stand out; other kinds stay plain. */
 const KIND_CLASS: Partial<Record<ClassificationKind, string>> = {
-  transfer: 'text-sky-700 dark:text-sky-400',
-  unclassified: 'text-amber-700 dark:text-amber-400',
+  transfer: 'text-info',
+  unclassified: 'text-warning',
 };
 
 /**
@@ -79,7 +79,7 @@ export function CategoryLabel({ transaction }: { transaction: TransactionListIte
   return (
     <>
       {label}{' '}
-      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs whitespace-nowrap text-sky-700 dark:bg-sky-950 dark:text-sky-400">
+      <span className="rounded-full bg-info-tint px-2 py-0.5 text-xs whitespace-nowrap text-info">
         {PARTLY_TRANSFER}
       </span>
     </>

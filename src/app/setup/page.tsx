@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { getCurrentSession, getPublicServiceContext } from '@/server/app-context';
 import { createTotpEnrolment, getAuthStatus } from '@/server/services/auth';
 import { SetupForm } from './setup-form';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Set up · Finance Manager' };
 
@@ -34,8 +35,8 @@ export default async function SetupPage() {
 function SetupLayout({ children }: { children: ReactNode }) {
   return (
     <section className="mx-auto flex max-w-md flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Set up Finance Manager</h1>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <h1 className={PAGE_TITLE_CLASS}>Set up Finance Manager</h1>
+      <p className="text-sm text-ink-soft">
         Choose a password and add Finance Manager to an authenticator app. You need both to sign in.
       </p>
       {children}

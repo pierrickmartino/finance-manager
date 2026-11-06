@@ -30,7 +30,7 @@ export async function GroupDetail({ groupKey, fmt }: GroupDetailProps) {
         aria-label={`Group ${description}`}
         className={`${CARD_CLASS} flex flex-col gap-2 p-5`}
       >
-        <p className="text-sm text-zinc-500">This group has no Unclassified Transactions left.</p>
+        <p className="text-sm text-muted">This group has no Unclassified Transactions left.</p>
         <Link href={unclassifiedHref({})} className="text-sm font-medium hover:underline">
           Next group →
         </Link>
@@ -53,7 +53,7 @@ export async function GroupDetail({ groupKey, fmt }: GroupDetailProps) {
       className={`${CARD_CLASS} flex flex-col gap-5 p-5`}
     >
       <header className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold break-words">{description}</h2>
+        <h2 className="font-display text-2xl tracking-tight break-words">{description}</h2>
         <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <Fact term="Transactions" value={String(members.total)} />
           <Fact term={isPartial ? 'Total of those shown' : 'Total'} value={total} />
@@ -65,7 +65,7 @@ export async function GroupDetail({ groupKey, fmt }: GroupDetailProps) {
           />
         </dl>
         {isPartial && (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted">
             Showing the {members.transactions.length} newest of {members.total}. Classify all
             applies to every one of them.
           </p>
@@ -88,7 +88,7 @@ export async function GroupDetail({ groupKey, fmt }: GroupDetailProps) {
 function Fact({ term, value, title }: { term: string; value: string; title?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <dt className="text-xs text-zinc-500">{term}</dt>
+      <dt className="text-xs text-muted">{term}</dt>
       <dd className="font-medium break-words tabular-nums" title={title}>
         {value}
       </dd>

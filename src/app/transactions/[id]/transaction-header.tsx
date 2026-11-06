@@ -7,10 +7,10 @@ import { amountClass, transactionName } from '../transaction-display';
 import type { BadgeTone, StatusBadge } from './transaction-badges';
 
 const TONE_CLASS: Record<BadgeTone, string> = {
-  warning: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-  info: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
-  positive: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-  neutral: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  warning: 'bg-warning-tint text-warning',
+  info: 'bg-info-tint text-info',
+  positive: 'bg-positive-tint text-positive',
+  neutral: 'bg-sunken text-ink-soft',
 };
 
 interface TransactionHeaderProps {
@@ -34,7 +34,7 @@ export function TransactionHeader({ transaction, badges, fmt, actions }: Transac
     >
       <span
         aria-hidden="true"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-zinc-100 text-lg font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sunken text-lg font-semibold text-ink-soft"
       >
         {name.slice(0, 1).toUpperCase()}
       </span>
@@ -42,7 +42,7 @@ export function TransactionHeader({ transaction, badges, fmt, actions }: Transac
         <h1 className="line-clamp-2 text-lg font-semibold break-words" title={name}>
           {name}
         </h1>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-zinc-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
           <span>
             {fmt.date(transaction.bookingDate)} ·{' '}
             <Link href={`/accounts/${transaction.accountId}`} className="underline">
@@ -62,7 +62,7 @@ export function TransactionHeader({ transaction, badges, fmt, actions }: Transac
         </div>
       </div>
       <p
-        className={`text-2xl font-semibold whitespace-nowrap tabular-nums ${amountClass(transaction.amountMinor)}`}
+        className={`font-display text-3xl tracking-tight whitespace-nowrap tabular-nums ${amountClass(transaction.amountMinor)}`}
       >
         {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
       </p>

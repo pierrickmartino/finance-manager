@@ -1,7 +1,8 @@
 import { useId, type ComponentProps, type ReactNode } from 'react';
+import { PRIMARY_BUTTON_CLASS } from './surface';
 
 const INPUT_CLASS =
-  'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+  'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm placeholder:text-faint';
 
 interface TextFieldProps extends Omit<ComponentProps<'input'>, 'id'> {
   label: string;
@@ -49,11 +50,7 @@ interface SubmitButtonProps {
 
 export function SubmitButton({ isPending, children }: SubmitButtonProps) {
   return (
-    <button
-      type="submit"
-      disabled={isPending}
-      className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-    >
+    <button type="submit" disabled={isPending} className={PRIMARY_BUTTON_CLASS}>
       {children}
     </button>
   );
@@ -61,7 +58,7 @@ export function SubmitButton({ isPending, children }: SubmitButtonProps) {
 
 export function FieldError({ message }: { message: string }) {
   return (
-    <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+    <p role="alert" className="text-sm text-negative">
       {message}
     </p>
   );

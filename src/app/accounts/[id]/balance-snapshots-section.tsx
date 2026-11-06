@@ -4,6 +4,7 @@ import type { Account } from '@/server/services/accounts';
 import type { SnapshotCheck } from '@/server/services/balance-snapshots';
 import { deleteBalanceSnapshotAction, recordBalanceSnapshotAction } from './actions';
 import { BalanceSnapshotForm } from './balance-snapshot-form';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 const CELL = 'px-3 py-2 text-left';
 
@@ -24,15 +25,15 @@ export function BalanceSnapshotsSection({ account, snapshots, fmt }: BalanceSnap
   const { currency } = account;
   return (
     <section aria-labelledby="balance-snapshots" className="flex flex-col gap-3">
-      <h2 id="balance-snapshots" className="text-lg font-semibold">
+      <h2 id="balance-snapshots" className={SECTION_TITLE_CLASS}>
         Balance snapshots
       </h2>
       {snapshots.length === 0 ? (
-        <p className="text-sm text-zinc-500">No Balance snapshots yet.</p>
+        <p className="text-sm text-muted">No Balance snapshots yet.</p>
       ) : (
         <div className="overflow-x-auto">
           <table aria-label="Balance snapshots" className="w-full text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800">
+            <thead className="border-b border-rule">
               <tr>
                 <th className={CELL}>Date</th>
                 <th className={`${CELL} text-right`}>Snapshot</th>
@@ -43,7 +44,7 @@ export function BalanceSnapshotsSection({ account, snapshots, fmt }: BalanceSnap
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <tbody className="divide-y divide-rule">
               {snapshots.map((check) => (
                 <tr key={check.id}>
                   <td className={CELL}>{fmt.date(check.date)}</td>
@@ -55,9 +56,7 @@ export function BalanceSnapshotsSection({ account, snapshots, fmt }: BalanceSnap
                       ? '—'
                       : fmt.amount(check.computedMinor, { currency })}
                   </td>
-                  <td
-                    className={`${CELL} ${check.isMismatch ? 'font-medium text-amber-700 dark:text-amber-400' : ''}`}
-                  >
+                  <td className={`${CELL} ${check.isMismatch ? 'font-medium text-warning' : ''}`}>
                     {checkLabel(check, fmt, currency)}
                   </td>
                   <td className={CELL}>

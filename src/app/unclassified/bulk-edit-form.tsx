@@ -9,13 +9,12 @@ import type { CategoryGroup } from '@/server/services/categories';
 import type { TransactionListItem } from '@/server/services/transactions';
 import type { BulkEditResult } from '@/server/services/transactions/bulk-edit';
 
-const INPUT =
-  'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+const INPUT = 'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm';
 const CELL = 'px-3 py-2 text-left align-top';
 const PRIMARY =
-  'rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300';
+  'rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-hover disabled:opacity-50';
 const SECONDARY =
-  'rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800';
+  'rounded-md border border-rule-strong px-3 py-1.5 text-sm font-medium hover:bg-sunken disabled:opacity-50';
 
 interface BulkEditFormProps {
   /** The group's heading: shown in the form's accessible name, and not repeated per row. */
@@ -114,7 +113,7 @@ export function BulkEditForm({
           />
         </label>
       </div>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-muted">
         Blank fields are left as they are. The fields you fill in are locked against Rules.
       </p>
       <div className="flex flex-wrap items-center gap-3">
@@ -131,7 +130,7 @@ export function BulkEditForm({
           Classify selected ({selectedCount})
         </button>
         {state?.ok && (
-          <span role="status" className="text-sm text-zinc-500">
+          <span role="status" className="text-sm text-muted">
             Classified {state.data.count} Transaction{state.data.count === 1 ? '' : 's'}.
           </span>
         )}
@@ -140,7 +139,7 @@ export function BulkEditForm({
 
       <div className="overflow-x-auto">
         <table aria-label={`Transactions in ${description}`} className="w-full text-sm">
-          <thead className="border-b border-zinc-200 dark:border-zinc-800">
+          <thead className="border-b border-rule">
             <tr>
               <th className={CELL}>
                 <span className="sr-only">Select</span>
@@ -154,7 +153,7 @@ export function BulkEditForm({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <tbody className="divide-y divide-rule">
             {transactions.map((transaction) => (
               <tr key={transaction.id}>
                 <td className={CELL}>
@@ -174,7 +173,7 @@ export function BulkEditForm({
                   {transaction.accountName}
                   {/* The heading names the group; only other spellings are worth repeating. */}
                   {transaction.rawDescription !== description && (
-                    <div className="text-xs text-zinc-500">
+                    <div className="text-xs text-muted">
                       {transaction.rawDescription || '(no description)'}
                     </div>
                   )}

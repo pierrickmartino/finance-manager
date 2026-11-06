@@ -19,7 +19,7 @@ interface TagDetailProps {
   fmt: Formatter;
 }
 
-const SECTION_HEADING = 'text-xs font-semibold tracking-wide text-zinc-400 uppercase';
+const SECTION_HEADING = 'text-xs font-semibold tracking-wide text-faint uppercase';
 
 function transactionsLabel(count: number): string {
   return `${count} Transaction${count === 1 ? '' : 's'}`;
@@ -32,21 +32,21 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
   const transactionsHref = `/transactions?tagId=${id}`;
   return (
     <section aria-label={`Tag ${name}`} className={`${CARD_CLASS} flex min-w-0 flex-col`}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 p-4 dark:border-zinc-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="truncate text-lg font-semibold">{name}</h2>
-          <Link href={transactionsHref} className="text-sm text-zinc-400 hover:underline">
+          <h2 className="truncate font-display text-2xl tracking-tight">{name}</h2>
+          <Link href={transactionsHref} className="text-sm text-faint hover:underline">
             {transactionsLabel(transactionCount)}
           </Link>
           {firstDate && lastDate && (
-            <span className="text-sm text-zinc-400 tabular-nums">
+            <span className="text-sm text-faint tabular-nums">
               {firstDate === lastDate
                 ? fmt.date(firstDate)
                 : `${fmt.date(firstDate)} – ${fmt.date(lastDate)}`}
             </span>
           )}
           {transactionCount === 0 && (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-600/20 ring-inset dark:bg-amber-950 dark:text-amber-300">
+            <span className="rounded-full bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
               Unused
             </span>
           )}
@@ -57,14 +57,11 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
       <Totals activity={activity} fmt={fmt} />
 
       {activity.topCategories.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+        <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
           <h3 className={SECTION_HEADING}>Mostly</h3>
           <ul aria-label={`Top Categories of ${name}`} className="flex flex-wrap gap-2">
             {activity.topCategories.map((category) => (
-              <li
-                key={category.name}
-                className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800"
-              >
+              <li key={category.name} className="rounded-full bg-sunken px-2 py-0.5 text-xs">
                 {category.name} · {category.transactionCount}
               </li>
             ))}
@@ -74,14 +71,11 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
 
       <h3 className={`${SECTION_HEADING} px-4 pt-3`}>Recent Transactions</h3>
       {recent.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-zinc-400">
+        <p className="px-4 py-6 text-center text-sm text-faint">
           No Transactions carry this Tag yet. Add it from a Transaction or with a Rule.
         </p>
       ) : (
-        <ul
-          aria-label={`Recent Transactions of ${name}`}
-          className="divide-y divide-zinc-100 dark:divide-zinc-800"
-        >
+        <ul aria-label={`Recent Transactions of ${name}`} className="divide-y divide-rule">
           {recent.map((transaction) => (
             <RecentRow key={transaction.id} transaction={transaction} fmt={fmt} />
           ))}
@@ -90,7 +84,7 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
       {transactionCount > recent.length && (
         <Link
           href={transactionsHref}
-          className="border-t border-zinc-100 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="border-t border-rule px-4 py-3 text-sm font-medium text-ink-soft hover:bg-paper"
         >
           All {transactionsLabel(transactionCount)} →
         </Link>
@@ -103,14 +97,14 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
 function Totals({ activity, fmt }: { activity: TagActivity; fmt: Formatter }) {
   if (activity.totals.length === 0) return null;
   return (
-    <dl className="flex flex-wrap gap-x-10 gap-y-4 border-b border-zinc-100 p-4 dark:border-zinc-800">
+    <dl className="flex flex-wrap gap-x-10 gap-y-4 border-b border-rule p-4">
       {activity.totals.map(({ currency, outMinor, inMinor }) => (
         <div key={currency} className="flex flex-col gap-1">
           <dt className={SECTION_HEADING}>Net {currency}</dt>
-          <dd className="text-xl font-semibold tabular-nums">
+          <dd className="font-display text-2xl tracking-tight tabular-nums">
             {fmt.amount(outMinor + inMinor, { currency })}
           </dd>
-          <dd className="text-xs text-zinc-500 tabular-nums">
+          <dd className="text-xs text-muted tabular-nums">
             out {fmt.amount(outMinor)} · in {fmt.amount(inMinor)}
           </dd>
         </div>
@@ -123,7 +117,7 @@ function RecentRow({ transaction, fmt }: { transaction: TransactionListItem; fmt
   const classification = categoryText(transaction);
   return (
     <li className="flex items-center gap-4 px-4 py-2.5 text-sm">
-      <span className="w-24 shrink-0 text-zinc-500 tabular-nums">
+      <span className="w-24 shrink-0 text-muted tabular-nums">
         {fmt.date(transaction.bookingDate)}
       </span>
       <Link
@@ -131,12 +125,12 @@ function RecentRow({ transaction, fmt }: { transaction: TransactionListItem; fmt
         className="min-w-0 flex-1 truncate hover:underline"
       >
         {transaction.rawDescription || '(no description)'}
-        <span className="block truncate text-xs text-zinc-400">
+        <span className="block truncate text-xs text-faint">
           {transaction.accountName} · {classification}
         </span>
       </Link>
       <span
-        className={`shrink-0 tabular-nums ${transaction.amountMinor > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+        className={`shrink-0 tabular-nums ${transaction.amountMinor > 0 ? 'text-positive' : ''}`}
       >
         {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
       </span>
@@ -187,7 +181,7 @@ function TagMenu({ tag, tags }: { tag: Tag; tags: Tag[] }) {
           </button>
         </ActionForm>
       )}
-      <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <div className="border-t border-rule pt-3">
         <ActionForm
           action={deleteTagAction.bind(null, id)}
           label={`Delete ${name}`}

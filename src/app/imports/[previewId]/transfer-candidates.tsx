@@ -1,6 +1,7 @@
 import type { Formatter } from '@/lib/format';
 import type { PreviewEntry } from '@/server/services/imports';
 import { NOT_A_TRANSFER, TRANSFER_FIELD_PREFIX } from '../transfer-decisions';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 const CELL = 'px-3 py-2 text-left align-top';
 
@@ -21,10 +22,10 @@ export function TransferCandidates({ entries, currency, fmt }: TransferCandidate
   if (withCandidates.length === 0) return null;
   return (
     <section aria-labelledby="transfer-candidates" className="flex flex-col gap-2">
-      <h2 id="transfer-candidates" className="text-lg font-semibold">
+      <h2 id="transfer-candidates" className={SECTION_TITLE_CLASS}>
         Possible Transfers
       </h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-ink-soft">
         These entries may be money moving between your own Accounts. Choose the other side to link
         them as a Transfer: it gets no Category and is left out of income and expense. Rules
         don&apos;t apply to Transfers.
@@ -37,14 +38,14 @@ export function TransferCandidates({ entries, currency, fmt }: TransferCandidate
           <fieldset
             key={entry.fingerprint}
             aria-label={`Transfer for ${entry.bankReference ?? label}`}
-            className="flex flex-col gap-2 rounded-md border border-sky-300 p-3 dark:border-sky-700"
+            className="flex flex-col gap-2 rounded-md border border-info p-3"
           >
             <legend className="px-1 text-sm font-medium">
               {label} · {entry.counterpartyName ?? entry.rawDescription}
             </legend>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-zinc-200 dark:border-zinc-800">
+                <thead className="border-b border-rule">
                   <tr>
                     <th className={CELL}>Link with</th>
                     <th className={CELL}>Account</th>
@@ -53,7 +54,7 @@ export function TransferCandidates({ entries, currency, fmt }: TransferCandidate
                     <th className={`${CELL} text-right`}>Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                <tbody className="divide-y divide-rule">
                   {entry.transferCandidates.map(({ transaction, isPreselected, isIbanMatch }) => (
                     <tr key={transaction.id}>
                       <td className={CELL}>
@@ -65,14 +66,14 @@ export function TransferCandidates({ entries, currency, fmt }: TransferCandidate
                             defaultChecked={isPreselected}
                             aria-label={`Link with ${transaction.accountName} ${fmt.date(transaction.bookingDate)}`}
                           />
-                          {isIbanMatch && <span className="text-xs text-sky-700">IBAN match</span>}
+                          {isIbanMatch && <span className="text-xs text-info">IBAN match</span>}
                         </label>
                       </td>
                       <td className={CELL}>{transaction.accountName}</td>
                       <td className={CELL}>{fmt.date(transaction.bookingDate)}</td>
                       <td className={CELL}>
                         {transaction.counterpartyName ?? transaction.rawDescription}
-                        <div className="font-mono text-xs text-zinc-500">
+                        <div className="font-mono text-xs text-muted">
                           {transaction.bankReference ?? 'No reference'}
                         </div>
                       </td>

@@ -7,6 +7,7 @@ import { BankDetail } from './bank-detail';
 import { BankList } from './bank-list';
 import { NewBankPanel } from './new-bank-panel';
 import { NEW_BANK, selectBank, summarizeBanks } from './view';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Banks · Finance Manager' };
 
@@ -36,7 +37,7 @@ export default async function BanksPage({ searchParams }: BanksPageProps) {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Banks</h1>
+      <h1 className={PAGE_TITLE_CLASS}>Banks</h1>
       <div className="grid items-start gap-6 md:grid-cols-[18rem_minmax(0,1fr)] lg:grid-cols-[22rem_minmax(0,1fr)]">
         <BankList summaries={summaries} selected={selected} fmt={fmt} />
         {selection.type === 'bank' ? (

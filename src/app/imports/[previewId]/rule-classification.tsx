@@ -7,7 +7,7 @@ interface RuleClassificationCellProps {
 
 function ByRule({ ruleId, ruleName }: { ruleId: string; ruleName: string }) {
   return (
-    <span className="text-xs text-zinc-500">
+    <span className="text-xs text-muted">
       {' '}
       (Rule{' '}
       <Link href={`/rules/${ruleId}`} className="hover:underline">
@@ -23,13 +23,13 @@ export function RuleClassificationCell({ classification }: RuleClassificationCel
   if (!classification) return null;
   const { payee, category, tags } = classification;
   if (!payee && !category && tags.length === 0) {
-    return <span className="text-zinc-500">No Rule matched</span>;
+    return <span className="text-muted">No Rule matched</span>;
   }
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-2 text-xs">
       {payee && (
         <>
-          <dt className="text-zinc-500">Payee</dt>
+          <dt className="text-muted">Payee</dt>
           <dd>
             {payee.name}
             <ByRule {...payee} />
@@ -38,7 +38,7 @@ export function RuleClassificationCell({ classification }: RuleClassificationCel
       )}
       {category && (
         <>
-          <dt className="text-zinc-500">Category</dt>
+          <dt className="text-muted">Category</dt>
           <dd>
             {category.name}
             <ByRule {...category} />
@@ -47,7 +47,7 @@ export function RuleClassificationCell({ classification }: RuleClassificationCel
       )}
       {tags.length > 0 && (
         <>
-          <dt className="text-zinc-500">Tags</dt>
+          <dt className="text-muted">Tags</dt>
           <dd>
             {tags.map((tag, index) => (
               <span key={tag.id}>

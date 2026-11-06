@@ -26,7 +26,7 @@ export function ApplyForm({ action, count }: ApplyFormProps) {
       )}
       {state && !state.ok && <FieldError message={state.error} />}
       {state?.ok && (
-        <p role="status" className="text-sm text-green-700 dark:text-green-400">
+        <p role="status" className="text-sm text-positive">
           {`Applied to ${state.data.count} ${state.data.count === 1 ? 'Transaction' : 'Transactions'}.`}
         </p>
       )}

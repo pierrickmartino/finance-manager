@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { GHOST_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
+import { GHOST_BUTTON_CLASS, PAGE_TITLE_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { countRuleMatches, listRules } from '@/server/services/rules';
@@ -51,8 +51,8 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Rules</h1>
-          <p className="max-w-2xl text-sm text-zinc-500">
+          <h1 className={PAGE_TITLE_CLASS}>Rules</h1>
+          <p className="max-w-2xl text-sm text-muted">
             {rows.length} Rule{rows.length === 1 ? '' : 's'}, {enabled} enabled. They run top to
             bottom on imports and Manual transactions: per field the first match wins, Tags add up,
             and fields you edited by hand are never changed.

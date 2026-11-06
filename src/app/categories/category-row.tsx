@@ -39,10 +39,7 @@ export function CategoryRow({
       <span id={`category-${id}`} className="min-w-0 flex-1 truncate text-sm font-medium">
         {name}
       </span>
-      <div
-        aria-hidden="true"
-        className="hidden h-1.5 w-40 rounded-full bg-zinc-100 sm:block dark:bg-zinc-800"
-      >
+      <div aria-hidden="true" className="hidden h-1.5 w-40 rounded-full bg-sunken sm:block">
         <div
           className={`h-1.5 rounded-full ${usageBarClass(groupType)}`}
           style={{ width: `${usagePercent(transactionCount, maxCount)}%` }}
@@ -51,7 +48,7 @@ export function CategoryRow({
       <Link
         href={`/transactions?categoryId=${id}`}
         aria-label={`${transactionCount} Transaction${transactionCount === 1 ? '' : 's'} in ${name}`}
-        className="w-12 text-right text-sm text-zinc-500 tabular-nums hover:underline"
+        className="w-12 text-right text-sm text-muted tabular-nums hover:underline"
       >
         {transactionCount}
       </Link>
@@ -139,7 +136,7 @@ export function CategoryRow({
             </button>
           </ActionForm>
         )}
-        <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+        <div className="border-t border-rule pt-3">
           <ActionForm
             action={deleteCategoryAction.bind(null, id)}
             label={`Delete ${name}`}

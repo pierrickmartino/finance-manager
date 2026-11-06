@@ -17,6 +17,7 @@ import {
 import { applyRulesAction } from '../actions';
 import { ApplyForm } from './apply-form';
 import { applyInputOf, readApplyValues, type ApplyValues } from './apply-search';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Apply Rules · Finance Manager' };
 
@@ -69,11 +70,11 @@ export default async function ApplyRulesPage({ searchParams }: ApplyPageProps) {
 
   return (
     <section className="flex flex-col gap-6">
-      <Link href="/rules" className="text-sm text-zinc-500 hover:underline">
+      <Link href="/rules" className="text-sm text-muted hover:underline">
         ← Rules
       </Link>
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <h1 className={PAGE_TITLE_CLASS}>{title}</h1>
+      <p className="text-sm text-ink-soft">
         {rule
           ? 'Runs this Rule (even when disabled) on existing Transactions.'
           : 'Runs every enabled Rule, in order, on existing Transactions.'}{' '}
@@ -116,7 +117,7 @@ export default async function ApplyRulesPage({ searchParams }: ApplyPageProps) {
       </form>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-negative">
           {error}
         </p>
       )}
@@ -160,12 +161,12 @@ function PreviewSection({ preview, fmt, apply }: PreviewSectionProps) {
       {changes.length > 0 && (
         <div className="overflow-x-auto">
           {changedCount > changes.length && (
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-muted">
               Showing the first {MAX_PREVIEW_ROWS}; applying changes all {changedCount}.
             </p>
           )}
           <table aria-label="Changes" className="w-full text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800">
+            <thead className="border-b border-rule">
               <tr>
                 <th className={CELL}>Date</th>
                 <th className={CELL}>Account</th>
@@ -174,7 +175,7 @@ function PreviewSection({ preview, fmt, apply }: PreviewSectionProps) {
                 <th className={CELL}>Changes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <tbody className="divide-y divide-rule">
               {changes.map((change) => (
                 <tr key={change.transactionId}>
                   <td className={`${CELL} whitespace-nowrap tabular-nums`}>
@@ -197,7 +198,7 @@ function PreviewSection({ preview, fmt, apply }: PreviewSectionProps) {
                       {change.fields.map((field) => (
                         <li key={field.field}>
                           {FIELD_LABELS[field.field]}: {field.before ?? '—'} → {field.after ?? '—'}{' '}
-                          <span className="text-xs text-zinc-500">({field.ruleName})</span>
+                          <span className="text-xs text-muted">({field.ruleName})</span>
                         </li>
                       ))}
                     </ul>

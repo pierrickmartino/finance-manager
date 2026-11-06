@@ -8,7 +8,7 @@ import {
 /** The Widget editor's side panel: collapsible sections of labelled controls. */
 
 export const PANEL_INPUT =
-  'w-full min-w-0 rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+  'w-full min-w-0 rounded-md border border-rule-strong bg-surface px-2 py-1 text-sm';
 
 interface PanelSectionProps {
   title: string;
@@ -28,13 +28,10 @@ export function PanelSection({
   children,
 }: PanelSectionProps) {
   return (
-    <details
-      open={isOpen}
-      className={`group border-b border-zinc-200 last:border-b-0 dark:border-zinc-800 ${className}`}
-    >
+    <details open={isOpen} className={`group border-b border-rule last:border-b-0 ${className}`}>
       <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         {title}
-        <span className="flex items-center gap-2 text-xs font-normal text-zinc-500 dark:text-zinc-400">
+        <span className="flex items-center gap-2 text-xs font-normal text-muted">
           {badge}
           <span
             aria-hidden="true"
@@ -53,7 +50,7 @@ export function PanelSection({
 export function PanelRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 text-sm">
-      <span className="text-zinc-600 dark:text-zinc-400">{label}</span>
+      <span className="text-ink-soft">{label}</span>
       {children}
     </label>
   );
@@ -76,7 +73,7 @@ export function VisualisationPicker({ value }: { value: Visualisation }) {
         {VISUALISATIONS.map((visualisation) => (
           <label
             key={visualisation}
-            className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-zinc-300 bg-white px-1 py-2 text-center text-[11px] leading-tight hover:border-zinc-400 has-checked:border-zinc-900 has-checked:ring-2 has-checked:ring-zinc-900 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-sky-500 dark:border-zinc-700 dark:bg-zinc-900 dark:has-checked:border-white dark:has-checked:ring-white"
+            className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-rule-strong bg-surface px-1 py-2 text-center text-[11px] leading-tight hover:border-faint has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-info"
           >
             <input
               type="radio"

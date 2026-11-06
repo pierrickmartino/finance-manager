@@ -127,7 +127,7 @@ function PeriodSection({
         </PanelRow>
         <div className={WHEN_LAST}>
           <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 text-sm">
-            <span className="text-zinc-600 dark:text-zinc-400">Last</span>
+            <span className="text-ink-soft">Last</span>
             <span className="flex gap-2">
               <input
                 name="count"
@@ -179,25 +179,21 @@ function FilterChecklist({ list }: { list: FilterList }) {
   const count = list.selected.length;
   return (
     <details open={count > 0} className="group/filter">
-      <summary className="flex cursor-pointer list-none items-center justify-between text-sm text-zinc-700 dark:text-zinc-300 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between text-sm text-ink-soft [&::-webkit-details-marker]:hidden">
         {list.label}
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          {count > 0 ? `${count} selected` : 'all'}
-        </span>
+        <span className="text-xs text-muted">{count > 0 ? `${count} selected` : 'all'}</span>
       </summary>
-      <fieldset className="mt-1 flex max-h-48 min-w-0 flex-col gap-0.5 overflow-y-auto rounded-md border border-zinc-200 bg-white p-1.5 dark:border-zinc-800 dark:bg-zinc-900">
+      <fieldset className="mt-1 flex max-h-48 min-w-0 flex-col gap-0.5 overflow-y-auto rounded-md border border-rule bg-surface p-1.5">
         <legend className="sr-only">{list.label}</legend>
         {list.options.length === 0 && (
-          <p className="px-1 text-sm text-zinc-500 dark:text-zinc-400">Nothing to choose yet.</p>
+          <p className="px-1 text-sm text-muted">Nothing to choose yet.</p>
         )}
         {list.options.map((option, index) => (
           <div key={option.value}>
             {option.group && option.group !== list.options[index - 1]?.group && (
-              <p className="mt-1.5 px-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                {option.group}
-              </p>
+              <p className="mt-1.5 px-1 text-xs font-semibold text-muted">{option.group}</p>
             )}
-            <label className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <label className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-sunken">
               <input
                 type="checkbox"
                 name={list.name}
@@ -222,7 +218,7 @@ function FiltersSection({ query, lists }: { query: WidgetQueryInput; lists: Quer
       badge={active > 0 ? `${active} active` : 'none'}
       isOpen={active > 0}
     >
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">Nothing ticked lets everything in.</p>
+      <p className="text-xs text-muted">Nothing ticked lets everything in.</p>
       {filterLists.map((list) => (
         <FilterChecklist key={list.name} list={list} />
       ))}

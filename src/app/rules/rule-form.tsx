@@ -270,7 +270,7 @@ export function RuleForm({ initial, options, action, submitLabel }: RuleFormProp
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-hover disabled:opacity-50"
         >
           {submitLabel}
         </button>

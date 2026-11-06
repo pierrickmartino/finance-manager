@@ -11,6 +11,7 @@ import { removeSplitAction, splitTransactionAction } from './actions';
 import { SplitForm } from './split-form';
 import { initialSplitDrafts } from './split-lines';
 import { LinkTransferForm, TransferCounterpart, UnlinkTransferForm } from './transfer-section';
+import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 const CELL = 'px-3 py-2 text-left';
 const SUMMARY = `${BUTTON_CLASS} inline-block cursor-pointer list-none`;
@@ -72,7 +73,7 @@ export function SplitSection({
   return (
     <section aria-labelledby="split" className={className}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="split" className="text-lg font-semibold">
+        <h2 id="split" className={SECTION_TITLE_CLASS}>
           {splitLabel(transaction) ?? 'Split'}
         </h2>
         {isSplit && (
@@ -98,7 +99,7 @@ export function SplitSection({
       ) : (
         <details className="w-full">
           <summary className={SUMMARY}>Split Transaction</summary>
-          <p className="pt-3 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="pt-3 text-sm text-ink-soft">
             Divide the amount into lines that add up to it, each with its own Category.
           </p>
           <div className="pt-4">{form}</div>
@@ -114,7 +115,7 @@ function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
   return (
     <div className="overflow-x-auto">
       <table aria-label="Split lines" className="w-full text-sm">
-        <thead className="border-b border-zinc-200 dark:border-zinc-800">
+        <thead className="border-b border-rule">
           <tr>
             <th className={CELL}>Category</th>
             <th className={CELL}>Payee</th>
@@ -123,7 +124,7 @@ function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
             <th className={`${CELL} text-right`}>Amount</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <tbody className="divide-y divide-rule">
           {transaction.splitLines.map((line, index) => (
             <tr key={line.id}>
               <td className={CELL}>
@@ -160,7 +161,7 @@ function LinePayee({ line }: { line: TransactionDetail['splitLines'][number] }) 
   if (line.payee) return <>{line.payee.name}</>;
   if (!line.reportedPayee) return <>—</>;
   return (
-    <span className="text-zinc-500" title="The Transaction's Payee">
+    <span className="text-muted" title="The Transaction's Payee">
       {line.reportedPayee.name}
     </span>
   );
@@ -189,7 +190,7 @@ function LineClassification({
   if (transfer?.counterpart) {
     return (
       <div className="flex flex-col gap-1">
-        <span className="text-sky-700 dark:text-sky-400">
+        <span className="text-info">
           <TransferCounterpart counterpart={transfer.counterpart} fmt={fmt} />
         </span>
         <UnlinkTransferForm
@@ -206,7 +207,7 @@ function LineClassification({
       <span>{line.category ? categoryLabel(line.category) : 'Unclassified'}</span>
       {options.length > 0 && (
         <details>
-          <summary className="cursor-pointer text-xs text-zinc-500 underline">
+          <summary className="cursor-pointer text-xs text-muted underline">
             Link as Transfer
           </summary>
           <div className="pt-2">

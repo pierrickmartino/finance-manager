@@ -97,29 +97,29 @@ export function RuleList({ groups, groupBy, total, selectedId, query, drag }: Ru
               onToggle={(event) => setOpen(group.key, event.currentTarget.open)}
               className="group"
             >
-              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken [&::-webkit-details-marker]:hidden">
                 <span
                   aria-hidden
-                  className="w-3 text-zinc-400 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+                  className="w-3 text-faint transition-transform group-open:rotate-90 motion-reduce:transition-none"
                 >
                   ›
                 </span>
                 <span
-                  className={`min-w-0 flex-1 break-words font-medium ${group.name === null ? 'italic text-zinc-500' : ''}`}
+                  className={`min-w-0 flex-1 break-words font-medium ${group.name === null ? 'italic text-muted' : ''}`}
                 >
                   {group.parent && (
-                    <span className="font-normal text-zinc-500">{group.parent} › </span>
+                    <span className="font-normal text-muted">{group.parent} › </span>
                   )}
                   {label}
                 </span>
-                <span className="rounded-full bg-zinc-100 px-2 text-xs tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                <span className="rounded-full bg-sunken px-2 text-xs tabular-nums text-ink-soft">
                   {group.rules.length}
                   <span className="sr-only"> Rules</span>
                 </span>
               </summary>
               <ol
                 aria-label={`Rules: ${group.parent ? `${group.parent} › ` : ''}${label}`}
-                className="mb-1 ml-4 flex flex-col gap-0.5 border-l border-zinc-200 pl-1 dark:border-zinc-800"
+                className="mb-1 ml-4 flex flex-col gap-0.5 border-l border-rule pl-1"
               >
                 {group.rules.map((rule) => (
                   <li
@@ -133,7 +133,7 @@ export function RuleList({ groups, groupBy, total, selectedId, query, drag }: Ru
                       aria-label={`Drag ${rule.name}`}
                       role="img"
                       title="Drag to change the run order"
-                      className="cursor-grab select-none px-1 text-zinc-400"
+                      className="cursor-grab select-none px-1 text-faint"
                     >
                       ⠿
                     </span>
@@ -151,11 +151,11 @@ export function RuleList({ groups, groupBy, total, selectedId, query, drag }: Ru
         })}
       </div>
       {groups.length === 0 ? (
-        <p className="px-2 text-sm text-zinc-400">
+        <p className="px-2 text-sm text-faint">
           {total === 0 ? 'No Rules yet.' : `No Rule matches "${query}".`}
         </p>
       ) : (
-        <p className="px-2 text-xs text-zinc-500">
+        <p className="px-2 text-xs text-muted">
           {ruleCount} Rule{ruleCount === 1 ? '' : 's'} in {groups.length}{' '}
           {groups.length === 1 ? labels.option : labels.plural}. #1 runs first.
         </p>
@@ -174,12 +174,12 @@ function GroupByToggle({
   query: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 px-1 text-xs text-zinc-500">
+    <div className="flex items-center justify-between gap-2 px-1 text-xs text-muted">
       <span id="rules-group-by">Group by</span>
       <div
         role="group"
         aria-labelledby="rules-group-by"
-        className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800"
+        className="flex rounded-lg bg-sunken p-0.5"
       >
         {(Object.keys(GROUP_BY_LABELS) as RuleGroupBy[]).map((by) => (
           <Link
@@ -188,9 +188,7 @@ function GroupByToggle({
             scroll={false}
             aria-current={by === groupBy ? 'true' : undefined}
             className={`rounded-md px-3 py-1 font-medium ${
-              by === groupBy
-                ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-white'
-                : 'hover:text-zinc-900 dark:hover:text-white'
+              by === groupBy ? 'bg-surface text-ink shadow-sm' : 'hover:text-ink'
             }`}
           >
             {GROUP_BY_LABELS[by].option}
@@ -218,26 +216,24 @@ function RuleLink({
       scroll={false}
       aria-current={isActive ? 'page' : undefined}
       className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
-        isActive
-          ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+        isActive ? 'bg-ink text-white' : 'hover:bg-sunken'
       }`}
     >
       <span
         title="Run order"
-        className={`w-8 shrink-0 text-right text-xs tabular-nums ${isActive ? '' : 'text-zinc-500'}`}
+        className={`w-8 shrink-0 text-right text-xs tabular-nums ${isActive ? '' : 'text-muted'}`}
       >
         #{rule.position}
       </span>
       <span
         aria-hidden
-        className={`h-2 w-2 shrink-0 rounded-full ${rule.enabled ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+        className={`h-2 w-2 shrink-0 rounded-full ${rule.enabled ? 'bg-positive' : 'bg-rule-strong'}`}
       />
       <span className={`min-w-0 flex-1 break-words ${rule.enabled ? 'font-medium' : ''}`}>
         {rule.name}
         {!rule.enabled && <span className="ml-1 text-xs">(Disabled)</span>}
       </span>
-      <span className={`text-xs tabular-nums ${isActive ? '' : 'text-zinc-500'}`}>
+      <span className={`text-xs tabular-nums ${isActive ? '' : 'text-muted'}`}>
         <span className="sr-only">Matches: </span>
         {rule.matchCount}
       </span>

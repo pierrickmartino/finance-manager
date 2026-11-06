@@ -8,6 +8,7 @@ import { NotFoundError } from '@/server/services/errors';
 import { getImport, listImportTransactions, type Import } from '@/server/services/imports';
 import { deleteImportedTransactionAction, undoImportAction } from '../../../../imports/actions';
 import { ConfirmActionButton } from '../../../../imports/confirm-action-button';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Import · Finance Manager' };
 
@@ -44,11 +45,11 @@ export default async function ImportPage({ params }: ImportPageProps) {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <Link href={`/accounts/${account.id}`} className="text-sm text-zinc-500 hover:underline">
+        <Link href={`/accounts/${account.id}`} className="text-sm text-muted hover:underline">
           ← {account.name}
         </Link>
-        <h1 className="text-2xl font-semibold">Import {found.fileName}</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <h1 className={PAGE_TITLE_CLASS}>Import {found.fileName}</h1>
+        <p className="text-sm text-ink-soft">
           Imported on {fmt.date(found.importedAt)} · {found.addedCount} added ·{' '}
           {found.duplicateCount} skipped
           {found.undoneAt && <> · Undone on {fmt.date(found.undoneAt)}</>}
@@ -67,13 +68,13 @@ export default async function ImportPage({ params }: ImportPageProps) {
       )}
 
       {transactions.length === 0 ? (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           {found.undoneAt ? 'This Import was undone.' : 'No Transactions left from this Import.'}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table aria-label="Transactions" className="w-full text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800">
+            <thead className="border-b border-rule">
               <tr>
                 <th className={CELL}>Booking date</th>
                 <th className={CELL}>Counterparty</th>
@@ -84,14 +85,14 @@ export default async function ImportPage({ params }: ImportPageProps) {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <tbody className="divide-y divide-rule">
               {transactions.map((transaction) => (
                 <tr key={transaction.id}>
                   <td className={CELL}>{fmt.date(transaction.bookingDate)}</td>
                   <td className={CELL}>
                     {transaction.counterpartyName ?? transaction.rawDescription}
                     {transaction.paymentReference && (
-                      <div className="text-xs text-zinc-500">{transaction.paymentReference}</div>
+                      <div className="text-xs text-muted">{transaction.paymentReference}</div>
                     )}
                   </td>
                   <td className={`${CELL} font-mono text-xs`}>

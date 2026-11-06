@@ -12,7 +12,7 @@ import { AllocationBar, lineColor } from './allocation-bar';
 import { editableAmount, splitAllocation, type SplitLineDraft } from './split-lines';
 
 const INPUT =
-  'w-full min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+  'w-full min-w-0 rounded-md border border-rule-strong bg-surface px-2.5 py-1.5 text-sm';
 
 /**
  * One row per line from `md` up, like a spreadsheet: marker, Category, Payee, Tags, Note,
@@ -22,7 +22,7 @@ const ROW =
   'grid grid-cols-2 items-end gap-2 md:grid-cols-[2rem_minmax(10rem,1.4fr)_minmax(8rem,1fr)_minmax(7rem,1fr)_minmax(8rem,1.3fr)_8rem_6.5rem] md:items-center';
 
 /** A field's visible name, shown above it only where the column headers are hidden. */
-const FIELD_NAME = 'text-xs text-zinc-500 md:sr-only';
+const FIELD_NAME = 'text-xs text-muted md:sr-only';
 
 const EMPTY_LINE: SplitLineDraft = { amount: '', categoryId: '', tags: '', note: '' };
 
@@ -117,7 +117,7 @@ export function SplitForm({
       <div className="flex flex-col">
         <div
           aria-hidden="true"
-          className={`${ROW} hidden border-b border-zinc-200 pb-1.5 text-xs text-zinc-500 md:grid dark:border-zinc-800`}
+          className={`${ROW} hidden border-b border-rule pb-1.5 text-xs text-muted md:grid`}
         >
           <span />
           <span>Category</span>
@@ -127,7 +127,7 @@ export function SplitForm({
           <span className="text-right">Amount</span>
           <span />
         </div>
-        <ol className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ol className="flex flex-col divide-y divide-rule">
           {lines.map((line, index) => (
             <SplitLineFields
               key={line.key}
@@ -163,7 +163,7 @@ export function SplitForm({
           Add line
         </button>
         <span className="ml-auto" />
-        {state?.ok && <span className="text-zinc-500">Saved.</span>}
+        {state?.ok && <span className="text-muted">Saved.</span>}
         <SubmitButton isPending={isPending}>Save Split</SubmitButton>
       </div>
       {state && !state.ok && <FieldError message={state.error} />}
@@ -201,7 +201,7 @@ function SplitLineFields({
   const number = index + 1;
   return (
     <li className={`${ROW} py-2 text-sm`}>
-      <span className="col-span-2 flex items-center gap-1.5 text-xs text-zinc-500 md:col-span-1">
+      <span className="col-span-2 flex items-center gap-1.5 text-xs text-muted md:col-span-1">
         <span
           aria-hidden="true"
           className={`h-2.5 w-2.5 shrink-0 rounded-full ${lineColor(index)}`}
@@ -214,7 +214,7 @@ function SplitLineFields({
       {transfer ? (
         <div className="col-span-2 flex flex-col gap-1" data-testid={`transfer of line ${number}`}>
           <span className={FIELD_NAME}>Transfer</span>
-          <span className="text-sky-700 dark:text-sky-400">{transfer}</span>
+          <span className="text-info">{transfer}</span>
         </div>
       ) : (
         <>
@@ -268,7 +268,7 @@ function SplitLineFields({
             aria-label={`Add what remains to line ${number}`}
             title="Add what remains to this line"
             onClick={onTakeRest}
-            className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="rounded-md px-1.5 py-1 text-xs font-medium text-ink-soft hover:bg-sunken"
           >
             + rest
           </button>
@@ -279,7 +279,7 @@ function SplitLineFields({
             aria-label={`Remove line ${number}`}
             title="Remove this line"
             onClick={onRemove}
-            className="rounded-md px-2 py-1 text-zinc-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950"
+            className="rounded-md px-2 py-1 text-muted hover:bg-negative-tint hover:text-negative"
           >
             ✕
           </button>
@@ -301,7 +301,7 @@ function CategoryPicker({ line, number, groups, onChange }: CategoryPickerProps)
         aria-label={`Category of line ${number}`}
         value={line.categoryId}
         onChange={(event) => onChange({ categoryId: event.target.value })}
-        className={`${INPUT} ${line.categoryId === '' ? 'text-zinc-500' : ''}`}
+        className={`${INPUT} ${line.categoryId === '' ? 'text-muted' : ''}`}
       >
         <option value="">Choose a Category</option>
         {groups.map((group) => (
@@ -336,7 +336,7 @@ function PayeePicker({ line, number, payees, transactionPayee, onChange }: Payee
         aria-label={`Payee of line ${number}`}
         value={payeeId}
         onChange={(event) => onChange({ payeeId: event.target.value })}
-        className={`${INPUT} ${payeeId === '' ? 'text-zinc-500' : ''}`}
+        className={`${INPUT} ${payeeId === '' ? 'text-muted' : ''}`}
       >
         <option value="">{transactionPayee ?? 'No Payee'}</option>
         {payees.map((payee) => (

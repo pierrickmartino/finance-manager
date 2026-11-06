@@ -8,8 +8,7 @@ import { findCurrentPage } from './navigation';
 import { Brand, Sidebar } from './sidebar';
 import type { SidebarMode } from './sidebar-mode';
 
-const ICON_BUTTON =
-  'grid h-9 w-9 place-items-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800';
+const ICON_BUTTON = 'grid h-9 w-9 place-items-center rounded-lg text-ink-soft hover:bg-sunken';
 
 /** "Money / Transactions" for the current page; nothing for pages outside the sidebar. */
 function Breadcrumb() {
@@ -17,8 +16,8 @@ function Breadcrumb() {
   if (!current) return null;
   return (
     <p data-testid="breadcrumb" className="flex items-center gap-2 text-sm">
-      <span className="text-zinc-400">{current.group.label}</span>
-      <span aria-hidden="true" className="text-zinc-300 dark:text-zinc-600">
+      <span className="text-faint">{current.group.label}</span>
+      <span aria-hidden="true" className="text-faint">
         /
       </span>
       <span className="font-medium">{current.link.label}</span>
@@ -42,13 +41,13 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
         type="button"
         aria-label="Close menu"
         onClick={onClose}
-        className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Menu"
-        className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-xl dark:bg-zinc-900"
+        className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-surface shadow-xl"
       >
         <Sidebar onNavigate={onClose} />
       </div>
@@ -75,12 +74,12 @@ export function AppShell({ showNavigation, sidebarMode, children }: AppShellProp
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex min-h-screen bg-paper">
       {showNavigation && <DesktopSidebar initialMode={sidebarMode} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {showNavigation && (
-          <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-zinc-200 bg-white/80 px-4 backdrop-blur md:px-6 dark:border-zinc-800 dark:bg-zinc-900/80">
+          <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-rule bg-surface/80 px-4 backdrop-blur md:px-6">
             <button
               type="button"
               aria-label="Open menu"

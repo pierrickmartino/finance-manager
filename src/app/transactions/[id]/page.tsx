@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ActionForm } from '@/components/action-form';
 import { BUTTON_CLASS } from '@/components/named-list';
-import { CARD_CLASS, DANGER_BUTTON_CLASS } from '@/components/surface';
+import { CARD_CLASS, DANGER_BUTTON_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { NotFoundError } from '@/server/services/errors';
@@ -105,7 +105,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
 
   return (
     <section className="flex flex-col gap-5">
-      <Link href="/transactions" className="text-sm text-zinc-500 hover:underline">
+      <Link href="/transactions" className="text-sm text-muted hover:underline">
         ← Transactions
       </Link>
       <TransactionHeader
@@ -117,7 +117,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <aside aria-label="Classify and link" className={EDITS_COLUMN}>
           <section aria-labelledby="classification" className={PANEL}>
-            <h2 id="classification" className="text-lg font-semibold">
+            <h2 id="classification" className={SECTION_TITLE_CLASS}>
               Classification
             </h2>
             <ClassificationForm
@@ -138,8 +138,8 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
           {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
           {isSplit ? (
             <div className={PANEL}>
-              <h2 className="text-lg font-semibold">Transfer</h2>
-              <p className="text-sm text-zinc-500">Linked line by line, in the Split.</p>
+              <h2 className={SECTION_TITLE_CLASS}>Transfer</h2>
+              <p className="text-sm text-muted">Linked line by line, in the Split.</p>
             </div>
           ) : (
             <TransferSection
@@ -164,12 +164,12 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
             className={`${PANEL} gap-4`}
           />
           <details open className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
-            <summary className="cursor-pointer text-sm font-semibold text-zinc-500">
+            <summary className="cursor-pointer text-sm font-semibold text-muted">
               History ({history.length})
             </summary>
             <div className="flex flex-col gap-3 pt-3">
               {history.length === 0 ? (
-                <p className="text-sm text-zinc-500">No History for this Transaction.</p>
+                <p className="text-sm text-muted">No History for this Transaction.</p>
               ) : (
                 <HistoryTimeline entries={history} fmt={fmt} label="Transaction History" />
               )}
@@ -219,13 +219,11 @@ function TransactionActions({ transaction }: { transaction: TransactionDetail })
 /** The fields a manual edit locked against Rules, each with an Unlock button (spec 65). */
 function LockedFields({ classification }: { classification: Classification }) {
   if (classification.lockedFields.length === 0) {
-    return <p className="text-sm text-zinc-500">No field is locked: Rules may classify it.</p>;
+    return <p className="text-sm text-muted">No field is locked: Rules may classify it.</p>;
   }
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Locked against Rules, because you edited them:
-      </p>
+      <p className="text-sm text-ink-soft">Locked against Rules, because you edited them:</p>
       <ul aria-label="Locked fields" className="flex flex-wrap gap-2">
         {classification.lockedFields.map((field) => (
           <li key={field} className="flex items-center gap-2 text-sm">

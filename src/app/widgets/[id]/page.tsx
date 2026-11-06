@@ -11,6 +11,7 @@ import { deleteWidgetAction } from '../actions';
 import { loadSavedWidget } from '../load';
 import { toPivotData } from '../pivot-data';
 import { WidgetView } from '../widget-view';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Widget · Finance Manager' };
 
@@ -31,7 +32,7 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{widget.name}</h1>
+        <h1 className={PAGE_TITLE_CLASS}>{widget.name}</h1>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/widgets" className="underline">
             All Widgets
@@ -44,15 +45,13 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
             label="Delete Widget"
             confirmMessage={`Delete the Widget "${widget.name}"?`}
           >
-            <button type="submit" className="text-red-700 underline dark:text-red-400">
+            <button type="submit" className="text-negative underline">
               Delete
             </button>
           </ActionForm>
         </div>
       </div>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {MEASURE_LABELS[widget.query.measure]} in CHF
-      </p>
+      <p className="text-sm text-ink-soft">{MEASURE_LABELS[widget.query.measure]} in CHF</p>
       {error && <FieldError message={error} />}
       {report && (
         <WidgetView

@@ -5,7 +5,7 @@ import type { RateStatus } from '@/server/services/fx';
 export function RateStatusNotice({ status, fmt }: { status: RateStatus; fmt: Formatter }) {
   return (
     <section aria-label="FX rate status" className="flex flex-col gap-1 text-sm">
-      <p className="text-zinc-600 dark:text-zinc-400">
+      <p className="text-ink-soft">
         {status.lastFetchedAt
           ? `FX rates last fetched ${fmt.dateTime(status.lastFetchedAt)}`
           : 'FX rates have never been fetched'}
@@ -14,13 +14,13 @@ export function RateStatusNotice({ status, fmt }: { status: RateStatus; fmt: For
       {status.isStale && (
         <p
           role="alert"
-          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+          className="rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning"
         >
           FX rates are stale: {status.staleReason}. CHF values may be out of date.
         </p>
       )}
       {status.lastError && status.lastAttemptAt && (
-        <p className="text-red-700 dark:text-red-400">
+        <p className="text-negative">
           The last fetch ({fmt.dateTime(status.lastAttemptAt)}) failed: {status.lastError}
         </p>
       )}

@@ -22,7 +22,7 @@ export async function WidgetView({
   const { range, partialPeriod } = report;
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-ink-soft">
         {range.from <= range.to
           ? `${fmt.date(range.from)} to ${fmt.date(range.to)}`
           : 'No complete period yet'}

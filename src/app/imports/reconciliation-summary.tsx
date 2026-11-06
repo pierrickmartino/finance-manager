@@ -28,11 +28,7 @@ export function ReconciliationSummary({
 }: ReconciliationSummaryProps) {
   const money = (minor: number) => fmt.amount(minor, { currency });
   if (reconciliation.status === 'ok') {
-    return (
-      <p className="text-sm text-green-700 dark:text-green-400">
-        Reconciled: the balances in the file add up.
-      </p>
-    );
+    return <p className="text-sm text-positive">Reconciled: the balances in the file add up.</p>;
   }
   const warnings = [
     isOpeningBalanceDerived
@@ -53,7 +49,7 @@ export function ReconciliationSummary({
   ].filter((warning): warning is string => warning !== null);
 
   return (
-    <div role="alert" className="flex flex-col gap-1 text-sm text-amber-700 dark:text-amber-400">
+    <div role="alert" className="flex flex-col gap-1 text-sm text-warning">
       <p className="font-medium">Reconciliation failed: the balances don&apos;t add up.</p>
       <ul className="list-disc pl-5">
         {warnings.map((warning) => (

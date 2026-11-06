@@ -48,7 +48,7 @@ function Hero({ hero }: { hero: StoryHero }) {
       </p>
       <Link
         href={hero.href}
-        className="mt-2 font-serif text-[clamp(3.25rem,10vw,9rem)] leading-[0.9] tracking-[-0.04em] tabular-nums"
+        className="mt-2 font-display text-[clamp(3.25rem,10vw,9rem)] leading-[0.9] tracking-[-0.04em] tabular-nums"
       >
         <CountUp value={hero.value} />
       </Link>
@@ -65,7 +65,7 @@ function Hero({ hero }: { hero: StoryHero }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.9 }}
-          className="mt-8 max-w-3xl font-serif text-2xl leading-snug md:text-3xl"
+          className="mt-8 max-w-3xl font-display text-2xl leading-snug md:text-3xl"
         >
           You brought in <b>{money(hero.flow.income)}</b>, spent <b>{money(hero.flow.expense)}</b>,
           and kept{' '}
@@ -88,11 +88,14 @@ function ChapterBody({ chapter }: { chapter: StoryChapter }) {
   switch (chapterKind(chapter)) {
     case 'number':
       return data.total === null ? (
-        <p className="font-serif text-6xl" style={{ color: STORY.muted }}>
+        <p className="font-display text-6xl" style={{ color: STORY.muted }}>
           —
         </p>
       ) : (
-        <Link href={data.hrefs.total} className="font-serif text-6xl tabular-nums hover:underline">
+        <Link
+          href={data.hrefs.total}
+          className="font-display text-6xl tabular-nums hover:underline"
+        >
           {fmt.amount(data.total, { currency: 'CHF', isWhole: true })}
         </Link>
       );
@@ -126,7 +129,10 @@ function Chapter({ chapter, index }: { chapter: StoryChapter; index: number }) {
     >
       <div className={isMirrored ? 'lg:order-2' : ''}>
         <div className="flex items-baseline gap-4">
-          <span className="font-serif text-6xl leading-none italic" style={{ color: STORY.accent }}>
+          <span
+            className="font-display text-6xl leading-none italic"
+            style={{ color: STORY.accent }}
+          >
             {index + 1}
           </span>
           <h2 id={`chapter-${chapter.id}`} className="text-lg font-medium">
@@ -135,12 +141,12 @@ function Chapter({ chapter, index }: { chapter: StoryChapter; index: number }) {
         </div>
         {chapter.error && <FieldError message={chapter.error} />}
         {chapter.unconvertedCount > 0 && (
-          <p className="mt-3 text-sm text-amber-700">
+          <p className="mt-3 text-sm text-warning">
             {chapter.unconvertedCount} left out: no FX rate yet.
           </p>
         )}
         {story.lead && (
-          <p className="mt-6 font-serif text-4xl leading-[1.05] tracking-tight md:text-5xl">
+          <p className="mt-6 font-display text-4xl leading-[1.05] tracking-tight md:text-5xl">
             {story.lead.headline}
             <span className="mt-2 block" style={{ color: STORY.accent }}>
               {story.lead.detail}
@@ -195,10 +201,10 @@ export function DashboardStory({ dashboardName, editHref, chapters }: DashboardS
           style={{ scaleX: progress, background: STORY.accent }}
         />
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="font-serif text-3xl tracking-tight">{dashboardName}</h1>
+          <h1 className="font-display text-3xl tracking-tight">{dashboardName}</h1>
           <Link
             href={editHref}
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-white"
+            className="rounded-md border px-3 py-1.5 text-sm hover:bg-surface"
             style={{ borderColor: STORY.rule }}
           >
             Edit Dashboard

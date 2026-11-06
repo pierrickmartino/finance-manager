@@ -7,8 +7,7 @@ import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
 import type { Classification } from '@/server/services/transactions';
 
-const INPUT =
-  'rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900';
+const INPUT = 'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm';
 
 interface ClassificationFormProps {
   classification: Classification;
@@ -21,9 +20,7 @@ interface ClassificationFormProps {
   ) => Promise<ActionResult<unknown>>;
 }
 
-const LOCKED = (
-  <span className="text-xs font-normal text-amber-700 dark:text-amber-400">locked</span>
-);
+const LOCKED = <span className="text-xs font-normal text-warning">locked</span>;
 
 /** Payee, Category, Tags and notes of one Transaction (spec 63). Saving locks what changed. */
 export function ClassificationForm({
@@ -87,7 +84,7 @@ export function ClassificationForm({
           ))}
         </select>
         {splitCount > 0 && (
-          <span className="text-xs font-normal text-zinc-500">
+          <span className="text-xs font-normal text-muted">
             Edit or remove the Split below to change the Categories.
           </span>
         )}
@@ -101,7 +98,7 @@ export function ClassificationForm({
           autoComplete="off"
           className={INPUT}
         />
-        <span className="text-xs font-normal text-zinc-500">Separate Tags with commas.</span>
+        <span className="text-xs font-normal text-muted">Separate Tags with commas.</span>
       </label>
       <label className="flex flex-col gap-1 text-sm font-medium">
         <span>Notes {isLocked('notes')}</span>
@@ -115,7 +112,7 @@ export function ClassificationForm({
       </label>
       <div className="flex items-center gap-3">
         <SubmitButton isPending={isPending}>Save classification</SubmitButton>
-        {state?.ok && <span className="text-sm text-zinc-500">Saved.</span>}
+        {state?.ok && <span className="text-sm text-muted">Saved.</span>}
       </div>
       {state && !state.ok && <FieldError message={state.error} />}
     </form>

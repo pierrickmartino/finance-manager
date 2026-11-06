@@ -27,7 +27,8 @@ import {
   type SeriesChart,
 } from '@/lib/reporting/chart-data';
 import type { Measure } from '@/server/services/reporting';
-import { useChartPalette, type ChartPalette } from './chart-palette';
+import { CHART_PALETTE, type ChartPalette } from './chart-palette';
+import { HEADLINE_AMOUNT_CLASS } from '@/components/surface';
 
 /** Formats a chart value: CHF for sums and averages, a plain count otherwise. */
 function useValueFormat(measure: Measure) {
@@ -54,7 +55,7 @@ function axisProps(palette: ChartPalette) {
 }
 
 function Empty() {
-  return <p className="text-sm text-zinc-500">No data in this date range yet.</p>;
+  return <p className="text-sm text-muted">No data in this date range yet.</p>;
 }
 
 function tooltipStyle(palette: ChartPalette) {
@@ -77,7 +78,7 @@ interface ChartProps {
 /** Line: one 2px line per series over the rows (periods); each dot drills down. */
 export function LineWidgetChart({ data, title }: ChartProps) {
   const router = useRouter();
-  const palette = useChartPalette();
+  const palette = CHART_PALETTE;
   const format = useValueFormat(data.measure);
   const chart = toSeriesChart(data);
   if (chart.points.length === 0) return <Empty />;
@@ -136,7 +137,7 @@ export function LineWidgetChart({ data, title }: ChartProps) {
 /** Stacked bar: one bar per row, one stacked segment per series; each segment drills down. */
 export function StackedBarWidgetChart({ data, title }: ChartProps) {
   const router = useRouter();
-  const palette = useChartPalette();
+  const palette = CHART_PALETTE;
   const format = useValueFormat(data.measure);
   const chart = toSeriesChart(data);
   if (chart.points.length === 0) return <Empty />;
@@ -186,7 +187,7 @@ export function StackedBarWidgetChart({ data, title }: ChartProps) {
 /** Donut: the parts of the total; each slice drills down. Sized by magnitude. */
 export function DonutWidgetChart({ data, title }: ChartProps) {
   const router = useRouter();
-  const palette = useChartPalette();
+  const palette = CHART_PALETTE;
   const format = useValueFormat(data.measure);
   const slices = toDonutSlices(data);
   if (slices.length === 0) return <Empty />;
@@ -242,12 +243,12 @@ export function SingleNumberWidget({ data, title }: ChartProps) {
   return (
     <div className="flex h-full flex-col justify-center">
       {value === null ? (
-        <span className="text-3xl text-zinc-400">—</span>
+        <span className="text-3xl text-faint">—</span>
       ) : (
         <Link
           href={href}
           aria-label={`${title}: ${format.value(value)}`}
-          className="text-3xl font-semibold tabular-nums hover:underline"
+          className={`${HEADLINE_AMOUNT_CLASS} hover:underline`}
         >
           {format.value(value)}
         </Link>

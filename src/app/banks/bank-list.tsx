@@ -11,8 +11,8 @@ interface BankListProps {
 }
 
 const ITEM_CLASS = 'rounded-md px-3 py-2.5 text-sm';
-const SELECTED_CLASS = 'bg-zinc-100 font-medium dark:bg-zinc-800';
-const IDLE_CLASS = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50';
+const SELECTED_CLASS = 'bg-sunken font-medium';
+const IDLE_CLASS = 'hover:bg-paper';
 
 /**
  * The master list: each Bank with its active Account count and CHF total. The last entry
@@ -36,7 +36,7 @@ export function BankList({ summaries, selected, fmt }: BankListProps) {
               >
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate">{bank.name}</span>
-                  <span className="text-xs font-normal text-zinc-500">
+                  <span className="text-xs font-normal text-muted">
                     {activeCount} Account{activeCount === 1 ? '' : 's'}
                   </span>
                 </span>
@@ -50,7 +50,7 @@ export function BankList({ summaries, selected, fmt }: BankListProps) {
         href={banksHref(NEW_BANK)}
         scroll={false}
         aria-current={selected === NEW_BANK ? 'true' : undefined}
-        className={`mt-3 border border-dashed border-zinc-300 text-center dark:border-zinc-700 ${ITEM_CLASS} ${
+        className={`mt-3 border border-dashed border-rule-strong text-center ${ITEM_CLASS} ${
           selected === NEW_BANK ? SELECTED_CLASS : IDLE_CLASS
         }`}
       >

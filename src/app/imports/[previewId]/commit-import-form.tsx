@@ -28,7 +28,7 @@ export function CommitImportForm({
     (discardState && !discardState.ok && discardState.error);
 
   return (
-    <div className="flex flex-col gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+    <div className="flex flex-col gap-3 border-t border-rule pt-4">
       <form action={commitAction} className="flex flex-col gap-3">
         {children}
         {proposedOpening && (
@@ -45,7 +45,7 @@ export function CommitImportForm({
             type="submit"
             formAction={discardAction}
             disabled={isCommitting || isDiscarding}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            className="rounded-md border border-rule-strong px-3 py-1.5 text-sm font-medium hover:bg-sunken disabled:opacity-50"
           >
             Discard
           </button>

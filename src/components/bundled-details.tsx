@@ -12,7 +12,7 @@ interface BundledDetailsProps {
  */
 export function BundledDetails({ details, formatAmount }: BundledDetailsProps) {
   return (
-    <details className="text-xs text-zinc-600 dark:text-zinc-400">
+    <details className="text-xs text-ink-soft">
       <summary className="cursor-pointer">{details.length} bundled payments</summary>
       <ul aria-label="Bundled payments" className="mt-1 flex flex-col gap-1">
         {details.map((detail, index) => (

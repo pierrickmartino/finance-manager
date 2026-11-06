@@ -28,14 +28,14 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
   const transactionsHref = `/transactions?payeeId=${id}`;
   return (
     <section aria-label={`Payee ${name}`} className={`${CARD_CLASS} flex min-w-0 flex-col`}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 p-4 dark:border-zinc-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="truncate text-lg font-semibold">{name}</h2>
-          <Link href={transactionsHref} className="text-sm text-zinc-400 hover:underline">
+          <h2 className="truncate font-display text-2xl tracking-tight">{name}</h2>
+          <Link href={transactionsHref} className="text-sm text-faint hover:underline">
             {transactionsLabel(transactionCount)}
           </Link>
           {transactionCount === 0 && (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-600/20 ring-inset dark:bg-amber-950 dark:text-amber-300">
+            <span className="rounded-full bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
               Unused
             </span>
           )}
@@ -43,18 +43,15 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
         <PayeeMenu payee={payee} payees={payees} />
       </div>
 
-      <h3 className="px-4 pt-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase">
+      <h3 className="px-4 pt-3 text-xs font-semibold tracking-wide text-faint uppercase">
         Recent Transactions
       </h3>
       {recent.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-zinc-400">
+        <p className="px-4 py-6 text-center text-sm text-faint">
           No Transactions. An unused Payee can be deleted from Edit Payee.
         </p>
       ) : (
-        <ul
-          aria-label={`Recent Transactions of ${name}`}
-          className="divide-y divide-zinc-100 dark:divide-zinc-800"
-        >
+        <ul aria-label={`Recent Transactions of ${name}`} className="divide-y divide-rule">
           {recent.map((transaction) => (
             <RecentRow key={transaction.id} transaction={transaction} fmt={fmt} />
           ))}
@@ -63,7 +60,7 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
       {transactionCount > recent.length && (
         <Link
           href={transactionsHref}
-          className="border-t border-zinc-100 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="border-t border-rule px-4 py-3 text-sm font-medium text-ink-soft hover:bg-paper"
         >
           All {transactionsLabel(transactionCount)} →
         </Link>
@@ -76,7 +73,7 @@ function RecentRow({ transaction, fmt }: { transaction: TransactionListItem; fmt
   const classification = categoryText(transaction);
   return (
     <li className="flex items-center gap-4 px-4 py-2.5 text-sm">
-      <span className="w-24 shrink-0 text-zinc-500 tabular-nums">
+      <span className="w-24 shrink-0 text-muted tabular-nums">
         {fmt.date(transaction.bookingDate)}
       </span>
       <Link
@@ -84,12 +81,12 @@ function RecentRow({ transaction, fmt }: { transaction: TransactionListItem; fmt
         className="min-w-0 flex-1 truncate hover:underline"
       >
         {transaction.rawDescription || '(no description)'}
-        <span className="block truncate text-xs text-zinc-400">
+        <span className="block truncate text-xs text-faint">
           {transaction.accountName} · {classification}
         </span>
       </Link>
       <span
-        className={`shrink-0 tabular-nums ${transaction.amountMinor > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+        className={`shrink-0 tabular-nums ${transaction.amountMinor > 0 ? 'text-positive' : ''}`}
       >
         {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
       </span>
@@ -140,7 +137,7 @@ function PayeeMenu({ payee, payees }: { payee: Payee; payees: Payee[] }) {
           </button>
         </ActionForm>
       )}
-      <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+      <div className="border-t border-rule pt-3">
         {transactionCount === 0 ? (
           <ActionForm
             action={deletePayeeAction.bind(null, id)}
@@ -152,7 +149,7 @@ function PayeeMenu({ payee, payees }: { payee: Payee; payees: Payee[] }) {
             </button>
           </ActionForm>
         ) : (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted">
             A Payee with Transactions can&apos;t be deleted; merge it into another instead.
           </p>
         )}
