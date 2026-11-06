@@ -2,7 +2,7 @@
 
 /**
  * PROTOTYPE (throwaway): floating bar to flip between UI variants via `?variant=`.
- * ← / → cycle (except while typing). Never renders in production builds.
+ * ← / → cycle (except while typing). Shown in every build, production included, on request.
  */
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
@@ -36,6 +36,8 @@ export function PrototypeSwitcher({ variants }: { variants: SwitcherVariant[] })
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, [contenteditable]')) return;
+      // A Widget's move handle uses the arrow keys too (and prevents their default).
+      if (event.defaultPrevented) return;
       if (event.key === 'ArrowLeft') go(-1);
       if (event.key === 'ArrowRight') go(1);
     };
@@ -43,7 +45,6 @@ export function PrototypeSwitcher({ variants }: { variants: SwitcherVariant[] })
     return () => window.removeEventListener('keydown', onKey);
   }, [go]);
 
-  if (process.env.NODE_ENV === 'production') return null;
   const variant = variants[index]!;
   return (
     <div className="fixed bottom-5 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-1 rounded-full border-2 border-fuchsia-500 bg-black px-2 py-1.5 font-mono text-sm text-white shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
