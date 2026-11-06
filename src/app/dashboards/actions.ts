@@ -43,7 +43,8 @@ export async function createDashboardAction(_previous: Result | null, formData: 
     createDashboard(await getServiceContext(), { name: formText(formData, 'name') }),
   );
   if (!result.ok) return result;
-  redirect(`/dashboards/${result.data.id}`);
+  // A new Dashboard has no Widgets yet: open it where they are added.
+  redirect(`/dashboards/${result.data.id}/edit`);
 }
 
 export async function renameDashboardAction(

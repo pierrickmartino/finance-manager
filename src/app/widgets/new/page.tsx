@@ -81,7 +81,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const hidden: Record<string, string> = {};
   if (widget) hidden.widget = widget.id;
   else if (dashboardId) hidden.dashboard = dashboardId;
-  const backHref = dashboardId ? `/dashboards/${dashboardId}` : '/widgets';
+  const backHref = dashboardId ? `/dashboards/${dashboardId}/edit` : '/widgets';
 
   const visualisationSection = (
     <PanelSection title="Visualisation">
