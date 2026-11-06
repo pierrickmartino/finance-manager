@@ -19,19 +19,20 @@ import {
   type ProtoWidget,
 } from './data';
 import { CHF_FORMAT, useMoney, type Money } from './money';
+import { APP, VARIANT_ROOT_STYLE } from './theme';
 
 const NEON = [
-  '#8b5cf6',
-  '#22d3ee',
-  '#f472b6',
-  '#34d399',
-  '#fbbf24',
-  '#fb7185',
-  '#60a5fa',
-  '#a3e635',
+  '#7c3aed',
+  '#0891b2',
+  '#db2777',
+  '#059669',
+  '#d97706',
+  '#e11d48',
+  '#2563eb',
+  '#65a30d',
 ];
-const AXIS = 'rgba(226,232,255,0.45)';
-const GRID = 'rgba(148,163,255,0.08)';
+const AXIS = APP.muted;
+const GRID = APP.border;
 
 const gradient = (color: string, from = 0.85, to = 0.05) =>
   new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -46,13 +47,13 @@ function hexA(hex: string, alpha: number): string {
 
 const tooltip = (money: Money) => ({
   trigger: 'axis',
-  backgroundColor: 'rgba(10,10,30,0.75)',
-  borderColor: 'rgba(139,92,246,0.5)',
+  backgroundColor: 'rgba(255,255,255,0.85)',
+  borderColor: APP.border,
   borderWidth: 1,
   padding: [10, 14],
-  textStyle: { color: '#fff', fontSize: 12 },
+  textStyle: { color: APP.ink, fontSize: 12 },
   extraCssText:
-    'backdrop-filter: blur(12px); border-radius: 14px; box-shadow: 0 0 30px rgba(139,92,246,.35);',
+    'backdrop-filter: blur(12px); border-radius: 14px; box-shadow: 0 12px 32px -12px rgba(24,24,27,.25);',
   valueFormatter: (value: unknown) => money.whole(Number(value)),
   axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(139,92,246,0.08)' } },
 });
@@ -81,7 +82,7 @@ function lineOption(widget: ProtoWidget, money: Money): EChartsOption | null {
       chart.points.map((point) => point.label),
       money,
     ),
-    tooltip: { ...tooltip(money), axisPointer: { type: 'line', lineStyle: { color: '#8b5cf6' } } },
+    tooltip: { ...tooltip(money), axisPointer: { type: 'line', lineStyle: { color: '#7c3aed' } } },
     animationDuration: 2200,
     animationEasing: 'cubicOut',
     series: chart.series.map((series, index) => {
@@ -114,7 +115,7 @@ function lineOption(widget: ProtoWidget, money: Money): EChartsOption | null {
         markLine: {
           symbol: 'none',
           silent: true,
-          lineStyle: { color: 'rgba(255,255,255,0.35)', type: 'dashed' },
+          lineStyle: { color: APP.muted, type: 'dashed' },
           label: { color: AXIS, formatter: 'avg' },
           data: [{ type: 'average' }],
         },
@@ -183,8 +184,8 @@ function roseOption(widget: ProtoWidget, money: Money): EChartsOption | null {
         type: 'pie',
         roseType: 'radius',
         radius: ['22%', '82%'],
-        itemStyle: { borderRadius: 10, borderColor: '#0b0b1f', borderWidth: 3 },
-        label: { color: '#fff', fontSize: 11 },
+        itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 3 },
+        label: { color: APP.ink, fontSize: 11 },
         labelLine: { lineStyle: { color: AXIS } },
         data: slices.map((slice) => ({
           name: slice.label,
@@ -209,7 +210,7 @@ function balanceOption(widget: ProtoWidget, money: Money): EChartsOption | null 
       data: slices.map((slice) => slice.label),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#e2e8ff', fontSize: 12 },
+      axisLabel: { color: APP.ink, fontSize: 12 },
     },
     animationDuration: 1600,
     series: [
@@ -217,7 +218,7 @@ function balanceOption(widget: ProtoWidget, money: Money): EChartsOption | null 
         type: 'bar',
         barWidth: 18,
         showBackground: true,
-        backgroundStyle: { color: 'rgba(255,255,255,0.04)', borderRadius: 9 },
+        backgroundStyle: { color: APP.track, borderRadius: 9 },
         data: slices.map((slice, index) => ({
           value: slice.value,
           itemStyle: {
@@ -233,7 +234,7 @@ function balanceOption(widget: ProtoWidget, money: Money): EChartsOption | null 
         label: {
           show: true,
           position: 'right',
-          color: '#fff',
+          color: APP.ink,
           fontWeight: 600,
           formatter: (p: { value?: unknown }) =>
             `${money.compact(Number(p.value))}  ·  ${Math.round((Number(p.value) / total) * 100)}%`,
@@ -284,7 +285,7 @@ function GlassCard({ children, className = '' }: { children: ReactNode; classNam
   const my = useMotionValue(50);
   const rx = useSpring(0, { stiffness: 150, damping: 18 });
   const ry = useSpring(0, { stiffness: 150, damping: 18 });
-  const spotlight = useMotionTemplate`radial-gradient(500px circle at ${mx}% ${my}%, rgba(139,92,246,0.18), transparent 45%)`;
+  const spotlight = useMotionTemplate`radial-gradient(500px circle at ${mx}% ${my}%, rgba(124,58,237,0.08), transparent 45%)`;
   const onMove = (event: MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const px = (event.clientX - rect.left) / rect.width;
@@ -307,14 +308,14 @@ function GlassCard({ children, className = '' }: { children: ReactNode; classNam
         ry.set(0);
       }}
       style={{ rotateX: rx, rotateY: ry, transformPerspective: 1200 }}
-      className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-xl ${className}`}
+      className={`group relative overflow-hidden rounded-3xl border border-zinc-200 bg-white/75 shadow-[0_18px_40px_-24px_rgba(24,24,27,0.35)] backdrop-blur-xl ${className}`}
     >
       <motion.div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
         style={{ background: spotlight }}
       />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
       <div className="relative h-full">{children}</div>
     </motion.div>
   );
@@ -332,7 +333,7 @@ function Aurora() {
       {blobs.map((blob) => (
         <motion.div
           key={blob.color}
-          className="absolute rounded-full opacity-40 mix-blend-screen blur-[110px]"
+          className="absolute rounded-full opacity-[0.16] blur-[110px]"
           style={{ width: blob.size, height: blob.size, background: blob.color }}
           animate={{ left: blob.x, top: blob.y }}
           transition={{ duration: blob.d, repeat: Infinity, ease: 'easeInOut' }}
@@ -342,7 +343,7 @@ function Aurora() {
         className="absolute inset-0 opacity-[0.15]"
         style={{
           backgroundImage:
-            'linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px)',
+            'linear-gradient(rgba(24,24,27,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(24,24,27,.07) 1px, transparent 1px)',
           backgroundSize: '44px 44px',
           maskImage: 'radial-gradient(ellipse at 50% 0%, black 20%, transparent 70%)',
         }}
@@ -375,19 +376,19 @@ function KpiCard({ kpi, index, money }: { kpi: Kpi; index: number; money: Money 
         onClick={() => router.push(kpi.href)}
         className="block w-full text-left"
       >
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-white/50">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
           <span
             className="h-2 w-2 rounded-full"
             style={{ background: color, boxShadow: `0 0 12px ${color}` }}
           />
           {kpi.label}
         </div>
-        <div className="mt-3 text-3xl font-semibold tracking-tight text-white tabular-nums md:text-4xl">
+        <div className="mt-3 text-3xl font-semibold tracking-tight text-zinc-900 tabular-nums md:text-4xl">
           <NumberFlow value={value} format={CHF_FORMAT} locales="de-CH" />
         </div>
         {kpi.momentum !== null && (
           <span
-            className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${isGood ? 'bg-emerald-400/15 text-emerald-300' : 'bg-rose-400/15 text-rose-300'}`}
+            className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${isGood ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
           >
             {isUp ? '▲' : '▼'} {Math.abs(Math.round(kpi.momentum * 100))}% vs. avg
           </span>
@@ -407,18 +408,11 @@ function SavingsRing({ rate }: { rate: number }) {
       <svg viewBox="0 0 128 128" className="h-24 w-24 shrink-0 -rotate-90">
         <defs>
           <linearGradient id="ring" x1="0" x2="1">
-            <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="100%" stopColor="#a3e635" />
+            <stop offset="0%" stopColor="#0891b2" />
+            <stop offset="100%" stopColor="#059669" />
           </linearGradient>
         </defs>
-        <circle
-          cx="64"
-          cy="64"
-          r={radius}
-          stroke="rgba(255,255,255,.08)"
-          strokeWidth="12"
-          fill="none"
-        />
+        <circle cx="64" cy="64" r={radius} stroke={APP.track} strokeWidth="12" fill="none" />
         <motion.circle
           cx="64"
           cy="64"
@@ -431,17 +425,17 @@ function SavingsRing({ rate }: { rate: number }) {
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: circumference * (1 - Math.max(0, Math.min(1, rate))) }}
           transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
-          style={{ filter: 'drop-shadow(0 0 10px rgba(34,211,238,.7))' }}
+          style={{ filter: 'drop-shadow(0 4px 8px rgba(5,150,105,.35))' }}
         />
       </svg>
       <div>
-        <div className="text-xs font-medium uppercase tracking-[0.18em] text-white/50">
+        <div className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
           Savings rate
         </div>
-        <div className="mt-2 text-4xl font-semibold text-white">
+        <div className="mt-2 text-4xl font-semibold text-zinc-900">
           <NumberFlow value={shown} format={{ style: 'percent', maximumFractionDigits: 0 }} />
         </div>
-        <div className="mt-1 text-xs text-white/50">of income kept, last 12 months</div>
+        <div className="mt-1 text-xs text-zinc-500">of income kept, last 12 months</div>
       </div>
     </GlassCard>
   );
@@ -475,18 +469,18 @@ function WidgetCard({
     <GlassCard className={`flex min-h-[340px] flex-col p-5 ${SPANS[index % SPANS.length]}`}>
       <div className="flex h-full flex-col">
         <div className="mb-2 flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold text-white/90">{widget.name}</h2>
+          <h2 className="text-sm font-semibold text-zinc-900">{widget.name}</h2>
           {widget.data?.total != null && (
-            <span className="font-mono text-xs text-white/40">
+            <span className="font-mono text-xs text-zinc-400">
               Σ {money.whole(widget.data.total)}
             </span>
           )}
         </div>
-        {widget.error && <p className="text-sm text-rose-300">{widget.error}</p>}
+        {widget.error && <p className="text-sm text-rose-700">{widget.error}</p>}
         {option ? (
           <EChart option={option} onClick={onClick} className="min-h-[260px] flex-1" />
         ) : (
-          <div className="flex flex-1 items-center text-5xl font-semibold text-white">
+          <div className="flex flex-1 items-center text-5xl font-semibold text-zinc-900">
             {widget.data?.total != null ? money.whole(widget.data.total) : '—'}
           </div>
         )}
@@ -500,7 +494,10 @@ export function VariantAurora({ dashboardName, widgets }: ProtoProps) {
   const kpis = heroKpisOf(widgets);
   const rate = widgets.map(savingsRateOf).find((value) => value !== null) ?? null;
   return (
-    <div className="relative -mx-2 overflow-hidden rounded-[32px] bg-[#05050f] px-5 py-8 text-white md:-mx-4 md:px-8 md:py-10">
+    <div
+      className="relative -mx-2 overflow-hidden rounded-[32px] px-5 py-8 md:-mx-4 md:px-8 md:py-10"
+      style={VARIANT_ROOT_STYLE}
+    >
       <Aurora />
       <motion.div
         initial="hidden"
@@ -513,14 +510,14 @@ export function VariantAurora({ dashboardName, widgets }: ProtoProps) {
           className="flex flex-wrap items-end justify-between gap-4"
         >
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 backdrop-blur">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-3 py-1 text-xs text-zinc-600 backdrop-blur">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
               </span>
               Live · all amounts in CHF
             </div>
-            <h1 className="bg-gradient-to-r from-white via-violet-200 to-cyan-200 bg-clip-text text-5xl font-semibold tracking-tight text-transparent md:text-6xl">
+            <h1 className="bg-gradient-to-r from-zinc-900 via-violet-700 to-cyan-700 bg-clip-text text-5xl font-semibold tracking-tight text-transparent md:text-6xl">
               {dashboardName}
             </h1>
           </div>

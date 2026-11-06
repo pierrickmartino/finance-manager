@@ -23,21 +23,22 @@ import {
   type ProtoWidget,
 } from './data';
 import { CHF_FORMAT, useMoney, type Money } from './money';
+import { APP, VARIANT_ROOT_STYLE } from './theme';
 
-const CYAN = '#00f0ff';
-const PINK = '#ff2bd6';
-const LIME = '#b6ff3b';
+const CYAN = '#0891b2';
+const PINK = '#db2777';
+const LIME = APP.accent;
 const HUD = [
-  '#00f0ff',
-  '#ff2bd6',
-  '#b6ff3b',
-  '#ffb000',
-  '#7a5cff',
-  '#ff5f5f',
-  '#2bffb1',
-  '#4da3ff',
+  '#0891b2',
+  '#db2777',
+  '#059669',
+  '#d97706',
+  '#7c3aed',
+  '#e11d48',
+  '#0d9488',
+  '#2563eb',
 ];
-const DIM = 'rgba(160,220,255,0.5)';
+const DIM = APP.muted;
 
 type Lens = {
   key: string;
@@ -46,11 +47,11 @@ type Lens = {
 };
 
 const baseTooltip = (money: Money) => ({
-  backgroundColor: 'rgba(3,10,20,0.9)',
+  backgroundColor: '#ffffff',
   borderColor: CYAN,
   borderWidth: 1,
-  textStyle: { color: '#dff', fontFamily: 'ui-monospace, monospace', fontSize: 12 },
-  extraCssText: 'box-shadow: 0 0 24px rgba(0,240,255,.35); border-radius: 4px;',
+  textStyle: { color: APP.ink, fontFamily: 'ui-monospace, monospace', fontSize: 12 },
+  extraCssText: 'box-shadow: 0 12px 28px -12px rgba(24,24,27,.25); border-radius: 8px;',
   valueFormatter: (value: unknown) => money.whole(Number(value)),
 });
 
@@ -87,14 +88,14 @@ function sankey(widget: ProtoWidget, money: Money): EChartsOption | null {
           itemStyle: {
             color: HUD[index % HUD.length],
             borderColor: HUD[index % HUD.length],
-            shadowBlur: 14,
+            shadowBlur: 0,
             shadowColor: HUD[index % HUD.length],
           },
         })),
         links,
         lineStyle: { color: 'gradient', opacity: 0.35, curveness: 0.55 },
         label: {
-          color: '#e6fbff',
+          color: APP.ink,
           fontFamily: 'ui-monospace, monospace',
           fontSize: 11,
           formatter: (p: { name: string; value?: unknown }) =>
@@ -140,8 +141,8 @@ function sunburst(widget: ProtoWidget, money: Money): EChartsOption | null {
         data,
         radius: ['14%', '92%'],
         sort: 'desc',
-        itemStyle: { borderColor: '#050a14', borderWidth: 3, borderRadius: 6 },
-        label: { color: '#04101c', fontWeight: 'bold', fontSize: 11, rotate: 'radial' },
+        itemStyle: { borderColor: '#ffffff', borderWidth: 3, borderRadius: 6 },
+        label: { color: '#ffffff', fontWeight: 'bold', fontSize: 11, rotate: 'radial' },
         levels: [
           {},
           { r0: '14%', r: '50%' },
@@ -167,20 +168,20 @@ function treemap(widget: ProtoWidget, money: Money): EChartsOption | null {
         roam: false,
         nodeClick: 'zoomToNode',
         breadcrumb: {
-          itemStyle: { color: '#0b1a2b', borderColor: CYAN },
+          itemStyle: { color: '#ffffff', borderColor: CYAN },
           textStyle: { color: CYAN },
         },
         width: '100%',
         height: '88%',
         top: 0,
-        upperLabel: { show: true, height: 22, color: '#04101c', fontWeight: 'bold' },
+        upperLabel: { show: true, height: 22, color: '#ffffff', fontWeight: 'bold' },
         label: {
-          color: '#04101c',
+          color: '#ffffff',
           fontWeight: 'bold',
           formatter: (p: { name: string; value?: unknown }) =>
             `${p.name}\n${money.compact(Number(p.value))}`,
         },
-        itemStyle: { borderColor: '#050a14', borderWidth: 2, gapWidth: 2 },
+        itemStyle: { borderColor: '#ffffff', borderWidth: 2, gapWidth: 2 },
         levels: [{ itemStyle: { borderWidth: 0, gapWidth: 4 } }, { colorSaturation: [0.45, 0.85] }],
         animationDuration: 1400,
       },
@@ -230,14 +231,14 @@ function heatmap(widget: ProtoWidget, money: Money): EChartsOption | null {
       itemHeight: 240,
       textStyle: { color: DIM },
       formatter: (value: unknown) => money.compact(Number(value)),
-      inRange: { color: ['#06121f', '#0b3550', '#00a7c4', CYAN, '#f7ff9e'] },
+      inRange: { color: ['#f4f4f5', '#a7f3d0', '#34d399', '#059669', '#065f46'] },
     },
     series: [
       {
         type: 'heatmap',
         data,
-        itemStyle: { borderColor: '#050a14', borderWidth: 3, borderRadius: 4 },
-        emphasis: { itemStyle: { shadowBlur: 20, shadowColor: CYAN } },
+        itemStyle: { borderColor: '#ffffff', borderWidth: 3, borderRadius: 4 },
+        emphasis: { itemStyle: { shadowBlur: 0, shadowColor: CYAN } },
         animationDuration: 1200,
       },
     ],
@@ -255,13 +256,13 @@ function radial(widget: ProtoWidget, money: Money): EChartsOption | null {
       type: 'category',
       data: chart.points.map((point) => point.label.split(' ')[0]),
       startAngle: 90,
-      axisLine: { lineStyle: { color: 'rgba(0,240,255,.25)' } },
+      axisLine: { lineStyle: { color: APP.border } },
       axisLabel: { color: DIM, fontFamily: 'ui-monospace, monospace' },
     },
     radiusAxis: {
       axisLabel: { show: false },
       axisLine: { show: false },
-      splitLine: { lineStyle: { color: 'rgba(0,240,255,.08)' } },
+      splitLine: { lineStyle: { color: APP.border } },
     },
     legend: { show: !isSingle, bottom: 0, textStyle: { color: DIM } },
     animationDuration: 2000,
@@ -275,7 +276,7 @@ function radial(widget: ProtoWidget, money: Money): EChartsOption | null {
       data: chart.points.map((point) => {
         const value = point.values[series.key] ?? 0;
         const color = isSingle ? (value >= 0 ? CYAN : PINK) : HUD[index % HUD.length]!;
-        return { value: Math.abs(value), itemStyle: { color, shadowBlur: 16, shadowColor: color } };
+        return { value: Math.abs(value), itemStyle: { color, shadowBlur: 0, shadowColor: color } };
       }),
     })),
   };
@@ -297,12 +298,12 @@ function cumulative(widget: ProtoWidget, money: Money): EChartsOption | null {
       boundaryGap: false,
       data: chart.points.map((point) => point.label.split(' ')[0]),
       axisLabel: { color: DIM },
-      axisLine: { lineStyle: { color: 'rgba(0,240,255,.3)' } },
+      axisLine: { lineStyle: { color: APP.border } },
     },
     yAxis: {
       type: 'value',
       axisLabel: { color: DIM, formatter: (value: number) => money.compact(value) },
-      splitLine: { lineStyle: { color: 'rgba(0,240,255,.07)' } },
+      splitLine: { lineStyle: { color: APP.border } },
     },
     animationDuration: 2600,
     series: [
@@ -312,12 +313,12 @@ function cumulative(widget: ProtoWidget, money: Money): EChartsOption | null {
         smooth: true,
         symbol: 'diamond',
         symbolSize: 10,
-        lineStyle: { width: 3, color: LIME, shadowBlur: 22, shadowColor: LIME },
+        lineStyle: { width: 3, color: LIME, shadowBlur: 0, shadowColor: LIME },
         itemStyle: { color: LIME },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(182,255,59,.35)' },
-            { offset: 1, color: 'rgba(182,255,59,0)' },
+            { offset: 0, color: 'rgba(5,150,105,.22)' },
+            { offset: 1, color: 'rgba(5,150,105,0)' },
           ]),
         },
         endLabel: {
@@ -353,7 +354,7 @@ function bars(widget: ProtoWidget, money: Money): EChartsOption | null {
     yAxis: {
       type: 'value',
       axisLabel: { color: DIM, formatter: (value: number) => money.compact(value) },
-      splitLine: { lineStyle: { color: 'rgba(0,240,255,.07)' } },
+      splitLine: { lineStyle: { color: APP.border } },
     },
     animationDuration: 1400,
     series: chart.series.map((series, index) => ({
@@ -364,7 +365,7 @@ function bars(widget: ProtoWidget, money: Money): EChartsOption | null {
       itemStyle: {
         color: HUD[index % HUD.length],
         borderRadius: 3,
-        shadowBlur: 10,
+        shadowBlur: 0,
         shadowColor: HUD[index % HUD.length],
       },
       emphasis: { focus: 'series' },
@@ -390,11 +391,11 @@ function polarShare(widget: ProtoWidget, money: Money): EChartsOption | null {
         width: 14,
         itemStyle: {
           color: HUD[index % HUD.length],
-          shadowBlur: 18,
+          shadowBlur: 0,
           shadowColor: HUD[index % HUD.length],
         },
       },
-      axisLine: { lineStyle: { width: 14, color: [[1, 'rgba(0,240,255,.06)']] } },
+      axisLine: { lineStyle: { width: 14, color: [[1, APP.track]] } },
       splitLine: { show: false },
       axisTick: { show: false },
       axisLabel: { show: false },
@@ -470,7 +471,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 function Ticker({ kpis, money }: { kpis: Kpi[]; money: Money }) {
   const items = [...kpis, ...kpis, ...kpis, ...kpis];
   return (
-    <div className="relative overflow-hidden border-y border-cyan-400/20 bg-cyan-400/[0.03] py-2 font-mono text-xs">
+    <div className="relative overflow-hidden border-y border-zinc-200 bg-white py-2 font-mono text-xs">
       <motion.div
         className="flex w-max gap-10 whitespace-nowrap"
         animate={{ x: ['0%', '-50%'] }}
@@ -478,8 +479,8 @@ function Ticker({ kpis, money }: { kpis: Kpi[]; money: Money }) {
       >
         {items.map((kpi, index) => (
           <span key={`${kpi.id}-${index}`} className="flex items-center gap-2">
-            <span className="text-cyan-200/50">{kpi.label.toUpperCase()}</span>
-            <span className="text-cyan-100">{money.whole(kpi.value)}</span>
+            <span className="text-zinc-500">{kpi.label.toUpperCase()}</span>
+            <span className="text-zinc-900">{money.whole(kpi.value)}</span>
             {kpi.momentum !== null && (
               <span style={{ color: kpi.momentum >= 0 ? LIME : PINK }}>
                 {kpi.momentum >= 0 ? '▲' : '▼'}
@@ -497,7 +498,7 @@ function Corner({ className }: { className: string }) {
   return (
     <span
       aria-hidden
-      className={`pointer-events-none absolute h-4 w-4 border-cyan-300 ${className}`}
+      className={`pointer-events-none absolute h-4 w-4 border-emerald-600 ${className}`}
     />
   );
 }
@@ -510,22 +511,22 @@ function Stage({ widget, money }: { widget: ProtoWidget; money: Money }) {
   const option = lens.build(widget, money);
   const insights = insightsOf(widget, money.whole);
   return (
-    <div className="relative flex min-h-[640px] flex-col border border-cyan-400/20 bg-[#06101d]/80 p-5">
+    <div className="relative flex min-h-[640px] flex-col border border-zinc-200 bg-white p-5">
       <Corner className="left-0 top-0 border-l-2 border-t-2" />
       <Corner className="right-0 top-0 border-r-2 border-t-2" />
       <Corner className="bottom-0 left-0 border-b-2 border-l-2" />
       <Corner className="bottom-0 right-0 border-b-2 border-r-2" />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-cyan-300/60">
+          <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-zinc-500">
             {'// focus'}
           </div>
-          <h2 className="mt-1 text-2xl font-semibold text-white">{widget.name}</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-zinc-900">{widget.name}</h2>
           {widget.data?.total != null && (
             <button
               type="button"
               onClick={() => router.push(widget.data!.hrefs.total)}
-              className="mt-1 font-mono text-4xl text-cyan-300 [text-shadow:0_0_24px_rgba(0,240,255,.6)]"
+              className="mt-1 font-mono text-4xl text-emerald-700 "
             >
               <NumberFlow
                 value={money.major(widget.data.total)}
@@ -537,7 +538,7 @@ function Stage({ widget, money }: { widget: ProtoWidget; money: Money }) {
         </div>
         <div
           role="tablist"
-          className="flex gap-1 rounded-full border border-cyan-400/25 p-1 font-mono text-xs"
+          className="flex gap-1 rounded-full border border-zinc-200 p-1 font-mono text-xs"
         >
           {lenses.map((item) => (
             <button
@@ -546,16 +547,16 @@ function Stage({ widget, money }: { widget: ProtoWidget; money: Money }) {
               role="tab"
               aria-selected={item.key === lens.key}
               onClick={() => setLensKey(item.key)}
-              className="relative rounded-full px-3 py-1.5 text-cyan-100/70"
+              className="relative rounded-full px-3 py-1.5 text-zinc-600"
             >
               {item.key === lens.key && (
                 <motion.span
                   layoutId="lens-pill"
-                  className="absolute inset-0 rounded-full bg-cyan-300 shadow-[0_0_20px_rgba(0,240,255,.7)]"
+                  className="absolute inset-0 rounded-full bg-emerald-600 "
                   transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                 />
               )}
-              <span className={`relative ${item.key === lens.key ? 'text-[#03111c]' : ''}`}>
+              <span className={`relative ${item.key === lens.key ? 'text-white' : ''}`}>
                 {item.label}
               </span>
             </button>
@@ -575,7 +576,7 @@ function Stage({ widget, money }: { widget: ProtoWidget; money: Money }) {
             {option ? (
               <EChart option={option} className="h-full w-full" />
             ) : (
-              <p className="text-cyan-200/50">No data.</p>
+              <p className="text-zinc-500">No data.</p>
             )}
           </motion.div>
         </AnimatePresence>
@@ -587,12 +588,12 @@ function Stage({ widget, money }: { widget: ProtoWidget; money: Money }) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 + index * 0.08 }}
-            className="border-l-2 border-cyan-300/60 bg-cyan-300/[0.04] px-3 py-2"
+            className="border-l-2 border-emerald-600 bg-zinc-50 px-3 py-2"
           >
-            <div className="font-mono text-[10px] uppercase tracking-widest text-cyan-200/50">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
               {insight.headline}
             </div>
-            <div className="font-mono text-sm text-white">{insight.detail}</div>
+            <div className="font-mono text-sm text-zinc-900">{insight.detail}</div>
           </motion.div>
         ))}
       </div>
@@ -606,27 +607,27 @@ export function VariantCockpit({ dashboardName, widgets }: ProtoProps) {
   const selected = widgets.find((widget) => widget.id === selectedId) ?? widgets[0];
   const kpis = heroKpisOf(widgets);
   return (
-    <div className="relative -mx-2 overflow-hidden rounded-xl bg-[#030812] text-cyan-50 md:-mx-4">
+    <div className="relative -mx-2 overflow-hidden rounded-xl md:-mx-4" style={VARIANT_ROOT_STYLE}>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-30"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 20% 0%, rgba(0,240,255,.25), transparent 40%), radial-gradient(circle at 90% 100%, rgba(255,43,214,.2), transparent 40%), repeating-linear-gradient(0deg, rgba(255,255,255,.03) 0 1px, transparent 1px 3px)',
+            'radial-gradient(circle at 15% 0%, rgba(5,150,105,.10), transparent 40%), radial-gradient(circle at 95% 100%, rgba(8,145,178,.08), transparent 40%)',
         }}
       />
       <div className="relative flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-3">
           <motion.span
-            className="h-3 w-3 rounded-full bg-cyan-300"
-            animate={{ boxShadow: ['0 0 0 0 rgba(0,240,255,.7)', '0 0 0 12px rgba(0,240,255,0)'] }}
+            className="h-3 w-3 rounded-full bg-emerald-600"
+            animate={{ boxShadow: ['0 0 0 0 rgba(5,150,105,.6)', '0 0 0 12px rgba(5,150,105,0)'] }}
             transition={{ duration: 1.6, repeat: Infinity }}
           />
-          <h1 className="font-mono text-lg uppercase tracking-[0.35em] text-cyan-100">
+          <h1 className="font-mono text-lg uppercase tracking-[0.35em] text-zinc-900">
             {dashboardName}
           </h1>
         </div>
-        <span className="font-mono text-xs text-cyan-200/50">
+        <span className="font-mono text-xs text-zinc-500">
           SYS.OK · CHF · {widgets.length} feeds
         </span>
       </div>
@@ -646,18 +647,18 @@ export function VariantCockpit({ dashboardName, widgets }: ProtoProps) {
                 transition={{ delay: index * 0.08 }}
                 whileHover={{ x: 4 }}
                 onClick={() => setSelectedId(widget.id)}
-                className={`relative overflow-hidden border px-3 py-3 text-left transition-colors ${isActive ? 'border-cyan-300 bg-cyan-300/10' : 'border-cyan-400/15 bg-white/[0.02] hover:border-cyan-400/40'}`}
+                className={`relative overflow-hidden border px-3 py-3 text-left transition-colors ${isActive ? 'border-emerald-600 bg-emerald-50' : 'border-zinc-200 bg-white hover:border-zinc-300'}`}
               >
                 {isActive && (
                   <motion.span
                     layoutId="rail-active"
-                    className="absolute inset-y-0 left-0 w-1 bg-cyan-300 shadow-[0_0_14px_rgba(0,240,255,.9)]"
+                    className="absolute inset-y-0 left-0 w-1 bg-emerald-600 "
                   />
                 )}
-                <div className="font-mono text-[10px] uppercase tracking-widest text-cyan-200/50">
+                <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
                   F{String(index + 1).padStart(2, '0')} · {widget.visualisation.replace('_', ' ')}
                 </div>
-                <div className="mt-0.5 text-sm font-medium text-white">{widget.name}</div>
+                <div className="mt-0.5 text-sm font-medium text-zinc-900">{widget.name}</div>
                 {kpi && (
                   <div className="font-mono text-xs" style={{ color }}>
                     {money.whole(kpi.value)}

@@ -12,9 +12,10 @@ import { useMemo, useState } from 'react';
 import { EChart, echarts, type EChartsOption } from './echart';
 import { monthlyFlowOf, slicesOf, splitPath, type MonthlyFlow, type ProtoProps } from './data';
 import { CHF_FORMAT, useMoney, type Money } from './money';
+import { APP, VARIANT_ROOT_STYLE } from './theme';
 
 const LAKE = {
-  paper: '#f6f9fb',
+  paper: APP.bg,
   ink: '#0d2b45',
   soft: '#5b7186',
   line: '#d7e3ec',
@@ -245,7 +246,7 @@ export function VariantTide(props: ProtoProps) {
   return (
     <div
       className="-mx-2 rounded-[20px] px-6 py-10 md:-mx-4 md:px-12"
-      style={{ background: LAKE.paper, color: LAKE.ink, colorScheme: 'light', ...FONT }}
+      style={{ ...VARIANT_ROOT_STYLE, color: LAKE.ink, ...FONT }}
     >
       <header className="flex flex-wrap items-baseline justify-between gap-4">
         <h1

@@ -23,8 +23,10 @@ import {
   type ProtoWidget,
 } from './data';
 import { useMoney, type Money } from './money';
+import { APP, VARIANT_ROOT_STYLE } from './theme';
 
-const PAPER = '#fdfdf7';
+/** Pages are white, like the app's cards, on the app background. */
+const PAPER = APP.surface;
 const GRAPHITE = '#2d2a26';
 const BLUE = '#2f62d0';
 const RED = '#df3b3b';
@@ -369,7 +371,7 @@ export function VariantSketchbook(props: ProtoProps) {
   }));
 
   return (
-    <div className="-mx-2 md:-mx-4" style={{ colorScheme: 'light', color: GRAPHITE }}>
+    <div className="-mx-2 md:-mx-4" style={{ ...VARIANT_ROOT_STYLE, color: GRAPHITE }}>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-zinc-500">Our money, drawn by hand.</p>
         <button

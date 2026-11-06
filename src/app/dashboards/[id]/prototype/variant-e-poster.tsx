@@ -22,6 +22,7 @@ import {
 } from './data';
 import { OTHER_LABEL } from '@/lib/reporting/chart-data';
 import { CHF_FORMAT, useMoney, type Money } from './money';
+import { VARIANT_ROOT_STYLE } from './theme';
 
 const RED = '#e30613';
 const BLACK = '#000000';
@@ -274,8 +275,8 @@ export function VariantPoster(props: ProtoProps) {
 
   return (
     <div
-      className="-mx-2 bg-white px-6 py-10 text-black md:-mx-4 md:px-12 md:py-14"
-      style={{ fontFamily: FONT, colorScheme: 'light' }}
+      className="-mx-2 px-6 py-10 md:-mx-4 md:px-12 md:py-14"
+      style={{ ...VARIANT_ROOT_STYLE, color: BLACK, fontFamily: FONT }}
     >
       <header className="grid gap-8 md:grid-cols-12">
         <div className="md:col-span-12">

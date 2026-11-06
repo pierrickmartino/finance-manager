@@ -22,11 +22,12 @@ import {
   type ProtoWidget,
 } from './data';
 import { CHF_FORMAT, useMoney, type Money } from './money';
+import { APP, VARIANT_ROOT_STYLE } from './theme';
 
-const INK = '#16130f';
+const INK = APP.ink;
 const ACCENT = '#ff4f1f';
-const PAPER = '#f5efe4';
-const MUTED = 'rgba(22,19,15,0.45)';
+const PAPER = APP.bg;
+const MUTED = APP.muted;
 const SERIF = 'font-[ui-serif,Georgia,Cambria,"Times_New_Roman",serif]';
 
 function inkAxes(labels: string[], money: Money) {
@@ -380,7 +381,7 @@ export function VariantStory(props: ProtoProps) {
   return (
     <div
       className="relative -mx-2 rounded-[28px] px-6 md:-mx-4 md:px-14"
-      style={{ background: PAPER, color: INK }}
+      style={VARIANT_ROOT_STYLE}
     >
       <motion.div
         className="fixed inset-x-0 top-0 z-50 h-1 origin-left"
