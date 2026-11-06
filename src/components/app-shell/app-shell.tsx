@@ -1,16 +1,12 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { PrototypeSwitcher, readVariantParam } from '@/components/prototype-switcher';
+import { useEffect, useState, type ReactNode } from 'react';
+import { DesktopSidebar } from './desktop-sidebar';
 import { Icon } from './icon';
 import { findCurrentPage } from './navigation';
-import {
-  PrototypeDesktopSidebar,
-  SIDEBAR_VARIANTS,
-  VariantBTopBarToggle,
-} from './prototype-sidebar-variants';
 import { Brand, Sidebar } from './sidebar';
+import type { SidebarMode } from './sidebar-mode';
 
 const ICON_BUTTON =
   'grid h-9 w-9 place-items-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800';
@@ -63,6 +59,8 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
 interface AppShellProps {
   /** Signed out (login, setup), only the page renders: no sidebar, top bar or drawer. */
   showNavigation: boolean;
+  /** The desktop sidebar's saved mode: pinned open, or a rail of icons. */
+  sidebarMode: SidebarMode;
   children: ReactNode;
 }
 
@@ -73,30 +71,12 @@ interface AppShellProps {
  * whose action signs the user in (first-run setup shows its recovery codes afterwards) is not
  * remounted, and loses no state, when the navigation appears.
  */
-export function AppShell({ showNavigation, children }: AppShellProps) {
+export function AppShell({ showNavigation, sidebarMode, children }: AppShellProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // PROTOTYPE — sidebar collapse variants (see prototype-sidebar-variants.tsx).
-  const [variant, setVariant] = useState('A');
-  const [collapsed, setCollapsed] = useState(false);
-  const switchVariant = useCallback((key: string) => {
-    setVariant(key);
-    setCollapsed(key === 'C'); // C starts as a rail so the peek is the first thing you meet
-  }, []);
-  useEffect(() => {
-    const fromUrl = readVariantParam();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- PROTOTYPE: one-off read of ?variant=
-    if (fromUrl && SIDEBAR_VARIANTS.some((v) => v.key === fromUrl)) switchVariant(fromUrl);
-  }, [switchVariant]);
 
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      {showNavigation && (
-        <PrototypeDesktopSidebar
-          variant={variant}
-          collapsed={collapsed}
-          setCollapsed={setCollapsed}
-        />
-      )}
+      {showNavigation && <DesktopSidebar initialMode={sidebarMode} />}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {showNavigation && (
@@ -113,9 +93,6 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
             <div className="md:hidden">
               <Brand />
             </div>
-            {variant === 'B' && (
-              <VariantBTopBarToggle collapsed={collapsed} setCollapsed={setCollapsed} />
-            )}
             <div className="hidden md:block">
               <Breadcrumb />
             </div>
@@ -129,9 +106,6 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
       </div>
 
       {showNavigation && isMenuOpen && <MobileDrawer onClose={() => setIsMenuOpen(false)} />}
-      {showNavigation && (
-        <PrototypeSwitcher variants={SIDEBAR_VARIANTS} current={variant} onChange={switchVariant} />
-      )}
     </div>
   );
 }
