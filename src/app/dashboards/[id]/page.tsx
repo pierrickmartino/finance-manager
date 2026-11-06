@@ -162,8 +162,8 @@ export default async function DashboardPage({
 }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
-  // PROTOTYPE (throwaway): `?variant=A|B|C` swaps the rendering; never in production.
-  const variant = process.env.NODE_ENV === 'production' ? null : (await searchParams).variant;
+  // PROTOTYPE (throwaway): `?variant=A…F` swaps the rendering, in every build (production too).
+  const { variant } = await searchParams;
   if (typeof variant === 'string' && variant !== 'current') {
     const dashboards = await listDashboards(ctx);
     return (
@@ -216,7 +216,7 @@ export default async function DashboardPage({
           widgets={widgets}
         />
       )}
-      {process.env.NODE_ENV !== 'production' && <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} />}
+      <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} />
     </section>
   );
 }
