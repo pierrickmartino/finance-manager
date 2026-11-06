@@ -192,3 +192,40 @@ export function savingsRateOf(widget: ProtoWidget): number | null {
   if (income <= 0 || expense >= 0) return null;
   return (income + expense) / income;
 }
+
+export interface MonthlyFlow {
+  months: string[];
+  /** Money in per month (positive). */
+  income: number[];
+  /** Money out per month (positive magnitudes), per spending series, largest first. */
+  spending: { label: string; values: number[]; total: number }[];
+}
+
+/**
+ * The year as one picture: income from an income-vs-expense Widget, spending split by the
+ * Widget with the most series (Categories). Months align by label. Null without both.
+ */
+export function monthlyFlowOf(widgets: ProtoWidget[]): MonthlyFlow | null {
+  const flow = widgets.find((widget) => savingsRateOf(widget) !== null);
+  const split = widgets
+    .filter((widget) => widget.source === 'query')
+    .map((widget) => ({ widget, chart: seriesOf(widget) }))
+    .filter((item) => item.chart && item.chart.series.length > 2)
+    .sort((a, b) => b.chart!.series.length - a.chart!.series.length)[0];
+  const flowChart = flow ? seriesOf(flow) : null;
+  if (!flowChart || !split?.chart) return null;
+  const incomeKey = flowChart.series.find((series) =>
+    flowChart.points.some((point) => (point.values[series.key] ?? 0) > 0),
+  )?.key;
+  const months = flowChart.points.map((point) => point.label);
+  const income = flowChart.points.map((point) => Math.max(0, point.values[incomeKey ?? ''] ?? 0));
+  const byLabel = new Map(split.chart.points.map((point) => [point.label, point]));
+  const spending = split.chart.series
+    .map((series) => {
+      const values = months.map((month) => Math.abs(byLabel.get(month)?.values[series.key] ?? 0));
+      return { label: series.label, values, total: values.reduce((sum, value) => sum + value, 0) };
+    })
+    .filter((item) => item.total > 0)
+    .sort((a, b) => b.total - a.total);
+  return { months, income, spending };
+}

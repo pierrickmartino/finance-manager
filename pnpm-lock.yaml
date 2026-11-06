@@ -8,6 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@fontsource-variable/archivo':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource-variable/bricolage-grotesque':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource-variable/caveat':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/kalam':
+        specifier: 5.3.0
+        version: 5.3.0
       '@node-rs/argon2':
         specifier: ^2.2.2
         version: 2.2.2
@@ -47,6 +59,9 @@ importers:
       recharts:
         specifier: 3.10.1
         version: 3.10.1(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react-is@16.13.1)(react@19.3.1)(redux@5.0.1)
+      roughjs:
+        specifier: 4.6.6
+        version: 4.6.6
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
@@ -391,6 +406,18 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fontsource-variable/archivo@5.3.0':
+    resolution: {integrity: sha512-HogK8FJelrD1o7TlZlkIVtHgc20bO5PZRWE7mUeUTdMN055alznQV6/00J00IBeu8FQAH4s3zW9UJNvKExXf+g==}
+
+  '@fontsource-variable/bricolage-grotesque@5.3.0':
+    resolution: {integrity: sha512-TLi9Q4hJjS2UvoTMRSS2nHu6c4R56lAw60NR9QYtVRCHn0XtsFpiEhNffZ8Glsoxu6wEEwLKBP8lb94J52PNBA==}
+
+  '@fontsource-variable/caveat@5.3.0':
+    resolution: {integrity: sha512-Q3mjghoYIlXgwqBPJKZ4q6f3zu921Gq7UU76r9Z+NAmhapHfX130GIFpOCYf8vt2SIcgCi9RHDT7anfJKg/kiA==}
+
+  '@fontsource/kalam@5.3.0':
+    resolution: {integrity: sha512-FDkVoDfPDCSN/eO81FOYtUI67eMgpVBJmjBtAqSL0PmEhJyeFY2biC+CR+yEttksgXR9+swpFdYmQTyjwBq80Q==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1876,6 +1903,9 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
+  hachure-fill@0.5.2:
+    resolution: {integrity: sha512-3GKBOn+m2LX9iq+JC1064cSFprJY4jL1jCXTcpnfER5HYE2l/4EfWSGzkPa/ZDBmYI0ZOEj5VHV/eKnPGkHuOg==}
+
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
     engines: {node: '>= 0.4'}
@@ -2459,6 +2489,9 @@ packages:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
     engines: {node: '>=6'}
 
+  path-data-parser@0.1.0:
+    resolution: {integrity: sha512-NOnmBpt5Y2RWbuv0LMzsayp3lVylAHLPUTut412ZA3l+C4uw4ZVkQbjShYCQ8TCpUMdPapr4YjUqLYD6v68j+w==}
+
   path-exists@4.0.0:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
     engines: {node: '>=8'}
@@ -2532,6 +2565,12 @@ packages:
   pngjs@5.0.0:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
+
+  points-on-curve@0.2.0:
+    resolution: {integrity: sha512-0mYKnYYe9ZcqMCWhUjItv/oHjvgEsfKvnUTg8sAtnHr3GVy7rGkXCb6d5cSyqrWqL4k81b9CPg3urd+T7aop3A==}
+
+  points-on-path@0.2.1:
+    resolution: {integrity: sha512-25ClnWWuw7JbWZcgqY/gJ4FQWadKxGWk+3kR/7kD0tCaDtPPMj7oHu2ToLaVhfpnHrZzYby2w6tUA0eOIuUg8g==}
 
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
@@ -2684,6 +2723,9 @@ packages:
     resolution: {integrity: sha512-bWvlMpFKiTfDKfnK7FC2MPgPeWCf/Kpwsq49ApdW+FQaBZb6O6dZ4MAPbPUjp7hYQrw/RobqCzn64BRrQecGHw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
+
+  roughjs@4.6.6:
+    resolution: {integrity: sha512-ZUz/69+SYpFN/g/lUlo2FXcIjRkSu3nDarreVdGGndHEBJ6cXPdKguS8JGxwj5HA5xIbVKSmLgr5b3AWxtRfvQ==}
 
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
@@ -3384,6 +3426,14 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fontsource-variable/archivo@5.3.0': {}
+
+  '@fontsource-variable/bricolage-grotesque@5.3.0': {}
+
+  '@fontsource-variable/caveat@5.3.0': {}
+
+  '@fontsource/kalam@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -4877,6 +4927,8 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
+  hachure-fill@0.5.2: {}
+
   has-bigints@1.1.0: {}
 
   has-flag@4.0.0: {}
@@ -5412,6 +5464,8 @@ snapshots:
     dependencies:
       callsites: 3.1.0
 
+  path-data-parser@0.1.0: {}
+
   path-exists@4.0.0: {}
 
   path-key@3.1.1: {}
@@ -5471,6 +5525,13 @@ snapshots:
       playwright-core: 1.64.1
 
   pngjs@5.0.0: {}
+
+  points-on-curve@0.2.0: {}
+
+  points-on-path@0.2.1:
+    dependencies:
+      path-data-parser: 0.1.0
+      points-on-curve: 0.2.0
 
   possible-typed-array-names@1.1.0: {}
 
@@ -5648,6 +5709,13 @@ snapshots:
       '@rolldown/binding-openharmony-arm64': 1.2.16
       '@rolldown/binding-win32-arm64-msvc': 1.2.16
       '@rolldown/binding-win32-x64-msvc': 1.2.16
+
+  roughjs@4.6.6:
+    dependencies:
+      hachure-fill: 0.5.2
+      path-data-parser: 0.1.0
+      points-on-curve: 0.2.0
+      points-on-path: 0.2.1
 
   run-parallel@1.2.0:
     dependencies:
