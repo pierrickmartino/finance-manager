@@ -19,6 +19,25 @@ test('the starter Dashboard is the landing page', async ({ page }) => {
   }
 });
 
+test('a Dashboard opens as its Story; Edit Dashboard opens the grid and Done returns', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
+  // The Story tells each Widget as a chapter, without the grid's Widget actions.
+  await expect(page.getByRole('heading', { name: 'Net cash flow', level: 2 })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Add Widget' })).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Edit Dashboard' }).click();
+  await expect(page).toHaveURL(/\/dashboards\/[^/]+\/edit$/);
+  await expect(page.getByRole('link', { name: 'Add Widget' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move Net cash flow' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Done' }).click();
+  await expect(page).toHaveURL(/\/dashboards\/[^/]+$/);
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+});
+
 test('create a Dashboard, add a stacked bar Widget, move it, and the layout persists', async ({
   page,
 }) => {

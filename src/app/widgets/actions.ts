@@ -43,7 +43,7 @@ export async function saveWidgetAction(_previous: Result | null, formData: FormD
   revalidatePath('/dashboards', 'layout');
   redirect(
     result.data.dashboardId
-      ? `/dashboards/${result.data.dashboardId}`
+      ? `/dashboards/${result.data.dashboardId}/edit`
       : `/widgets/${result.data.id}`,
   );
 }

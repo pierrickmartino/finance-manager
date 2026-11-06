@@ -1,8 +1,10 @@
 import 'server-only';
+import { notFound } from 'next/navigation';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { queryToParams } from '@/lib/reporting/widget-params';
 import type { ServiceContext } from '@/server/services/context';
-import { ServiceError } from '@/server/services/errors';
+import { getDashboard, type DashboardWithWidgets } from '@/server/services/dashboards';
+import { NotFoundError, ServiceError } from '@/server/services/errors';
 import { runSavedWidget, type CellRef, type Widget } from '@/server/services/reporting';
 import { toPivotData } from '../widgets/pivot-data';
 
@@ -39,4 +41,17 @@ export function editWidgetHref(widget: Widget): string {
   params.set('widget', widget.id);
   params.set('vis', widget.visualisation);
   return `/widgets/new?${params}`;
+}
+
+/** A Dashboard and its Widgets, or the not-found page. */
+export async function findDashboard(
+  ctx: ServiceContext,
+  id: string,
+): Promise<DashboardWithWidgets> {
+  try {
+    return await getDashboard(ctx, id);
+  } catch (error: unknown) {
+    if (error instanceof NotFoundError) notFound();
+    throw error;
+  }
 }

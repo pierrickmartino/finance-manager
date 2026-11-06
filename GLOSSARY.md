@@ -119,4 +119,8 @@ A Widget that sits on no Dashboard. Adding it to a Dashboard places a copy there
 _Avoid_: Report, saved report
 
 **Dashboard**:
-A named, user-arranged grid of Widgets. Each Widget sits on at most one Dashboard.
+A named, user-arranged set of Widgets, read as its Dashboard Story and arranged on a grid. Each Widget sits on at most one Dashboard.
+
+**Dashboard Story**:
+A Dashboard read top to bottom: one headline amount, then one chapter per Widget in grid order, each saying in words what its chart shows.
+_Avoid_: Report, overview page, presentation
