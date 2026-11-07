@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useInView } from 'motion/react';
+import { motion } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useRef } from 'react';
@@ -22,6 +22,7 @@ import { useFormatter } from '@/components/formatter-provider';
 import { toSeriesChart, type ChartSource } from '@/lib/reporting/chart-data';
 import { rankedTotals, shareParts } from '@/lib/reporting/story';
 import { STORY, STORY_TONES } from './palette';
+import { INSTANT, useIsShown, useIsStill } from './stillness';
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 /** How many Categories a ranking shows. */
@@ -62,10 +63,10 @@ function tooltipProps(money: (minor: number) => string) {
   };
 }
 
-/** Charts animate in when their chapter scrolls into view, not on page load. */
+/** Charts animate in when their chapter scrolls into view, not on page load (at once when still). */
 function OnView({ children, className }: { children: React.ReactNode; className: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-20% 0px' });
+  const isInView = useIsShown(ref, '-20% 0px');
   return (
     <div ref={ref} className={className}>
       {isInView && children}
@@ -77,6 +78,7 @@ function OnView({ children, className }: { children: React.ReactNode; className:
 export function TrendChart({ data, title }: { data: ChartSource; title: string }) {
   const router = useRouter();
   const money = useMoney();
+  const isStill = useIsStill();
   const gradientId = useId();
   const { chart, rows: points } = rows(data);
   const last = points.length - 1;
@@ -106,6 +108,7 @@ export function TrendChart({ data, title }: { data: ChartSource; title: string }
                 strokeWidth={2.5}
                 fill={`url(#${gradientId})`}
                 animationDuration={1600}
+                isAnimationActive={!isStill}
                 activeDot={false}
                 dot={(props: { cx?: number; cy?: number; index?: number }) => {
                   const href = chart.points[props.index ?? -1]?.hrefs[series.key] ?? null;
@@ -164,6 +167,7 @@ export function TrendChart({ data, title }: { data: ChartSource; title: string }
 export function PeriodBars({ data, title }: { data: ChartSource; title: string }) {
   const router = useRouter();
   const money = useMoney();
+  const isStill = useIsStill();
   const { chart, rows: points } = rows(data);
   return (
     <OnView className={CHART_HEIGHT}>
@@ -199,6 +203,7 @@ export function PeriodBars({ data, title }: { data: ChartSource; title: string }
                 barSize={14}
                 fill={STORY_TONES[series.slot % STORY_TONES.length]}
                 animationDuration={1200}
+                isAnimationActive={!isStill}
                 className="cursor-pointer"
                 onClick={(_item, index) => {
                   const href = chart.points[index]?.hrefs[series.key];
@@ -217,7 +222,8 @@ export function PeriodBars({ data, title }: { data: ChartSource; title: string }
 export function RankedBars({ data, title }: { data: ChartSource; title: string }) {
   const money = useMoney();
   const ref = useRef<HTMLOListElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-15% 0px' });
+  const isStill = useIsStill();
+  const isInView = useIsShown(ref, '-15% 0px');
   const items = rankedTotals(data, RANKING_LIMIT);
   const max = Math.max(1, ...items.map((item) => Math.abs(item.value)));
   return (
@@ -261,7 +267,9 @@ export function RankedBars({ data, title }: { data: ChartSource; title: string }
                   style={{ background: index === 0 ? STORY.accent : STORY.ink }}
                   initial={{ width: 0 }}
                   animate={{ width: isInView ? `${(Math.abs(item.value) / max) * 100}%` : 0 }}
-                  transition={{ duration: 1.4, delay: index * 0.12, ease: EASE_OUT }}
+                  transition={
+                    isStill ? INSTANT : { duration: 1.4, delay: index * 0.12, ease: EASE_OUT }
+                  }
                 />
               </div>
             </div>
@@ -276,7 +284,8 @@ export function RankedBars({ data, title }: { data: ChartSource; title: string }
 export function ShareBand({ data, title }: { data: ChartSource; title: string }) {
   const money = useMoney();
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-15% 0px' });
+  const isStill = useIsStill();
+  const isInView = useIsShown(ref, '-15% 0px');
   const parts = shareParts(data);
   const tone = (index: number) => STORY_TONES[index % STORY_TONES.length];
   return (
@@ -293,7 +302,7 @@ export function ShareBand({ data, title }: { data: ChartSource; title: string })
             style={{ background: tone(index) }}
             initial={{ flexGrow: 0.0001 }}
             animate={{ flexGrow: isInView ? part.share : 0.0001 }}
-            transition={{ duration: 1.6, delay: index * 0.15, ease: EASE_OUT }}
+            transition={isStill ? INSTANT : { duration: 1.6, delay: index * 0.15, ease: EASE_OUT }}
           />
         ))}
       </div>

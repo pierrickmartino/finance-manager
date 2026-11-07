@@ -7,6 +7,7 @@ import {
   rankedTotals,
   savingsRate,
   shareParts,
+  STORY_SHOWN_AS,
   storyHero,
   type StoryWidget,
 } from './story';
@@ -114,13 +115,19 @@ describe('storyHero', () => {
       value: 10000_00,
       href: 'total',
       flow: { income: 3500_00, expense: 2200_00, keptShare: 1300 / 3500 },
+      sources: { value: balances.name, flow: incomeVsExpense.name },
     });
   });
 
   it('falls back to the first Widget with a total, without a flow sentence', () => {
     const hero = storyHero([spending]);
 
-    expect(hero).toMatchObject({ label: 'Spending by Category', value: -8400_00, flow: null });
+    expect(hero).toMatchObject({
+      label: 'Spending by Category',
+      value: -8400_00,
+      flow: null,
+      sources: { value: 'Spending by Category', flow: null },
+    });
   });
 
   it('is null when no Widget has a total', () => {
@@ -237,5 +244,28 @@ describe('shareParts', () => {
       ['BCGE · Pillar 3a', 0.1],
     ]);
     expect(parts[0]).toMatchObject({ value: 6000_00, href: 'row:UBS · Savings' });
+  });
+});
+
+describe('STORY_SHOWN_AS', () => {
+  const kindWords: Record<string, string> = {
+    share: 'share',
+    trend: 'trend',
+    bars: 'bars',
+    ranking: 'ranking',
+    number: 'number',
+  };
+
+  it('names the chapter each visualisation becomes', () => {
+    for (const visualisation of ['table', 'line', 'stacked_bar', 'donut', 'number'] as const) {
+      const kind = chapterKind(widget({ visualisation, data: incomeVsExpense.data }));
+      expect(STORY_SHOWN_AS[visualisation].full).toContain(kindWords[kind]);
+    }
+  });
+
+  it('mentions the ranking a stacked bar becomes with many series', () => {
+    const manySeries = widget({ visualisation: 'stacked_bar', data: spending.data });
+    expect(chapterKind(manySeries)).toBe('ranking');
+    expect(STORY_SHOWN_AS.stacked_bar.full).toContain('ranking');
   });
 });

@@ -26,6 +26,8 @@ export interface StoryHero {
   href: string;
   /** The year in and out, when the Dashboard has an income-vs-expense Widget. */
   flow: { income: number; expense: number; keptShare: number } | null;
+  /** The names of the Widgets the number and the flow sentence come from (shown in Edit mode). */
+  sources: { value: string; flow: string | null };
 }
 
 export interface ChapterStory {
@@ -71,15 +73,16 @@ export function storyHero(widgets: StoryWidget[]): StoryHero | null {
   const lead = balances ?? widgets.find((widget) => widget.data?.total != null);
   if (!lead?.data || lead.data.total == null) return null;
 
-  const flowData = widgets
-    .map((widget) => widget.data)
-    .find((data) => data !== null && incomeAndExpense(data) !== null);
-  const flow = flowData ? incomeAndExpense(flowData) : null;
+  const flowWidget = widgets.find(
+    (widget) => widget.data !== null && incomeAndExpense(widget.data) !== null,
+  );
+  const flow = flowWidget?.data ? incomeAndExpense(flowWidget.data) : null;
   return {
     label: balances ? 'Your net worth today' : lead.name,
     value: lead.data.total,
     href: lead.data.hrefs.total,
     flow: flow ? { ...flow, keptShare: (flow.income - flow.expense) / flow.income } : null,
+    sources: { value: lead.name, flow: flow ? flowWidget!.name : null },
   };
 }
 
@@ -215,3 +218,18 @@ export function chapterStory(widget: StoryWidget, money: Money): ChapterStory {
   if (kind === 'bars' && incomeAndExpense(data)) return flowStory(data, money);
   return periodStory(widget, data, money);
 }
+
+/**
+ * What each visualisation becomes in the Dashboard Story, for the Widget editor's picker: the
+ * Story draws chapters, not the five visualisations one for one (see `chapterKind`).
+ */
+export const STORY_SHOWN_AS: Record<Visualisation, { short: string; full: string }> = {
+  table: { short: 'as a share', full: 'In the Story: a share band of its rows' },
+  line: { short: 'as a trend', full: 'In the Story: a trend line' },
+  stacked_bar: {
+    short: 'as bars',
+    full: `In the Story: bars per period, or a ranking from ${RANKING_FROM_SERIES} series`,
+  },
+  donut: { short: 'as a share', full: 'In the Story: a share band of its slices' },
+  number: { short: 'as a number', full: 'In the Story: one large number' },
+};

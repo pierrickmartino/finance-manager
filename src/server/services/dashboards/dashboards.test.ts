@@ -19,7 +19,7 @@ import {
   listDashboards,
   renameDashboard,
   reorderDashboards,
-  saveDashboardLayout,
+  reorderDashboardWidgets,
 } from '.';
 
 const t = setupTestDatabase();
@@ -76,6 +76,12 @@ describe('Dashboards', () => {
   });
 });
 
+/** A Dashboard's Widgets as [name, y], in the order the Story tells them. */
+async function storyOrder(dashboardId: string): Promise<[string, number | undefined][]> {
+  const { widgets } = await getDashboard(t.ctx, dashboardId);
+  return widgets.map((w) => [w.name, w.layout?.y]);
+}
+
 const SPENDING: WidgetQueryInput = {
   dateRange: { kind: 'last', count: 12, unit: 'month' },
   rows: 'month',
@@ -83,7 +89,7 @@ const SPENDING: WidgetQueryInput = {
 };
 
 describe('Widgets on a Dashboard', () => {
-  it('adds Widgets below each other and records their creation', async () => {
+  it('adds Widgets after each other in Story order and records their creation', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
 
     const first = await addWidget(t.ctx, dashboard.id, {
@@ -99,7 +105,7 @@ describe('Widgets on a Dashboard', () => {
       visualisation: 'stacked_bar',
       layout: { x: 0, y: 0, w: 6, h: 8 },
     });
-    expect(second.layout).toEqual({ x: 0, y: 8, w: 6, h: 8 });
+    expect(second.layout).toEqual({ x: 0, y: 1, w: 6, h: 8 });
     expect((await getDashboard(t.ctx, dashboard.id)).widgets.map((w) => w.name)).toEqual([
       'Spending',
       'Again',
@@ -119,44 +125,101 @@ describe('Widgets on a Dashboard', () => {
     ).rejects.toThrow('Dashboard not found');
   });
 
-  it('saves the layout without writing History', async () => {
+  it('adds a Widget at a position, moving the ones after it down', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    await addWidget(t.ctx, dashboard.id, { name: 'A', query: SPENDING });
+    await addWidget(t.ctx, dashboard.id, { name: 'C', query: SPENDING });
+
+    const b = await addWidget(t.ctx, dashboard.id, { name: 'B', query: SPENDING, position: 1 });
+    await addWidget(t.ctx, dashboard.id, { name: 'Z', query: SPENDING, position: 99 });
+
+    expect(b.layout).toEqual({ x: 0, y: 1, w: 6, h: 8 });
+    expect(await storyOrder(dashboard.id)).toEqual([
+      ['A', 0],
+      ['B', 1],
+      ['C', 2],
+      ['Z', 3],
+    ]);
+  });
+
+  it('refuses a negative position', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+
+    await expect(
+      addWidget(t.ctx, dashboard.id, { name: 'A', query: SPENDING, position: -1 }),
+    ).rejects.toThrow();
+  });
+
+  it('reorders the Widgets of a Dashboard, keeping their sizes, without writing History', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
     const a = await addWidget(t.ctx, dashboard.id, { name: 'A', query: SPENDING });
-    const b = await addWidget(t.ctx, dashboard.id, { name: 'B', query: SPENDING });
+    const b = await addWidget(t.ctx, dashboard.id, {
+      name: 'B',
+      query: SPENDING,
+      layout: { x: 6, y: 0, w: 6, h: 10 },
+    });
+    const c = await addWidget(t.ctx, dashboard.id, { name: 'C', query: SPENDING });
     const historyBefore = await listHistory(t.ctx, {});
 
-    await saveDashboardLayout(t.ctx, dashboard.id, [
-      { widgetId: a.id, layout: { x: 6, y: 0, w: 6, h: 4 } },
-      { widgetId: b.id, layout: { x: 0, y: 0, w: 6, h: 10 } },
-    ]);
+    await reorderDashboardWidgets(t.ctx, dashboard.id, [c.id, a.id, b.id]);
 
     const { widgets } = await getDashboard(t.ctx, dashboard.id);
     expect(widgets.map((w) => [w.name, w.layout])).toEqual([
-      ['B', { x: 0, y: 0, w: 6, h: 10 }],
-      ['A', { x: 6, y: 0, w: 6, h: 4 }],
+      ['C', { x: 0, y: 0, w: 6, h: 8 }],
+      ['A', { x: 0, y: 1, w: 6, h: 8 }],
+      ['B', { x: 0, y: 2, w: 6, h: 10 }],
     ]);
     expect(await listHistory(t.ctx, {})).toEqual(historyBefore);
   });
 
-  it('refuses a layout outside the grid or for a Widget of another Dashboard', async () => {
-    const home = await createDashboard(t.ctx, { name: 'Home' });
-    const other = await createDashboard(t.ctx, { name: 'Other' });
-    const widget = await addWidget(t.ctx, home.id, { name: 'A', query: SPENDING });
+  it('turns an old grid layout into Story order on the first change', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    await addWidget(t.ctx, dashboard.id, {
+      name: 'Right',
+      query: SPENDING,
+      layout: { x: 6, y: 0, w: 6, h: 8 },
+    });
+    await addWidget(t.ctx, dashboard.id, {
+      name: 'Left',
+      query: SPENDING,
+      layout: { x: 0, y: 0, w: 6, h: 8 },
+    });
+    await addWidget(t.ctx, dashboard.id, {
+      name: 'Below',
+      query: SPENDING,
+      layout: { x: 0, y: 8, w: 12, h: 4 },
+    });
 
-    await expect(
-      saveDashboardLayout(t.ctx, home.id, [
-        { widgetId: widget.id, layout: { x: 8, y: 0, w: 6, h: 4 } },
-      ]),
-    ).rejects.toThrow('A Widget must fit in the 12 grid columns');
-    await expect(
-      saveDashboardLayout(t.ctx, other.id, [
-        { widgetId: widget.id, layout: { x: 0, y: 0, w: 6, h: 4 } },
-      ]),
-    ).rejects.toThrow('A Widget in this layout is not on this Dashboard');
-    expect((await getWidget(t.ctx, widget.id)).layout).toEqual({ x: 0, y: 0, w: 6, h: 8 });
+    await addWidget(t.ctx, dashboard.id, { name: 'New', query: SPENDING });
+
+    expect(await storyOrder(dashboard.id)).toEqual([
+      ['Left', 0],
+      ['Right', 1],
+      ['Below', 2],
+      ['New', 3],
+    ]);
   });
 
-  it('duplicates a Widget with its query and visualisation, below the others', async () => {
+  it('refuses an order that leaves out, repeats or adds a Widget', async () => {
+    const home = await createDashboard(t.ctx, { name: 'Home' });
+    const other = await createDashboard(t.ctx, { name: 'Other' });
+    const a = await addWidget(t.ctx, home.id, { name: 'A', query: SPENDING });
+    const b = await addWidget(t.ctx, home.id, { name: 'B', query: SPENDING });
+    const stranger = await addWidget(t.ctx, other.id, { name: 'X', query: SPENDING });
+    const message = 'List every Widget of this Dashboard once';
+
+    await expect(reorderDashboardWidgets(t.ctx, home.id, [b.id])).rejects.toThrow(message);
+    await expect(reorderDashboardWidgets(t.ctx, home.id, [b.id, b.id])).rejects.toThrow(message);
+    await expect(
+      reorderDashboardWidgets(t.ctx, home.id, [b.id, a.id, stranger.id]),
+    ).rejects.toThrow(message);
+    expect(await storyOrder(home.id)).toEqual([
+      ['A', 0],
+      ['B', 1],
+    ]);
+  });
+
+  it('duplicates a Widget with its query and visualisation, right after the original', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
     const widget = await addWidget(t.ctx, dashboard.id, {
       name: 'Spending',
@@ -164,6 +227,7 @@ describe('Widgets on a Dashboard', () => {
       visualisation: 'donut',
       layout: { x: 3, y: 0, w: 4, h: 5 },
     });
+    await addWidget(t.ctx, dashboard.id, { name: 'Last', query: SPENDING });
 
     const copy = await duplicateWidget(t.ctx, widget.id);
 
@@ -172,9 +236,14 @@ describe('Widgets on a Dashboard', () => {
       dashboardId: dashboard.id,
       query: widget.query,
       visualisation: 'donut',
-      layout: { x: 0, y: 5, w: 4, h: 5 },
+      layout: { x: 0, y: 1, w: 4, h: 5 },
     });
     expect(copy.id).not.toBe(widget.id);
+    expect(await storyOrder(dashboard.id)).toEqual([
+      ['Spending', 0],
+      ['Spending (copy)', 1],
+      ['Last', 2],
+    ]);
     expect(await listHistory(t.ctx, { entityType: 'widget', entityId: copy.id })).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ field: 'name', after: 'Spending (copy)' }),
@@ -201,7 +270,7 @@ describe('Widgets on a Dashboard', () => {
     const copied = await getDashboard(t.ctx, copy.id);
     expect(copied.widgets.map((w) => [w.name, w.source, w.visualisation, w.layout])).toEqual([
       ['Spending', 'query', 'line', widget.layout],
-      ['Balances', 'account_balances', 'table', { x: 0, y: 8, w: 6, h: 8 }],
+      ['Balances', 'account_balances', 'table', { x: 0, y: 1, w: 6, h: 8 }],
     ]);
     expect(copied.widgets[0]!.query).toEqual(widget.query);
     expect((await listDashboards(t.ctx)).map((d) => d.name)).toEqual(['Home', 'Home (copy)']);
@@ -249,7 +318,7 @@ describe('Widgets on a Dashboard', () => {
     await deleteWidget(t.ctx, widget.id);
     expect((await getDashboard(t.ctx, dashboard.id)).widgets).toEqual([]);
   });
-  it('copies a Standalone Widget onto a Dashboard, below the others, leaving the original', async () => {
+  it('copies a Standalone Widget onto a Dashboard, after the others, leaving the original', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
     await addWidget(t.ctx, dashboard.id, { name: 'First', query: SPENDING });
     const standalone = await createWidget(t.ctx, {
@@ -266,7 +335,7 @@ describe('Widgets on a Dashboard', () => {
       source: 'query',
       query: standalone.query,
       visualisation: 'line',
-      layout: { x: 0, y: 8, w: 6, h: 8 },
+      layout: { x: 0, y: 1, w: 6, h: 8 },
     });
     expect(copy.id).not.toBe(standalone.id);
     expect(await getWidget(t.ctx, standalone.id)).toEqual(standalone);
@@ -296,6 +365,21 @@ describe('Widgets on a Dashboard', () => {
       layout: { x: 0, y: 0, w: 8, h: 5 },
     });
     expect((await getDashboard(t.ctx, home.id)).widgets.map((w) => w.id)).toEqual([balances.id]);
+  });
+
+  it('copies a Widget onto a Dashboard at a position', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    await addWidget(t.ctx, dashboard.id, { name: 'First', query: SPENDING });
+    await addWidget(t.ctx, dashboard.id, { name: 'Second', query: SPENDING });
+    const standalone = await createWidget(t.ctx, { name: 'Groceries', query: SPENDING });
+
+    await copyWidgetToDashboard(t.ctx, standalone.id, dashboard.id, 0);
+
+    expect(await storyOrder(dashboard.id)).toEqual([
+      ['Groceries', 0],
+      ['First', 1],
+      ['Second', 2],
+    ]);
   });
 
   it('refuses to copy an unknown Widget or onto an unknown Dashboard', async () => {
