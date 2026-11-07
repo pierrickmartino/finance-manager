@@ -85,7 +85,7 @@ export function ClassificationForm({
         </select>
         {splitCount > 0 && (
           <span className="text-xs font-normal text-muted">
-            Edit or remove the Split below to change the Categories.
+            Edit or remove the Split above to change the Categories.
           </span>
         )}
       </label>

@@ -82,9 +82,10 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
 
 /**
  * One Transaction (spec 38, 48, 63-65, 116). A one-line header says what happened; beneath it,
- * two columns. On the left, narrow and kept in view, what to do with it as a whole: classify
- * (with the fields locked against Rules) and link as a Transfer. On the right, wide, what is
- * known about it: the bank fields, its Split (whose table needs the room) and its History.
+ * its Split across the full width (its table needs the room), then two columns. On the left,
+ * narrow and kept in view, what to do with it as a whole: classify (with the fields locked
+ * against Rules) and link as a Transfer. On the right, wide, what is known about it: the bank
+ * fields and its History.
  */
 export default async function TransactionPage({ params }: TransactionPageProps) {
   const { id } = await params;
@@ -113,6 +114,14 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         badges={transactionBadges(transaction, classification)}
         fmt={fmt}
         actions={<TransactionActions transaction={transaction} />}
+      />
+      <SplitSection
+        transaction={transaction}
+        groups={groups}
+        payees={payees}
+        lineTransfers={lineTransfers}
+        fmt={fmt}
+        className={`${PANEL} gap-4`}
       />
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <aside aria-label="Classify and link" className={EDITS_COLUMN}>
@@ -155,14 +164,6 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         </aside>
         <div className="flex min-w-0 flex-col gap-5">
           <BankDetails transaction={transaction} fmt={fmt} className={PANEL} />
-          <SplitSection
-            transaction={transaction}
-            groups={groups}
-            payees={payees}
-            lineTransfers={lineTransfers}
-            fmt={fmt}
-            className={`${PANEL} gap-4`}
-          />
           <details open className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
             <summary className="cursor-pointer text-sm font-semibold text-muted">
               History ({history.length})
