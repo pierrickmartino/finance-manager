@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ActionForm } from '@/components/action-form';
 import { FieldError } from '@/components/form';
-import { CARD_CLASS, PAGE_TITLE_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
+import { ACCENT_BUTTON_CLASS, CARD_CLASS, PAGE_TITLE_CLASS } from '@/components/surface';
 import { queryFromParams, type UrlParams } from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
 import {
@@ -22,6 +22,8 @@ import { PanelSection, VisualisationPicker } from '../editor-panel';
 import { HiddenFields, QueryForm } from '../query-form';
 import { WidgetView } from '../widget-view';
 import { toPivotData } from '../pivot-data';
+import { ChapterPreview } from '../chapter-preview';
+import { PreviewTabs } from '../preview-tabs';
 
 export const metadata: Metadata = { title: 'Widget editor · Finance Manager' };
 
@@ -61,8 +63,10 @@ function resetHref(hidden: Record<string, string>): string {
 
 /**
  * The Widget editor: a side panel with the visualisation and the query, and next to it the
- * report as it will show, refreshed on every change, under the name and Save. `widget=<id>` edits that Widget (its query comes in the URL like any other);
- * `dashboard=<id>` adds the new Widget to that Dashboard.
+ * Widget as its Dashboard Story chapter (and the raw table behind it), refreshed on every
+ * change, under the name and Save. `widget=<id>` edits that Widget (its query comes in the URL
+ * like any other); `dashboard=<id>` adds the new Widget to that Dashboard, at `at` (from 0) when
+ * given, else last.
  */
 export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const params = await searchParams;
@@ -78,14 +82,18 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
       : loadReport(query),
     loadQueryFormLists(),
   ]);
+  const position = widget ? '' : param(params, 'at');
   const hidden: Record<string, string> = {};
   if (widget) hidden.widget = widget.id;
   else if (dashboardId) hidden.dashboard = dashboardId;
+  if (dashboardId && position) hidden.at = position;
+  const title = widget?.name ?? 'New Widget';
+  const pivot = report ? toPivotData(report, isBalances ? balanceHref : undefined) : null;
   const backHref = dashboardId ? `/dashboards/${dashboardId}/edit` : '/widgets';
 
   const visualisationSection = (
     <PanelSection title="Visualisation">
-      <VisualisationPicker value={visualisation} />
+      <VisualisationPicker value={visualisation} isAlwaysShare={isBalances} />
     </PanelSection>
   );
 
@@ -135,30 +143,44 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
             {!widget && dashboardId && (
               <input type="hidden" name="dashboardId" value={dashboardId} />
             )}
+            {!widget && dashboardId && position && (
+              <input type="hidden" name="position" value={position} />
+            )}
             <input
               name="name"
               required
               aria-label="Widget name"
               placeholder="Name this Widget"
               defaultValue={widget?.name ?? ''}
-              className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-lg font-semibold placeholder:text-faint hover:border-rule focus:border-rule-strong"
+              className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 font-display text-2xl tracking-tight placeholder:text-faint hover:border-rule focus:border-rule-strong"
             />
-            <button type="submit" disabled={!report} className={PRIMARY_BUTTON_CLASS}>
+            <button type="submit" disabled={!report} className={ACCENT_BUTTON_CLASS}>
               {widget ? 'Update Widget' : 'Save Widget'}
             </button>
           </ActionForm>
           <div className="flex flex-col gap-3 p-5">
             {error && <FieldError message={error} />}
-            {report && (
-              <WidgetView
-                report={report}
-                title={widget?.name ?? 'New Widget'}
-                visualisation={visualisation}
-                data={isBalances ? toPivotData(report, balanceHref) : undefined}
+            {report && pivot && (
+              <PreviewTabs
+                story={
+                  <ChapterPreview
+                    chapter={{
+                      id: widget?.id ?? 'preview',
+                      name: title,
+                      source: isBalances ? 'account_balances' : 'query',
+                      visualisation,
+                      data: pivot,
+                      error: null,
+                      unconvertedCount: report.unconvertedCount,
+                    }}
+                  />
+                }
+                data={<WidgetView report={report} title={title} data={pivot} />}
               />
             )}
             <p className="text-xs text-muted">
-              The preview follows every change. All values in CHF. Transfers are always left out;
+              The preview follows every change: Story shows the chapter this Widget becomes on a
+              Dashboard, Data the table behind it. All values in CHF. Transfers are always left out;
               Capital only when included.
             </p>
           </div>
