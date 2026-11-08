@@ -201,6 +201,53 @@ describe('chapterStory', () => {
     expect(story.facts[0]).toEqual({ label: 'Lightest month: Mar', value: 'CHF -300' });
   });
 
+  it('speaks of years when the Widget rows are years', () => {
+    const yearly = widget({
+      visualisation: 'stacked_bar',
+      data: source(['2023', '2024', '2025'], ['Rent'], [[-500_00], [-900_00], [-700_00]]),
+    });
+
+    const story = chapterStory(yearly, money);
+
+    expect(story.lead).toEqual({ headline: 'Heaviest year: 2024', detail: 'CHF -900' });
+    expect(story.facts).toEqual([
+      { label: 'Lightest year: 2023', value: 'CHF -500' },
+      { label: 'Yearly average', value: 'CHF -700' },
+    ]);
+  });
+
+  it('speaks of quarters when the Widget rows are quarters', () => {
+    const quarterly = widget({
+      data: source(['2025-Q1', '2025-Q2'], ['Net'], [[400_00], [100_00]]),
+    });
+
+    const story = chapterStory(quarterly, money);
+
+    expect(story.lead).toEqual({ headline: 'Best net quarter: 2025-Q1', detail: 'CHF 400' });
+    expect(story.facts).toEqual([
+      { label: 'Weakest quarter: 2025-Q2', value: 'CHF 100' },
+      { label: 'Quarterly average', value: 'CHF 250' },
+    ]);
+  });
+
+  it('tells yearly income vs. expense as kept per year', () => {
+    const yearly = widget({
+      visualisation: 'stacked_bar',
+      data: source(
+        ['2024', '2025'],
+        ['Income', 'Expense'],
+        [
+          [1000_00, -600_00],
+          [1200_00, -800_00],
+        ],
+      ),
+    });
+
+    const story = chapterStory(yearly, money);
+
+    expect(story.facts.at(-1)).toEqual({ label: 'Kept per year, on average', value: 'CHF 400' });
+  });
+
   it('says how much of the whole sits in the largest part', () => {
     const story = chapterStory(balances, money);
 

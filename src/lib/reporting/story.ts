@@ -149,8 +149,30 @@ function shareStory(data: ChartSource, money: Money): ChapterStory {
   };
 }
 
-/** Income vs. expense: the biggest month in, the biggest month out, and what stayed. */
+/** The words for the period each row stands for, so a yearly Widget doesn't speak of months. */
+interface PeriodWords {
+  noun: string;
+  adjective: string;
+}
+
+const PERIOD_WORDS = {
+  month: { noun: 'month', adjective: 'Monthly' },
+  quarter: { noun: 'quarter', adjective: 'Quarterly' },
+  year: { noun: 'year', adjective: 'Yearly' },
+} as const satisfies Record<string, PeriodWords>;
+
+/** The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`); months by default. */
+function periodWords(data: ChartSource): PeriodWords {
+  const keys = data.rows.map((row) => row.key).filter((key): key is string => key !== null);
+  if (keys.length === 0) return PERIOD_WORDS.month;
+  if (keys.every((key) => /^\d{4}$/.test(key))) return PERIOD_WORDS.year;
+  if (keys.every((key) => /^\d{4}-Q[1-4]$/.test(key))) return PERIOD_WORDS.quarter;
+  return PERIOD_WORDS.month;
+}
+
+/** Income vs. expense: the biggest period in, the biggest period out, and what stayed. */
 function flowStory(data: ChartSource, money: Money): ChapterStory {
+  const { noun } = periodWords(data);
   const chart = toSeriesChart(data);
   const columnOf = (sign: 1 | -1) =>
     chart.series.find((series) =>
@@ -169,13 +191,14 @@ function flowStory(data: ChartSource, money: Money): ChapterStory {
     },
     facts: [
       { label: `Most went out: ${month(most(expense))}`, value: money(expense[most(expense)]!) },
-      { label: 'Kept per month, on average', value: money(kept) },
+      { label: `Kept per ${noun}, on average`, value: money(kept) },
     ],
   };
 }
 
-/** Month by month: the best and weakest (or, for spending, heaviest and lightest) months. */
+/** Period by period: the best and weakest (or, for spending, heaviest and lightest) periods. */
 function periodStory(widget: StoryWidget, data: ChartSource, money: Money): ChapterStory {
+  const { noun, adjective } = periodWords(data);
   const chart = toSeriesChart(data);
   const totals = chart.points.map((point) =>
     sum(Object.values(point.values).map((value) => value ?? 0)),
@@ -184,18 +207,18 @@ function periodStory(widget: StoryWidget, data: ChartSource, money: Money): Chap
   // Spending is negative: rank by magnitude so "heaviest" means the most spent.
   const ranked = isSpending ? totals.map(Math.abs) : totals;
   const top = ranked.indexOf(Math.max(...ranked));
-  // A month with no spending at all has no data yet; it isn't the lightest month.
+  // A period with no spending at all has no data yet; it isn't the lightest one.
   const candidates = isSpending ? ranked.filter((value) => value > 0) : ranked;
   const low = ranked.indexOf(Math.min(...(candidates.length > 0 ? candidates : ranked)));
   const [topLabel, lowLabel] = isSpending
-    ? ['Heaviest month', 'Lightest month']
-    : ['Best net month', 'Weakest month'];
+    ? [`Heaviest ${noun}`, `Lightest ${noun}`]
+    : [`Best net ${noun}`, `Weakest ${noun}`];
   const average = Math.round(sum(totals) / totals.length);
   const month = (index: number) => chart.points[index]!.label;
   const peak = { label: `${topLabel}: ${month(top)}`, value: money(totals[top]!) };
   const facts = [
     { label: `${lowLabel}: ${month(low)}`, value: money(totals[low]!) },
-    { label: 'Monthly average', value: money(average) },
+    { label: `${adjective} average`, value: money(average) },
   ];
 
   if (chapterKind(widget) === 'ranking') {
