@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { formText, runAction, type ActionResult } from '@/server/actions';
+import { formPosition, formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
 import {
   addWidget,
@@ -14,10 +14,10 @@ import {
   listDashboards,
   renameDashboard,
   reorderDashboards,
-  saveDashboardLayout,
-  type DashboardLayoutInput,
+  reorderDashboardWidgets,
 } from '@/server/services/dashboards';
 import { deleteWidget } from '@/server/services/reporting';
+import { moveBy } from '@/lib/reporting/order';
 import { DEFAULT_WIDGET_QUERY } from '@/lib/reporting/widget-params';
 
 type Result = ActionResult<unknown>;
@@ -26,16 +26,6 @@ async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   const result = await runAction(fn);
   if (result.ok) revalidatePath('/dashboards', 'layout');
   return result;
-}
-
-/** `ids` with `id` moved one place up (-1) or down (+1). */
-function shifted(ids: string[], id: string, delta: -1 | 1): string[] {
-  const from = ids.indexOf(id);
-  const to = from + delta;
-  if (from < 0 || to < 0 || to >= ids.length) return ids;
-  const order = [...ids];
-  [order[from], order[to]] = [order[to]!, order[from]!];
-  return order;
 }
 
 export async function createDashboardAction(_previous: Result | null, formData: FormData) {
@@ -61,7 +51,7 @@ export async function shiftDashboardAction(id: string, delta: -1 | 1, _previous:
   return run(async () => {
     const ctx = await getServiceContext();
     const ids = (await listDashboards(ctx)).map((dashboard) => dashboard.id);
-    await reorderDashboards(ctx, shifted(ids, id, delta));
+    await reorderDashboards(ctx, moveBy(ids, id, delta));
   });
 }
 
@@ -77,26 +67,39 @@ export async function deleteDashboardAction(id: string, _previous: Result | null
   redirect('/dashboards');
 }
 
-/** Adds the Account balances in CHF to a Dashboard. */
-export async function addBalancesWidgetAction(dashboardId: string, _previous: Result | null) {
+/** Adds the Account balances in CHF to a Dashboard, at the form's `position` (else last). */
+export async function addBalancesWidgetAction(
+  dashboardId: string,
+  _previous: Result | null,
+  formData: FormData,
+) {
   return run(async () =>
     addWidget(await getServiceContext(), dashboardId, {
       name: 'Account balances in CHF',
       source: 'account_balances',
       query: { ...DEFAULT_WIDGET_QUERY, rows: 'account', columns: null },
       visualisation: 'table',
+      position: formPosition(formData),
     }),
   );
 }
 
-/** Places a copy of a saved Widget on a Dashboard; the original is left as it is. */
+/**
+ * Places a copy of a saved Widget on a Dashboard, at the form's `position` (else last); the
+ * original is left as it is.
+ */
 export async function copyWidgetToDashboardAction(
   dashboardId: string,
   _previous: Result | null,
   formData: FormData,
 ) {
   return run(async () =>
-    copyWidgetToDashboard(await getServiceContext(), formText(formData, 'widgetId'), dashboardId),
+    copyWidgetToDashboard(
+      await getServiceContext(),
+      formText(formData, 'widgetId'),
+      dashboardId,
+      formPosition(formData),
+    ),
   );
 }
 
@@ -108,10 +111,12 @@ export async function deleteDashboardWidgetAction(widgetId: string, _previous: R
   return run(async () => deleteWidget(await getServiceContext(), widgetId));
 }
 
-/** Saves Widget positions and sizes after a drag or resize. Writes no History. */
-export async function saveLayoutAction(
+/** Saves the Widgets' Story order after a move. Writes no History. */
+export async function reorderWidgetsAction(
   dashboardId: string,
-  items: DashboardLayoutInput,
+  widgetIds: string[],
 ): Promise<ActionResult<void>> {
-  return runAction(async () => saveDashboardLayout(await getServiceContext(), dashboardId, items));
+  return runAction(async () =>
+    reorderDashboardWidgets(await getServiceContext(), dashboardId, widgetIds),
+  );
 }

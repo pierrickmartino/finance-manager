@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import type { WidgetLayout } from '../reporting';
 
-/** The Dashboard grid: 12 columns; heights in rows. */
+/** The bounds a stored layout is checked against (from the former grid: 12 columns, rows). */
 export const GRID_COLUMNS = 12;
 export const MAX_WIDGET_HEIGHT = 40;
 const MAX_ROW = 10_000;
 
-/** Where a new Widget lands when nothing says otherwise: half width, a medium height. */
+/** The size stored with a new Widget. */
 export const DEFAULT_WIDGET_SIZE = { w: 6, h: 8 } as const;
 
 export const widgetLayoutInput = z
@@ -25,19 +25,19 @@ export const widgetLayoutInput = z
     message: `A Widget must fit in the ${GRID_COLUMNS} grid columns`,
   });
 
-/** The first free row under every placed Widget. */
-export function bottomRow(layouts: ReadonlyArray<WidgetLayout | null>): number {
-  return layouts.reduce(
-    (bottom, layout) => (layout ? Math.max(bottom, layout.y + layout.h) : bottom),
-    0,
-  );
+/**
+ * The Dashboard Story is one column (ADR-0007): a Widget's place is its `y`, counted from 0,
+ * at `x` 0. Its `w` and `h` are kept as they are, though nothing reads them any more.
+ */
+export function storyLayout(
+  index: number,
+  size: { w: number; h: number } = DEFAULT_WIDGET_SIZE,
+): WidgetLayout {
+  return { x: 0, y: index, w: size.w, h: size.h };
 }
 
-/** A Widget of `size` placed at the left, below every other Widget. */
-export function placeAtBottom(
-  layouts: ReadonlyArray<WidgetLayout | null>,
-  size: { w: number; h: number } = DEFAULT_WIDGET_SIZE,
-  x = 0,
-): WidgetLayout {
-  return { x, y: bottomRow(layouts), w: size.w, h: size.h };
+/** `items` with `item` inserted at `position` (clamped), or at the end without one. */
+export function insertAt<T>(items: readonly T[], item: T, position?: number): T[] {
+  const at = position === undefined ? items.length : Math.min(Math.max(position, 0), items.length);
+  return [...items.slice(0, at), item, ...items.slice(at)];
 }

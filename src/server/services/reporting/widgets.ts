@@ -26,7 +26,10 @@ export const VISUALISATION_LABELS: Record<Visualisation, string> = {
 export const WIDGET_SOURCES = ['query', 'account_balances'] as const;
 export type WidgetSource = (typeof WIDGET_SOURCES)[number];
 
-/** Position and size on a Dashboard's 12-column grid, in grid units. */
+/**
+ * A Widget's place on its Dashboard: `y` is its Story order (ADR-0007). `x`, `w` and `h` are
+ * left from the former 12-column grid; nothing reads `w` and `h` any more.
+ */
 export interface WidgetLayout {
   x: number;
   y: number;
@@ -44,7 +47,7 @@ export interface Widget {
   /** The query with every default filled in. */
   query: WidgetQuery;
   visualisation: Visualisation;
-  /** Position and size on its Dashboard's grid; null until placed. */
+  /** Its place on its Dashboard; null for a Standalone Widget. */
   layout: WidgetLayout | null;
   createdAt: Date;
 }
@@ -101,7 +104,7 @@ export async function findWidget(db: Queryable, id: string, lock = false): Promi
 }
 
 /**
- * What History tracks of a Widget. The layout is left out: moving and resizing Widgets isn't
+ * What History tracks of a Widget. The layout is left out: reordering Widgets isn't
  * History (spec 117).
  */
 export function widgetSnapshot(widget: Widget): HistorySnapshot {

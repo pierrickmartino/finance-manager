@@ -14,12 +14,12 @@ import {
   type WidgetInput,
   type WidgetLayout,
 } from '../reporting/widgets';
-import { placeAtBottom, widgetLayoutInput } from './layout';
+import { insertAt, storyLayout, widgetLayoutInput } from './layout';
 
 export { GRID_COLUMNS, DEFAULT_WIDGET_SIZE, MAX_WIDGET_HEIGHT } from './layout';
 export { seedStarterDashboard, STARTER_DASHBOARD_NAME } from './seed';
 
-/** A named grid of Widgets (GLOSSARY: Dashboard). */
+/** A named, ordered set of Widgets (GLOSSARY: Dashboard). */
 export interface Dashboard {
   id: string;
   name: string;
@@ -27,7 +27,7 @@ export interface Dashboard {
 }
 
 export interface DashboardWithWidgets extends Dashboard {
-  /** Top to bottom, left to right. */
+  /** In Story order. */
   widgets: Widget[];
 }
 
@@ -117,8 +117,8 @@ export async function renameDashboard(
 }
 
 /**
- * Puts the Dashboards in the given order (every Dashboard listed once). Like the grid layout,
- * the order is arrangement, not content: it writes no History.
+ * Puts the Dashboards in the given order (every Dashboard listed once). Like the order of a
+ * Dashboard's Widgets, it is arrangement, not content: it writes no History.
  */
 export async function reorderDashboards(ctx: ServiceContext, ids: string[]): Promise<void> {
   const order = parseInput(z.array(z.string()), ids);
@@ -162,98 +162,129 @@ export async function deleteDashboard(ctx: ServiceContext, id: string): Promise<
   });
 }
 
-/** Adds a Widget to a Dashboard, below the others unless a layout is given. */
+/** Where a Widget goes among a Dashboard's Widgets: 0 is first; none, or past the end, is last. */
+const positionInput = z.number().int().min(0, 'A position starts at 0').optional();
+
+/**
+ * Writes `ordered` as the Dashboard's Story order: the nth Widget at `y` n, `x` 0, its size kept.
+ * This turns a layout left from the former grid into Story order. Order isn't History (spec 117).
+ */
+async function writeOrder(tx: Queryable, ordered: readonly Widget[]): Promise<Widget[]> {
+  const placed = ordered.map((widget, index) => ({
+    ...widget,
+    layout: storyLayout(index, widget.layout ?? undefined),
+  }));
+  await tx.query(
+    `UPDATE widget w SET layout = item.layout
+     FROM jsonb_to_recordset($1::jsonb) AS item(id uuid, layout jsonb)
+     WHERE w.id = item.id`,
+    [JSON.stringify(placed.map(({ id, layout }) => ({ id, layout })))],
+  );
+  return placed;
+}
+
+/** Inserts `widget` among the Dashboard's other Widgets and returns it with its final place. */
+async function placeAmong(
+  tx: Queryable,
+  siblings: readonly Widget[],
+  widget: Widget,
+  position?: number,
+): Promise<Widget> {
+  const placed = await writeOrder(tx, insertAt(siblings, widget, position));
+  return placed.find((item) => item.id === widget.id)!;
+}
+
+/**
+ * Adds a Widget to a Dashboard at `position` (last without one). A given `layout` is stored as
+ * it is, leaving the other Widgets alone (the starter Dashboard).
+ */
 export async function addWidget(
   ctx: ServiceContext,
   dashboardId: string,
-  input: WidgetInput & { source?: Widget['source']; layout?: WidgetLayout },
+  input: WidgetInput & { source?: Widget['source']; layout?: WidgetLayout; position?: number },
 ): Promise<Widget> {
   const values = parseInput(widgetInput, input);
   const source = parseInput(z.enum(['query', 'account_balances']).default('query'), input.source);
   const layout = input.layout ? parseInput(widgetLayoutInput, input.layout) : null;
+  const position = parseInput(positionInput, input.position);
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
-    const widgets = await findDashboardWidgets(scope.tx, dashboardId);
-    return insertWidget(scope, {
+    const siblings = await findDashboardWidgets(scope.tx, dashboardId);
+    const widget = await insertWidget(scope, {
       ...values,
       source,
       dashboardId,
-      layout: layout ?? placeAtBottom(widgets.map((widget) => widget.layout)),
+      layout: layout ?? storyLayout(siblings.length),
     });
+    return layout ? widget : placeAmong(scope.tx, siblings, widget, position);
   });
 }
 
-/** Copies a Widget (query and visualisation) onto the same Dashboard, below the others. */
+/** Copies a Widget (query and visualisation) onto the same Dashboard, right after it. */
 export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<Widget> {
   return mutate(ctx, async (scope) => {
     const widget = await findWidget(scope.tx, id);
-    const siblings = widget.dashboardId
-      ? await findDashboardWidgets(scope.tx, widget.dashboardId)
-      : [];
-    const size = widget.layout ?? undefined;
-    return insertWidget(scope, {
-      ...widget,
-      name: copyName(widget.name),
-      layout: widget.dashboardId
-        ? placeAtBottom(
-            siblings.map((sibling) => sibling.layout),
-            size,
-          )
-        : null,
-    });
+    if (!widget.dashboardId) {
+      return insertWidget(scope, { ...widget, name: copyName(widget.name), layout: null });
+    }
+    const siblings = await findDashboardWidgets(scope.tx, widget.dashboardId);
+    const copy = await insertWidget(scope, { ...widget, name: copyName(widget.name) });
+    const after = siblings.findIndex((sibling) => sibling.id === widget.id) + 1;
+    return placeAmong(scope.tx, siblings, copy, after);
   });
 }
 
 /**
- * Places a copy of a Widget (a Standalone Widget or one from another Dashboard) at the bottom
- * of a Dashboard, at the original's size if it has one. The original is left as it is
- * (GLOSSARY: Standalone Widget).
+ * Places a copy of a Widget (a Standalone Widget or one from another Dashboard) on a Dashboard
+ * at `position` (last without one), at the original's size if it has one. The original is left
+ * as it is (GLOSSARY: Standalone Widget).
  */
 export async function copyWidgetToDashboard(
   ctx: ServiceContext,
   widgetId: string,
   dashboardId: string,
+  position?: number,
 ): Promise<Widget> {
+  const at = parseInput(positionInput, position);
   return mutate(ctx, async (scope) => {
     const widget = await findWidget(scope.tx, widgetId);
     await findDashboard(scope.tx, dashboardId, true);
     const siblings = await findDashboardWidgets(scope.tx, dashboardId);
-    return insertWidget(scope, {
+    const copy = await insertWidget(scope, {
       ...widget,
       dashboardId,
-      layout: placeAtBottom(
-        siblings.map((sibling) => sibling.layout),
-        widget.layout ?? undefined,
-      ),
+      layout: storyLayout(siblings.length, widget.layout ?? undefined),
     });
+    return placeAmong(scope.tx, siblings, copy, at);
   });
 }
 
-const layoutItemsInput = z.array(
-  z.object({ widgetId: z.uuid({ error: 'Unknown Widget' }), layout: widgetLayoutInput }).strict(),
-);
-export type DashboardLayoutInput = z.input<typeof layoutItemsInput>;
+const widgetIdsInput = z.array(z.uuid({ error: 'Unknown Widget' }));
+const WIDGET_ORDER_MISMATCH = 'List every Widget of this Dashboard once';
 
 /**
- * Saves the positions and sizes of a Dashboard's Widgets (after a drag or a resize). Layout
- * isn't History (spec 117): this writes none. Widgets not listed keep their layout.
+ * Puts a Dashboard's Widgets in the given Story order (every Widget listed once). Order isn't
+ * History (spec 117): this writes none.
  */
-export async function saveDashboardLayout(
+export async function reorderDashboardWidgets(
   ctx: ServiceContext,
   dashboardId: string,
-  items: DashboardLayoutInput,
+  widgetIds: string[],
 ): Promise<void> {
-  const values = parseInput(layoutItemsInput, items);
+  const ids = parseInput(widgetIdsInput, widgetIds);
   await withTransaction(ctx.db, async (tx) => {
     await findDashboard(tx, dashboardId, true);
-    const result = await tx.query(
-      `UPDATE widget w SET layout = item.layout
-       FROM jsonb_to_recordset($2::jsonb) AS item("widgetId" uuid, layout jsonb)
-       WHERE w.id = item."widgetId" AND w.dashboard_id = $1`,
-      [dashboardId, JSON.stringify(values)],
+    const byId = new Map(
+      (await findDashboardWidgets(tx, dashboardId)).map((widget) => [widget.id, widget]),
     );
-    if (result.rowCount !== values.length) {
-      throw new ValidationError('A Widget in this layout is not on this Dashboard');
+    const ordered = ids.map((id) => byId.get(id));
+    if (
+      new Set(ids).size !== ids.length ||
+      ids.length !== byId.size ||
+      ordered.includes(undefined)
+    ) {
+      throw new ValidationError(WIDGET_ORDER_MISMATCH);
     }
+    await writeOrder(tx, ordered as Widget[]);
   });
 }

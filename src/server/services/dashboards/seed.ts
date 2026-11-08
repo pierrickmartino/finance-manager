@@ -12,7 +12,7 @@ export const STARTER_DASHBOARD_NAME = 'Overview';
 
 const LAST_12_MONTHS = { kind: 'last', count: 12, unit: 'month' } as const;
 
-/** The starter Widgets (spec 106), with their place on the grid. */
+/** The starter Widgets (spec 106), with their place (read in Story order: by y, then x). */
 export const STARTER_WIDGETS: ReadonlyArray<{
   name: string;
   source: WidgetSource;

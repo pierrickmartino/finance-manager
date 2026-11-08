@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { STORY_SHOWN_AS } from '@/lib/reporting/story';
 import {
   VISUALISATION_LABELS,
   VISUALISATIONS,
@@ -64,8 +65,19 @@ const VISUALISATION_PATHS: Record<Visualisation, string> = {
   number: 'M9 4L7 20M17 4l-2 16M4 9h16M3 15h16',
 };
 
-/** The visualisation as a row of icon tiles (radio buttons sent as `vis`). */
-export function VisualisationPicker({ value }: { value: Visualisation }) {
+const ALWAYS_SHARE = { short: 'as a share', full: 'In the Story: a share band of the Accounts' };
+
+/**
+ * The visualisation as a row of icon tiles (radio buttons sent as `vis`), each saying what it
+ * becomes in the Dashboard Story. The Account balances are always told as a share.
+ */
+export function VisualisationPicker({
+  value,
+  isAlwaysShare = false,
+}: {
+  value: Visualisation;
+  isAlwaysShare?: boolean;
+}) {
   return (
     <fieldset className="min-w-0">
       <legend className="sr-only">Visualisation</legend>
@@ -73,6 +85,7 @@ export function VisualisationPicker({ value }: { value: Visualisation }) {
         {VISUALISATIONS.map((visualisation) => (
           <label
             key={visualisation}
+            title={(isAlwaysShare ? ALWAYS_SHARE : STORY_SHOWN_AS[visualisation]).full}
             className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-rule-strong bg-surface px-1 py-2 text-center text-[11px] leading-tight hover:border-faint has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-info"
           >
             <input
@@ -95,6 +108,9 @@ export function VisualisationPicker({ value }: { value: Visualisation }) {
               <path d={VISUALISATION_PATHS[visualisation]} />
             </svg>
             {VISUALISATION_LABELS[visualisation]}
+            <span className="text-[10px] text-muted">
+              {(isAlwaysShare ? ALWAYS_SHARE : STORY_SHOWN_AS[visualisation]).short}
+            </span>
           </label>
         ))}
       </div>

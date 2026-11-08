@@ -23,6 +23,12 @@ export const CARD_CLASS = 'rounded-xl border border-rule bg-surface shadow-sm';
 /** The page's main action. One per view where possible. */
 export const PRIMARY_BUTTON_CLASS =
   'rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink-hover disabled:opacity-50';
+/**
+ * The main action of the Dashboard Story's own views (Done in Edit mode, Save in the Widget
+ * editor): the accent, darkened for AA, under paper text.
+ */
+export const ACCENT_BUTTON_CLASS =
+  'rounded-md bg-accent-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink disabled:opacity-50';
 /** Any other action; also links styled as buttons. */
 export const SECONDARY_BUTTON_CLASS =
   'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-sunken disabled:opacity-40';

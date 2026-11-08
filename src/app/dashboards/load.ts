@@ -7,6 +7,7 @@ import { getDashboard, type DashboardWithWidgets } from '@/server/services/dashb
 import { NotFoundError, ServiceError } from '@/server/services/errors';
 import { runSavedWidget, type CellRef, type Widget } from '@/server/services/reporting';
 import { toPivotData } from '../widgets/pivot-data';
+import type { StoryChapter } from './[id]/story/chapter';
 
 export interface WidgetView {
   data: ChartSource | null;
@@ -33,6 +34,18 @@ export async function loadWidgetView(ctx: ServiceContext, widget: Widget): Promi
     }
     throw error;
   }
+}
+
+/** A Widget run into its Story chapter. */
+export async function loadStoryChapter(ctx: ServiceContext, widget: Widget): Promise<StoryChapter> {
+  const view = await loadWidgetView(ctx, widget);
+  return {
+    id: widget.id,
+    name: widget.name,
+    source: widget.source,
+    visualisation: widget.visualisation,
+    ...view,
+  };
 }
 
 /** The Widget editor, opened on a Widget (its query, visualisation and Dashboard in the URL). */

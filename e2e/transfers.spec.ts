@@ -190,6 +190,7 @@ test('links one Split line of a Transaction with a Transaction on another Accoun
     `/widgets/new?range=fixed&from=2025-10-01&to=2025-10-31&rows=month&columns=category` +
       `&account=${bcgeId}&account=${ubsId}`,
   );
+  await page.getByRole('tab', { name: 'Data' }).click();
   const pivot = page.getByRole('table', { name: 'Pivot' });
   const cells = pivot.getByRole('link');
   await expect(cells).toHaveCount(1);
