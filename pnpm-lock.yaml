@@ -73,7 +73,7 @@ importers:
         specifier: ^5.0.5
         version: 5.0.5(vitest@5.0.5)
       babel-plugin-react-compiler:
-        specifier: ^1.0.0
+        specifier: 1.0.0
         version: 1.0.0
       eslint:
         specifier: ^9.39.5
