@@ -67,7 +67,7 @@ The standing check that every imported Account's data is current, has no Gaps, a
 _Avoid_: Data health, import check, freshness
 
 **Gap**:
-A span of days between two of an Account's Imports that no Import's statement period covers.
+A span of days between two of an Account's Imports that no Import's statement period covers and no Manual transaction fills.
 _Avoid_: Hole, missing period
 
 **Stale**:
