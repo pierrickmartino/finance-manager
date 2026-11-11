@@ -55,7 +55,7 @@ A Completeness check runs whenever I open the home Dashboard and shows its resul
 
 ### Presentation
 
-27. As the user, I want a single neutral line when everything is fine, reading "All N Accounts current to ⟨date⟩", so that I'm reassured without clutter.
+27. As the user, I want a single neutral line when everything is fine, reading "All N Accounts current to ⟨date⟩" ("1 Account current to ⟨date⟩" for a single Account), so that I'm reassured without clutter.
 28. As the user, I want the date in that line to be the earliest data end among checked Accounts, so that it tells me how current my reports really are.
 29. As the user, I want the line to read "N Accounts need attention" in the `warning` token when any problem exists, so that problems stand out.
 30. As the user, I want the per-Account list collapsed when everything is fine and open when anything is wrong, so that I see problems without a click.

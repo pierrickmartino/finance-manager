@@ -1,10 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { createDb } from '../src/server/db/client';
 import { createAccount } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import { backfillRates, type EcbRateSource } from '../src/server/services/fx';
-import { databaseUrl } from '../test/support/postgres';
 import { accountDetail, accountListEntry } from './support/accounts';
+import { withServices } from './support/services';
 
 /** The only test double: an ECB that publishes 0.9324 CHF per EUR on weekdays. */
 const ecb: EcbRateSource = {
@@ -24,9 +23,7 @@ test('shows Account balances in CHF at the rate of the chosen date, and warns of
   page,
 }) => {
   const suffix = Date.now();
-  const db = createDb(databaseUrl(process.env.E2E_DATABASE_NAME!));
-  const ctx = { db, actor: { type: 'manual' as const, id: null } };
-  try {
+  await withServices(async (ctx) => {
     // Rates for early March 2025 only, so the newest rate is always stale.
     await backfillRates(ctx, ecb, { from: '2025-03-03', to: '2025-03-10' });
     const bank = await createBank(ctx, { name: `Crédit Agricole ${suffix}` });
@@ -45,9 +42,7 @@ test('shows Account balances in CHF at the rate of the chosen date, and warns of
       openingBalanceMinor: 50_000,
       openingDate: '2021-01-01',
     });
-  } finally {
-    await db.end();
-  }
+  });
 
   await page.goto('/accounts');
   await expect(page.getByRole('alert').filter({ hasText: 'FX rates are stale' })).toContainText(

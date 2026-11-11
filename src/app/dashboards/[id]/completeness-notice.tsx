@@ -36,7 +36,7 @@ function headline(entries: CompletenessEntry[], attention: number, fmt: Formatte
   // Manual-only Accounts are listed only for a mismatch: "current" speaks of the others.
   const checked = entries.filter((entry) => entry.isFreshnessChecked);
   const earliest = earliestDataEnd(checked);
-  const all = `All ${accounts(checked.length)} current`;
+  const all = `${checked.length === 1 ? '' : 'All '}${accounts(checked.length)} current`;
   return earliest ? `${all} to ${fmt.date(earliest)}` : all;
 }
 
