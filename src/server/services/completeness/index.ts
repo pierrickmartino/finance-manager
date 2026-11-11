@@ -3,6 +3,7 @@ import { listAccounts, type Account } from '../accounts';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { daysBetween } from '../fx/dates';
+import { findGaps, type DaySpan } from './gaps';
 import { findMismatches, type MismatchProblem } from './mismatch';
 
 export type { MismatchProblem } from './mismatch';
@@ -30,6 +31,16 @@ export interface StaleProblem {
   kind: 'stale';
 }
 
+/**
+ * Days between the Account's first and latest committed Import that no Import covers and no
+ * Manual transaction fills (GLOSSARY: Gap). `from` and `to` are its first and last day.
+ */
+export interface GapProblem {
+  kind: 'gap';
+  from: string;
+  to: string;
+}
+
 /** The Account has an Import format but no committed Import ("No Import yet"). */
 export interface NeverImportedProblem {
   kind: 'never_imported';
@@ -40,7 +51,8 @@ export interface NeverImportedProblem {
  * `mismatch` (difference and Statement balance date), `gap` (first and last day), `stale` and
  * `never_imported`; each new kind is a member here and a rank in `SEVERITY`.
  */
-export type CompletenessProblem = MismatchProblem | StaleProblem | NeverImportedProblem;
+export type CompletenessProblem =
+  MismatchProblem | GapProblem | StaleProblem | NeverImportedProblem;
 export type CompletenessProblemKind = CompletenessProblem['kind'];
 
 /**
@@ -49,6 +61,7 @@ export type CompletenessProblemKind = CompletenessProblem['kind'];
  */
 const SEVERITY = {
   mismatch: 0,
+  gap: 1,
   stale: 2,
   never_imported: 2,
 } as const satisfies Record<CompletenessProblemKind, number>;
@@ -82,9 +95,10 @@ export async function checkCompleteness(
   input: { today: string },
 ): Promise<CompletenessEntry[]> {
   const { today } = parseInput(checkInput, input);
-  const [accounts, dataEnds] = await Promise.all([
+  const [accounts, dataEnds, gapsById] = await Promise.all([
     listAccounts(ctx).then((all) => all.filter((account) => account.archivedAt === null)),
     ctx.db.query<{ accountId: string; dataEnd: string | null }>(SELECT_DATA_ENDS),
+    findGaps(ctx.db),
   ]);
   const dataEndById = new Map(dataEnds.rows.map((row) => [row.accountId, row.dataEnd]));
   const mismatches = await findMismatches(ctx, accounts);
@@ -107,7 +121,9 @@ export async function checkCompleteness(
         isFreshnessChecked,
         problems: worstFirst([
           ...(mismatch ? [mismatch] : []),
-          ...(isFreshnessChecked ? freshnessProblems(daysSince) : []),
+          ...(isFreshnessChecked
+            ? [...gapProblems(gapsById.get(account.id) ?? []), ...freshnessProblems(daysSince)]
+            : []),
         ]),
       };
     });
@@ -123,6 +139,10 @@ function worstFirst(problems: CompletenessProblem[]): CompletenessProblem[] {
 function worstRank(entry: CompletenessEntry): number {
   const [worst] = entry.problems;
   return worst ? SEVERITY[worst.kind] : HEALTHY_RANK;
+}
+
+function gapProblems(gaps: DaySpan[]): CompletenessProblem[] {
+  return gaps.map((gap) => ({ kind: 'gap', from: gap.from, to: gap.to }));
 }
 
 function freshnessProblems(daysSince: number | null): CompletenessProblem[] {

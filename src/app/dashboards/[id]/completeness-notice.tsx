@@ -13,6 +13,10 @@ function describeProblem(problem: CompletenessProblem, currency: string, fmt: Fo
   switch (problem.kind) {
     case 'mismatch':
       return `Mismatch of ${fmt.amount(problem.differenceMinor, { currency })} on ${fmt.date(problem.statementDate)}`;
+    case 'gap':
+      return problem.from === problem.to
+        ? `Gap ${fmt.date(problem.from)}`
+        : `Gap ${fmt.date(problem.from)} – ${fmt.date(problem.to)}`;
     case 'stale':
       return 'Stale';
     case 'never_imported':

@@ -342,3 +342,121 @@ describe('mismatch', () => {
     ]);
   });
 });
+
+/** A CAMT file for `account` covering `from` to `to`, with one entry booked on `from`. */
+function periodFile(
+  account: Account,
+  from: string,
+  to: string,
+): { fileName: string; content: Uint8Array } {
+  return camtFile(account, [{ date: from, amount: '1.00' }], { from, to });
+}
+
+describe('gaps', () => {
+  it('flags a one-day Gap between two Imports with its first and last day, ranked above Stale', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, periodFile(account, '2025-09-01', '2025-09-30'));
+    await importFile(account, periodFile(account, '2025-10-02', '2025-10-31'));
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-31' });
+
+    expect(entry!.problems).toEqual([
+      { kind: 'gap', from: '2025-10-01', to: '2025-10-01' },
+      { kind: 'stale' },
+    ]);
+  });
+
+  it('does not flag a span that holds a Manual transaction on that Account', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, periodFile(account, '2025-09-01', '2025-09-30'));
+    await importFile(account, periodFile(account, '2025-10-11', '2025-10-31'));
+    await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-10-05',
+      amountMinor: -500,
+      description: 'Cash withdrawal',
+    });
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(entry!.problems).toEqual([]);
+  });
+
+  it('flags no Gap between contiguous Imports', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, fixture(BCGE_OCTOBER));
+    await importFile(account, fixture(BCGE_NOVEMBER));
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-10' });
+
+    expect(entry!.problems).toEqual([]);
+  });
+
+  it('flags no Gap between overlapping Imports, whatever order they were imported in', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, periodFile(account, '2025-10-16', '2025-11-15'));
+    await importFile(account, periodFile(account, '2025-09-01', '2025-10-31'));
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-11-20' });
+
+    expect(entry!.problems).toEqual([]);
+  });
+
+  it("covers an Import with no statement period from its first to its last Transaction's date", async () => {
+    const account = await bcgeAccount();
+    await importFile(account, periodFile(account, '2025-09-01', '2025-09-30'));
+    await importFile(
+      account,
+      camtFile(account, [
+        { date: '2025-10-05', amount: '10.00' },
+        { date: '2025-10-20', amount: '12.50' },
+      ]),
+    );
+    await importFile(account, periodFile(account, '2025-10-21', '2025-11-30'));
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-10' });
+
+    expect(entry!.problems).toEqual([{ kind: 'gap', from: '2025-10-01', to: '2025-10-04' }]);
+  });
+
+  it('turns the period of an undone Import between two others into a Gap', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, periodFile(account, '2025-09-01', '2025-09-30'));
+    const october = await importFile(account, periodFile(account, '2025-10-01', '2025-10-31'));
+    await importFile(account, periodFile(account, '2025-11-01', '2025-11-30'));
+    await undoImport(t.ctx, october.id);
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-10' });
+
+    expect(entry!.problems).toEqual([{ kind: 'gap', from: '2025-10-01', to: '2025-10-31' }]);
+  });
+
+  it("flags every Gap across the Account's whole history, oldest first", async () => {
+    const account = await bcgeAccount();
+    await importFile(account, periodFile(account, '2025-11-01', '2025-11-30'));
+    await importFile(account, periodFile(account, '2025-01-01', '2025-01-31'));
+    await importFile(account, periodFile(account, '2025-06-01', '2025-06-30'));
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-10' });
+
+    expect(entry!.problems).toEqual([
+      { kind: 'gap', from: '2025-02-01', to: '2025-05-31' },
+      { kind: 'gap', from: '2025-07-01', to: '2025-10-31' },
+    ]);
+  });
+
+  it('ranks an Account with a Gap above a Stale one, even when the Gap is its only problem', async () => {
+    const stale = await bcgeAccount();
+    const gapped = await bcgeAccount({ name: 'BCGE savings', iban: 'CH6900235235123456010' });
+    await importFile(stale, periodFile(stale, '2025-09-01', '2025-09-30'));
+    await importFile(gapped, periodFile(gapped, '2025-09-01', '2025-09-30'));
+    await importFile(gapped, periodFile(gapped, '2025-10-15', '2025-11-30'));
+
+    const entries = await checkCompleteness(t.ctx, { today: '2025-12-10' });
+
+    expect(entries.map((entry) => [entry.account.id, entry.problems])).toEqual([
+      [gapped.id, [{ kind: 'gap', from: '2025-10-01', to: '2025-10-14' }]],
+      [stale.id, [{ kind: 'stale' }]],
+    ]);
+  });
+});
