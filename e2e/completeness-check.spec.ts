@@ -2,9 +2,12 @@ import { expect, test } from '@playwright/test';
 import { createDb } from '../src/server/db/client';
 import { archiveAccount, createAccount, listAccounts } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
+import { recordBalanceSnapshot } from '../src/server/services/balance-snapshots';
+import { checkCompleteness } from '../src/server/services/completeness';
 import type { ServiceContext } from '../src/server/services/context';
 import { addDays, swissToday } from '../src/server/services/fx/dates';
 import { commitImport, previewImport } from '../src/server/services/imports';
+import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { databaseUrl } from '../test/support/postgres';
 
 /** A CHF CAMT.053 statement with no IBAN, one booked entry, covering `from` to `to`. */
@@ -42,12 +45,11 @@ test('the home Dashboard shows the Completeness check: one line when current, op
   const suffix = Date.now();
   const bankName = `Completeness ${suffix}`;
   // The E2E database is shared by the run, and earlier specs leave imported Accounts whose
-  // 2025 data is Stale by now: archive them, so this test controls every checked Account.
+  // 2025 data is Stale by now (and possibly mismatched manual-only ones): archive every Account
+  // the check lists, so this test controls every checked Account.
   await withServices(async (ctx) => {
-    for (const account of await listAccounts(ctx)) {
-      if (account.archivedAt === null && account.importFormat !== null) {
-        await archiveAccount(ctx, account.id);
-      }
+    for (const entry of await checkCompleteness(ctx, { today: swissToday() })) {
+      await archiveAccount(ctx, entry.account.id);
     }
     const bank = await createBank(ctx, { name: bankName });
     const current = await createAccount(ctx, {
@@ -85,11 +87,36 @@ test('the home Dashboard shows the Completeness check: one line when current, op
       importFormat: 'camt053',
       openingBalanceMinor: 0,
     });
+    // A manual-only Account is listed only for a mismatch: its snapshot says CHF 20 less.
+    const cash = await createAccount(ctx, {
+      bankId: bank!.bankId,
+      name: `Cash ${suffix}`,
+      currency: 'CHF',
+      iban: null,
+      kind: 'current',
+      importFormat: null,
+      openingBalanceMinor: 0,
+    });
+    const today = swissToday();
+    await createManualTransaction(ctx, {
+      accountId: cash.id,
+      bookingDate: addDays(today, -5),
+      amountMinor: 10_000,
+      description: 'Cash withdrawal',
+    });
+    await recordBalanceSnapshot(ctx, {
+      accountId: cash.id,
+      date: addDays(today, -1),
+      balanceMinor: 8_000,
+    });
   });
 
   await page.reload();
   const problems = page.getByRole('alert', { name: 'Completeness check' });
-  await expect(problems).toContainText('1 Account needs attention');
+  await expect(problems).toContainText('2 Accounts need attention');
+  const mismatchRow = problems.getByRole('link', { name: new RegExp(`Cash ${suffix}`) });
+  await expect(mismatchRow).toContainText(/Mismatch of CHF.*20\.00/);
+  await expect(mismatchRow).not.toContainText('Data ends');
   const problemRow = problems.getByRole('link', { name: new RegExp(`Spare ${suffix}`) });
   await expect(problemRow).toContainText('No Import yet');
   await expect(problems.getByRole('link', { name: new RegExp(`Current ${suffix}`) })).toBeVisible();

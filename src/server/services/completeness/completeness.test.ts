@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { archiveAccount, createAccount, type Account, type AccountInput } from '../accounts';
 import { createBank } from '../banks';
+import { recordBalanceSnapshot } from '../balance-snapshots';
 import { commitImport, previewImport, undoImport, type Import } from '../imports';
+import { createManualTransaction, updateManualTransaction } from '../transactions/manual';
 import { checkCompleteness } from '.';
 
 const t = setupTestDatabase();
@@ -89,6 +91,7 @@ describe('freshness', () => {
         account: { id: account.id, name: 'BCGE current', bankName: 'BCGE', currency: 'CHF' },
         dataEnd: '2025-10-31',
         daysSince: 10,
+        isFreshnessChecked: true,
         problems: [],
       },
     ]);
@@ -187,6 +190,155 @@ describe('order', () => {
       [stale.id, [{ kind: 'stale' }]],
       [neverImported.id, [{ kind: 'never_imported' }]],
       [healthy.id, []],
+    ]);
+  });
+});
+
+describe('mismatch', () => {
+  it('flags a Manual transaction edited into a reconciled Import, with the difference and the statement end', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, fixture(BCGE_OCTOBER));
+    const coffee = await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-11-03',
+      amountMinor: -450,
+      description: 'Coffee',
+    });
+
+    const [before] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+    await updateManualTransaction(t.ctx, coffee.id, {
+      bookingDate: '2025-10-20',
+      amountMinor: -450,
+      description: 'Coffee',
+    });
+    const [after] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(before).toMatchObject({ problems: [] });
+    expect(after).toMatchObject({
+      problems: [{ kind: 'mismatch', differenceMinor: -450, statementDate: '2025-10-31' }],
+    });
+  });
+
+  it('has no mismatch on a reconciled Import', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, fixture(BCGE_OCTOBER));
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(entry).toMatchObject({ problems: [] });
+  });
+
+  it('compares a Balance snapshot later than the last Import instead of its closing balance', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, fixture(BCGE_OCTOBER));
+    await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-11-04',
+      amountMinor: -2_000,
+      description: 'Groceries',
+    });
+    // The October Import closes at CHF 16'908.15; minus the CHF 20 Manual transaction.
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: account.id,
+      date: '2025-11-05',
+      balanceMinor: 1_688_815,
+    });
+    const [matching] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: account.id,
+      date: '2025-11-07',
+      balanceMinor: 1_690_815,
+    });
+    const [drifting] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(matching).toMatchObject({ problems: [] });
+    expect(drifting).toMatchObject({
+      problems: [{ kind: 'mismatch', differenceMinor: -2_000, statementDate: '2025-11-07' }],
+    });
+  });
+
+  it('lists a manual-only Account only when its Balance snapshot drifts, and never as Stale', async () => {
+    const cash = await bcgeAccount({ name: 'BCGE cash', iban: null, importFormat: null });
+    await createManualTransaction(t.ctx, {
+      accountId: cash.id,
+      bookingDate: '2025-06-02',
+      amountMinor: 5_000,
+      description: 'Cash withdrawal',
+    });
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: cash.id,
+      date: '2025-06-30',
+      balanceMinor: 5_000,
+    });
+    const whileMatching = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: cash.id,
+      date: '2025-07-31',
+      balanceMinor: 4_250,
+    });
+
+    const entries = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(whileMatching).toEqual([]);
+    expect(entries).toEqual([
+      {
+        account: { id: cash.id, name: 'BCGE cash', bankName: 'BCGE BCGE cash', currency: 'CHF' },
+        dataEnd: null,
+        daysSince: null,
+        isFreshnessChecked: false,
+        problems: [{ kind: 'mismatch', differenceMinor: 750, statementDate: '2025-07-31' }],
+      },
+    ]);
+  });
+
+  it('leaves out an Account tracked only by Balance snapshots and an archived Account', async () => {
+    const loan = await bcgeAccount({ name: 'BCGE loan', iban: null, importFormat: null });
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: loan.id,
+      date: '2025-06-30',
+      balanceMinor: -900_000,
+    });
+    const archived = await bcgeAccount({ name: 'BCGE old', iban: null, importFormat: null });
+    await createManualTransaction(t.ctx, {
+      accountId: archived.id,
+      bookingDate: '2025-06-02',
+      amountMinor: 5_000,
+      description: 'Cash withdrawal',
+    });
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: archived.id,
+      date: '2025-06-30',
+      balanceMinor: 1,
+    });
+    await archiveAccount(t.ctx, archived.id);
+
+    const entries = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(entries).toEqual([]);
+  });
+
+  it('ranks a mismatch above every other problem, in its row and in the list', async () => {
+    const neverImported = await bcgeAccount({ name: 'BCGE spare', iban: null });
+    const staleAndMismatched = await bcgeAccount();
+    await importFile(staleAndMismatched, fixture(BCGE_OCTOBER));
+    await createManualTransaction(t.ctx, {
+      accountId: staleAndMismatched.id,
+      bookingDate: '2025-10-15',
+      amountMinor: -100,
+      description: 'Fee',
+    });
+
+    const entries = await checkCompleteness(t.ctx, { today: '2025-12-31' });
+
+    expect(entries.map((entry) => [entry.account.id, entry.problems])).toEqual([
+      [
+        staleAndMismatched.id,
+        [
+          { kind: 'mismatch', differenceMinor: -100, statementDate: '2025-10-31' },
+          { kind: 'stale' },
+        ],
+      ],
+      [neverImported.id, [{ kind: 'never_imported' }]],
     ]);
   });
 });

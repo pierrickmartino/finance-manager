@@ -8,9 +8,11 @@ function accounts(count: number): string {
   return `${count} ${count === 1 ? 'Account' : 'Accounts'}`;
 }
 
-/** One problem in words, as its row lists it. */
-function describeProblem(problem: CompletenessProblem): string {
+/** One problem in words, as its row lists it; amounts in the Account's own Currency. */
+function describeProblem(problem: CompletenessProblem, currency: string, fmt: Formatter): string {
   switch (problem.kind) {
+    case 'mismatch':
+      return `Mismatch of ${fmt.amount(problem.differenceMinor, { currency })} on ${fmt.date(problem.statementDate)}`;
     case 'stale':
       return 'Stale';
     case 'never_imported':
@@ -27,8 +29,10 @@ function earliestDataEnd(entries: CompletenessEntry[]): string | null {
 function headline(entries: CompletenessEntry[], attention: number, fmt: Formatter): string {
   if (attention > 0)
     return `${accounts(attention)} ${attention === 1 ? 'needs' : 'need'} attention`;
-  const earliest = earliestDataEnd(entries);
-  const all = `All ${accounts(entries.length)} current`;
+  // Manual-only Accounts are listed only for a mismatch: "current" speaks of the others.
+  const checked = entries.filter((entry) => entry.isFreshnessChecked);
+  const earliest = earliestDataEnd(checked);
+  const all = `All ${accounts(checked.length)} current`;
   return earliest ? `${all} to ${fmt.date(earliest)}` : all;
 }
 
@@ -49,9 +53,15 @@ function EntryRow({ entry, fmt }: { entry: CompletenessEntry; fmt: Formatter }) 
         <span className="font-medium break-words">
           {entry.account.bankName} · {entry.account.name}
         </span>
-        <span className={hasProblems ? undefined : 'text-muted'}>{freshness(entry, fmt)}</span>
+        {entry.isFreshnessChecked && (
+          <span className={hasProblems ? undefined : 'text-muted'}>{freshness(entry, fmt)}</span>
+        )}
         {hasProblems && (
-          <span className="font-medium">{entry.problems.map(describeProblem).join(' · ')}</span>
+          <span className="font-medium">
+            {entry.problems
+              .map((problem) => describeProblem(problem, entry.account.currency, fmt))
+              .join(' · ')}
+          </span>
         )}
       </Link>
     </li>

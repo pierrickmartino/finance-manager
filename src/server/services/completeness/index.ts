@@ -3,6 +3,9 @@ import { listAccounts, type Account } from '../accounts';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { daysBetween } from '../fx/dates';
+import { findMismatches, type MismatchProblem } from './mismatch';
+
+export type { MismatchProblem } from './mismatch';
 
 /** The Account a Completeness check entry is about, as its row names and links it. */
 export type CheckedAccount = Pick<Account, 'id' | 'name' | 'bankName' | 'currency'>;
@@ -14,6 +17,11 @@ export interface CompletenessEntry {
   dataEnd: string | null;
   /** Whole days from `dataEnd` to the `today` checked against; null without a data end. */
   daysSince: number | null;
+  /**
+   * Whether the Account is checked for freshness (it has an Import format). A manual-only
+   * Account is listed only for a mismatch, so its data end and days since are always null.
+   */
+  isFreshnessChecked: boolean;
   problems: CompletenessProblem[];
 }
 
@@ -32,7 +40,7 @@ export interface NeverImportedProblem {
  * `mismatch` (difference and Statement balance date), `gap` (first and last day), `stale` and
  * `never_imported`; each new kind is a member here and a rank in `SEVERITY`.
  */
-export type CompletenessProblem = StaleProblem | NeverImportedProblem;
+export type CompletenessProblem = MismatchProblem | StaleProblem | NeverImportedProblem;
 export type CompletenessProblemKind = CompletenessProblem['kind'];
 
 /**
@@ -40,6 +48,7 @@ export type CompletenessProblemKind = CompletenessProblem['kind'];
  * No Import yet (spec: Ordering). A kind without a rank does not compile.
  */
 const SEVERITY = {
+  mismatch: 0,
   stale: 2,
   never_imported: 2,
 } as const satisfies Record<CompletenessProblemKind, number>;
@@ -64,7 +73,8 @@ const SELECT_DATA_ENDS = `
 
 /**
  * The Completeness check (spec: Completeness check; ADR-0008): one entry per non-archived
- * Account with an Import format. Computed on each call from stored data; `today` is passed in,
+ * Account with an Import format, plus each non-archived manual-only Account with a mismatch.
+ * Computed on each call from stored data; `today` is passed in,
  * the clock is never read.
  */
 export async function checkCompleteness(
@@ -73,15 +83,18 @@ export async function checkCompleteness(
 ): Promise<CompletenessEntry[]> {
   const { today } = parseInput(checkInput, input);
   const [accounts, dataEnds] = await Promise.all([
-    listAccounts(ctx),
+    listAccounts(ctx).then((all) => all.filter((account) => account.archivedAt === null)),
     ctx.db.query<{ accountId: string; dataEnd: string | null }>(SELECT_DATA_ENDS),
   ]);
   const dataEndById = new Map(dataEnds.rows.map((row) => [row.accountId, row.dataEnd]));
+  const mismatches = await findMismatches(ctx, accounts);
   const entries = accounts
-    .filter((account) => account.archivedAt === null && account.importFormat !== null)
+    .filter((account) => account.importFormat !== null || mismatches.has(account.id))
     .map((account): CompletenessEntry => {
+      const isFreshnessChecked = account.importFormat !== null;
       const dataEnd = dataEndById.get(account.id) ?? null;
       const daysSince = dataEnd === null ? null : daysBetween(dataEnd, today);
+      const mismatch = mismatches.get(account.id);
       return {
         account: {
           id: account.id,
@@ -91,7 +104,11 @@ export async function checkCompleteness(
         },
         dataEnd,
         daysSince,
-        problems: worstFirst(freshnessProblems(daysSince)),
+        isFreshnessChecked,
+        problems: worstFirst([
+          ...(mismatch ? [mismatch] : []),
+          ...(isFreshnessChecked ? freshnessProblems(daysSince) : []),
+        ]),
       };
     });
   // A stable sort: equally bad rows, and all healthy rows, keep Accounts-list order.
