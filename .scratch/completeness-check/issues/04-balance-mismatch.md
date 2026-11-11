@@ -8,9 +8,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] Every non-archived Account with at least one Statement balance is checked for mismatch, including manual-only Accounts and snapshot-only loans. Those Accounts appear in the notice only when they have a mismatch, and never for Stale or Gap.
+- [ ] Every non-archived Account with at least one Transaction and at least one Statement balance is checked for mismatch, excluding Accounts with no Transactions (whose balance is their latest snapshot, so they can never mismatch) and including manual-only Accounts that have Transactions. Manual-only Accounts appear in the notice only when they have a mismatch, and never for Stale or Gap.
 - [ ] The latest Statement balance is the later of the newest committed Import's closing balance (dated at its statement end) and the newest Balance snapshot.
 - [ ] It is compared with the Account's computed native balance on that date, reusing the existing balance-on-date and Balance-snapshot check logic rather than recomputing balances.
 - [ ] Any difference of one minor unit or more is a `mismatch` problem carrying the difference and the Statement balance date. An Account with no Statement balance has no mismatch problem.
 - [ ] A mismatch ranks first among problems, and its row shows the difference formatted in the Account's Currency.
-- [ ] Service tests (real database, public services only) cover: a reconciled Import with no mismatch; a mismatch after editing a Manual transaction; a Balance snapshot later than the last Import, both matching and not matching; a snapshot-only loan with a mismatch; and an archived Account excluded.
+- [ ] Service tests (real database, public services only) cover: a reconciled Import with no mismatch; a mismatch after editing a Manual transaction; a Balance snapshot later than the last Import, both matching and not matching; a manual-only Account whose Balance snapshot drifts; an Account with only Balance snapshots and no Transactions excluded; and an archived Account excluded.

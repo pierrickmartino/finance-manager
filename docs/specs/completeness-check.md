@@ -50,29 +50,30 @@ A Completeness check runs whenever I open the home Dashboard and shows its resul
 
 23. As the user, I want archived Accounts left out entirely, so that closed Accounts never raise warnings.
 24. As the user, I want manual-only Accounts left out of the Stale and Gap checks, so that Accounts with no bank export never count as overdue.
-25. As the user, I want manual-only Accounts and snapshot-only loans still checked against their Balance snapshots, so that a hand-kept balance that drifts is caught.
+25. As the user, I want manual-only Accounts that have Transactions still checked against their Balance snapshots, so that a hand-kept balance that drifts is caught.
+26. As the user, I want Accounts with no Transactions (such as a loan tracked only by Balance snapshots) left out of the Completeness check, so that an Account whose balance is its latest snapshot is never reported as out of reconciliation.
 
 ### Presentation
 
-26. As the user, I want a single neutral line when everything is fine, reading "All N Accounts current to ⟨date⟩", so that I'm reassured without clutter.
-27. As the user, I want the date in that line to be the earliest data end among checked Accounts, so that it tells me how current my reports really are.
-28. As the user, I want the line to read "N Accounts need attention" in the `warning` token when any problem exists, so that problems stand out.
-29. As the user, I want the per-Account list collapsed when everything is fine and open when anything is wrong, so that I see problems without a click.
-30. As the user, I want to expand the list even when everything is fine, so that I can see every Account's data end date.
-31. As the user, I want one row per Account listing all its problems, so that an Account with several problems isn't repeated.
-32. As the user, I want rows with problems ordered by worst problem first (mismatch, then Gap, then Stale or No Import yet), so that the most damaging problem is on top.
-33. As the user, I want only problem rows in the `warning` token, so that healthy Accounts read as healthy.
-34. As the user, I want each row to link to that Account's page, so that I can start the fix from its Imports and Balance snapshots.
-35. As the user, I want the notice to work at phone width and without client-side scripting, so that it loads instantly anywhere.
-36. As the user, I want the notice announced to assistive technology as an alert when problems exist, so that I don't miss it if I can't see the colour.
-37. As the user, I want every warning notice in the app to look the same, so that I recognise one at a glance.
+27. As the user, I want a single neutral line when everything is fine, reading "All N Accounts current to ⟨date⟩", so that I'm reassured without clutter.
+28. As the user, I want the date in that line to be the earliest data end among checked Accounts, so that it tells me how current my reports really are.
+29. As the user, I want the line to read "N Accounts need attention" in the `warning` token when any problem exists, so that problems stand out.
+30. As the user, I want the per-Account list collapsed when everything is fine and open when anything is wrong, so that I see problems without a click.
+31. As the user, I want to expand the list even when everything is fine, so that I can see every Account's data end date.
+32. As the user, I want one row per Account listing all its problems, so that an Account with several problems isn't repeated.
+33. As the user, I want rows with problems ordered by worst problem first (mismatch, then Gap, then Stale or No Import yet), so that the most damaging problem is on top.
+34. As the user, I want only problem rows in the `warning` token, so that healthy Accounts read as healthy.
+35. As the user, I want each row to link to that Account's page, so that I can start the fix from its Imports and Balance snapshots.
+36. As the user, I want the notice to work at phone width and without client-side scripting, so that it loads instantly anywhere.
+37. As the user, I want the notice announced to assistive technology as an alert when problems exist, so that I don't miss it if I can't see the colour.
+38. As the user, I want every warning notice in the app to look the same, so that I recognise one at a glance.
 
 ## Implementation Decisions
 
 - **Placement (ADR-0008).** A server-rendered notice above the Hero, rendered only on the Dashboard the home route redirects to. It is not a Widget, has no Widget source, and leaves the Dashboard Story of ADR-0007 unchanged.
 - **New Completeness check service.** It is a deep module with one entry point, `checkCompleteness(ctx, { today })`. It returns one entry per checked Account: the Account's identity and Currency, the data end date (or none), days since, and a list of problems. Problems are a tagged union: `mismatch` (difference in minor units and the Statement balance date), `gap` (first and last day), `stale`, `never_imported`. The caller passes `today`; the service never reads the clock.
 - **No stored state.** The service computes everything on each request from Accounts, Imports, Transactions and Balance snapshots. There are no schema changes.
-- **Scope.** Freshness and Gaps cover non-archived Accounts that have an Import format. The mismatch check covers every non-archived Account with at least one Statement balance.
+- **Scope.** Freshness and Gaps cover non-archived Accounts that have an Import format. The mismatch check covers every non-archived Account that has at least one Transaction and at least one Statement balance.
 - **Coverage.** An Import covers its statement period. A missing start or end falls back to that Import's earliest or latest Transaction date. Undone Imports cover nothing. Overlaps are allowed.
 - **Gap.** A run of one or more days that no Import covers, after the first committed Import's coverage starts and before the latest coverage ends, and that contains no Manual transaction on that Account.
 - **Stale.** The data end date is more than 40 days before `today`. The 40 is a named constant, not configurable.
@@ -86,7 +87,7 @@ A Completeness check runs whenever I open the home Dashboard and shows its resul
 
 - **One seam: `checkCompleteness`.** Every rule (coverage, Gaps, Stale, never imported, mismatch, scope, ordering) is tested through this one function against the real test database. There are no unit tests of internal helpers, so the internals can be restructured freely.
 - **Test external behaviour only.** Arrange state through public services alone: create Banks and Accounts, commit Imports from parser fixture files, create Manual transactions, record Balance snapshots, undo Imports, archive Accounts. Assert only on the returned entries. `today` is passed in, so day counts and the 40/41-day boundary are deterministic without a fake clock.
-- **Cases to cover:** contiguous Imports; overlap; a one-day Gap; a Gap filled by a Manual transaction; an Import with no statement period; an undone Import between two others; Stale at 40 vs 41 days; never imported; a mismatch caused by editing a Manual transaction after a reconciled Import; a Balance snapshot later than the last Import; manual-only, snapshot-only loan and archived Accounts; severity ordering.
+- **Cases to cover:** contiguous Imports; overlap; a one-day Gap; a Gap filled by a Manual transaction; an Import with no statement period; an undone Import between two others; Stale at 40 vs 41 days; never imported; a mismatch caused by editing a Manual transaction after a reconciled Import; a Balance snapshot later than the last Import; manual-only and archived Accounts excluded where they should be; an Account with only Balance snapshots and no Transactions excluded; severity ordering.
 - **Prior art:** the Balance snapshot service tests (real database via the shared test-database setup, state built through services) and the Account balance tests.
 - **One thin E2E** on the home Dashboard, seeded through services like the FX balances E2E. It checks the neutral all-fine line, then an open notice with a problem row that links to the Account page. It does not re-test the rules.
 - **No component tests for the notice.** The move to the shared warning primitive is covered by the existing tests of the two notices.
