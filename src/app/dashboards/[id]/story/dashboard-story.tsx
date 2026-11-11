@@ -2,6 +2,7 @@
 
 import { motion, MotionConfig, useScroll, useSpring } from 'motion/react';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { storyHero } from '@/lib/reporting/story';
 import { Chapter, type StoryChapter } from './chapter';
 import { Hero } from './hero';
@@ -13,13 +14,18 @@ interface DashboardStoryProps {
   dashboardName: string;
   editHref: string;
   chapters: StoryChapter[];
+  /**
+   * Shown between the title and the Hero, outside the Story itself: the home Dashboard's
+   * Completeness check (ADR-0008). A server component, so it stays server-rendered.
+   */
+  notice?: ReactNode;
 }
 
 /**
  * The Dashboard as a Story: a hero number, then one chapter per Widget in Story order, each
  * revealed as it scrolls into view. Light only. Edit mode shows the same Story, still (./edit).
  */
-export function DashboardStory({ dashboardName, editHref, chapters }: DashboardStoryProps) {
+export function DashboardStory({ dashboardName, editHref, chapters, notice }: DashboardStoryProps) {
   const hero = storyHero(chapters);
   const { scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 30 });
@@ -44,6 +50,7 @@ export function DashboardStory({ dashboardName, editHref, chapters }: DashboardS
             Edit Dashboard
           </Link>
         </header>
+        {notice}
         {chapters.length === 0 ? (
           <p className="py-16 text-lg" style={{ color: STORY.muted }}>
             No Widgets yet.{' '}
