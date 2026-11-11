@@ -23,7 +23,7 @@ A Completeness check runs whenever I open the home Dashboard and shows its resul
 
 5. As the user, I want to see, for each checked Account, the day its data ends and how many days ago that is, so that I know how current it is.
 6. As the user, I want an Account's data to end on the last day its latest committed Import covers, not on the day I uploaded it, so that uploading an old file does not make the Account look current.
-7. As the user, I want an Import whose file states no statement period to count as covering its first to last Transaction date, so that every Import has a coverage.
+7. As the user, I want an Import whose file states no statement period to count as covering its first to last Transaction date, and an Import with no statement period and no Transactions to cover nothing and be ignored, so that coverage is never invented.
 8. As the user, I want undone Imports ignored, so that coverage counts only data that is really there.
 9. As the user, I want an Account flagged Stale when its data ends more than 40 days ago, so that I'm told a statement is overdue while allowing for the usual delay after month end.
 10. As the user, I want an Account that has an Import format but no Import yet flagged "No Import yet", so that a newly added Account isn't forgotten.
@@ -74,7 +74,7 @@ A Completeness check runs whenever I open the home Dashboard and shows its resul
 - **New Completeness check service.** It is a deep module with one entry point, `checkCompleteness(ctx, { today })`. It returns one entry per checked Account: the Account's identity and Currency, the data end date (or none), days since, and a list of problems. Problems are a tagged union: `mismatch` (difference in minor units and the Statement balance date), `gap` (first and last day), `stale`, `never_imported`. The caller passes `today`; the service never reads the clock.
 - **No stored state.** The service computes everything on each request from Accounts, Imports, Transactions and Balance snapshots. There are no schema changes.
 - **Scope.** Freshness and Gaps cover non-archived Accounts that have an Import format. The mismatch check covers every non-archived Account that has at least one Transaction and at least one Statement balance.
-- **Coverage.** An Import covers its statement period. A missing start or end falls back to that Import's earliest or latest Transaction date. Undone Imports cover nothing. Overlaps are allowed.
+- **Coverage.** An Import covers its statement period. A missing start or end falls back to that Import's earliest or latest Transaction date; an Import with neither a statement end nor any Transactions covers nothing. Undone Imports cover nothing. An Account whose committed Imports cover nothing has no data end and is Stale, not "No Import yet". Overlaps are allowed.
 - **Gap.** A run of one or more days that no Import covers, after the first committed Import's coverage starts and before the latest coverage ends, and that contains no Manual transaction on that Account.
 - **Stale.** The data end date is more than 40 days before `today`. The 40 is a named constant, not configurable.
 - **Mismatch.** Compare the later of the newest committed Import's closing balance (dated at its statement end) and the newest Balance snapshot with the Account's computed native balance on that date. Reuse the existing balance-on-date and snapshot-check logic; do not reimplement balance computation. Any non-zero difference is a mismatch.

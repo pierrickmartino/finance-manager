@@ -122,7 +122,10 @@ export async function checkCompleteness(
         problems: worstFirst([
           ...(mismatch ? [mismatch] : []),
           ...(isFreshnessChecked
-            ? [...gapProblems(gapsById.get(account.id) ?? []), ...freshnessProblems(daysSince)]
+            ? [
+                ...gapProblems(gapsById.get(account.id) ?? []),
+                ...freshnessProblems(dataEndById.has(account.id), daysSince),
+              ]
             : []),
         ]),
       };
@@ -145,8 +148,9 @@ function gapProblems(gaps: DaySpan[]): CompletenessProblem[] {
   return gaps.map((gap) => ({ kind: 'gap', from: gap.from, to: gap.to }));
 }
 
-function freshnessProblems(daysSince: number | null): CompletenessProblem[] {
-  if (daysSince === null) return [{ kind: 'never_imported' }];
-  if (daysSince > STALE_AFTER_DAYS) return [{ kind: 'stale' }];
+/** An Account with committed Imports that cover nothing has no data end: it is Stale. */
+function freshnessProblems(isImported: boolean, daysSince: number | null): CompletenessProblem[] {
+  if (!isImported) return [{ kind: 'never_imported' }];
+  if (daysSince === null || daysSince > STALE_AFTER_DAYS) return [{ kind: 'stale' }];
   return [];
 }

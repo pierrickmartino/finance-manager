@@ -158,6 +158,32 @@ describe('freshness', () => {
     ]);
   });
 
+  it('ignores an Import with no statement period and no Transactions: it covers nothing', async () => {
+    const covered = await bcgeAccount();
+    await importFile(covered, fixture(BCGE_OCTOBER));
+    await importFile(covered, camtFile(covered, []));
+    const uncovered = await bcgeAccount({ name: 'BCGE savings', iban: 'CH6900235235123456010' });
+    await importFile(uncovered, camtFile(uncovered, []));
+
+    const entries = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(entries).toEqual([
+      // Imported, but nothing covered: no data end, so Stale rather than "No Import yet".
+      expect.objectContaining({
+        account: expect.objectContaining({ id: uncovered.id }),
+        dataEnd: null,
+        daysSince: null,
+        problems: [{ kind: 'stale' }],
+      }),
+      expect.objectContaining({
+        account: expect.objectContaining({ id: covered.id }),
+        dataEnd: '2025-10-31',
+        daysSince: 10,
+        problems: [],
+      }),
+    ]);
+  });
+
   it('is Stale when the data ends more than 40 days before today: 40 is current, 41 is Stale', async () => {
     const account = await bcgeAccount();
     await importFile(account, fixture(BCGE_OCTOBER));
