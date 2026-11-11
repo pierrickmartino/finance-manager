@@ -283,6 +283,40 @@ describe('mismatch', () => {
     });
   });
 
+  it("compares the Import's closing balance, not a Balance snapshot on the same date", async () => {
+    const account = await bcgeAccount();
+    // The October Import closes at CHF 16'908.15 on 2025-10-31, as the Transactions add up to.
+    await importFile(account, fixture(BCGE_OCTOBER));
+    await recordBalanceSnapshot(t.ctx, {
+      accountId: account.id,
+      date: '2025-10-31',
+      balanceMinor: 1_690_000,
+    });
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(entry).toMatchObject({ problems: [] });
+  });
+
+  it('falls back to the newest older Import that states a closing balance', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, fixture(BCGE_OCTOBER));
+    // No balances in the file: this newer Import states no closing balance.
+    await importFile(account, periodFile(account, '2025-11-01', '2025-11-07'));
+    await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-10-20',
+      amountMinor: -450,
+      description: 'Coffee',
+    });
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(entry).toMatchObject({
+      problems: [{ kind: 'mismatch', differenceMinor: -450, statementDate: '2025-10-31' }],
+    });
+  });
+
   it('lists a manual-only Account only when its Balance snapshot drifts, and never as Stale', async () => {
     const cash = await bcgeAccount({ name: 'BCGE cash', iban: null, importFormat: null });
     await createManualTransaction(t.ctx, {

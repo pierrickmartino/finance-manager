@@ -41,7 +41,7 @@ A Completeness check runs whenever I open the home Dashboard and shows its resul
 ### Balance mismatch
 
 18. As the user, I want each Account's latest Statement balance compared with its computed balance on that date, so that edits made after an Import that break the reconciliation are caught.
-19. As the user, I want the latest Statement balance to be a committed Import's closing balance or a Balance snapshot, whichever is dated later, so that the most recent word from the Bank is what counts.
+19. As the user, I want the latest Statement balance to be a committed Import's closing balance or a Balance snapshot, whichever is dated later (the Import's closing balance when both fall on the same date), so that the most recent word from the Bank is what counts.
 20. As the user, I want any difference of one minor unit or more counted as a mismatch, so that balances reconcile to the cent.
 21. As the user, I want a mismatch shown with its difference in the Account's own Currency, so that I can match it against my bank statement.
 22. As the user, I want an Account with no Statement balance at all to have no mismatch problem, so that I'm not warned about a check that cannot run.

@@ -59,7 +59,7 @@ async function computedBalances(
 /**
  * The mismatch of each given Account that has Transactions, keyed by Account id. The latest
  * Statement balance is the later of the newest Import closing balance and the newest Balance
- * snapshot (the snapshot on a tie); an Account with neither has no mismatch.
+ * snapshot (the Import closing balance on a tie); an Account with neither has no mismatch.
  */
 export async function findMismatches(
   ctx: ServiceContext,
@@ -85,7 +85,7 @@ export async function findMismatches(
   const closingDates = new Map<string, string>();
   for (const { account, snapshot } of latestSnapshots) {
     const closing = closingById.get(account.id);
-    if (snapshot && (!closing || snapshot.date >= closing.date)) {
+    if (snapshot && (!closing || snapshot.date > closing.date)) {
       if (snapshot.differenceMinor) {
         mismatches.set(account.id, {
           kind: 'mismatch',
