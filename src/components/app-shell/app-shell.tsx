@@ -1,11 +1,22 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useState, type ReactNode } from 'react';
 import { DesktopSidebar } from './desktop-sidebar';
 import { Icon } from './icon';
+import { MobileDrawer } from './mobile-drawer';
 import { findCurrentPage } from './navigation';
-import { Brand, Sidebar } from './sidebar';
+import { DockLayout } from './prototype-layout-dock';
+import { HeroLayout } from './prototype-layout-hero';
+import { PrototypeLayoutSwitcher } from './prototype-layout-switcher';
+import { TabsLayout } from './prototype-layout-tabs';
+import {
+  IS_PROTOTYPE_ENABLED,
+  PROTOTYPE_LAYOUT_PARAM,
+  parsePrototypeLayout,
+  type PrototypeLayoutKey,
+} from './prototype-layouts';
+import { Brand } from './sidebar';
 import type { SidebarMode } from './sidebar-mode';
 
 const ICON_BUTTON = 'grid h-9 w-9 place-items-center rounded-lg text-ink-soft hover:bg-sunken';
@@ -25,41 +36,13 @@ function Breadcrumb() {
   );
 }
 
-/** Below `md` the sidebar becomes a drawer opened from the top bar. */
-function MobileDrawer({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-30 md:hidden">
-      <button
-        type="button"
-        aria-label="Close menu"
-        onClick={onClose}
-        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Menu"
-        className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-surface shadow-xl"
-      >
-        <Sidebar onNavigate={onClose} />
-      </div>
-    </div>
-  );
-}
-
 interface AppShellProps {
   /** Signed out (login, setup), only the page renders: no sidebar, top bar or drawer. */
   showNavigation: boolean;
   /** The desktop sidebar's saved mode: pinned open, or a rail of icons. */
   sidebarMode: SidebarMode;
+  /** PROTOTYPE: the layout variant saved in the prototype cookie, if any. */
+  prototypeLayout?: string;
   children: ReactNode;
 }
 
@@ -70,7 +53,30 @@ interface AppShellProps {
  * whose action signs the user in (first-run setup shows its recovery codes afterwards) is not
  * remounted, and loses no state, when the navigation appears.
  */
-export function AppShell({ showNavigation, sidebarMode, children }: AppShellProps) {
+export function AppShell(props: AppShellProps) {
+  // PROTOTYPE: pick a layout variant (?layout=A|B|C|D, remembered in a cookie). Delete after.
+  const searchParams = useSearchParams();
+  const [saved, setSaved] = useState<PrototypeLayoutKey | null>(
+    parsePrototypeLayout(props.prototypeLayout),
+  );
+  const layout =
+    parsePrototypeLayout(searchParams.get(PROTOTYPE_LAYOUT_PARAM)) ??
+    saved ??
+    (IS_PROTOTYPE_ENABLED ? 'A' : null);
+  if (!props.showNavigation || layout === null) return <CurrentShell {...props} />;
+
+  return (
+    <>
+      {layout === 'A' && <CurrentShell {...props} />}
+      {layout === 'B' && <HeroLayout>{props.children}</HeroLayout>}
+      {layout === 'C' && <DockLayout>{props.children}</DockLayout>}
+      {layout === 'D' && <TabsLayout>{props.children}</TabsLayout>}
+      <PrototypeLayoutSwitcher current={layout} onChange={setSaved} />
+    </>
+  );
+}
+
+function CurrentShell({ showNavigation, sidebarMode, children }: AppShellProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
