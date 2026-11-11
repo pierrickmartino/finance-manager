@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { WARNING_NOTICE_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { Account } from '@/server/services/accounts';
 import type { SnapshotCheck } from '@/server/services/balance-snapshots';
@@ -35,10 +36,7 @@ export function SnapshotMismatches({
   if (mismatches.length === 0) return null;
   const byId = new Map(accounts.map((account) => [account.id, account]));
   return (
-    <div
-      role="alert"
-      className="flex flex-col gap-1 rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-sm text-warning"
-    >
+    <div role="alert" className={`flex flex-col gap-1 text-sm ${WARNING_NOTICE_CLASS}`}>
       <p className="font-medium">
         {mismatches.length === 1
           ? 'A Balance snapshot differs from the computed balance.'

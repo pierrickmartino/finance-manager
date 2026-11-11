@@ -17,6 +17,12 @@ export const HEADLINE_AMOUNT_CLASS = 'font-display text-4xl tracking-tight tabul
 
 /** A separate object on the page: a list, a detail panel, a Widget. Use by role, not for every block. */
 export const CARD_CLASS = 'rounded-xl border border-rule bg-surface shadow-sm';
+/**
+ * A notice that asks for attention (stale FX rates, a Balance snapshot mismatch): warning text
+ * on the warning tint, inside a warning rule. Give the element `role="alert"`.
+ */
+export const WARNING_NOTICE_CLASS =
+  'rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning';
 
 // Buttons --------------------------------------------------------------------------------------
 
