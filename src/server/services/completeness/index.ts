@@ -1,0 +1,115 @@
+import { z } from 'zod';
+import { listAccounts, type Account } from '../accounts';
+import type { ServiceContext } from '../context';
+import { parseInput } from '../errors';
+import { daysBetween } from '../fx/dates';
+
+/** The Account a Completeness check entry is about, as its row names and links it. */
+export type CheckedAccount = Pick<Account, 'id' | 'name' | 'bankName' | 'currency'>;
+
+/** One checked Account (GLOSSARY: Completeness check). */
+export interface CompletenessEntry {
+  account: CheckedAccount;
+  /** The last day the Account's latest committed Import covers; null when it has none. */
+  dataEnd: string | null;
+  /** Whole days from `dataEnd` to the `today` checked against; null without a data end. */
+  daysSince: number | null;
+  problems: CompletenessProblem[];
+}
+
+/** The data ends more than `STALE_AFTER_DAYS` before today (GLOSSARY: Stale). */
+export interface StaleProblem {
+  kind: 'stale';
+}
+
+/** The Account has an Import format but no committed Import ("No Import yet"). */
+export interface NeverImportedProblem {
+  kind: 'never_imported';
+}
+
+/**
+ * What can be wrong with a checked Account, tagged by `kind`. The spec's full set is
+ * `mismatch` (difference and Statement balance date), `gap` (first and last day), `stale` and
+ * `never_imported`; each new kind is a member here and a rank in `SEVERITY`.
+ */
+export type CompletenessProblem = StaleProblem | NeverImportedProblem;
+export type CompletenessProblemKind = CompletenessProblem['kind'];
+
+/**
+ * How bad each kind of problem is, worst (lowest) first: mismatch 0, Gap 1, then Stale and
+ * No Import yet (spec: Ordering). A kind without a rank does not compile.
+ */
+const SEVERITY = {
+  stale: 2,
+  never_imported: 2,
+} as const satisfies Record<CompletenessProblemKind, number>;
+/** Ranks after every problem, so healthy rows come last. */
+const HEALTHY_RANK = Number.MAX_SAFE_INTEGER;
+
+/** An Account is Stale when its data ends more than this many days before today. */
+export const STALE_AFTER_DAYS = 40;
+
+const checkInput = z.object({ today: z.iso.date() });
+
+/** Each Account's data end: the latest last day any of its committed Imports covers. */
+const SELECT_DATA_ENDS = `
+  SELECT i.account_id AS "accountId",
+         max(coalesce(
+           i.statement_to,
+           (SELECT max(t.booking_date) FROM "transaction" t WHERE t.import_id = i.id)
+         )) AS "dataEnd"
+  FROM import i
+  WHERE i.undone_at IS NULL
+  GROUP BY i.account_id`;
+
+/**
+ * The Completeness check (spec: Completeness check; ADR-0008): one entry per non-archived
+ * Account with an Import format. Computed on each call from stored data; `today` is passed in,
+ * the clock is never read.
+ */
+export async function checkCompleteness(
+  ctx: ServiceContext,
+  input: { today: string },
+): Promise<CompletenessEntry[]> {
+  const { today } = parseInput(checkInput, input);
+  const [accounts, dataEnds] = await Promise.all([
+    listAccounts(ctx),
+    ctx.db.query<{ accountId: string; dataEnd: string | null }>(SELECT_DATA_ENDS),
+  ]);
+  const dataEndById = new Map(dataEnds.rows.map((row) => [row.accountId, row.dataEnd]));
+  const entries = accounts
+    .filter((account) => account.archivedAt === null && account.importFormat !== null)
+    .map((account): CompletenessEntry => {
+      const dataEnd = dataEndById.get(account.id) ?? null;
+      const daysSince = dataEnd === null ? null : daysBetween(dataEnd, today);
+      return {
+        account: {
+          id: account.id,
+          name: account.name,
+          bankName: account.bankName,
+          currency: account.currency,
+        },
+        dataEnd,
+        daysSince,
+        problems: worstFirst(freshnessProblems(daysSince)),
+      };
+    });
+  // A stable sort: equally bad rows, and all healthy rows, keep Accounts-list order.
+  return entries.toSorted((a, b) => worstRank(a) - worstRank(b));
+}
+
+function worstFirst(problems: CompletenessProblem[]): CompletenessProblem[] {
+  return problems.toSorted((a, b) => SEVERITY[a.kind] - SEVERITY[b.kind]);
+}
+
+/** The rank of an entry's worst problem; healthy entries rank after every problem. */
+function worstRank(entry: CompletenessEntry): number {
+  const [worst] = entry.problems;
+  return worst ? SEVERITY[worst.kind] : HEALTHY_RANK;
+}
+
+function freshnessProblems(daysSince: number | null): CompletenessProblem[] {
+  if (daysSince === null) return [{ kind: 'never_imported' }];
+  if (daysSince > STALE_AFTER_DAYS) return [{ kind: 'stale' }];
+  return [];
+}
