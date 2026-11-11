@@ -8,7 +8,7 @@ A new Completeness check service with a single entry point, `checkCompleteness(c
 
 **Blocked by:** 01: Shared warning-notice primitive
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Checked Accounts are the non-archived Accounts with an Import format; manual-only and archived Accounts are not listed.
 - [ ] The data end date is the last day the latest committed Import covers: its statement end, else its latest Transaction date. Undone Imports are ignored.

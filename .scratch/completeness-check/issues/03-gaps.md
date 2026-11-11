@@ -6,7 +6,7 @@
 
 **Blocked by:** 02: Tracer bullet: the Completeness check notice with freshness
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] A Gap is a run of one or more days, after the first committed Import's coverage starts and before the latest coverage ends, that no committed Import covers.
 - [ ] An Import's coverage is its statement period; a missing start or end falls back to that Import's earliest or latest Transaction date.

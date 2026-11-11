@@ -6,7 +6,7 @@
 
 **Blocked by:** 02: Tracer bullet: the Completeness check notice with freshness
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Every non-archived Account with at least one Transaction and at least one Statement balance is checked for mismatch, excluding Accounts with no Transactions (whose balance is their latest snapshot, so they can never mismatch) and including manual-only Accounts that have Transactions. Manual-only Accounts appear in the notice only when they have a mismatch, and never for Stale or Gap.
 - [ ] The latest Statement balance is the later of the newest committed Import's closing balance (dated at its statement end) and the newest Balance snapshot.

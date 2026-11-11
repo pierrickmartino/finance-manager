@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] One shared warning-notice primitive exists alongside the other surface primitives and uses only design-system tokens.
 - [ ] The FX staleness notice uses it; no inline warning classes remain there.
