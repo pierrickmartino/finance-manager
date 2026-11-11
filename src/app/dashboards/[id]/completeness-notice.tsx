@@ -3,9 +3,14 @@ import { WARNING_NOTICE_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { CompletenessEntry, CompletenessProblem } from '@/server/services/completeness';
 
+/** The word for `count` of something: `one` for exactly one, `many` otherwise. */
+function pluralise(count: number, one: string, many: string): string {
+  return count === 1 ? one : many;
+}
+
 /** A count of Accounts in words: "1 Account", "3 Accounts". */
-function accounts(count: number): string {
-  return `${count} ${count === 1 ? 'Account' : 'Accounts'}`;
+function accountCountLabel(count: number): string {
+  return `${count} ${pluralise(count, 'Account', 'Accounts')}`;
 }
 
 /** One problem in words, as its row lists it; amounts in the Account's own Currency. */
@@ -31,25 +36,26 @@ function earliestDataEnd(entries: CompletenessEntry[]): string | null {
 }
 
 function headline(entries: CompletenessEntry[], attention: number, fmt: Formatter): string {
-  if (attention > 0)
-    return `${accounts(attention)} ${attention === 1 ? 'needs' : 'need'} attention`;
+  if (attention > 0) {
+    return `${accountCountLabel(attention)} ${pluralise(attention, 'needs', 'need')} attention`;
+  }
   // Manual-only Accounts are listed only for a mismatch: "current" speaks of the others.
   const checked = entries.filter((entry) => entry.isFreshnessChecked);
   const earliest = earliestDataEnd(checked);
-  const all = `${checked.length === 1 ? '' : 'All '}${accounts(checked.length)} current`;
-  return earliest ? `${all} to ${fmt.date(earliest)}` : all;
+  const current = `${checked.length === 1 ? '' : 'All '}${accountCountLabel(checked.length)} current`;
+  return earliest ? `${current} to ${fmt.date(earliest)}` : current;
 }
 
 function freshness(entry: CompletenessEntry, fmt: Formatter): string {
   if (entry.dataEnd === null || entry.daysSince === null) return 'No data yet';
-  const days = entry.daysSince === 1 ? '1 day' : `${entry.daysSince} days`;
+  const days = `${entry.daysSince} ${pluralise(entry.daysSince, 'day', 'days')}`;
   return `Data ends ${fmt.date(entry.dataEnd)} · ${days} ago`;
 }
 
 function EntryRow({ entry, fmt }: { entry: CompletenessEntry; fmt: Formatter }) {
   const hasProblems = entry.problems.length > 0;
   return (
-    <li className={hasProblems ? WARNING_NOTICE_CLASS : 'px-3 py-1 text-ink'}>
+    <li className={hasProblems ? 'text-warning' : 'text-ink'}>
       <Link
         href={`/accounts/${entry.account.id}`}
         className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 hover:underline"
@@ -74,8 +80,9 @@ function EntryRow({ entry, fmt }: { entry: CompletenessEntry; fmt: Formatter }) 
 
 /**
  * The Completeness check's notice above the home Dashboard's Hero (ADR-0008). One neutral line
- * when every Account is current, its list collapsed; open, in the warning token and announced as
- * an alert when any Account needs attention. A native disclosure: no client script.
+ * when every Account is current, its list collapsed; open, as a warning notice announced as an
+ * alert when any Account needs attention, with only the problem rows in the warning token. A
+ * native disclosure: no client script.
  */
 export function CompletenessNotice({
   entries,
@@ -92,12 +99,10 @@ export function CompletenessNotice({
     <section
       aria-label="Completeness check"
       role={needsAttention ? 'alert' : undefined}
-      className="mt-4 text-sm"
+      className={`mt-4 text-sm ${needsAttention ? WARNING_NOTICE_CLASS : 'text-ink'}`}
     >
       <details open={needsAttention}>
-        <summary
-          className={`cursor-pointer ${needsAttention ? 'font-medium text-warning' : 'text-muted'}`}
-        >
+        <summary className={`cursor-pointer ${needsAttention ? 'font-medium' : 'text-muted'}`}>
           {headline(entries, attention, fmt)}
         </summary>
         <ul className="mt-2 flex flex-col gap-1">

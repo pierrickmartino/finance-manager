@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { checkCompleteness, type CompletenessEntry } from '@/server/services/completeness';
-import { listDashboards } from '@/server/services/dashboards';
+import { homeDashboard, listDashboards } from '@/server/services/dashboards';
 import { swissToday } from '@/server/services/fx/dates';
 import { findDashboard, loadStoryChapter } from '../load';
 import { DashboardTabs } from '../tabs';
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 /**
  * A Dashboard, told as a Story: a hero number, then one chapter per Widget, in Story order
  * (GLOSSARY: Dashboard Story). Values in CHF. Changing the Widgets happens in Edit mode (./edit).
- * The Dashboard the home page opens (the first) also shows the Completeness check (ADR-0008).
+ * The home Dashboard (the one the home page opens) also shows the Completeness check (ADR-0008).
  */
 export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
@@ -25,7 +25,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
     getFormatter(),
   ]);
   const completeness: CompletenessEntry[] | null =
-    dashboards[0]?.id === dashboard.id
+    homeDashboard(dashboards)?.id === dashboard.id
       ? await checkCompleteness(ctx, { today: swissToday() })
       : null;
 

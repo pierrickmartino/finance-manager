@@ -36,7 +36,7 @@ Type: `font-display` (a serif) for page titles, section titles and headline amou
 | `SECTION_TITLE_CLASS` | Each section's `h2`, and the title of a detail panel. |
 | `HEADLINE_AMOUNT_CLASS` | The number a page is about: an Account's balance, a Bank's total, the selected Transaction's amount. |
 | `CARD_CLASS` | A separate object: a list, a detail panel, a Widget. Not every block. |
-| `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch. |
+| `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch, the Completeness check when an Account needs attention. Put it on the notice itself, never on rows inside it; mark problem rows with `text-warning`. |
 | `PRIMARY_BUTTON_CLASS` | The view's main action, one per view where possible. |
 | `ACCENT_BUTTON_CLASS` | The main action of the Dashboard Story's own views: Done in Edit mode, Save in the Widget editor. |
 | `SECONDARY_BUTTON_CLASS` / `SMALL_BUTTON_CLASS` | Every other action, and links styled as buttons; the small one in dense rows. |

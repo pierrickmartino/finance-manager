@@ -87,6 +87,14 @@ export async function listDashboards(ctx: ServiceContext): Promise<Dashboard[]> 
   return result.rows;
 }
 
+/**
+ * The home Dashboard among `dashboards` (in the user's order, as `listDashboards` gives them):
+ * the one the home page opens, and the only one showing the Completeness check (ADR-0008).
+ */
+export function homeDashboard(dashboards: readonly Dashboard[]): Dashboard | undefined {
+  return dashboards[0];
+}
+
 /** A Dashboard with its Widgets. */
 export async function getDashboard(ctx: ServiceContext, id: string): Promise<DashboardWithWidgets> {
   const dashboard = await findDashboard(ctx.db, id);
