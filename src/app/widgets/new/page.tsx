@@ -110,7 +110,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
 
       <div className="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <aside
-          className={`${CARD_CLASS} lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto`}
+          className={`${CARD_CLASS} lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto`}
         >
           <div className="flex items-center justify-between border-b border-rule px-4 py-3">
             <h2 className="text-sm font-semibold">Settings</h2>

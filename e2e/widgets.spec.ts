@@ -28,6 +28,10 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await expect(page.getByRole('heading', { name })).toBeVisible();
 
   // Build the pivot: October 2025, month × Category, this Account only.
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('button', { name: 'More' })
+    .click();
   await page.getByRole('link', { name: 'Widgets' }).click();
   await page.getByRole('link', { name: 'New Widget' }).click();
   const form = page.getByRole('form', { name: 'Widget query' });
