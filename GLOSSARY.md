@@ -62,6 +62,18 @@ _Avoid_: Bank balance
 **Balance snapshot**:
 A Statement balance entered by hand, for Accounts whose exports contain no balances.
 
+**Completeness check**:
+The standing check that every imported Account's data is current, has no Gaps, and adds up to its latest Statement balance.
+_Avoid_: Data health, import check, freshness
+
+**Gap**:
+A span of days between two of an Account's Imports that no Import's statement period covers and no Manual transaction fills.
+_Avoid_: Hole, missing period
+
+**Stale**:
+The state of an imported Account whose data ends too long ago, counted from the last day its latest Import covers.
+_Avoid_: Outdated, old
+
 ### Classification
 
 **Category group**:
