@@ -54,8 +54,7 @@ is **declared**, not that it renders right: the `audit/` journeys (`reflow.mjs` 
 - Icons → from `@/components/pulse/icons`, never `lucide-react`; keep that file pure re-exports
   (`icon-import-policy.ts`, ADR-0092).
 - Per-second tick → in the leaf that renders the figure (`useSecondTick`, `ElapsedClock`,
-  `RestCountdown`), never in a screen. `React.memo` only together with `useMemo`'d arrays and
-  `useCallback`'d handlers (`live-session-tick.test.ts`, `catalog-list-memo.test.ts`, ADR-0091).
+  `RestCountdown`), never in a screen (`live-session-tick.test.ts`, ADR-0091).
 - Filter over an unpaged list → hoist work the filter doesn't affect, filter through
   `useDeferredValue` (not a debounce), `.list-row-defer` on rows, read summary copy off the
   deferred value (`admin-catalog-list.test.ts`, ADR-0097).
@@ -126,7 +125,7 @@ is **declared**, not that it renders right: the `audit/` journeys (`reflow.mjs` 
   detail inside the component's own rendering is fine (`generate-training-launchpad.test.ts`, ADR-0109).
 - State three components away from its control → a context `{ state, actions, meta }`: one
   `dispatch`, payloads derived from the reducer's union, membership registries
-  `as const satisfies`; don't memoize a value no `React.memo` reads. Props stay for a leaf's own
+  `as const satisfies`. Props stay for a leaf's own
   closure or shared presentation (`PrescriptionFieldStack`, ADR-0067)
   (`prescription-draft-context.test.ts`, ADR-0105).
 - Context API → read with `use(Ctx)`, provide with `<Ctx value={…}>`, never `useContext` or

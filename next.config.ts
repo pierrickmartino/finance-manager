@@ -3,6 +3,8 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   // `pg` uses Node built-ins; keep it out of the server bundle.
   serverExternalPackages: ['pg'],
+  // Memoizes components at build time, so new code needn't write `useMemo`/`useCallback` by hand.
+  reactCompiler: true,
   experimental: {
     // Bank files are uploaded through a server action. The service caps a file at 5 MB
     // (MAX_IMPORT_FILE_BYTES); this leaves room for the multipart overhead.
