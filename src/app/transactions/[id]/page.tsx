@@ -44,12 +44,12 @@ export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
 const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
 /**
- * The narrow left column stays in view below the sticky breadcrumb bar (3.5rem) while the wide
+ * The narrow left column stays in view at the top of the screen while the wide
  * one scrolls; if it is taller than the screen, it scrolls on its own so nothing is out of reach.
  * The padding keeps the cards' shadows from being clipped by the overflow.
  */
 const EDITS_COLUMN =
-  'flex min-w-0 flex-col gap-5 lg:sticky lg:top-[4.75rem] lg:-m-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:p-1';
+  'flex min-w-0 flex-col gap-5 lg:sticky lg:top-6 lg:-m-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:p-1';
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;

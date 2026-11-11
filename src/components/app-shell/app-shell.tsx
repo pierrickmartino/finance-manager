@@ -1,113 +1,158 @@
 'use client';
 
-import { usePathname, useSearchParams } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
-import { DesktopSidebar } from './desktop-sidebar';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
+import { logoutAction } from '@/app/login/actions';
+import { greetingFor } from './greeting';
+import {
+  HERO_ICON_BUTTON_CLASS,
+  HERO_PILL_ACTIVE,
+  HERO_PILL_CLASS,
+  HERO_PILL_IDLE,
+  HERO_PRIMARY_BUTTON_CLASS,
+  HERO_SECONDARY_BUTTON_CLASS,
+} from './hero-styles';
 import { Icon } from './icon';
 import { MobileDrawer } from './mobile-drawer';
-import { findCurrentPage } from './navigation';
-import { DockLayout } from './prototype-layout-dock';
-import { HeroLayout } from './prototype-layout-hero';
-import { PrototypeLayoutSwitcher } from './prototype-layout-switcher';
-import { TabsLayout } from './prototype-layout-tabs';
-import {
-  IS_PROTOTYPE_ENABLED,
-  PROTOTYPE_LAYOUT_PARAM,
-  parsePrototypeLayout,
-  type PrototypeLayoutKey,
-} from './prototype-layouts';
-import { Brand } from './sidebar';
-import type { SidebarMode } from './sidebar-mode';
+import { MoreMenu } from './more-menu';
+import { PRIMARY_LINKS, findCurrentPage, isActive } from './navigation';
 
-const ICON_BUTTON = 'grid h-9 w-9 place-items-center rounded-lg text-ink-soft hover:bg-sunken';
+const subscribeToNothing = () => () => {};
 
-/** "Money / Transactions" for the current page; nothing for pages outside the sidebar. */
-function Breadcrumb() {
-  const current = findCurrentPage(usePathname());
+/** The greeting by the browser's clock; the server, which can't know it, says hello. */
+function Greeting() {
+  const text = useSyncExternalStore(
+    subscribeToNothing,
+    () => greetingFor(new Date()),
+    () => 'Hello',
+  );
+  return <p className="font-display text-4xl tracking-tight md:text-5xl">{text}.</p>;
+}
+
+/** "Money / Transactions" for the current page; nothing for pages outside the navigation. */
+function Breadcrumb({ pathname }: { pathname: string }) {
+  const current = findCurrentPage(pathname);
   if (!current) return null;
   return (
-    <p data-testid="breadcrumb" className="flex items-center gap-2 text-sm">
-      <span className="text-faint">{current.group.label}</span>
-      <span aria-hidden="true" className="text-faint">
+    <p data-testid="breadcrumb" className="mt-3 flex items-center gap-2 text-base">
+      <span className="text-on-hero/65">{current.group.label}</span>
+      <span aria-hidden="true" className="text-on-hero/45">
         /
       </span>
-      <span className="font-medium">{current.link.label}</span>
+      <span className="text-on-hero">{current.link.label}</span>
     </p>
   );
 }
 
+/** Brand, the pills and More from `lg`; the menu button below it; settings and sign out. */
+function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => void }) {
+  return (
+    <header className="flex h-20 items-center gap-3 px-5 md:px-8">
+      <button
+        type="button"
+        aria-label="Open menu"
+        onClick={onOpenMenu}
+        className={`${HERO_ICON_BUTTON_CLASS} lg:hidden`}
+      >
+        <Icon name="menu" className="h-5 w-5" />
+      </button>
+      <Link href="/" className="flex items-center gap-2 font-display text-2xl text-on-hero">
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-accent" />
+        Finance Manager
+      </Link>
+      <nav aria-label="Main" className="mx-auto hidden items-center gap-2 lg:flex">
+        {PRIMARY_LINKS.map((link) => {
+          const active = isActive(pathname, link.href);
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={active ? 'page' : undefined}
+              className={`${HERO_PILL_CLASS} ${active ? HERO_PILL_ACTIVE : HERO_PILL_IDLE}`}
+            >
+              <Icon name={link.icon} />
+              {link.label}
+            </Link>
+          );
+        })}
+        <MoreMenu pathname={pathname} />
+      </nav>
+      <div className="ml-auto hidden items-center gap-2 md:flex lg:ml-0">
+        <Link href="/settings" aria-label="Settings" className={HERO_ICON_BUTTON_CLASS}>
+          <Icon name="settings" />
+        </Link>
+        <form action={logoutAction}>
+          <button type="submit" aria-label="Sign out" className={HERO_ICON_BUTTON_CLASS}>
+            <Icon name="signOut" />
+          </button>
+        </form>
+      </div>
+    </header>
+  );
+}
+
 interface AppShellProps {
-  /** Signed out (login, setup), only the page renders: no sidebar, top bar or drawer. */
+  /** Signed out (login, setup), only the page renders: no hero, top bar or drawer. */
   showNavigation: boolean;
-  /** The desktop sidebar's saved mode: pinned open, or a rail of icons. */
-  sidebarMode: SidebarMode;
-  /** PROTOTYPE: the layout variant saved in the prototype cookie, if any. */
-  prototypeLayout?: string;
   children: ReactNode;
 }
 
 /**
- * The page layout: a grouped sidebar, a sticky breadcrumb bar and the page on a soft canvas.
+ * The page layout: the app in a rounded frame on a grey canvas. A deep-teal hero carries the
+ * brand, the main pages as pills (the rest under More), a greeting with where you are, and the
+ * quick actions; the page sits on a paper panel that rises out of the hero's fade. Below `lg`
+ * the pills give way to a drawer opened from the top bar.
  *
  * `children` keeps the same position in the tree whether or not the navigation shows, so a page
  * whose action signs the user in (first-run setup shows its recovery codes afterwards) is not
  * remounted, and loses no state, when the navigation appears.
  */
-export function AppShell(props: AppShellProps) {
-  // PROTOTYPE: pick a layout variant (?layout=A|B|C|D, remembered in a cookie). Delete after.
-  const searchParams = useSearchParams();
-  const [saved, setSaved] = useState<PrototypeLayoutKey | null>(
-    parsePrototypeLayout(props.prototypeLayout),
-  );
-  const layout =
-    parsePrototypeLayout(searchParams.get(PROTOTYPE_LAYOUT_PARAM)) ??
-    saved ??
-    (IS_PROTOTYPE_ENABLED ? 'A' : null);
-  if (!props.showNavigation || layout === null) return <CurrentShell {...props} />;
-
-  return (
-    <>
-      {layout === 'A' && <CurrentShell {...props} />}
-      {layout === 'B' && <HeroLayout>{props.children}</HeroLayout>}
-      {layout === 'C' && <DockLayout>{props.children}</DockLayout>}
-      {layout === 'D' && <TabsLayout>{props.children}</TabsLayout>}
-      <PrototypeLayoutSwitcher current={layout} onChange={setSaved} />
-    </>
-  );
-}
-
-function CurrentShell({ showNavigation, sidebarMode, children }: AppShellProps) {
+export function AppShell({ showNavigation, children }: AppShellProps) {
+  const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  return (
-    <div className="flex min-h-screen bg-paper">
-      {showNavigation && <DesktopSidebar initialMode={sidebarMode} />}
+  // The frame clips nothing (its corners come from the hero's own rounding): a menu that drops
+  // past the end of a page must still be reachable, and sticky columns must stick.
+  const frame = showNavigation
+    ? 'relative mx-auto min-h-screen max-w-[1400px] bg-sunken md:min-h-[calc(100vh-3rem)] md:rounded-[28px] md:shadow-2xl md:shadow-hero/25'
+    : '';
+  const main = showNavigation
+    ? 'mx-3 mb-6 rounded-3xl bg-paper px-4 py-8 shadow-xl shadow-hero/10 md:mx-8 md:mb-8 md:px-8'
+    : 'mx-auto w-full max-w-5xl px-4 py-8 md:px-6';
 
-      <div className="flex min-w-0 flex-1 flex-col">
+  return (
+    <div className={showNavigation ? 'min-h-screen bg-canvas md:p-6' : 'min-h-screen bg-paper'}>
+      <div className={frame}>
         {showNavigation && (
-          <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-rule bg-surface/80 px-4 backdrop-blur md:px-6">
-            <button
-              type="button"
-              aria-label="Open menu"
-              aria-expanded={isMenuOpen}
-              onClick={() => setIsMenuOpen(true)}
-              className={`${ICON_BUTTON} md:hidden`}
-            >
-              <Icon name="menu" className="h-5 w-5" />
-            </button>
-            <div className="md:hidden">
-              <Brand />
-            </div>
-            <div className="hidden md:block">
-              <Breadcrumb />
-            </div>
-          </header>
+          <div
+            aria-hidden="true"
+            className="bg-hero absolute inset-x-0 top-0 h-[600px] md:rounded-t-[28px]"
+          />
         )}
-        <main
-          className={`mx-auto w-full px-4 py-8 md:px-6 ${showNavigation ? 'max-w-6xl' : 'max-w-5xl'}`}
-        >
-          {children}
-        </main>
+        <div className="relative">
+          {showNavigation && (
+            <>
+              <TopBar pathname={pathname} onOpenMenu={() => setIsMenuOpen(true)} />
+              <div className="flex flex-wrap items-end justify-between gap-6 px-5 pt-6 pb-10 text-on-hero md:px-8">
+                <div>
+                  <Greeting />
+                  <Breadcrumb pathname={pathname} />
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {/* Statements are imported from an Account's page: pick the Account there. */}
+                  <Link href="/accounts" className={HERO_SECONDARY_BUTTON_CLASS}>
+                    Import statement
+                  </Link>
+                  <Link href="/unclassified" className={HERO_PRIMARY_BUTTON_CLASS}>
+                    Review unclassified
+                  </Link>
+                </div>
+              </div>
+            </>
+          )}
+          <main className={main}>{children}</main>
+        </div>
       </div>
 
       {showNavigation && isMenuOpen && <MobileDrawer onClose={() => setIsMenuOpen(false)} />}

@@ -26,6 +26,16 @@
   --color-accent-ink: #c93a10; /* AA on paper, surface and accent-tint */
   --color-accent-tint: #fff1ec; /* selected navigation, highlighted rows */
 
+  /* The hero: the deep-teal band at the top of every signed-in page, and the canvas around the
+     app's frame. Atmosphere only, never meaning: the accent stays vermilion. */
+  --color-hero-deep: #0a2f3c;
+  --color-hero: #0f4352; /* also text on the hero's white buttons (AA) */
+  --color-hero-mid: #1f6577;
+  --color-hero-glow: #3b8597;
+  --color-hero-mist: #a9c7cf;
+  --color-on-hero: #ffffff; /* text and outlines on the hero */
+  --color-canvas: #e9ecee; /* behind the app's frame */
+
   /* Meaning, kept apart from the accent: never use these for decoration. */
   --color-positive: #047857;
   --color-positive-tint: #ecfdf5;
@@ -43,6 +53,21 @@
 
 :root {
   color-scheme: light;
+}
+
+/* The hero's backdrop: deep teal at the top, lit from the top right, fading into the page. */
+@utility bg-hero {
+  background:
+    radial-gradient(120% 90% at 85% 10%, var(--color-hero-glow) 0%, transparent 55%),
+    radial-gradient(90% 120% at 0% 0%, var(--color-hero-deep) 0%, transparent 100%),
+    linear-gradient(
+      180deg,
+      var(--color-hero) 0%,
+      var(--color-hero-mid) 38%,
+      var(--color-hero-mist) 72%,
+      transparent 100%
+    );
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
 }
 
 body {

@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { Sidebar } from './sidebar';
 
-/** Below `md` the sidebar becomes a drawer opened from the top bar. */
+/** Below `lg`, where the top bar has no pills, every page is in this drawer. */
 export function MobileDrawer({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -14,7 +14,7 @@ export function MobileDrawer({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-30 md:hidden">
+    <div className="fixed inset-0 z-50 lg:hidden">
       <button
         type="button"
         aria-label="Close menu"

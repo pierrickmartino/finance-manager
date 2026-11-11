@@ -13,7 +13,7 @@ Style with tokens and primitives, so a change to the look is a one-place edit. W
 
 | Token | Role |
 | --- | --- |
-| `paper` | Page background (the app shell). |
+| `paper` | Page background: the panel each page sits on. |
 | `surface` | Cards, inputs, menus: anything that sits on the page. |
 | `sunken` | Hover, selected rows, tracks, quiet fills. |
 | `rule` / `rule-strong` | Dividers and card borders / control borders. |
@@ -24,6 +24,9 @@ Style with tokens and primitives, so a change to the look is a one-place edit. W
 | `accent` | Vermilion fills: marks in charts, underlines, the focus ring, large display numbers. |
 | `accent-ink` | Vermilion for text and links (the accent darkened to pass AA). |
 | `accent-tint` | Selected navigation, highlighted rows. |
+| `hero-deep`, `hero`, `hero-mid`, `hero-glow`, `hero-mist` | The app shell's hero only: the deep-teal band at the top of every signed-in page, drawn by the `bg-hero` utility. `hero` is also the text of a white button on it. |
+| `on-hero` | Text, outlines and translucent fills on the hero (`text-on-hero/75`, `ring-on-hero/25`). |
+| `canvas` | Behind the app's rounded frame. |
 | `positive`, `negative`, `warning`, `info` (+ `-tint`, `warning-rule`) | Meaning only: income and success, expense and errors, attention, neutral status. Never decoration. |
 
 Type: `font-display` (a serif) for page titles, section titles and headline amounts; the default sans for everything else. Amounts that line up use `tabular-nums`.
@@ -44,9 +47,13 @@ Type: `font-display` (a serif) for page titles, section titles and headline amou
 
 Form fields come from `src/components/form.tsx` (`TextField`, `SubmitButton`, `FieldError`) and the list pages' `INPUT_CLASS` / `BUTTON_CLASS` in `src/components/named-list.tsx`.
 
+## The app shell
+
+Signed in, the app sits in a rounded frame on the `canvas`. A deep-teal hero carries the brand, the most used pages as pills (every other page under More), a greeting with where you are, and the quick actions; the page sits on a `paper` panel that rises out of the hero's fade. Below `lg` the pills give way to a drawer. The hero's controls take their look from `src/components/app-shell/hero-styles.ts`.
+
 ## Rules
 
-- **One accent.** Vermilion marks what is selected, focused or the point of a chart. Status colours carry meaning and stay apart from it.
+- **One accent.** Vermilion marks what is selected, focused or the point of a chart. Status colours carry meaning and stay apart from it. The hero's teal is atmosphere, not a second accent: it stays in the app shell and never marks a state.
 - **Serif with restraint.** Titles and headline amounts only; labels, tables and controls stay in the sans.
 - **Words in sentence case.** Labels and group names read as plain words, without letter-spaced capitals.
 - **Charts.** Categorical series use `CHART_PALETTE` (`src/app/dashboards/chart-palette.ts`), a colour-blind-safe order; text and gridlines use `muted` and `rule`. The Dashboard Story draws in ink with the accent (`src/app/dashboards/[id]/story/palette.ts`).
