@@ -1,7 +1,8 @@
 import type { Account } from '../accounts';
-import { listAccountBalances } from '../accounts/balances';
-import { listBalanceSnapshots } from '../balance-snapshots';
+import { nativeBalancesOn } from '../accounts/balances';
+import { listLatestBalanceSnapshots } from '../balance-snapshots';
 import type { ServiceContext } from '../context';
+import type { ImportCoverage } from './coverage';
 
 /**
  * The Account's Transactions no longer add up to its latest Statement balance (spec: Balance
@@ -14,46 +15,25 @@ export interface MismatchProblem {
   statementDate: string;
 }
 
-interface StatementBalance {
+interface Closing {
   date: string;
   balanceMinor: number;
+  importedAt: Date;
 }
-
-/**
- * Per Account, the closing balance of its newest committed Import that states one, dated at that
- * Import's statement end (or, without one, its latest Transaction date).
- */
-const SELECT_LATEST_CLOSINGS = `
-  SELECT DISTINCT ON (i.account_id) i.account_id AS "accountId", e.date,
-         i.closing_balance_minor AS "balanceMinor"
-  FROM import i
-  CROSS JOIN LATERAL (
-    SELECT coalesce(
-      i.statement_to,
-      (SELECT max(t.booking_date) FROM "transaction" t WHERE t.import_id = i.id)
-    ) AS date
-  ) e
-  WHERE i.undone_at IS NULL AND i.closing_balance_minor IS NOT NULL AND e.date IS NOT NULL
-  ORDER BY i.account_id, e.date DESC, i.imported_at DESC`;
 
 const SELECT_ACCOUNTS_WITH_TRANSACTIONS = `SELECT DISTINCT account_id AS "accountId" FROM "transaction"`;
 
-/** The computed native balance of each given Account on its date, via the Account balances. */
-async function computedBalances(
-  ctx: ServiceContext,
-  datesById: Map<string, string>,
-): Promise<Map<string, number>> {
-  const dates = [...new Set(datesById.values())];
-  const perDate = await Promise.all(
-    dates.map((date) => listAccountBalances(ctx, { date }).then((rows) => ({ date, rows }))),
-  );
-  const computed = new Map<string, number>();
-  for (const { date, rows } of perDate) {
-    for (const row of rows) {
-      if (datesById.get(row.account.id) === date) computed.set(row.account.id, row.balanceMinor);
-    }
-  }
-  return computed;
+/**
+ * The closing balance of the Account's newest committed Import that states one, dated at that
+ * Import's coverage end; null when none does.
+ */
+function latestClosing(imports: readonly ImportCoverage[]): Closing | null {
+  return imports.reduce<Closing | null>((latest, { to, closingBalanceMinor, importedAt }) => {
+    if (to === null || closingBalanceMinor === null) return latest;
+    const isNewer =
+      latest === null || to > latest.date || (to === latest.date && importedAt > latest.importedAt);
+    return isNewer ? { date: to, balanceMinor: closingBalanceMinor, importedAt } : latest;
+  }, null);
 }
 
 /**
@@ -63,47 +43,44 @@ async function computedBalances(
  */
 export async function findMismatches(
   ctx: ServiceContext,
-  accounts: Account[],
+  accounts: readonly Account[],
+  coverageById: ReadonlyMap<string, readonly ImportCoverage[]>,
 ): Promise<Map<string, MismatchProblem>> {
-  const [closings, withTransactions] = await Promise.all([
-    ctx.db.query<StatementBalance & { accountId: string }>(SELECT_LATEST_CLOSINGS),
+  const [withTransactions, snapshots] = await Promise.all([
     ctx.db.query<{ accountId: string }>(SELECT_ACCOUNTS_WITH_TRANSACTIONS),
+    listLatestBalanceSnapshots(ctx),
   ]);
   const hasTransactions = new Set(withTransactions.rows.map((row) => row.accountId));
-  const closingById = new Map(
-    closings.rows.map(({ accountId, ...closing }) => [accountId, closing]),
-  );
-  const checked = accounts.filter((account) => hasTransactions.has(account.id));
-  const latestSnapshots = await Promise.all(
-    checked.map(async (account) => ({
+  const snapshotById = new Map(snapshots.map((snapshot) => [snapshot.accountId, snapshot]));
+  const latest = accounts
+    .filter((account) => hasTransactions.has(account.id))
+    .map((account) => ({
       account,
-      snapshot: (await listBalanceSnapshots(ctx, account.id))[0],
-    })),
+      snapshot: snapshotById.get(account.id),
+      closing: latestClosing(coverageById.get(account.id) ?? []),
+    }));
+
+  // A Balance snapshot already carries its check; it counts when dated after the closing.
+  const snapshotMismatches = latest.flatMap(({ account, snapshot, closing }) =>
+    snapshot?.differenceMinor && (!closing || snapshot.date > closing.date)
+      ? [mismatchEntry(account, snapshot.differenceMinor, snapshot.date)]
+      : [],
   );
+  const closings = latest.flatMap(({ account, snapshot, closing }) =>
+    closing && (!snapshot || snapshot.date <= closing.date) ? [{ account, ...closing }] : [],
+  );
+  const computed = await nativeBalancesOn(ctx.db, closings);
+  const closingMismatches = closings.flatMap(({ account, date, balanceMinor }) => {
+    const differenceMinor = computed.get(account.id)! - balanceMinor;
+    return differenceMinor === 0 ? [] : [mismatchEntry(account, differenceMinor, date)];
+  });
+  return new Map([...snapshotMismatches, ...closingMismatches]);
+}
 
-  const mismatches = new Map<string, MismatchProblem>();
-  const closingDates = new Map<string, string>();
-  for (const { account, snapshot } of latestSnapshots) {
-    const closing = closingById.get(account.id);
-    if (snapshot && (!closing || snapshot.date > closing.date)) {
-      if (snapshot.differenceMinor) {
-        mismatches.set(account.id, {
-          kind: 'mismatch',
-          differenceMinor: snapshot.differenceMinor,
-          statementDate: snapshot.date,
-        });
-      }
-    } else if (closing) {
-      closingDates.set(account.id, closing.date);
-    }
-  }
-
-  const computed = await computedBalances(ctx, closingDates);
-  for (const [accountId, date] of closingDates) {
-    const differenceMinor = computed.get(accountId)! - closingById.get(accountId)!.balanceMinor;
-    if (differenceMinor !== 0) {
-      mismatches.set(accountId, { kind: 'mismatch', differenceMinor, statementDate: date });
-    }
-  }
-  return mismatches;
+function mismatchEntry(
+  account: Account,
+  differenceMinor: number,
+  statementDate: string,
+): [string, MismatchProblem] {
+  return [account.id, { kind: 'mismatch', differenceMinor, statementDate }];
 }

@@ -74,6 +74,31 @@ function balanceOn(account: Account, date: string, laterMinor: number): number {
 }
 
 /**
+ * The native balance of each given Account at the end of its own date, keyed by Account id, in
+ * one query for all of them. As `listAccountBalances` computes it for an Account with
+ * Transactions; a snapshot-only Account's balance is its snapshot, so it is not asked here.
+ */
+export async function nativeBalancesOn(
+  db: Queryable,
+  datedAccounts: ReadonlyArray<{ account: Account; date: string }>,
+): Promise<Map<string, number>> {
+  const result = await db.query<{ accountId: string; laterMinor: number }>(
+    `SELECT d.account_id AS "accountId", coalesce(sum(t.amount_minor), 0)::bigint AS "laterMinor"
+     FROM unnest($1::uuid[], $2::date[]) AS d(account_id, date)
+     LEFT JOIN "transaction" t ON t.account_id = d.account_id AND t.booking_date > d.date
+     GROUP BY d.account_id`,
+    [datedAccounts.map(({ account }) => account.id), datedAccounts.map(({ date }) => date)],
+  );
+  const laterById = new Map(result.rows.map((row) => [row.accountId, row.laterMinor]));
+  return new Map(
+    datedAccounts.map(({ account, date }) => [
+      account.id,
+      balanceOn(account, date, laterById.get(account.id) ?? 0),
+    ]),
+  );
+}
+
+/**
  * Every Account (in `listAccounts` order) with its balance on `date` (default: today in
  * Switzerland) in its own Currency and in CHF at that date's rate (story 95). CHF values are
  * computed here, never stored (ADR-0002).
