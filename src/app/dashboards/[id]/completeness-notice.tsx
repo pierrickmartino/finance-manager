@@ -9,8 +9,12 @@ function accounts(count: number): string {
 }
 
 /** One problem in words, as its row lists it. */
-function describeProblem(problem: CompletenessProblem): string {
+function describeProblem(problem: CompletenessProblem, fmt: Formatter): string {
   switch (problem.kind) {
+    case 'gap':
+      return problem.from === problem.to
+        ? `Gap ${fmt.date(problem.from)}`
+        : `Gap ${fmt.date(problem.from)} – ${fmt.date(problem.to)}`;
     case 'stale':
       return 'Stale';
     case 'never_imported':
@@ -51,7 +55,9 @@ function EntryRow({ entry, fmt }: { entry: CompletenessEntry; fmt: Formatter }) 
         </span>
         <span className={hasProblems ? undefined : 'text-muted'}>{freshness(entry, fmt)}</span>
         {hasProblems && (
-          <span className="font-medium">{entry.problems.map(describeProblem).join(' · ')}</span>
+          <span className="font-medium">
+            {entry.problems.map((problem) => describeProblem(problem, fmt)).join(' · ')}
+          </span>
         )}
       </Link>
     </li>

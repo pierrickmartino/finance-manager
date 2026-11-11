@@ -3,6 +3,7 @@ import { listAccounts, type Account } from '../accounts';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { daysBetween } from '../fx/dates';
+import { findGaps, type DaySpan } from './gaps';
 
 /** The Account a Completeness check entry is about, as its row names and links it. */
 export type CheckedAccount = Pick<Account, 'id' | 'name' | 'bankName' | 'currency'>;
@@ -22,6 +23,16 @@ export interface StaleProblem {
   kind: 'stale';
 }
 
+/**
+ * Days between the Account's first and latest committed Import that no Import covers and no
+ * Manual transaction fills (GLOSSARY: Gap). `from` and `to` are its first and last day.
+ */
+export interface GapProblem {
+  kind: 'gap';
+  from: string;
+  to: string;
+}
+
 /** The Account has an Import format but no committed Import ("No Import yet"). */
 export interface NeverImportedProblem {
   kind: 'never_imported';
@@ -32,7 +43,7 @@ export interface NeverImportedProblem {
  * `mismatch` (difference and Statement balance date), `gap` (first and last day), `stale` and
  * `never_imported`; each new kind is a member here and a rank in `SEVERITY`.
  */
-export type CompletenessProblem = StaleProblem | NeverImportedProblem;
+export type CompletenessProblem = GapProblem | StaleProblem | NeverImportedProblem;
 export type CompletenessProblemKind = CompletenessProblem['kind'];
 
 /**
@@ -40,6 +51,7 @@ export type CompletenessProblemKind = CompletenessProblem['kind'];
  * No Import yet (spec: Ordering). A kind without a rank does not compile.
  */
 const SEVERITY = {
+  gap: 1,
   stale: 2,
   never_imported: 2,
 } as const satisfies Record<CompletenessProblemKind, number>;
@@ -72,9 +84,10 @@ export async function checkCompleteness(
   input: { today: string },
 ): Promise<CompletenessEntry[]> {
   const { today } = parseInput(checkInput, input);
-  const [accounts, dataEnds] = await Promise.all([
+  const [accounts, dataEnds, gapsById] = await Promise.all([
     listAccounts(ctx),
     ctx.db.query<{ accountId: string; dataEnd: string | null }>(SELECT_DATA_ENDS),
+    findGaps(ctx.db),
   ]);
   const dataEndById = new Map(dataEnds.rows.map((row) => [row.accountId, row.dataEnd]));
   const entries = accounts
@@ -91,7 +104,10 @@ export async function checkCompleteness(
         },
         dataEnd,
         daysSince,
-        problems: worstFirst(freshnessProblems(daysSince)),
+        problems: worstFirst([
+          ...gapProblems(gapsById.get(account.id) ?? []),
+          ...freshnessProblems(daysSince),
+        ]),
       };
     });
   // A stable sort: equally bad rows, and all healthy rows, keep Accounts-list order.
@@ -106,6 +122,10 @@ function worstFirst(problems: CompletenessProblem[]): CompletenessProblem[] {
 function worstRank(entry: CompletenessEntry): number {
   const [worst] = entry.problems;
   return worst ? SEVERITY[worst.kind] : HEALTHY_RANK;
+}
+
+function gapProblems(gaps: DaySpan[]): CompletenessProblem[] {
+  return gaps.map((gap) => ({ kind: 'gap', from: gap.from, to: gap.to }));
 }
 
 function freshnessProblems(daysSince: number | null): CompletenessProblem[] {
