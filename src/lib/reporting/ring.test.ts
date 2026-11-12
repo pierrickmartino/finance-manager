@@ -22,6 +22,7 @@ function parts(entries: [string, number][]): ChartSource {
       columnTotals: [],
       total: 'total',
     },
+    drill: null,
   };
 }
 

@@ -6,7 +6,7 @@ import { FieldError } from '@/components/form';
 import { getServiceContext } from '@/server/app-context';
 import { NotFoundError } from '@/server/services/errors';
 import { getWidget, MEASURE_LABELS, type Widget } from '@/server/services/reporting';
-import { balanceHref, editWidgetHref } from '../../dashboards/load';
+import { BALANCE_LINKS, editWidgetHref } from '../../dashboards/load';
 import { deleteWidgetAction } from '../actions';
 import { loadSavedWidget } from '../load';
 import { drillLinks, toPivotData } from '../pivot-data';
@@ -61,7 +61,7 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
           data={toPivotData(
             report,
             widget.source === 'account_balances'
-              ? balanceHref
+              ? BALANCE_LINKS
               : drillLinks(report, { kind: 'widget', id: widget.id }),
           )}
         />

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FieldError } from '@/components/form';
 import { backLink, originFromParams } from '@/lib/reporting/drill-origin';
-import { drillFilterLine, drillHeadline } from '@/lib/reporting/drill-summary';
+import { changeWorking, drillFilterLine, drillHeadline } from '@/lib/reporting/drill-summary';
 import { cellFromParams, queryFromParams, type UrlParams } from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
 import { splitLabel } from '@/app/transactions/transaction-display';
@@ -11,8 +11,12 @@ import type { Formatter } from '@/lib/format';
 import { getFormatter } from '@/server/formatter';
 import { ServiceError } from '@/server/services/errors';
 import {
+  isExcept,
+  isTimeAxis,
   listCellTransactions,
+  type AxisSelector,
   type CellRef,
+  type ReportAxis,
   type CellTransaction,
   type CellTransactionPage,
   type ReportHeader,
@@ -42,16 +46,54 @@ async function loadCell(
   }
 }
 
+/** At most this many names in "All but …"; past it, "Other", as the chart calls it. */
+const EXCEPT_NAMES = 2;
+
+const headerLabel = (headers: ReportHeader[] | undefined, key: string | null): string =>
+  headers?.find((header) => header.key === key)?.label ?? key ?? 'None';
+
+/**
+ * One axis of the cell in words: its key's label; for every key but some, the periods kept on
+ * a time axis ("Jan 2025 to Feb 2025"), else "All but Rent" or "Other".
+ */
+function describeSelector(
+  headers: ReportHeader[] | undefined,
+  axis: ReportAxis | null | undefined,
+  selector: AxisSelector | undefined,
+): string | null {
+  if (selector === undefined) return null;
+  if (!isExcept(selector)) return headerLabel(headers, selector);
+  const kept = (headers ?? []).filter((header) => !selector.except.includes(header.key));
+  if (isTimeAxis(axis ?? null) && kept.length > 0) {
+    const [first, last] = [kept[0]!, kept.at(-1)!];
+    return first === last ? first.label : `${first.label} to ${last.label}`;
+  }
+  if (selector.except.length === 0) return 'All';
+  if (selector.except.length > EXCEPT_NAMES) return 'Other';
+  return `All but ${selector.except.map((key) => headerLabel(headers, key)).join(', ')}`;
+}
+
 /** "Mar 2025 · Food › Groceries": the labels of the cell's row and column. */
 function describeCell(report: ReportTable | null, cell: CellRef): string {
-  const label = (headers: ReportHeader[] | undefined, key: string | null | undefined) =>
-    key === undefined
-      ? null
-      : (headers?.find((header) => header.key === key)?.label ?? key ?? 'None');
-  const parts = [label(report?.rows, cell.row), label(report?.columns, cell.column)].filter(
-    (part): part is string => part !== null,
-  );
+  const parts = [
+    describeSelector(report?.rows, report?.query.rows, cell.row),
+    describeSelector(report?.columns, report?.query.columns, cell.column),
+  ].filter((part): part is string => part !== null);
   return parts.length ? parts.join(' · ') : 'All';
+}
+
+/** The change a cell's subtotals work out, each period by its label. */
+function changeLine(
+  page: CellTransactionPage,
+  report: ReportTable | null,
+  chf: (minor: number) => string,
+): string | null {
+  if (!page.subtotals) return null;
+  const labelled = page.subtotals.map((period) => ({
+    label: headerLabel(report?.rows, period.key),
+    sumChfMinor: period.sumChfMinor,
+  }));
+  return changeWorking(labelled, chf);
 }
 
 /**
@@ -86,6 +128,7 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
     loadQueryFormLists(),
   ]);
   const chf = (minor: number) => fmt.amount(minor, { currency: 'CHF' });
+  const change = page ? changeLine(page, report, chf) : null;
 
   return (
     <section className="flex flex-col gap-6">
@@ -112,8 +155,11 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
       {page && (
         <>
           <p role="status" className="text-lg text-ink tabular-nums">
-            {drillHeadline(page, chf)}
+            {change ?? drillHeadline(page, chf)}
           </p>
+          {change && (
+            <p className="-mt-4 text-sm text-muted tabular-nums">{drillHeadline(page, chf)}</p>
+          )}
           {page.unconvertedCount > 0 && report && (
             <p role="alert" className={`${WARNING_NOTICE_CLASS} text-sm`}>
               {page.unconvertedCount} Transaction{page.unconvertedCount === 1 ? '' : 's'} left out:

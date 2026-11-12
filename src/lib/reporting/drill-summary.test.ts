@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WidgetQuery } from '@/server/services/reporting/query';
-import { drillFilterLine, drillHeadline, type DrillNumber } from './drill-summary';
+import { changeWorking, drillFilterLine, drillHeadline, type DrillNumber } from './drill-summary';
 import type { FilterChoices } from './query-filters';
 import { DEFAULT_WIDGET_QUERY } from './widget-params';
 
@@ -44,6 +44,34 @@ describe('drillHeadline', () => {
   it('says so when no Transaction falls in the cell', () => {
     expect(drillHeadline(number({}), chf)).toBe('No Transactions');
     expect(drillHeadline(number({ measure: 'average' }), chf)).toBe('No Transactions');
+  });
+});
+
+describe('changeWorking', () => {
+  it('works a change out from two months: the newest over the one before', () => {
+    const months = [
+      { label: 'March', sumChfMinor: 124_000 },
+      { label: 'February', sumChfMinor: 110_700 },
+    ];
+
+    expect(changeWorking(months, chf)).toBe('March CHF 1,240 · February CHF 1,107 → +12%');
+  });
+
+  it('compares the newest month with the average of the months before, as the insight does', () => {
+    // Spending is negative; Mar spent 300 against an average of 750 before: 60% below.
+    const months = [
+      { label: 'Mar', sumChfMinor: -30_000 },
+      { label: 'Feb', sumChfMinor: -90_000 },
+      { label: 'Jan', sumChfMinor: -60_000 },
+    ];
+
+    expect(changeWorking(months, chf)).toBe(
+      'Mar CHF -300 · Feb CHF -900 · Jan CHF -600 · average before CHF -750 → −60%',
+    );
+  });
+
+  it('has nothing to work out from a single month', () => {
+    expect(changeWorking([{ label: 'Mar', sumChfMinor: 1 }], chf)).toBeNull();
   });
 });
 

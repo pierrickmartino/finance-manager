@@ -4,10 +4,10 @@ import { parseInput } from '../errors';
 import { swissToday } from '../fx/dates';
 import { listTransactionsByIds, type TransactionListItem } from '../transactions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../transactions/query';
-import { cellPeriodCount, cellSpan, currenciesInUse, measureOf } from './engine';
-import { ALL_HEADER, type ReportHeader } from './headers';
-import { resolveRange, type DateSpan } from './periods';
+import { currenciesInUse, measureOf } from './engine';
+import { intersect, periodSpan, periodsIn, resolveRange, type DateSpan } from './periods';
 import {
+  isTimeAxis,
   widgetQueryInput,
   type Measure,
   type ReportAxis,
@@ -15,23 +15,23 @@ import {
   type WidgetQuery,
   type WidgetQueryInput,
 } from './query';
-import { axisCondition, baseCte, SqlParams } from './sql';
+import { axisCondition, axisExceptCondition, axisKey, baseCte, SqlParams } from './sql';
 
-/**
- * Which cell to drill into (spec 107), by the header keys of the report. An absent key means
- * the whole axis: `{ row }` is a row total, `{}` the grand total. `null` is the "none" bucket
- * (no Category, no Payee, no Tag), as in `ReportHeader.key`.
- */
-export interface CellRef {
-  row?: string | null;
-  column?: string | null;
-  page?: number;
-  pageSize?: number;
-}
+import { isExcept, type AxisSelector, type CellRef } from './cell-ref';
+
+export { isExcept, type AxisExcept, type AxisSelector, type CellRef } from './cell-ref';
+
+/** More keys than a chart ever keeps out of "Other". */
+const MAX_EXCEPT = 100;
+const keyInput = z.string().max(100).nullable();
+const selectorInput = z
+  .union([keyInput, z.object({ except: z.array(keyInput).max(MAX_EXCEPT) })])
+  .optional();
 
 const cellInput = z.object({
-  row: z.string().max(100).nullable().optional(),
-  column: z.string().max(100).nullable().optional(),
+  row: selectorInput,
+  column: selectorInput,
+  change: z.boolean().default(false),
   page: z.number().int().min(1, 'Page must be 1 or more').default(1),
   pageSize: z
     .number()
@@ -54,6 +54,12 @@ export interface CellTransaction extends TransactionListItem {
   countedLineCount: number | null;
 }
 
+/** The CHF sum of one period of a cell (0 when no Transaction falls in it). */
+export interface PeriodSubtotal {
+  key: string;
+  sumChfMinor: number;
+}
+
 export interface CellTransactionPage {
   /** The measure of the number drilled into, and the period its `average` divides by. */
   measure: Measure;
@@ -71,6 +77,11 @@ export interface CellTransactionPage {
   sumChfMinor: number | null;
   /** Transactions that would fall in the cell but are left out: no FX rate yet. */
   unconvertedCount: number;
+  /**
+   * When a change was asked for: the sum of each period of the rows in the cell, newest first,
+   * over the whole cell (not only this page). Null otherwise.
+   */
+  subtotals: PeriodSubtotal[] | null;
   page: number;
   pageSize: number;
   pageCount: number;
@@ -85,28 +96,56 @@ const ID_AXES: ReadonlySet<ReportAxis> = new Set([
   'tag',
 ]);
 
-const headerOf = (key: string | null | undefined): ReportHeader =>
-  key === undefined ? ALL_HEADER : { key, label: '', isPartial: false };
+type CellAxes = Pick<CellRef, 'row' | 'column'>;
+
+const axesOf = (query: WidgetQuery, cell: CellAxes) =>
+  [
+    [query.rows, cell.row],
+    [query.columns, cell.column],
+  ] as const;
 
 /**
  * The conditions (over `report_base b`) selecting the cell's rows, or null when a key is an
  * unknown id, which can't match anything (checking here keeps the uuid casts safe).
  */
-function cellConditions(
-  query: WidgetQuery,
-  cell: { row?: string | null; column?: string | null },
-  params: SqlParams,
-): string[] | null {
+function cellConditions(query: WidgetQuery, cell: CellAxes, params: SqlParams): string[] | null {
   const conditions: string[] = [];
-  for (const [axis, key] of [
-    [query.rows, cell.row],
-    [query.columns, cell.column],
-  ] as const) {
+  for (const [axis, key] of axesOf(query, cell)) {
     if (axis === null || key === undefined) continue;
+    if (isExcept(key)) {
+      conditions.push(axisExceptCondition(axis, key.except, params));
+      continue;
+    }
     if (key !== null && ID_AXES.has(axis) && !UUID.safeParse(key).success) return null;
     conditions.push(axisCondition(axis, key, params));
   }
   return conditions;
+}
+
+/** The periods of a time axis in `span` that the selector keeps (all when absent), oldest first. */
+function keptPeriods(axis: TimeAxis, selector: AxisSelector | undefined, span: DateSpan): string[] {
+  const all = periodsIn(span, axis);
+  if (selector === undefined) return all;
+  if (isExcept(selector)) return all.filter((key) => !selector.except.includes(key));
+  return all.filter((key) => key === selector);
+}
+
+/**
+ * The dates the cell covers: the range, narrowed by its time periods. Every period but some
+ * covers from the first period it keeps to the last.
+ */
+function drillSpan(query: WidgetQuery, range: DateSpan, cell: CellAxes): DateSpan | null {
+  let span: DateSpan | null = range.from > range.to ? null : range;
+  for (const [axis, selector] of axesOf(query, cell)) {
+    if (!span || !isTimeAxis(axis) || selector === undefined || selector === null) continue;
+    const kept = keptPeriods(axis, selector, range);
+    const [first, last] = [kept[0], kept.at(-1)];
+    span =
+      first && last
+        ? intersect(span, { from: periodSpan(first, axis).from, to: periodSpan(last, axis).to })
+        : null;
+  }
+  return span;
 }
 
 interface CellRow {
@@ -120,6 +159,7 @@ interface CellAggregate {
   sumMinor: number | null;
   unconverted: number;
   items: CellRow[] | null;
+  subtotals: PeriodSubtotal[] | null;
 }
 
 /**
@@ -136,12 +176,19 @@ export async function listCellTransactions(
   const cell = parseInput(cellInput, cellRef);
   const { page, pageSize } = cell;
   const { range } = resolveRange(query.dateRange, swissToday());
-  const [row, column] = [headerOf(cell.row), headerOf(cell.column)];
+  const span = drillSpan(query, range, cell);
   const measured = {
     measure: query.measure,
     averagePer: query.averagePer,
-    periodCount: cellPeriodCount(query, range, row, column),
-    span: cellSpan(query, range, row, column),
+    periodCount: span ? periodsIn(span, query.averagePer).length : 0,
+    span,
+  };
+  const subtotalAxis = cell.change && isTimeAxis(query.rows) ? query.rows : null;
+  const subtotalsOf = (sums: PeriodSubtotal[]): PeriodSubtotal[] | null => {
+    if (!subtotalAxis) return null;
+    const byKey = new Map(sums.map((item) => [item.key, item.sumChfMinor]));
+    const keys = span ? keptPeriods(subtotalAxis, cell.row, span) : [];
+    return keys.toReversed().map((key) => ({ key, sumChfMinor: byKey.get(key) ?? 0 }));
   };
   const empty: CellTransactionPage = {
     ...measured,
@@ -150,22 +197,23 @@ export async function listCellTransactions(
     total: 0,
     sumChfMinor: null,
     unconvertedCount: 0,
+    subtotals: subtotalsOf([]),
     page,
     pageSize,
     pageCount: 0,
   };
-  if (range.from > range.to) return empty;
+  if (span === null) return empty;
 
   const params = new SqlParams();
   const conditions = cellConditions(query, cell, params);
   if (conditions === null) return empty;
-  const { total, sumMinor, unconverted, items } = await queryCell(
+  const { total, sumMinor, unconverted, items, subtotals } = await queryCell(
     ctx,
     query,
     range,
     conditions,
     params,
-    cell,
+    { page, pageSize, subtotalAxis },
   );
   const byId = new Map((items ?? []).map((item) => [item.id, item]));
   const transactions = await listTransactionsByIds(ctx, [...byId.keys()]);
@@ -183,10 +231,18 @@ export async function listCellTransactions(
     total,
     sumChfMinor: sumMinor,
     unconvertedCount: unconverted,
+    subtotals: subtotalsOf(subtotals ?? []),
     page,
     pageSize,
     pageCount: Math.ceil(total / pageSize),
   };
+}
+
+interface CellPaging {
+  page: number;
+  pageSize: number;
+  /** The time axis to sum the cell per period of, or null for no subtotals. */
+  subtotalAxis: TimeAxis | null;
 }
 
 /**
@@ -200,12 +256,17 @@ async function queryCell(
   range: DateSpan,
   conditions: string[],
   params: SqlParams,
-  { page, pageSize }: { page: number; pageSize: number },
+  { page, pageSize, subtotalAxis }: CellPaging,
 ): Promise<CellAggregate> {
   const cte = baseCte(query, range, await currenciesInUse(ctx), params);
   const limit = params.add(pageSize);
   const offset = params.add((page - 1) * pageSize);
   const where = (first: string) => [first, ...conditions].join(' AND ');
+  const subtotals = subtotalAxis
+    ? `(SELECT json_agg(json_build_object('key', s.key, 'sumChfMinor', s.sum_minor))
+        FROM (SELECT ${axisKey(subtotalAxis)} AS key, sum(b.chf_minor)::bigint AS sum_minor
+              FROM report_base b WHERE ${where('b.chf_minor IS NOT NULL')} GROUP BY 1) s)`
+    : 'NULL';
   const result = await ctx.db.query<CellAggregate>(
     `${cte}, cell AS (
        SELECT b.id, sum(b.chf_minor)::bigint AS chf_minor, count(b.line_id)::int AS line_count,
@@ -222,7 +283,8 @@ async function queryCell(
                                           'lineCount', p.line_count)
                         ORDER BY p.booking_date DESC, p.entry_order DESC)
         FROM (SELECT * FROM cell ORDER BY booking_date DESC, entry_order DESC
-              LIMIT ${limit} OFFSET ${offset}) p) AS items`,
+              LIMIT ${limit} OFFSET ${offset}) p) AS items,
+       ${subtotals} AS subtotals`,
     params.values,
   );
   return result.rows[0]!;
