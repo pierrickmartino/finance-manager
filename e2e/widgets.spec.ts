@@ -46,7 +46,7 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   // No Preview button: the preview follows every change.
   await expect(page).toHaveURL(/[?&]account=/);
 
-  // The preview opens on the Story chapter; the pivot behind it is under Data.
+  // The preview opens on the Dashboard card; the pivot behind it is under Data.
   await page.getByRole('tab', { name: 'Data' }).click();
   const pivot = page.getByRole('table', { name: 'Pivot' });
   await expect(pivot.getByRole('columnheader', { name: 'Unclassified' })).toBeVisible();

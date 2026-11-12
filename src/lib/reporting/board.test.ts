@@ -3,6 +3,7 @@ import type { Visualisation, WidgetSource } from '@/server/services/reporting';
 import {
   type Cell,
   defaultSize,
+  editedCardSize,
   findOverlaps,
   firstFreeSpot,
   growToMinimum,
@@ -49,6 +50,20 @@ describe('Widget sizes', () => {
     expect(defaultSize(widget('query', 'donut'))).toEqual({ w: 4, h: 8 });
     expect(defaultSize(widget('query', 'line'))).toEqual({ w: 8, h: 6 });
     expect(minimumSize(widget('query', 'line'))).toEqual({ w: 4, h: 4 });
+  });
+
+  it('sizes a new Widget card at its default', () => {
+    expect(editedCardSize(null, widget('query', 'number'))).toEqual({ w: 4, h: 3 });
+  });
+
+  it('keeps an edited card at its size when it still meets its minimum', () => {
+    const layout = { x: 2, y: 5, w: 6, h: 9 };
+    expect(editedCardSize(layout, widget('query', 'line'))).toEqual({ w: 6, h: 9 });
+  });
+
+  it('grows an edited card to its new minimum, never shrinking it', () => {
+    const layout = { x: 0, y: 0, w: 2, h: 7 };
+    expect(editedCardSize(layout, widget('query', 'line'))).toEqual({ w: 4, h: 7 });
   });
 
   it('keeps every minimum at or below its default, and within three across', () => {

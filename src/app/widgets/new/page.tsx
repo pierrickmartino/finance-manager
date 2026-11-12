@@ -22,7 +22,7 @@ import { PanelSection, VisualisationPicker } from '../editor-panel';
 import { HiddenFields, QueryForm } from '../query-form';
 import { WidgetView } from '../widget-view';
 import { toPivotData } from '../pivot-data';
-import { ChapterPreview } from '../chapter-preview';
+import { CardPreview } from '../card-preview';
 import { PreviewTabs } from '../preview-tabs';
 
 export const metadata: Metadata = { title: 'Widget editor · Finance Manager' };
@@ -63,10 +63,10 @@ function resetHref(hidden: Record<string, string>): string {
 
 /**
  * The Widget editor: a side panel with the visualisation and the query, and next to it the
- * Widget as its Dashboard Story chapter (and the raw table behind it), refreshed on every
- * change, under the name and Save. `widget=<id>` edits that Widget (its query comes in the URL
- * like any other); `dashboard=<id>` adds the new Widget to that Dashboard, in the first free spot
- * at the bottom of its board.
+ * Widget as the card it becomes on its Dashboard's board (and the raw table behind it),
+ * refreshed on every change, under the name and Save. `widget=<id>` edits that Widget (its query
+ * comes in the URL like any other); `dashboard=<id>` adds the new Widget to that Dashboard, in
+ * the first free spot at the bottom of its board.
  */
 export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const params = await searchParams;
@@ -157,8 +157,9 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
             {error && <FieldError message={error} />}
             {report && pivot && (
               <PreviewTabs
-                story={
-                  <ChapterPreview
+                card={
+                  <CardPreview
+                    layout={widget?.layout ?? null}
                     chapter={{
                       id: widget?.id ?? 'preview',
                       name: title,
@@ -174,9 +175,9 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
               />
             )}
             <p className="text-xs text-muted">
-              The preview follows every change: Story shows the chapter this Widget becomes on a
-              Dashboard, Data the table behind it. All values in CHF. Transfers are always left out;
-              Capital only when included.
+              The preview follows every change: Card shows the card this Widget becomes on a
+              Dashboard, at its size there, Data the table behind it. All values in CHF. Transfers
+              are always left out; Capital only when included.
             </p>
           </div>
         </div>

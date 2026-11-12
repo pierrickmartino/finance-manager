@@ -72,7 +72,7 @@ test('a Dashboard opens as its Story; Edit mode lists the same Widgets in order,
   await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
 });
 
-test('add a stacked bar Widget from the empty Dashboard; the editor previews its chapter', async ({
+test('add a stacked bar Widget from the empty Dashboard; the editor previews its card', async ({
   page,
 }) => {
   const dashboardName = `Dash ${Date.now()}`;
@@ -84,7 +84,7 @@ test('add a stacked bar Widget from the empty Dashboard; the editor previews its
   await page.getByRole('group', { name: 'Visualisation' }).getByText('Stacked bar').click();
   await expect(page).toHaveURL(/[?&]vis=stacked_bar/);
   await expect(page.getByRole('radio', { name: /Stacked bar/ })).toBeChecked();
-  await expect(page.getByRole('tab', { name: 'Story', selected: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Card', selected: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'New Widget', level: 2 })).toBeVisible();
   await page.getByRole('tab', { name: 'Data' }).click();
   await expect(page.getByRole('table', { name: 'Pivot' })).toBeVisible();

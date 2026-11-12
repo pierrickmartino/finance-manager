@@ -77,6 +77,19 @@ export function minimumSize(widget: ChapterSource): Size {
   return { ...WIDGET_SIZES[sizeKind(widget)].min };
 }
 
+/**
+ * The size a Widget's card has once the editor saves it: a new Widget's default size, or the
+ * card it already has, grown to the chart's minimum but never shrunk (as `growToMinimum`).
+ */
+export function editedCardSize(layout: Size | null, widget: ChapterSource): Size {
+  if (!layout) return defaultSize(widget);
+  const min = minimumSize(widget);
+  return {
+    w: clamp(Math.max(layout.w, min.w), 1, GRID_COLUMNS),
+    h: clamp(Math.max(layout.h, min.h), 1, MAX_WIDGET_HEIGHT),
+  };
+}
+
 /** Whole cells, inside the 12 columns and the board's rows, at most the maximum height. */
 export function isInBounds(cell: Cell): boolean {
   const { x, y, w, h } = cell;
