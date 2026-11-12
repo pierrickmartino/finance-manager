@@ -40,7 +40,7 @@ Corners: the radius scale itself is small (`rounded-md` 6px, `rounded-lg`/`xl`/`
 | `SECTION_TITLE_CLASS` | Each section's `h2`, and the title of a detail panel. |
 | `HEADLINE_AMOUNT_CLASS` | The number a page is about: an Account's balance, a Bank's total, the selected Transaction's amount. |
 | `CARD_CLASS` | A separate object: a list, a detail panel, a Widget. Not every block. |
-| `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch, the Completeness check when an Account needs attention. Put it on the notice itself, never on rows inside it; mark problem rows with `text-warning`. |
+| `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch. Put it on the notice itself, never on rows inside it; mark problem rows with `text-warning`. |
 | `TILE_CLASS` | A card of the Dashboard's grid (the overview row and each Widget). |
 | `PILL_BUTTON_CLASS` | A pill-shaped action beside or on the Dashboard's tiles (Edit Dashboard). |
 | `PRIMARY_BUTTON_CLASS` | The view's main action, one per view where possible. |
@@ -57,8 +57,9 @@ Signed in, the app runs full width. A navy hero carries the brand, the most used
 
 ## Rules
 
-- **One accent.** Amber marks what is selected, focused or the point of a chart (as `accent-ink` wherever it sits on white). Status colours carry meaning and stay apart from it. The hero's navy is atmosphere, not a second accent: it never marks a state, and outside the app shell it appears only in the Dashboard's cards (below).
+- **One accent.** Amber marks what is selected, focused or the point of a chart (as `accent-ink` wherever it sits on white). Status colours carry meaning and stay apart from it. The hero's navy is atmosphere, not a second accent: it never marks a state, and outside the app shell it appears only in the Dashboard's cards and the Completeness check's coverage tracks (below).
 - **Display with restraint.** Inter Tight for titles and headline amounts only; labels, tables and controls stay in Inter.
 - **Words in sentence case.** Labels and group names read as plain words, without letter-spaced capitals.
 - **Charts.** Categorical series use `CHART_PALETTE` (`src/app/dashboards/chart-palette.ts`), a colour-blind-safe order; text and gridlines use `muted` and `rule`. The Dashboard's cards (`src/app/dashboards/[id]/overview/`) draw in the hero's navy, continuing the hero into the page (ADR-0009); Edit mode draws the same cards, each with a toolbar of `GHOST_BUTTON_CLASS` actions; where a dragged or resized card will land is `accent-tint` with a dashed `accent-ink` outline (the react-grid-layout overrides at the end of `globals.css`). The Widget editor's preview still draws chapters in ink with the accent (`src/app/dashboards/[id]/story/palette.ts`).
+- **Completeness check.** The home Dashboard's Completeness check (`src/app/dashboards/[id]/completeness-notice.tsx`) is a `CARD_CLASS` card, not a `WARNING_NOTICE_CLASS` notice: each checked Account has a coverage track over the last 120 days, covered in `hero-mid`, a Gap in `warning`, the overdue run of a Stale Account in `warning-tint` inside `warning-rule`, a mismatch as a `warning` diamond. Attention shows in the `warning` headline and problem rows, and the card is still announced as an alert. The tracks are decorative (`aria-hidden`); each row's words say what its track shows.
 - **Focus.** Every interactive element shows the global accent outline from `globals.css`; keep it visible.

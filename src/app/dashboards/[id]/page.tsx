@@ -29,10 +29,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
     loadRecentActivity(ctx),
     getFormatter(),
   ]);
+  const today = swissToday();
   const completeness: CompletenessEntry[] | null =
-    homeDashboard(dashboards)?.id === dashboard.id
-      ? await checkCompleteness(ctx, { today: swissToday() })
-      : null;
+    homeDashboard(dashboards)?.id === dashboard.id ? await checkCompleteness(ctx, { today }) : null;
 
   const editHref = `/dashboards/${dashboard.id}/edit`;
 
@@ -49,7 +48,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
         }
         chapters={chapters}
         recent={recent}
-        notice={completeness && <CompletenessNotice entries={completeness} fmt={fmt} />}
+        notice={
+          completeness && <CompletenessNotice entries={completeness} fmt={fmt} today={today} />
+        }
         board={<WidgetBoard chapters={chapters} />}
         empty={
           <p className="py-16 text-lg text-muted">
