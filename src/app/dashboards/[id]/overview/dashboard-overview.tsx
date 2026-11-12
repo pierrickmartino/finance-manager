@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { PILL_BUTTON_CLASS } from '@/components/surface';
-import type { StoryChapter } from '../story/chapter';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
-import { WidgetCard } from './widget-card';
+import { WidgetBoard, type BoardChapter } from './widget-board';
 
 interface DashboardOverviewProps {
   dashboardName: string;
   editHref: string;
-  chapters: StoryChapter[];
+  /** In reading order. */
+  chapters: BoardChapter[];
   recent: RecentActivity[];
   /**
    * Shown between the title and the grid, outside the Story itself: the home Dashboard's
@@ -19,8 +19,8 @@ interface DashboardOverviewProps {
 
 /**
  * The Dashboard read as a grid of cards (GLOSSARY: Dashboard Story, ADR-0009): an overview row
- * (the headline number, the month's insight, recent activity), then one card per Widget in the
- * Dashboard's order, left to right and top to bottom. Light only; values in CHF.
+ * (the headline number, the month's insight, recent activity) in its own band, then the board,
+ * each Widget's card at its place and size (ADR-0010). Light only; values in CHF.
  */
 export function DashboardOverview({
   dashboardName,
@@ -52,14 +52,14 @@ export function DashboardOverview({
           to add one.
         </p>
       ) : (
-        <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
-          <NetWorthCard chapters={chapters} />
-          <InsightCard chapters={chapters} />
-          <RecentActivityCard recent={recent} />
-          {chapters.map((chapter) => (
-            <WidgetCard key={chapter.id} chapter={chapter} />
-          ))}
-        </div>
+        <>
+          <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <NetWorthCard chapters={chapters} />
+            <InsightCard chapters={chapters} />
+            <RecentActivityCard recent={recent} />
+          </div>
+          <WidgetBoard chapters={chapters} />
+        </>
       )}
     </div>
   );

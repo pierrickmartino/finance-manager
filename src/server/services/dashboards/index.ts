@@ -14,12 +14,13 @@ import {
   type WidgetInput,
   type WidgetLayout,
 } from '../reporting/widgets';
-import { insertAt, storyLayout, widgetLayoutInput } from './layout';
+import { reorderPlaces } from '@/lib/reporting/board';
+import { boardCells, freeLayout, initialSize, sizeOf, widgetLayoutInput } from './layout';
 
-export { GRID_COLUMNS, DEFAULT_WIDGET_SIZE, MAX_WIDGET_HEIGHT } from './layout';
+export { GRID_COLUMNS, MAX_WIDGET_HEIGHT } from './layout';
 export { seedStarterDashboard, STARTER_DASHBOARD_NAME } from './seed';
 
-/** A named, ordered set of Widgets (GLOSSARY: Dashboard). */
+/** A named set of Widgets, each placed and sized on its board (GLOSSARY: Dashboard). */
 export interface Dashboard {
   id: string;
   name: string;
@@ -27,7 +28,7 @@ export interface Dashboard {
 }
 
 export interface DashboardWithWidgets extends Dashboard {
-  /** In Story order. */
+  /** In reading order: by row (`y`), then column (`x`). */
   widgets: Widget[];
 }
 
@@ -170,100 +171,67 @@ export async function deleteDashboard(ctx: ServiceContext, id: string): Promise<
   });
 }
 
-/** Where a Widget goes among a Dashboard's Widgets: 0 is first; none, or past the end, is last. */
-const positionInput = z.number().int().min(0, 'A position starts at 0').optional();
-
 /**
- * Writes `ordered` as the Dashboard's Story order: the nth Widget at `y` n, `x` 0, its size kept.
- * This turns a layout left from the former grid into Story order. Order isn't History (spec 117).
- */
-async function writeOrder(tx: Queryable, ordered: readonly Widget[]): Promise<Widget[]> {
-  const placed = ordered.map((widget, index) => ({
-    ...widget,
-    layout: storyLayout(index, widget.layout ?? undefined),
-  }));
-  await tx.query(
-    `UPDATE widget w SET layout = item.layout
-     FROM jsonb_to_recordset($1::jsonb) AS item(id uuid, layout jsonb)
-     WHERE w.id = item.id`,
-    [JSON.stringify(placed.map(({ id, layout }) => ({ id, layout })))],
-  );
-  return placed;
-}
-
-/** Inserts `widget` among the Dashboard's other Widgets and returns it with its final place. */
-async function placeAmong(
-  tx: Queryable,
-  siblings: readonly Widget[],
-  widget: Widget,
-  position?: number,
-): Promise<Widget> {
-  const placed = await writeOrder(tx, insertAt(siblings, widget, position));
-  return placed.find((item) => item.id === widget.id)!;
-}
-
-/**
- * Adds a Widget to a Dashboard at `position` (last without one). A given `layout` is stored as
- * it is, leaving the other Widgets alone (the starter Dashboard).
+ * Adds a Widget to a Dashboard at the default size for its chapter kind, in the first free spot
+ * at the bottom of the board. A given `layout` is stored as it is (the starter Dashboard).
  */
 export async function addWidget(
   ctx: ServiceContext,
   dashboardId: string,
-  input: WidgetInput & { source?: Widget['source']; layout?: WidgetLayout; position?: number },
+  input: WidgetInput & { source?: Widget['source']; layout?: WidgetLayout },
 ): Promise<Widget> {
   const values = parseInput(widgetInput, input);
   const source = parseInput(z.enum(['query', 'account_balances']).default('query'), input.source);
-  const layout = input.layout ? parseInput(widgetLayoutInput, input.layout) : null;
-  const position = parseInput(positionInput, input.position);
+  const given = input.layout ? parseInput(widgetLayoutInput, input.layout) : null;
+  const size = given ? sizeOf(given) : await initialSize(ctx, { ...values, source });
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
-    const siblings = await findDashboardWidgets(scope.tx, dashboardId);
-    const widget = await insertWidget(scope, {
+    const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
+    return insertWidget(scope, {
       ...values,
       source,
       dashboardId,
-      layout: layout ?? storyLayout(siblings.length),
+      layout: given ?? freeLayout(cells, size),
     });
-    return layout ? widget : placeAmong(scope.tx, siblings, widget, position);
-  });
-}
-
-/** Copies a Widget (query and visualisation) onto the same Dashboard, right after it. */
-export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<Widget> {
-  return mutate(ctx, async (scope) => {
-    const widget = await findWidget(scope.tx, id);
-    if (!widget.dashboardId) {
-      return insertWidget(scope, { ...widget, name: copyName(widget.name), layout: null });
-    }
-    const siblings = await findDashboardWidgets(scope.tx, widget.dashboardId);
-    const copy = await insertWidget(scope, { ...widget, name: copyName(widget.name) });
-    const after = siblings.findIndex((sibling) => sibling.id === widget.id) + 1;
-    return placeAmong(scope.tx, siblings, copy, after);
   });
 }
 
 /**
- * Places a copy of a Widget (a Standalone Widget or one from another Dashboard) on a Dashboard
- * at `position` (last without one), at the original's size if it has one. The original is left
- * as it is (GLOSSARY: Standalone Widget).
+ * Copies a Widget (query and visualisation) onto the same Dashboard, at its size, in the first
+ * free spot next to or below the original.
+ */
+export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<Widget> {
+  return mutate(ctx, async (scope) => {
+    const widget = await findWidget(scope.tx, id);
+    const copy = { ...widget, name: copyName(widget.name) };
+    if (!widget.dashboardId || !widget.layout) {
+      return insertWidget(scope, { ...copy, layout: null });
+    }
+    await findDashboard(scope.tx, widget.dashboardId, true);
+    const cells = boardCells(await findDashboardWidgets(scope.tx, widget.dashboardId));
+    return insertWidget(scope, {
+      ...copy,
+      layout: freeLayout(cells, sizeOf(widget.layout), widget.id),
+    });
+  });
+}
+
+/**
+ * Places a copy of a Widget (a Standalone Widget or one from another Dashboard) in the first
+ * free spot at the bottom of a Dashboard: at the original's size if it has one, else at the
+ * default size for its chapter kind. The original is left as it is (GLOSSARY: Standalone Widget).
  */
 export async function copyWidgetToDashboard(
   ctx: ServiceContext,
   widgetId: string,
   dashboardId: string,
-  position?: number,
 ): Promise<Widget> {
-  const at = parseInput(positionInput, position);
+  const widget = await findWidget(ctx.db, widgetId);
+  const size = widget.layout ? sizeOf(widget.layout) : await initialSize(ctx, widget);
   return mutate(ctx, async (scope) => {
-    const widget = await findWidget(scope.tx, widgetId);
     await findDashboard(scope.tx, dashboardId, true);
-    const siblings = await findDashboardWidgets(scope.tx, dashboardId);
-    const copy = await insertWidget(scope, {
-      ...widget,
-      dashboardId,
-      layout: storyLayout(siblings.length, widget.layout ?? undefined),
-    });
-    return placeAmong(scope.tx, siblings, copy, at);
+    const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
+    return insertWidget(scope, { ...widget, dashboardId, layout: freeLayout(cells, size) });
   });
 }
 
@@ -271,8 +239,9 @@ const widgetIdsInput = z.array(z.uuid({ error: 'Unknown Widget' }));
 const WIDGET_ORDER_MISMATCH = 'List every Widget of this Dashboard once';
 
 /**
- * Puts a Dashboard's Widgets in the given Story order (every Widget listed once). Order isn't
- * History (spec 117): this writes none.
+ * Puts a Dashboard's Widgets in the given reading order (every Widget listed once), the stopgap
+ * for the one-column Edit mode: the nth Widget takes the place of the nth card, keeping its
+ * size, and cards that then overlap are pushed down (ADR-0010). Layout isn't History (spec 117).
  */
 export async function reorderDashboardWidgets(
   ctx: ServiceContext,
@@ -282,17 +251,19 @@ export async function reorderDashboardWidgets(
   const ids = parseInput(widgetIdsInput, widgetIds);
   await withTransaction(ctx.db, async (tx) => {
     await findDashboard(tx, dashboardId, true);
-    const byId = new Map(
-      (await findDashboardWidgets(tx, dashboardId)).map((widget) => [widget.id, widget]),
+    const cells = boardCells(await findDashboardWidgets(tx, dashboardId));
+    const known = new Set(cells.map((cell) => cell.id));
+    const isEveryWidgetOnce =
+      new Set(ids).size === ids.length &&
+      ids.length === known.size &&
+      ids.every((id) => known.has(id));
+    if (!isEveryWidgetOnce) throw new ValidationError(WIDGET_ORDER_MISMATCH);
+    const placed = reorderPlaces(cells, ids);
+    await tx.query(
+      `UPDATE widget w SET layout = item.layout
+       FROM jsonb_to_recordset($1::jsonb) AS item(id uuid, layout jsonb)
+       WHERE w.id = item.id`,
+      [JSON.stringify(placed.map(({ id, x, y, w, h }) => ({ id, layout: { x, y, w, h } })))],
     );
-    const ordered = ids.map((id) => byId.get(id));
-    if (
-      new Set(ids).size !== ids.length ||
-      ids.length !== byId.size ||
-      ordered.includes(undefined)
-    ) {
-      throw new ValidationError(WIDGET_ORDER_MISMATCH);
-    }
-    await writeOrder(tx, ordered as Widget[]);
   });
 }

@@ -15,6 +15,6 @@ The Dashboard Story reads a Dashboard top to bottom, one chapter per Widget, and
 
 - A Widget is moved with its up and down arrows (keyboard and phone too), or dragged by its handle on wide screens. Every move saves the whole order at once, without History (spec 117 still holds).
 - A new Widget, the Account balances or a copy of an existing Widget can be inserted at any place; a duplicate goes right after its original. Inserting shifts the Widgets after it.
-- A Dashboard still holding a grid layout is read in grid order (top to bottom, left to right) and is rewritten to Story order on its first change.
+- A Dashboard still holding a grid layout is read in grid order (top to bottom, left to right) and is rewritten to Story order on its first change. (Removed with ADR-0010: a one-time migration moved every Dashboard onto the grid, three across, and no "old format" path is left.)
 - The Widget editor previews a Widget as its chapter, with the raw table under a Data tab. The visualisation picker keeps its five choices and says what each becomes in the Story.
 - react-grid-layout is no longer a dependency.

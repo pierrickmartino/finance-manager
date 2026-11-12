@@ -66,7 +66,7 @@ test('add a stacked bar Widget from the empty Dashboard; the editor previews its
   await createDashboard(page, dashboardName);
 
   await page.getByRole('link', { name: 'New Widget' }).click();
-  await expect(page).toHaveURL(/[?&]at=0/);
+  await expect(page).toHaveURL(/[?&]dashboard=/);
   await page.getByRole('group', { name: 'Visualisation' }).getByText('Stacked bar').click();
   await expect(page).toHaveURL(/[?&]vis=stacked_bar/);
   await expect(page.getByRole('radio', { name: /Stacked bar/ })).toBeChecked();
@@ -112,10 +112,13 @@ test('duplicate places the copy right after its original; the arrows reorder and
   await expect(chapterTitles(page)).toHaveText([copy, original]);
 });
 
-test('a chapter added between two others goes there', async ({ page }) => {
-  const widgetName = `Between ${Date.now()}`;
+test('a Widget added from any slot goes in the first free spot; the board draws each card at its place', async ({
+  page,
+}) => {
+  const widgetName = `Free spot ${Date.now()}`;
   await createDashboard(page, `Slots ${Date.now()}`);
   const balances = 'Account balances in CHF';
+  const copy = `${balances} (copy)`;
   await page
     .getByRole('form', { name: 'Add Account balances as chapter 1' })
     .getByRole('button')
@@ -125,15 +128,37 @@ test('a chapter added between two others goes there', async ({ page }) => {
     .getByRole('form', { name: `Duplicate ${balances}` })
     .getByRole('button')
     .click();
-  await expect(chapterTitles(page)).toHaveText([balances, `${balances} (copy)`]);
+  await expect(chapterTitles(page)).toHaveText([balances, copy]);
 
-  await page.getByText('Add chapter 2').click();
+  // The first slot no longer means "first": every slot adds at the first free spot.
+  await page.getByText('Add chapter 1').click();
   await page.getByRole('link', { name: 'New Widget' }).locator('visible=true').click();
-  await expect(page).toHaveURL(/[?&]at=1/);
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
+  await expect(chapterTitles(page)).toHaveText([balances, copy, widgetName]);
 
-  await expect(chapterTitles(page)).toHaveText([balances, widgetName, `${balances} (copy)`]);
+  // At lg the board is the grid: the duplicate sits right of its original, the new Widget next
+  // to it, all on one row (4 columns each), the shorter cards not stretched to the taller one.
+  await page.getByRole('link', { name: 'Done' }).click();
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  const box = async (name: string) => {
+    const found = await page.getByRole('region', { name, exact: true }).boundingBox();
+    if (!found) throw new Error(`No card for ${name}`);
+    return found;
+  };
+  let [original, duplicate, added] = [await box(balances), await box(copy), await box(widgetName)];
+  expect(duplicate.x).toBeGreaterThan(original.x + original.width);
+  expect(added.x).toBeGreaterThan(duplicate.x + duplicate.width);
+  expect(duplicate.y).toBeCloseTo(original.y, 0);
+  expect(added.y).toBeCloseTo(original.y, 0);
+  expect(added.height).toBeGreaterThan(original.height);
+
+  // Below lg the cards are one column in reading order.
+  await page.setViewportSize({ width: 600, height: 900 });
+  [original, duplicate, added] = [await box(balances), await box(copy), await box(widgetName)];
+  expect(duplicate.y).toBeGreaterThan(original.y + original.height);
+  expect(added.y).toBeGreaterThan(duplicate.y + duplicate.height);
+  expect(duplicate.x).toBeCloseTo(original.x, 0);
 });
 
 test('add an existing Widget from the Widgets page to a Dashboard as a copy', async ({ page }) => {

@@ -27,8 +27,8 @@ export const WIDGET_SOURCES = ['query', 'account_balances'] as const;
 export type WidgetSource = (typeof WIDGET_SOURCES)[number];
 
 /**
- * A Widget's place on its Dashboard: `y` is its Story order (ADR-0007). `x`, `w` and `h` are
- * left from the former 12-column grid; nothing reads `w` and `h` any more.
+ * A Widget's card on its Dashboard's board (ADR-0010): its column `x` and row `y` (from 0) and
+ * its width `w` and height `h`, in cells of the 12-column grid. Reading order is by `y`, then `x`.
  */
 export interface WidgetLayout {
   x: number;
@@ -195,7 +195,10 @@ export async function listWidgets(ctx: ServiceContext): Promise<Widget[]> {
 }
 
 /** Runs a Widget: its query, or the Account balances in CHF today. */
-export async function runSavedWidget(ctx: ServiceContext, widget: Widget): Promise<ReportTable> {
+export async function runSavedWidget(
+  ctx: ServiceContext,
+  widget: Pick<Widget, 'source' | 'query'>,
+): Promise<ReportTable> {
   return widget.source === 'account_balances'
     ? runAccountBalances(ctx, widget.query)
     : runWidgetQuery(ctx, widget.query);

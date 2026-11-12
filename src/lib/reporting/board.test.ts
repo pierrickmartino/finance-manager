@@ -13,6 +13,7 @@ import {
   resizeCard,
   pushDown,
   readingOrder,
+  reorderPlaces,
   sizeKind,
   threeAcross,
   WIDGET_SIZES,
@@ -286,5 +287,47 @@ describe('resizeCard', () => {
       cell('a', 0, 0, 4, 4),
       cell('b', 0, 4, 8, 3),
     ]);
+  });
+});
+
+describe('firstFreeSpot given a whole layout as the size', () => {
+  it('reads only its width and height', () => {
+    const board = [cell('a', 0, 0, 4, 5)];
+    expect(firstFreeSpot(board, cell('a', 0, 0, 4, 5), 'a')).toEqual({ x: 4, y: 0 });
+  });
+});
+
+describe('reorderPlaces', () => {
+  it('swaps two neighbours in reading order by swapping their places', () => {
+    const board = [cell('a', 0, 0, 4, 6), cell('b', 4, 0, 4, 6), cell('c', 8, 0, 4, 3)];
+
+    expect(reorderPlaces(board, ['b', 'a', 'c'])).toEqual([
+      cell('a', 4, 0, 4, 6),
+      cell('b', 0, 0, 4, 6),
+      cell('c', 8, 0, 4, 3),
+    ]);
+  });
+
+  it('pushes a card that lands on a taller one down', () => {
+    const board = [cell('a', 0, 0, 4, 3), cell('b', 4, 0, 4, 8), cell('c', 0, 3, 4, 3)];
+
+    expect(reorderPlaces(board, ['b', 'a', 'c'])).toEqual([
+      cell('a', 4, 0, 4, 3),
+      cell('b', 0, 0, 4, 8),
+      cell('c', 0, 8, 4, 3),
+    ]);
+  });
+
+  it('keeps each size inside the columns, leaving no overlaps, in the order asked', () => {
+    const board = [cell('small', 0, 0, 4, 3), cell('mid', 4, 0, 4, 3), cell('wide', 0, 3, 12, 4)];
+
+    const placed = reorderPlaces(board, ['small', 'wide', 'mid']);
+
+    expect(placed).toEqual([
+      cell('small', 0, 0, 4, 3),
+      cell('mid', 0, 7, 4, 3),
+      cell('wide', 0, 3, 12, 4),
+    ]);
+    expect(findOverlaps(placed)).toEqual([]);
   });
 });

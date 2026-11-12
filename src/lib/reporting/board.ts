@@ -116,7 +116,7 @@ export interface Spot {
 }
 
 function isFree(cells: readonly Cell[], spot: Spot, size: Size): boolean {
-  const candidate: Cell = { id: '', ...spot, ...size };
+  const candidate: Cell = { id: '', x: spot.x, y: spot.y, w: size.w, h: size.h };
   return isInBounds(candidate) && !cells.some((cell) => overlaps(cell, candidate));
 }
 
@@ -205,6 +205,22 @@ export function growToMinimum<T extends Cell>(cells: readonly T[], id: string, m
       h: clamp(Math.max(card.h, min.h), 1, MAX_WIDGET_HEIGHT),
     };
   });
+}
+
+/**
+ * The board put in the reading order `ids` (every card once): the nth card in `ids` takes the
+ * place of the nth card in reading order, keeping its size (moved left if it would pass the
+ * right edge), and cards that then overlap are pushed down. Order is kept.
+ */
+export function reorderPlaces<T extends Cell>(cells: readonly T[], ids: readonly string[]): T[] {
+  const places = readingOrder(cells);
+  const placeOf = new Map(ids.map((id, index) => [id, places[index]]));
+  const swapped = cells.map((cell) => {
+    const place = placeOf.get(cell.id);
+    if (!place) return cell;
+    return { ...cell, x: Math.min(place.x, GRID_COLUMNS - cell.w), y: place.y };
+  });
+  return ids[0] === undefined ? swapped : pushDown(swapped, ids[0]);
 }
 
 const ACROSS = 3;

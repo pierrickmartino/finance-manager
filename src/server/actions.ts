@@ -29,9 +29,3 @@ export function formText(formData: FormData, field: string): string {
   const value = formData.get(field);
   return typeof value === 'string' ? value : '';
 }
-
-/** A Widget's place on a Dashboard from the form's `position` field, or none when it is blank. */
-export function formPosition(formData: FormData): number | undefined {
-  const text = formText(formData, 'position');
-  return text ? Number(text) : undefined;
-}

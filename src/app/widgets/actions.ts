@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { formPosition, formText, runAction, type ActionResult } from '@/server/actions';
+import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
 import { ValidationError } from '@/server/services/errors';
 import {
@@ -36,9 +36,7 @@ export async function saveWidgetAction(_previous: Result | null, formData: FormD
       visualisation: (formText(formData, 'visualisation') || undefined) as Visualisation,
     };
     if (widgetId) return updateWidget(ctx, widgetId, input);
-    return dashboardId
-      ? addWidget(ctx, dashboardId, { ...input, position: formPosition(formData) })
-      : createWidget(ctx, input);
+    return dashboardId ? addWidget(ctx, dashboardId, input) : createWidget(ctx, input);
   });
   if (!result.ok) return result;
   revalidatePath('/widgets', 'layout');

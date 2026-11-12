@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { formPosition, formText, runAction, type ActionResult } from '@/server/actions';
+import { formText, runAction, type ActionResult } from '@/server/actions';
 import { getServiceContext } from '@/server/app-context';
 import {
   addWidget,
@@ -67,26 +67,21 @@ export async function deleteDashboardAction(id: string, _previous: Result | null
   redirect('/dashboards');
 }
 
-/** Adds the Account balances in CHF to a Dashboard, at the form's `position` (else last). */
-export async function addBalancesWidgetAction(
-  dashboardId: string,
-  _previous: Result | null,
-  formData: FormData,
-) {
+/** Adds the Account balances in CHF to a Dashboard, in the first free spot of its board. */
+export async function addBalancesWidgetAction(dashboardId: string, _previous: Result | null) {
   return run(async () =>
     addWidget(await getServiceContext(), dashboardId, {
       name: 'Account balances in CHF',
       source: 'account_balances',
       query: { ...DEFAULT_WIDGET_QUERY, rows: 'account', columns: null },
       visualisation: 'table',
-      position: formPosition(formData),
     }),
   );
 }
 
 /**
- * Places a copy of a saved Widget on a Dashboard, at the form's `position` (else last); the
- * original is left as it is.
+ * Places a copy of a saved Widget in the first free spot of a Dashboard's board; the original
+ * is left as it is.
  */
 export async function copyWidgetToDashboardAction(
   dashboardId: string,
@@ -94,12 +89,7 @@ export async function copyWidgetToDashboardAction(
   formData: FormData,
 ) {
   return run(async () =>
-    copyWidgetToDashboard(
-      await getServiceContext(),
-      formText(formData, 'widgetId'),
-      dashboardId,
-      formPosition(formData),
-    ),
+    copyWidgetToDashboard(await getServiceContext(), formText(formData, 'widgetId'), dashboardId),
   );
 }
 
@@ -111,7 +101,10 @@ export async function deleteDashboardWidgetAction(widgetId: string, _previous: R
   return run(async () => deleteWidget(await getServiceContext(), widgetId));
 }
 
-/** Saves the Widgets' Story order after a move. Writes no History. */
+/**
+ * Saves the Widgets' reading order after a move in the one-column Edit mode, by swapping their
+ * places on the board (a stopgap until Edit mode is the grid). Writes no History.
+ */
 export async function reorderWidgetsAction(
   dashboardId: string,
   widgetIds: string[],

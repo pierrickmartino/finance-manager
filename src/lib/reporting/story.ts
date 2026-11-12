@@ -86,8 +86,13 @@ export function storyHero(widgets: StoryWidget[]): StoryHero | null {
   };
 }
 
-/** What a Widget's chapter kind is read from. */
-export type ChapterSource = Pick<StoryWidget, 'source' | 'visualisation' | 'data'>;
+/**
+ * What a Widget's chapter kind is read from. Of its data only the series (columns) count, so
+ * the server can tell a kind without the whole chart.
+ */
+export type ChapterSource = Pick<StoryWidget, 'source' | 'visualisation'> & {
+  data: Pick<ChartSource, 'columns'> | null;
+};
 
 export function chapterKind(widget: ChapterSource): ChapterKind {
   if (widget.visualisation === 'number') return 'number';

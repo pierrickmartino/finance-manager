@@ -65,8 +65,8 @@ function resetHref(hidden: Record<string, string>): string {
  * The Widget editor: a side panel with the visualisation and the query, and next to it the
  * Widget as its Dashboard Story chapter (and the raw table behind it), refreshed on every
  * change, under the name and Save. `widget=<id>` edits that Widget (its query comes in the URL
- * like any other); `dashboard=<id>` adds the new Widget to that Dashboard, at `at` (from 0) when
- * given, else last.
+ * like any other); `dashboard=<id>` adds the new Widget to that Dashboard, in the first free spot
+ * at the bottom of its board.
  */
 export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const params = await searchParams;
@@ -82,11 +82,9 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
       : loadReport(query),
     loadQueryFormLists(),
   ]);
-  const position = widget ? '' : param(params, 'at');
   const hidden: Record<string, string> = {};
   if (widget) hidden.widget = widget.id;
   else if (dashboardId) hidden.dashboard = dashboardId;
-  if (dashboardId && position) hidden.at = position;
   const title = widget?.name ?? 'New Widget';
   const pivot = report ? toPivotData(report, isBalances ? balanceHref : undefined) : null;
   const backHref = dashboardId ? `/dashboards/${dashboardId}/edit` : '/widgets';
@@ -142,9 +140,6 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
             {widget && <input type="hidden" name="widgetId" value={widget.id} />}
             {!widget && dashboardId && (
               <input type="hidden" name="dashboardId" value={dashboardId} />
-            )}
-            {!widget && dashboardId && position && (
-              <input type="hidden" name="position" value={position} />
             )}
             <input
               name="name"

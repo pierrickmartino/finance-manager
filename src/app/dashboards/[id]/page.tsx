@@ -12,8 +12,8 @@ import { DashboardOverview } from './overview/dashboard-overview';
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 
 /**
- * A Dashboard, read as a grid of cards: an overview row, then one card per Widget in the
- * Dashboard's order (GLOSSARY: Dashboard Story, ADR-0009). Values in CHF. Changing the Widgets
+ * A Dashboard, read as a grid of cards: an overview row, then the board, one card per Widget at
+ * its place and size (GLOSSARY: Dashboard Story, ADR-0009, ADR-0010). Values in CHF. Changing the Widgets
  * happens in Edit mode (./edit). The home Dashboard (the one the home page opens) also shows the
  * Completeness check (ADR-0008).
  */

@@ -70,14 +70,20 @@ function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ chapter }: { chapter: StoryChapter }) {
+export function WidgetCard({
+  chapter,
+  className = '',
+}: {
+  chapter: StoryChapter;
+  className?: string;
+}) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const story = chapterStory(chapter, money);
   return (
     <section
       aria-labelledby={`chapter-${chapter.id}`}
-      className={`${TILE_CLASS} flex flex-col gap-4`}
+      className={`${TILE_CLASS} flex flex-col gap-4 ${className}`}
     >
       <div>
         <h2 id={`chapter-${chapter.id}`} className="font-medium">
