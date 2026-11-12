@@ -7,10 +7,10 @@ import {
   type Cell,
   type Size,
 } from '@/lib/reporting/board';
-import type { ChapterSource } from '@/lib/reporting/story';
 import type { ServiceContext } from '../context';
-import { ServiceError } from '../errors';
-import { runSavedWidget, type Widget, type WidgetLayout } from '../reporting/widgets';
+import { chapterSourceOf, type Widget, type WidgetLayout } from '../reporting/widgets';
+
+export { chapterSourceOf };
 
 /** The bounds a stored layout is checked against: the board's (ADR-0010). */
 export { GRID_COLUMNS, MAX_WIDGET_HEIGHT };
@@ -45,28 +45,6 @@ export type CellInput = z.input<typeof boardInput>[number];
 /** The cards of a Dashboard's Widgets on its board (a Widget without a layout has none). */
 export function boardCells(widgets: readonly Widget[]): Cell[] {
   return widgets.flatMap((widget) => (widget.layout ? [{ id: widget.id, ...widget.layout }] : []));
-}
-
-/**
- * What decides a Widget's chapter kind, as the Dashboard Story reads it. Only a stacked bar
- * depends on its data (how many series it has), so only a stacked bar's query is run; one that
- * fails to run counts as having no series.
- */
-export async function chapterSourceOf(
-  ctx: ServiceContext,
-  widget: Pick<Widget, 'source' | 'query' | 'visualisation'>,
-): Promise<ChapterSource> {
-  const { source, visualisation } = widget;
-  if (source !== 'query' || visualisation !== 'stacked_bar') {
-    return { source, visualisation, data: null };
-  }
-  try {
-    const report = await runSavedWidget(ctx, widget);
-    return { source, visualisation, data: { columns: report.columns } };
-  } catch (error: unknown) {
-    if (error instanceof ServiceError) return { source, visualisation, data: null };
-    throw error;
-  }
 }
 
 /** A layout's size alone. */
