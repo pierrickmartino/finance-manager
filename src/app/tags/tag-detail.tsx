@@ -46,7 +46,7 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
             </span>
           )}
           {transactionCount === 0 && (
-            <span className="rounded-full bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
+            <span className="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
               Unused
             </span>
           )}
@@ -61,7 +61,7 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
           <h3 className={SECTION_HEADING}>Mostly</h3>
           <ul aria-label={`Top Categories of ${name}`} className="flex flex-wrap gap-2">
             {activity.topCategories.map((category) => (
-              <li key={category.name} className="rounded-full bg-sunken px-2 py-0.5 text-xs">
+              <li key={category.name} className="rounded-md bg-sunken px-2 py-0.5 text-xs">
                 {category.name} · {category.transactionCount}
               </li>
             ))}

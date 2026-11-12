@@ -45,7 +45,7 @@ export function TypeDot({ type }: { type: CategoryGroupType }) {
 export function TypeBadge({ type }: { type: CategoryGroupType }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${TYPE_TONE[type].badge}`}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${TYPE_TONE[type].badge}`}
     >
       <TypeDot type={type} />
       {CATEGORY_GROUP_TYPE_LABELS[type]}

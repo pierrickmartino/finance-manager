@@ -148,7 +148,7 @@ function EnabledSwitch({ rule }: { rule: RuleDetailRule }) {
         {rule.enabled ? 'Enabled' : 'Disabled'}
         <span
           aria-hidden
-          className={`relative h-5 w-9 rounded-full transition-colors ${rule.enabled ? 'bg-accent' : 'bg-rule-strong'}`}
+          className={`relative h-5 w-9 rounded-full transition-colors ${rule.enabled ? 'bg-accent-ink' : 'bg-rule-strong'}`}
         >
           <span
             className={`absolute top-0.5 h-4 w-4 rounded-full bg-surface shadow transition-transform motion-reduce:transition-none ${rule.enabled ? 'left-4' : 'left-0.5'}`}

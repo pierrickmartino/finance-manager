@@ -95,7 +95,7 @@ function Progress({ progress, groupCount, fmt }: ProgressProps) {
 function TargetBadge({ isTargetMet }: { isTargetMet: boolean }) {
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-medium ${
+      className={`rounded-md px-3 py-1 text-xs font-medium ${
         isTargetMet ? 'bg-positive-tint text-positive' : 'bg-warning-tint text-warning'
       }`}
     >

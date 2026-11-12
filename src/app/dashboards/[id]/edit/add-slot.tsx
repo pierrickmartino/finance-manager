@@ -30,7 +30,7 @@ export function AddSlot({ dashboardId, position, savedWidgets, isOpen = false }:
       >
         <span aria-hidden className="h-px flex-1" style={{ background: STORY.rule }} />
         <span
-          className="rounded-full border px-3 py-1 hover:text-ink"
+          className="rounded-lg border px-3 py-1 hover:text-ink"
           style={{ borderColor: STORY.rule }}
         >
           <span aria-hidden>+ </span>Add chapter
