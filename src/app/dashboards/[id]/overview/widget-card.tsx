@@ -9,7 +9,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { monthFlows, periodValues } from '@/lib/reporting/overview';
 import { chapterKind, chapterStory, rankedTotals, shareParts } from '@/lib/reporting/story';
 import type { StoryChapter } from '../story/chapter';
-import { DotMatrix, MonthBars, TickList, type TickItem } from './marks';
+import { DotMatrix, HeatmapGrid, MonthBars, TickList, type TickItem } from './marks';
 import { DonutRing } from './ring';
 
 /** How many parts a ranking card lists. */
@@ -62,6 +62,8 @@ function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
       return <DonutRing data={data} money={money} />;
     case 'ranking':
       return <TickList items={rankingItems(data, money)} />;
+    case 'grid':
+      return <HeatmapGrid data={data} />;
     case 'trend':
     case 'bars': {
       const months = monthFlows(data);

@@ -39,6 +39,7 @@ function ChapterBody({ chapter }: { chapter: StoryChapter }) {
       );
     case 'share':
     case 'ring':
+    case 'grid':
       return <ShareBand data={data} title={chapter.name} />;
     case 'ranking':
       return <RankedBars data={data} title={chapter.name} />;
