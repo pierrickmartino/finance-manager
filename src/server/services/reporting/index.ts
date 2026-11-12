@@ -5,8 +5,12 @@
  */
 export { runWidgetQuery, type ReportTable } from './engine';
 export {
+  isExcept,
   listCellTransactions,
+  type AxisExcept,
+  type AxisSelector,
   type CellRef,
+  type PeriodSubtotal,
   type CellTransaction,
   type CellTransactionPage,
 } from './drill';

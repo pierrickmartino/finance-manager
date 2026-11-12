@@ -556,6 +556,65 @@ describe('drill down into a cell', () => {
     const pastTheEnd = await listCellTransactions(t.ctx, { dateRange: Q1_2025 }, { page: 9 });
     expect(pastTheEnd).toMatchObject({ total: 7, sumChfMinor: 564949, transactions: [] });
   });
+
+  it('lists every key of an axis but the ones named, as "Other" folds them', async () => {
+    const { salary, groceries } = await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month', columns: 'category' } as const;
+    const report = await runWidgetQuery(t.ctx, query);
+    const others = (values: (number | null)[], left: (string | null)[]) =>
+      values
+        .filter((_, c) => !left.includes(report.columns[c]!.key))
+        .reduce<number>((total, value) => total + (value ?? 0), 0);
+
+    const january = await listCellTransactions(t.ctx, query, {
+      row: '2025-01',
+      column: { except: [salary.id] },
+    });
+    const allYear = await listCellTransactions(t.ctx, query, {
+      column: { except: [groceries.id, null] },
+    });
+
+    expect(january.value).toBe(others(report.cells[0]!, [salary.id]));
+    expect(january.transactions.reduce((total, item) => total + item.chfMinor, 0)).toBe(
+      january.value,
+    );
+    // The "none" bucket (Unclassified) is named too, so its -30.00 stays out.
+    expect(allYear.value).toBe(others(report.columnTotals, [groceries.id, null]));
+    expect(allYear.transactions.every((item) => item.category !== null)).toBe(true);
+  });
+
+  it('narrows the dates of "every month but these" to the months it keeps', async () => {
+    await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month', measure: 'average' } as const;
+    const report = await runWidgetQuery(t.ctx, { ...query, measure: 'sum' });
+
+    const page = await listCellTransactions(t.ctx, query, { row: { except: ['2025-03'] } });
+
+    expect(page.span).toEqual({ from: '2025-01-01', to: '2025-02-28' });
+    expect(page.periodCount).toBe(2);
+    expect(page.sumChfMinor).toBe(report.rowTotals[0]! + report.rowTotals[1]!);
+  });
+
+  it('subtotals each whole period, newest first, when asked for a change', async () => {
+    const { restaurants } = await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month', columns: 'category' } as const;
+
+    const page = await listCellTransactions(t.ctx, query, {
+      row: { except: [] },
+      column: restaurants.id,
+      change: true,
+      pageSize: 1,
+    });
+    const plain = await listCellTransactions(t.ctx, query, { column: restaurants.id });
+
+    // Restaurants only spent in February (EUR -50.00 → -46.51); the other months count as 0.
+    expect(page.subtotals).toEqual([
+      { key: '2025-03', sumChfMinor: 0 },
+      { key: '2025-02', sumChfMinor: -4651 },
+      { key: '2025-01', sumChfMinor: 0 },
+    ]);
+    expect(plain.subtotals).toBeNull();
+  });
 });
 
 describe('filters', () => {

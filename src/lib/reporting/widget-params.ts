@@ -1,4 +1,4 @@
-import type { CellRef } from '@/server/services/reporting/drill';
+import { isExcept, type AxisSelector, type CellRef } from '@/server/services/reporting/cell-ref';
 import type {
   ReportFilters,
   WidgetQuery,
@@ -112,26 +112,41 @@ export function queryToParams(query: WidgetQueryInput): URLSearchParams {
 /** URL value of the "none" bucket (no Category, no Payee, no Tag). */
 const NONE = 'none';
 
-/** Drill-down cell parameters: `row`, `column` (absent = the whole axis), `page`. */
+const CELL_AXES = ['row', 'column'] as const;
+
+/**
+ * Drill-down cell parameters: `row`, `column` (absent = the whole axis), or repeated `rowNot`,
+ * `columnNot` for every key but those; `change=1`, `page`.
+ */
 export function cellToParams(cell: CellRef): URLSearchParams {
   const params = new URLSearchParams();
-  if (cell.row !== undefined) params.set('row', cell.row ?? NONE);
-  if (cell.column !== undefined) params.set('column', cell.column ?? NONE);
+  for (const axis of CELL_AXES) {
+    const selector = cell[axis];
+    if (selector === undefined) continue;
+    if (isExcept(selector)) {
+      for (const key of selector.except) params.append(`${axis}Not`, key ?? NONE);
+    } else {
+      params.set(axis, selector ?? NONE);
+    }
+  }
+  if (cell.change) params.set('change', '1');
   if (cell.page !== undefined && cell.page > 1) params.set('page', String(cell.page));
   return params;
 }
 
 export function cellFromParams(params: UrlParams): CellRef {
-  const key = (name: string): string | null | undefined => {
-    if (params[name] === undefined) return undefined;
-    const value = first(params[name]);
-    return value === NONE ? null : value;
+  const keyOf = (value: string): string | null => (value === NONE ? null : value);
+  const selector = (axis: (typeof CELL_AXES)[number]): AxisSelector | undefined => {
+    if (params[axis] !== undefined) return keyOf(first(params[axis]));
+    const except = all(params[`${axis}Not`]).map(keyOf);
+    return except.length > 0 ? { except } : undefined;
   };
   const cell: CellRef = {};
-  const row = key('row');
-  const column = key('column');
-  if (row !== undefined) cell.row = row;
-  if (column !== undefined) cell.column = column;
+  for (const axis of CELL_AXES) {
+    const value = selector(axis);
+    if (value !== undefined) cell[axis] = value;
+  }
+  if (first(params.change) === '1') cell.change = true;
   const page = Number(first(params.page));
   cell.page = Number.isSafeInteger(page) && page >= 1 ? page : 1;
   return cell;
