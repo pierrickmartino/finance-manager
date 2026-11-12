@@ -1,3 +1,4 @@
+import { divideRounded } from '@/lib/reporting/average';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { swissToday } from '../fx/dates';
@@ -200,10 +201,4 @@ export function measureOf(
   if (sumMinor === null) return null;
   if (measure === 'sum') return sumMinor;
   return periods === 0 ? null : divideRounded(sumMinor, periods);
-}
-
-/** Integer division rounded half away from zero, like the CHF conversion. */
-function divideRounded(amount: number, by: number): number {
-  const quotient = Math.round(Math.abs(amount) / by);
-  return amount < 0 ? -quotient : quotient;
 }

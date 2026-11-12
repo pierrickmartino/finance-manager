@@ -9,7 +9,7 @@ import { NotFoundError, ServiceError } from '@/server/services/errors';
 import { runSavedWidget, type CellRef, type Widget } from '@/server/services/reporting';
 import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
-import { drillLinks, toPivotData } from '../widgets/pivot-data';
+import { drillLinks, toPivotData, type PivotLinks } from '../widgets/pivot-data';
 import type { RecentActivity } from './[id]/overview/overview-row';
 import type { BoardChapter } from './[id]/overview/widget-board';
 
@@ -22,8 +22,11 @@ export interface WidgetView {
 
 /** An Account balance links to its Account, the total to the Accounts page. */
 export function balanceHref(cell: CellRef): string {
-  return cell.row ? `/accounts/${cell.row}` : '/accounts';
+  return typeof cell.row === 'string' ? `/accounts/${cell.row}` : '/accounts';
 }
+
+/** Account balances aren't Transactions: no Drill-down, only their Accounts. */
+export const BALANCE_LINKS: PivotLinks = { hrefOf: balanceHref, drill: null };
 
 /**
  * Runs a Widget into what its visualisation draws, Drill-down links included: they lead back
@@ -37,7 +40,7 @@ export async function loadWidgetView(ctx: ServiceContext, widget: Widget): Promi
       : { kind: 'widget', id: widget.id };
     const data = toPivotData(
       report,
-      widget.source === 'account_balances' ? balanceHref : drillLinks(report, origin),
+      widget.source === 'account_balances' ? BALANCE_LINKS : drillLinks(report, origin),
     );
     return { data, unconvertedCount: report.unconvertedCount, error: null };
   } catch (error: unknown) {

@@ -1,6 +1,8 @@
 import type { CellTransactionPage } from '@/server/services/reporting/drill';
 import type { TimeAxis, WidgetQuery } from '@/server/services/reporting/query';
 import { includesCapital } from '@/server/services/reporting/sql';
+import { divideRounded } from './average';
+import { changeOverAverage } from './overview';
 import { queryFilterLists, type FilterChoices } from './query-filters';
 
 /**
@@ -30,6 +32,42 @@ export function drillHeadline(number: DrillNumber, formatChf: (minor: number) =>
   if (measure === 'sum') return `${plural(total, 'Transaction')}, total ${formatChf(value)}`;
   const period = PERIOD_NAMES[number.averagePer];
   return `${formatChf(sumChfMinor ?? 0)} ÷ ${plural(number.periodCount, period)} = ${formatChf(value)} / ${period}`;
+}
+
+/** One period's subtotal, labelled. */
+export interface LabelledSubtotal {
+  label: string;
+  sumChfMinor: number;
+}
+
+/** A change as the insight rounds it, signed: "+12%", "−60%", "0%". */
+function signedPercent(change: number): string {
+  const points = Math.round(Math.abs(change) * 100);
+  if (points === 0) return '0%';
+  return `${change > 0 ? '+' : '−'}${points}%`;
+}
+
+/**
+ * A change worked out from the periods' subtotals, newest first: the newest against the one
+ * before ("March CHF 1,240 · February CHF 1,107 → +12%"), or against the average of all the
+ * ones before when there are more. Null without a period to compare with.
+ */
+export function changeWorking(
+  periods: LabelledSubtotal[],
+  formatChf: (minor: number) => string,
+): string | null {
+  const [latest, ...before] = periods;
+  if (!latest || before.length === 0) return null;
+  const sums = before.map((period) => period.sumChfMinor);
+  const parts = periods.map((period) => `${period.label} ${formatChf(period.sumChfMinor)}`);
+  if (before.length > 1) {
+    const average = divideRounded(
+      sums.reduce((total, value) => total + value, 0),
+      sums.length,
+    );
+    parts.push(`average before ${formatChf(average)}`);
+  }
+  return `${parts.join(' · ')} → ${signedPercent(changeOverAverage(latest.sumChfMinor, sums))}`;
 }
 
 /**

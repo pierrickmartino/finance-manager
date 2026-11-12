@@ -1,4 +1,7 @@
-import type { Measure, ReportHeader } from '@/server/services/reporting';
+import type { CellRef } from '@/server/services/reporting/cell-ref';
+import type { ReportHeader } from '@/server/services/reporting/headers';
+import type { Measure } from '@/server/services/reporting/query';
+import { drillUrl, type DrillTarget } from './drill-link';
 
 /**
  * The data mapping behind the chart visualisations (spec 104). Every chart is a pure renderer
@@ -21,6 +24,34 @@ export interface ChartSource {
     columnTotals: string[];
     total: string;
   };
+  /**
+   * Where the values the charts work out themselves ("Other", an average) drill down: null
+   * when they don't (Account balances, which aren't Transactions).
+   */
+  drill: DrillTarget | null;
+}
+
+type Axis = 'rows' | 'columns';
+
+/** A header's key in a Drill-down cell; undefined (the whole axis) when the query has no axis. */
+function cellKey(data: ChartSource, axis: Axis, header: ReportHeader): string | null | undefined {
+  return data.drill?.query[axis] === null ? undefined : header.key;
+}
+
+/**
+ * The Drill-down of every key of `axis` but `kept` (in the cell `rest`), or null where it would
+ * not add up to the folded value: without Drill-downs, or on the Tag axis, where a Transaction
+ * with two folded Tags counts twice in the value but is listed once.
+ */
+function foldedHref(
+  data: ChartSource,
+  axis: Axis,
+  kept: ReportHeader[],
+  rest: CellRef = {},
+): string | null {
+  if (!data.drill || data.drill.query[axis] === 'tag') return null;
+  const except = { except: kept.map((header) => header.key) };
+  return drillUrl(data.drill, { ...rest, [axis === 'rows' ? 'row' : 'column']: except });
 }
 
 /**
@@ -47,6 +78,8 @@ export interface ChartPoint {
 export interface SeriesChart {
   series: ChartSeries[];
   points: ChartPoint[];
+  /** Each series' Drill-down over the whole range, by series key (null: none). */
+  totalHrefs: Record<string, string | null>;
 }
 
 function headerLabel(header: ReportHeader): string {
@@ -60,15 +93,25 @@ function sumOrNull(values: (number | null)[]): number | null {
 
 /**
  * Line and stacked bar: the rows run along the x axis (periods, usually) and each column is a
- * series. Columns past the eighth fold into one "Other" series, which links nowhere.
+ * series. Columns past the eighth fold into one "Other" series, which drills down to every
+ * column but the kept ones.
  */
 export function toSeriesChart(data: ChartSource): SeriesChart {
   const isFolded = data.columns.length > MAX_SERIES;
   const kept = isFolded ? MAX_SERIES - 1 : data.columns.length;
-  const series: ChartSeries[] = data.columns
-    .slice(0, kept)
-    .map((column, index) => ({ key: `s${index}`, label: headerLabel(column), slot: index }));
-  if (isFolded) series.push({ key: `s${kept}`, label: OTHER_LABEL, slot: kept });
+  const keptColumns = data.columns.slice(0, kept);
+  const series: ChartSeries[] = keptColumns.map((column, index) => ({
+    key: `s${index}`,
+    label: headerLabel(column),
+    slot: index,
+  }));
+  const totalHrefs: Record<string, string | null> = Object.fromEntries(
+    keptColumns.map((_, c) => [`s${c}`, data.hrefs.columnTotals[c] ?? null]),
+  );
+  if (isFolded) {
+    series.push({ key: `s${kept}`, label: OTHER_LABEL, slot: kept });
+    totalHrefs[`s${kept}`] = foldedHref(data, 'columns', keptColumns);
+  }
 
   const points = data.rows.map((row, r) => {
     const cells = data.cells[r] ?? [];
@@ -80,11 +123,13 @@ export function toSeriesChart(data: ChartSource): SeriesChart {
     }
     if (isFolded) {
       values[`s${kept}`] = sumOrNull(cells.slice(kept));
-      hrefs[`s${kept}`] = null;
+      hrefs[`s${kept}`] = foldedHref(data, 'columns', keptColumns, {
+        row: cellKey(data, 'rows', row),
+      });
     }
     return { label: headerLabel(row), values, hrefs };
   });
-  return { series, points };
+  return { series, points, totalHrefs };
 }
 
 /** One donut slice: sized by magnitude, labelled with the signed value. */
@@ -108,6 +153,7 @@ export function toDonutSlices(data: ChartSource): DonutSlice[] {
   const hrefs = byRows ? data.hrefs.rowTotals : data.hrefs.columnTotals;
   const parts = headers
     .map((header, index) => ({
+      header,
       label: headerLabel(header),
       signedValue: totals[index] ?? 0,
       href: hrefs[index] ?? null,
@@ -125,9 +171,11 @@ export function toDonutSlices(data: ChartSource): DonutSlice[] {
     shown = parts.filter((part) => largest.has(part));
     rest = parts.filter((part) => !largest.has(part));
   }
-  const slices = shown.map((part, slot) => ({
-    ...part,
-    value: Math.abs(part.signedValue),
+  const slices: DonutSlice[] = shown.map(({ label, signedValue, href }, slot) => ({
+    label,
+    value: Math.abs(signedValue),
+    signedValue,
+    href,
     slot,
   }));
   if (rest.length > 0) {
@@ -136,17 +184,16 @@ export function toDonutSlices(data: ChartSource): DonutSlice[] {
       label: OTHER_LABEL,
       value: Math.abs(signedValue),
       signedValue,
-      href: null,
+      // Every part but the shown ones: the empty and zero parts add nothing to it.
+      href: foldedHref(
+        data,
+        byRows ? 'rows' : 'columns',
+        shown.map((part) => part.header),
+      ),
       slot: slices.length,
     });
   }
-  return slices.map(({ label, value, signedValue, href, slot }) => ({
-    label,
-    value,
-    signedValue,
-    href,
-    slot,
-  }));
+  return slices;
 }
 
 /** Single number: the grand total, linking to every Transaction behind it. */

@@ -5,6 +5,7 @@ import { useFormatter } from '@/components/formatter-provider';
 import { TILE_CLASS } from '@/components/surface';
 import { findMonthFlows, spendingInsight } from '@/lib/reporting/overview';
 import { storyHero } from '@/lib/reporting/story';
+import { FigureLink } from '../figure-link';
 import type { StoryChapter } from '../story/chapter';
 import { Sparkline } from './marks';
 
@@ -48,9 +49,12 @@ export function NetWorthCard({ chapters }: { chapters: StoryChapter[] }) {
           </Link>
           {flow && (
             <p className="mt-2 text-sm text-muted">
-              <span className={kept >= 0 ? 'text-positive' : 'text-negative'}>
+              <FigureLink
+                href={flow.href}
+                className={kept >= 0 ? 'text-positive' : 'text-negative'}
+              >
                 <span aria-hidden>{kept >= 0 ? '↗' : '↘'}</span> {money(kept)}
-              </span>{' '}
+              </FigureLink>{' '}
               kept over {nets.length} months
             </p>
           )}
@@ -66,6 +70,7 @@ export function InsightCard({ chapters }: { chapters: StoryChapter[] }) {
   const flow = findMonthFlows(chapters);
   const insight = flow ? spendingInsight(flow.months) : null;
   if (!flow || !insight) return null;
+  const [before, change, after] = insight.detail;
   return (
     <section
       aria-labelledby="overview-insight"
@@ -75,14 +80,25 @@ export function InsightCard({ chapters }: { chapters: StoryChapter[] }) {
         <h2 id="overview-insight" className="font-display text-3xl leading-tight tracking-tight">
           {insight.headline}
         </h2>
-        <p className="mt-3 max-w-sm text-on-hero/80">{insight.detail}</p>
+        <p className="mt-3 max-w-sm text-on-hero/80">
+          {before}
+          <FigureLink
+            href={flow.changeHref}
+            className={flow.changeHref ? 'underline underline-offset-4' : ''}
+          >
+            {change}
+          </FigureLink>
+          {after}
+        </p>
       </div>
-      <Link
-        href={flow.href}
-        className="mt-6 self-start rounded-lg bg-on-hero px-5 py-2.5 text-sm font-medium text-hero shadow-lg hover:bg-on-hero/90"
-      >
-        See the Transactions
-      </Link>
+      {flow.latestHref && (
+        <Link
+          href={flow.latestHref}
+          className="mt-6 self-start rounded-lg bg-on-hero px-5 py-2.5 text-sm font-medium text-hero shadow-lg hover:bg-on-hero/90"
+        >
+          See the Transactions
+        </Link>
+      )}
     </section>
   );
 }
