@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { TILE_CLASS } from '@/components/surface';
@@ -66,19 +67,27 @@ function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
   }
 }
 
+interface WidgetCardProps {
+  chapter: StoryChapter;
+  className?: string;
+  /** Edit mode's actions on this Widget, at the top of its card. */
+  toolbar?: ReactNode;
+}
+
 /**
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ chapter }: { chapter: StoryChapter }) {
+export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const story = chapterStory(chapter, money);
   return (
     <section
       aria-labelledby={`chapter-${chapter.id}`}
-      className={`${TILE_CLASS} flex flex-col gap-4`}
+      className={`${TILE_CLASS} flex flex-col gap-4 ${className}`}
     >
+      {toolbar}
       <div>
         <h2 id={`chapter-${chapter.id}`} className="font-medium">
           {chapter.name}

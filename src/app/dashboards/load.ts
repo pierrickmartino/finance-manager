@@ -10,7 +10,7 @@ import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
 import { toPivotData } from '../widgets/pivot-data';
 import type { RecentActivity } from './[id]/overview/overview-row';
-import type { StoryChapter } from './[id]/story/chapter';
+import type { BoardChapter } from './[id]/overview/widget-board';
 
 export interface WidgetView {
   data: ChartSource | null;
@@ -39,14 +39,15 @@ export async function loadWidgetView(ctx: ServiceContext, widget: Widget): Promi
   }
 }
 
-/** A Widget run into its Story chapter. */
-export async function loadStoryChapter(ctx: ServiceContext, widget: Widget): Promise<StoryChapter> {
+/** A Widget run into its Story chapter, with its card's place and size on the board. */
+export async function loadStoryChapter(ctx: ServiceContext, widget: Widget): Promise<BoardChapter> {
   const view = await loadWidgetView(ctx, widget);
   return {
     id: widget.id,
     name: widget.name,
     source: widget.source,
     visualisation: widget.visualisation,
+    layout: widget.layout,
     ...view,
   };
 }

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (its "cards placed in Widget order" superseded by ADR-0010)
 ---
 
 # The Dashboard Story is a grid of cards, in Widget order
