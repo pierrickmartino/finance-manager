@@ -70,6 +70,23 @@
   mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
 }
 
+/* The Dashboard's insight card: the hero's teal, lit from the lower right. */
+@utility bg-insight {
+  background:
+    radial-gradient(120% 120% at 100% 100%, var(--color-hero-mist) 0%, transparent 45%),
+    radial-gradient(90% 90% at 70% 60%, var(--color-hero-deep) 0%, transparent 70%),
+    linear-gradient(135deg, var(--color-hero-mid), var(--color-hero-deep));
+}
+
+/* The period a Dashboard card points out (the latest full month): hatched teal. */
+@utility bg-hatch {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-hero-deep) 0 3px,
+    var(--color-hero-glow) 3px 6px
+  );
+}
+
 body {
   @apply bg-paper text-ink antialiased;
 }

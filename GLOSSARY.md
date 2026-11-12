@@ -131,8 +131,8 @@ A Widget that sits on no Dashboard. Adding it to a Dashboard places a copy there
 _Avoid_: Report, saved report
 
 **Dashboard**:
-A named, user-ordered set of Widgets, read as its Dashboard Story and edited in place as that Story (Edit mode). Each Widget sits on at most one Dashboard.
+A named, user-ordered set of Widgets, read as its Dashboard Story and edited in place as an ordered list of chapters (Edit mode). Each Widget sits on at most one Dashboard.
 
 **Dashboard Story**:
-A Dashboard read top to bottom: one headline amount, then one chapter per Widget in the Dashboard's order, each saying in words what its chart shows.
+A Dashboard read as a grid of cards: an overview row (the headline amount, the latest month's insight, the most recent Transactions), then one card per Widget in the Dashboard's order, left to right and top to bottom, each saying in words what its chart shows. Edit mode shows the same Widgets as one column of chapters, in that order.
 _Avoid_: Report, overview page, presentation

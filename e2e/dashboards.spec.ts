@@ -19,10 +19,13 @@ function nextAction(page: Page) {
   return page.waitForResponse((response) => response.request().method() === 'POST');
 }
 
-test('the starter Dashboard is the landing page', async ({ page }) => {
+test('the starter Dashboard is the landing page: an overview row, then a card per Widget', async ({
+  page,
+}) => {
   await page.goto('/');
 
   await expect(page).toHaveURL(/\/dashboards\//);
+  await expect(page.getByRole('heading', { name: 'Recent activity', level: 2 })).toBeVisible();
   for (const name of [
     'Income vs. expense',
     'Net cash flow',
@@ -33,7 +36,7 @@ test('the starter Dashboard is the landing page', async ({ page }) => {
   }
 });
 
-test('a Dashboard opens as its Story; Edit mode is the same Story with actions, and Done returns', async ({
+test('a Dashboard opens as its Story; Edit mode lists the same Widgets in order, and Done returns', async ({
   page,
 }) => {
   await page.goto('/');

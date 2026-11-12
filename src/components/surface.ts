@@ -17,6 +17,8 @@ export const HEADLINE_AMOUNT_CLASS = 'font-display text-4xl tracking-tight tabul
 
 /** A separate object on the page: a list, a detail panel, a Widget. Use by role, not for every block. */
 export const CARD_CLASS = 'rounded-xl border border-rule bg-surface shadow-sm';
+/** A card of the Dashboard's grid: rounder and roomier than CARD_CLASS. */
+export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 
 // Buttons --------------------------------------------------------------------------------------
 
@@ -35,6 +37,9 @@ export const SECONDARY_BUTTON_CLASS =
 /** The compact secondary button of dense lists and rows. */
 export const SMALL_BUTTON_CLASS =
   'rounded-md border border-rule-strong bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-sunken disabled:opacity-40';
+/** A rounded action on the Dashboard's tiles (Edit Dashboard, See the Transactions). */
+export const PILL_BUTTON_CLASS =
+  'rounded-full border border-rule bg-surface px-4 py-1.5 text-sm font-medium text-ink shadow-sm hover:bg-sunken';
 /** A quiet action that sits inside a row or toolbar. */
 export const GHOST_BUTTON_CLASS =
   'rounded-md px-2 py-1 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink disabled:opacity-30';
