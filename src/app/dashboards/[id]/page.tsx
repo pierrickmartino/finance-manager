@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Suspense } from 'react';
 import { PILL_BUTTON_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
@@ -11,8 +10,6 @@ import { findDashboard, loadRecentActivity, loadStoryChapter } from '../load';
 import { DashboardTabs } from '../tabs';
 import { CompletenessNotice } from './completeness-notice';
 import { DashboardOverview } from './overview/dashboard-overview';
-import { DonutPrototypeSwitcher } from './overview/donut-prototype';
-import { IS_DONUT_PROTOTYPE_ENABLED } from './overview/donut-prototype/parts';
 import { WidgetBoard } from './overview/widget-board';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
@@ -65,12 +62,6 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
           </p>
         }
       />
-      {/* PROTOTYPE: the Donut Widget visualisation switcher (./overview/donut-prototype). */}
-      {IS_DONUT_PROTOTYPE_ENABLED && chapters.some((c) => c.visualisation === 'donut') && (
-        <Suspense>
-          <DonutPrototypeSwitcher />
-        </Suspense>
-      )}
     </section>
   );
 }

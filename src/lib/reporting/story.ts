@@ -15,7 +15,7 @@ export interface StoryWidget {
 }
 
 /** How a chapter shows its Widget. */
-export type ChapterKind = 'trend' | 'bars' | 'ranking' | 'share' | 'number';
+export type ChapterKind = 'trend' | 'bars' | 'ranking' | 'share' | 'ring' | 'number';
 
 /** Above this many series a stacked bar is told as a ranking of its parts. */
 const RANKING_FROM_SERIES = 3;
@@ -96,12 +96,8 @@ export type ChapterSource = Pick<StoryWidget, 'source' | 'visualisation'> & {
 
 export function chapterKind(widget: ChapterSource): ChapterKind {
   if (widget.visualisation === 'number') return 'number';
-  if (
-    widget.source === 'account_balances' ||
-    widget.visualisation === 'table' ||
-    widget.visualisation === 'donut'
-  )
-    return 'share';
+  if (widget.source === 'account_balances' || widget.visualisation === 'table') return 'share';
+  if (widget.visualisation === 'donut') return 'ring';
   if (widget.visualisation === 'line') return 'trend';
   return (widget.data?.columns.length ?? 0) >= RANKING_FROM_SERIES ? 'ranking' : 'bars';
 }
@@ -245,7 +241,7 @@ export function chapterStory(widget: StoryWidget, money: Money): ChapterStory {
   if (!data || data.rows.length === 0) return { lead: null, facts: [] };
   const kind = chapterKind(widget);
   if (kind === 'number') return { lead: null, facts: [] };
-  if (kind === 'share') return shareStory(data, money);
+  if (kind === 'share' || kind === 'ring') return shareStory(data, money);
   if (kind === 'bars' && incomeAndExpense(data)) return flowStory(data, money);
   return periodStory(widget, data, money);
 }
@@ -261,6 +257,6 @@ export const STORY_SHOWN_AS: Record<Visualisation, { short: string; full: string
     short: 'as bars',
     full: `In the Story: bars per period, or a ranking from ${RANKING_FROM_SERIES} series`,
   },
-  donut: { short: 'as a share', full: 'In the Story: a share band of its slices' },
+  donut: { short: 'as a ring', full: 'In the Story: a ring of its slices, the total inside' },
   number: { short: 'as a number', full: 'In the Story: one large number' },
 };

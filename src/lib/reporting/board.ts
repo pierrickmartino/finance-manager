@@ -66,7 +66,7 @@ export function sizeKind(widget: ChapterSource): SizeKind {
   const kind = chapterKind(widget);
   if (kind === 'number') return 'number';
   if (widget.source === 'account_balances') return 'balances';
-  return kind === 'ranking' || kind === 'share' ? 'list' : 'chart';
+  return kind === 'ranking' || kind === 'share' || kind === 'ring' ? 'list' : 'chart';
 }
 
 export function defaultSize(widget: ChapterSource): Size {

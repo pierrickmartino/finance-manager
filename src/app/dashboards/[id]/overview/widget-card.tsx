@@ -10,8 +10,7 @@ import { monthFlows, periodValues } from '@/lib/reporting/overview';
 import { chapterKind, chapterStory, rankedTotals, shareParts } from '@/lib/reporting/story';
 import type { StoryChapter } from '../story/chapter';
 import { DotMatrix, MonthBars, TickList, type TickItem } from './marks';
-import { DonutPrototype } from './donut-prototype';
-import { IS_DONUT_PROTOTYPE_ENABLED } from './donut-prototype/parts';
+import { DonutRing } from './ring';
 
 /** How many parts a ranking card lists. */
 const RANKING_LIMIT = 6;
@@ -44,9 +43,6 @@ function shareItems(data: ChartSource, money: Money): TickItem[] {
 function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
   const { data } = chapter;
   if (!data) return null;
-  // PROTOTYPE: ./donut-prototype swaps the Donut Widget's mark via ?variant= (and ?sample=).
-  if (IS_DONUT_PROTOTYPE_ENABLED && chapter.visualisation === 'donut')
-    return <DonutPrototype data={data} money={money} />;
   if (data.rows.length === 0) return <p className="text-muted">No data in this date range yet.</p>;
   switch (chapterKind(chapter)) {
     case 'number':
@@ -62,6 +58,8 @@ function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
       );
     case 'share':
       return <TickList items={shareItems(data, money)} />;
+    case 'ring':
+      return <DonutRing data={data} money={money} />;
     case 'ranking':
       return <TickList items={rankingItems(data, money)} />;
     case 'trend':
