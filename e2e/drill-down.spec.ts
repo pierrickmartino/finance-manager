@@ -226,7 +226,7 @@ test("the insight opens the latest month, its change and the Story's kept per mo
 
   await insight.getByRole('link', { name: '24% above' }).click();
   await expect(page.getByRole('status')).toHaveText(
-    /CHF -1'300\.00 · .* CHF -1'100\.00 · .* CHF -1'000\.00 · average before CHF -1'050\.00 → \+24%$/,
+    /CHF 1'300\.00 · .* CHF 1'100\.00 · .* CHF 1'000\.00 · average before CHF 1'050\.00 → \+24%$/,
   );
   await expect(
     page.getByRole('table', { name: 'Cell Transactions' }).locator('tbody tr'),

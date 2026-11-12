@@ -18,6 +18,8 @@ export type DrillNumber = Pick<
 
 const PERIOD_NAMES: Record<TimeAxis, string> = { month: 'month', quarter: 'quarter', year: 'year' };
 
+const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
+
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /**
@@ -50,24 +52,26 @@ function signedPercent(change: number): string {
 /**
  * A change worked out from the periods' subtotals, newest first: the newest against the one
  * before ("March CHF 1,240 · February CHF 1,107 → +12%"), or against the average of all the
- * ones before when there are more. Null without a period to compare with.
+ * ones before when there are more. Spending (no period above zero) is stated as positive
+ * amounts, as the insight speaks of it; the change is the same either way. Null without a
+ * period to compare with.
  */
 export function changeWorking(
   periods: LabelledSubtotal[],
   formatChf: (minor: number) => string,
 ): string | null {
-  const [latest, ...before] = periods;
+  const isSpending = periods.every((period) => period.sumChfMinor <= 0);
+  const shown = isSpending
+    ? periods.map((period) => ({ ...period, sumChfMinor: Math.abs(period.sumChfMinor) }))
+    : periods;
+  const [latest, ...before] = shown;
   if (!latest || before.length === 0) return null;
   const sums = before.map((period) => period.sumChfMinor);
-  const parts = periods.map((period) => `${period.label} ${formatChf(period.sumChfMinor)}`);
-  if (before.length > 1) {
-    const average = divideRounded(
-      sums.reduce((total, value) => total + value, 0),
-      sums.length,
-    );
-    parts.push(`average before ${formatChf(average)}`);
-  }
-  return `${parts.join(' · ')} → ${signedPercent(changeOverAverage(latest.sumChfMinor, sums))}`;
+  const parts = shown.map((period) => `${period.label} ${formatChf(period.sumChfMinor)}`);
+  const average =
+    before.length > 1 ? [`average before ${formatChf(divideRounded(sum(sums), sums.length))}`] : [];
+  const change = signedPercent(changeOverAverage(latest.sumChfMinor, sums));
+  return `${[...parts, ...average].join(' · ')} → ${change}`;
 }
 
 /**

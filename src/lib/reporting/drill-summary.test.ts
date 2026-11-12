@@ -58,6 +58,18 @@ describe('changeWorking', () => {
   });
 
   it('compares the newest month with the average of the months before, as the insight does', () => {
+    const months = [
+      { label: 'Mar', sumChfMinor: 30_000 },
+      { label: 'Feb', sumChfMinor: 90_000 },
+      { label: 'Jan', sumChfMinor: 60_000 },
+    ];
+
+    expect(changeWorking(months, chf)).toBe(
+      'Mar CHF 300 · Feb CHF 900 · Jan CHF 600 · average before CHF 750 → −60%',
+    );
+  });
+
+  it('states spending as positive amounts, as the insight speaks of it', () => {
     // Spending is negative; Mar spent 300 against an average of 750 before: 60% below.
     const months = [
       { label: 'Mar', sumChfMinor: -30_000 },
@@ -66,7 +78,7 @@ describe('changeWorking', () => {
     ];
 
     expect(changeWorking(months, chf)).toBe(
-      'Mar CHF -300 · Feb CHF -900 · Jan CHF -600 · average before CHF -750 → −60%',
+      'Mar CHF 300 · Feb CHF 900 · Jan CHF 600 · average before CHF 750 → −60%',
     );
   });
 
