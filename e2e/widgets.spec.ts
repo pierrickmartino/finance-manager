@@ -64,12 +64,15 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Full screen' })).toBeVisible();
 
-  // Drill into the cell: all 14 October Transactions are unclassified.
-  await pivot.getByRole('link', { name: /^Oct 2025, Unclassified: / }).click();
+  // Drill into the cell: all 14 October Transactions are unclassified, and the headline's
+  // total is the number clicked.
+  const cell = pivot.getByRole('link', { name: /^Oct 2025, Unclassified: / });
+  const clicked = (await cell.getAttribute('aria-label'))!.replace(/^.*: /, '');
+  await cell.click();
   await expect(
     page.getByRole('heading', { name: 'Transactions in Oct 2025 · Unclassified' }),
   ).toBeVisible();
-  await expect(page.getByRole('status')).toContainText('14 Transactions');
+  await expect(page.getByRole('status')).toHaveText(`14 Transactions, total ${clicked}`);
   await expect(
     page.getByRole('table', { name: 'Cell Transactions' }).locator('tbody tr'),
   ).toHaveCount(14);
@@ -83,6 +86,15 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await expect(
     page.getByRole('table', { name: 'Pivot' }).getByRole('rowheader', { name: 'Oct 2025' }),
   ).toBeVisible();
+
+  // From the standalone Widget, the Drill-down leads back to it.
+  await page
+    .getByRole('table', { name: 'Pivot' })
+    .getByRole('link', { name: /^Oct 2025, Unclassified: / })
+    .click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=widget/);
+  await page.getByRole('link', { name: 'Back to the Widget' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: widgetName })).toBeVisible();
 });
 
 test("a Donut Widget's legend row opens the Drill-down behind its amount", async ({ page }) => {

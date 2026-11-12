@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
+import { seedEurRates } from '@test/support/fx';
 import { seedTransactions, type SeedTransaction } from '@test/support/transactions';
 import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
@@ -117,6 +118,22 @@ describe('filter Transactions', () => {
 
     expect(await descriptions({ accountId: ubs.id })).toEqual(['ubs']);
     expect(await descriptions({ accountId: bcge.id })).toEqual(['bcge']);
+  });
+
+  it('by a missing FX rate: foreign Transactions booked before any rate of their Currency', async () => {
+    const chf = await account();
+    const eur = await account('EUR');
+    await seedEurRates(t.ctx, [['2025-10-10', '0.9400']]);
+    await seed(chf, [{ bookingDate: '2025-10-01', amountMinor: -1, rawDescription: 'chf' }]);
+    await seed(eur, [
+      { bookingDate: '2025-10-09', amountMinor: -1, rawDescription: 'eur before' },
+      { bookingDate: '2025-10-10', amountMinor: -1, rawDescription: 'eur on the day' },
+    ]);
+
+    expect(await descriptions({ fxRate: 'missing' })).toEqual(['eur before']);
+    await expect(listTransactions(t.ctx, { fxRate: 'stale' as 'missing' })).rejects.toThrow(
+      ValidationError,
+    );
   });
 
   it('by status: imported or manual', async () => {

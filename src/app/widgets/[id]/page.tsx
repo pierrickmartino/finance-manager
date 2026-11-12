@@ -9,7 +9,7 @@ import { getWidget, MEASURE_LABELS, type Widget } from '@/server/services/report
 import { balanceHref, editWidgetHref } from '../../dashboards/load';
 import { deleteWidgetAction } from '../actions';
 import { loadSavedWidget } from '../load';
-import { toPivotData } from '../pivot-data';
+import { drillLinks, toPivotData } from '../pivot-data';
 import { WidgetView } from '../widget-view';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
 
@@ -58,7 +58,12 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
           report={report}
           title={widget.name}
           visualisation={widget.visualisation}
-          data={widget.source === 'account_balances' ? toPivotData(report, balanceHref) : undefined}
+          data={toPivotData(
+            report,
+            widget.source === 'account_balances'
+              ? balanceHref
+              : drillLinks(report, { kind: 'widget', id: widget.id }),
+          )}
         />
       )}
     </section>

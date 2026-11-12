@@ -6,6 +6,7 @@ import { intersect, periodSpan, periodsIn, resolveRange, type DateSpan } from '.
 import {
   isTimeAxis,
   widgetQueryInput,
+  type Measure,
   type ReportAxis,
   type WidgetQuery,
   type WidgetQueryInput,
@@ -159,12 +160,46 @@ function measureValue(
   row: ReportHeader,
   column: ReportHeader,
 ): number | null {
-  if (query.measure === 'count') return aggregate.count;
-  if (aggregate.sumMinor === null) return null;
-  if (query.measure === 'sum') return aggregate.sumMinor;
+  const periods = query.measure === 'average' ? cellPeriodCount(query, range, row, column) : 0;
+  return measureOf(query.measure, {
+    sumMinor: aggregate.sumMinor,
+    count: aggregate.count,
+    periods,
+  });
+}
+
+/** The number of `averagePer` periods one cell's `average` divides by (0 when it has none). */
+export function cellPeriodCount(
+  query: WidgetQuery,
+  range: DateSpan,
+  row: ReportHeader,
+  column: ReportHeader,
+): number {
   const span = cellSpan(query, range, row, column);
-  const periods = span ? periodsIn(span, query.averagePer).length : 0;
-  return periods === 0 ? null : divideRounded(aggregate.sumMinor, periods);
+  return span ? periodsIn(span, query.averagePer).length : 0;
+}
+
+/** What makes up a measured number: its CHF sum, its Transactions and its periods. */
+export interface MeasureParts {
+  sumMinor: number | null;
+  count: number;
+  /** The `averagePer` periods the `average` divides by. */
+  periods: number;
+}
+
+/**
+ * A cell's value under a measure: its sum, its count of Transactions, or its sum divided by its
+ * periods (rounded half away from zero). Null where no Transaction falls or no period is left.
+ */
+export function measureOf(
+  measure: Measure,
+  { sumMinor, count, periods }: MeasureParts,
+): number | null {
+  if (count === 0) return null;
+  if (measure === 'count') return count;
+  if (sumMinor === null) return null;
+  if (measure === 'sum') return sumMinor;
+  return periods === 0 ? null : divideRounded(sumMinor, periods);
 }
 
 /** Integer division rounded half away from zero, like the CHF conversion. */
