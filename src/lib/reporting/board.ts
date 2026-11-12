@@ -52,13 +52,14 @@ export function boardKey(cells: readonly Cell[]): string {
 }
 
 /** What a card's size is chosen by: what it shows, coarser than its chapter kind. */
-export type SizeKind = 'number' | 'balances' | 'list' | 'chart';
+export type SizeKind = 'number' | 'balances' | 'list' | 'grid' | 'chart';
 
 /** The size a new Widget starts at, and the smallest its card can be read at, per kind. */
 export const WIDGET_SIZES: Record<SizeKind, { initial: Size; min: Size }> = {
   number: { initial: { w: 4, h: 3 }, min: { w: 2, h: 2 } },
   balances: { initial: { w: 4, h: 6 }, min: { w: 3, h: 4 } },
   list: { initial: { w: 4, h: 8 }, min: { w: 3, h: 5 } },
+  grid: { initial: { w: 8, h: 8 }, min: { w: 4, h: 5 } },
   chart: { initial: { w: 8, h: 6 }, min: { w: 4, h: 4 } },
 };
 
@@ -66,6 +67,7 @@ export function sizeKind(widget: ChapterSource): SizeKind {
   const kind = chapterKind(widget);
   if (kind === 'number') return 'number';
   if (widget.source === 'account_balances') return 'balances';
+  if (kind === 'grid') return 'grid';
   return kind === 'ranking' || kind === 'share' ? 'list' : 'chart';
 }
 

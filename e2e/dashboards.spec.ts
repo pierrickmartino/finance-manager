@@ -1,4 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createAccount } from '../src/server/services/accounts';
+import { createBank } from '../src/server/services/banks';
+import {
+  addWidget,
+  createDashboard as createDashboardRecord,
+} from '../src/server/services/dashboards';
+import { createManualTransaction } from '../src/server/services/transactions/manual';
 import {
   arrangeCard,
   cardBox,
@@ -6,7 +13,9 @@ import {
   nextAction,
   resizeCard,
   stepWithKey,
+  widgetCard,
 } from './support/dashboards';
+import { withServices } from './support/services';
 
 /** The chapter titles, in the order the page tells them. */
 function chapterTitles(page: Page) {
@@ -210,6 +219,9 @@ test('a Widget added from Add Widget goes in the first free spot; removing one l
 
   await page.getByText('Add Widget', { exact: true }).click();
   await page.getByRole('link', { name: 'New Widget' }).click();
+  // A donut starts 4 columns wide (a table, the default, starts 8: too wide for this row).
+  await page.getByRole('group', { name: 'Visualisation' }).getByText('Donut').click();
+  await expect(page).toHaveURL(/[?&]vis=donut/);
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
   await expect(chapterTitles(page)).toHaveText([balances, copy, widgetName]);
@@ -359,4 +371,57 @@ test('add an existing Widget from the Widgets page to a Dashboard as a copy', as
   await expect(
     page.getByRole('combobox', { name: 'Existing Widget' }).getByRole('option'),
   ).toContainText([`${widgetName} (No Dashboard)`, `${widgetName} (${dashboardName})`]);
+});
+
+test('a table Widget shows its rows and columns as a heatmap whose cells open their Transactions', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const accountName = `Heatmap account ${suffix}`;
+  const dayBefore = (days: number) =>
+    new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Heatmap bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: accountName,
+      currency: 'CHF',
+      openingBalanceMinor: 0,
+      openingDate: '2021-01-01',
+    });
+    for (const [days, amountMinor] of [
+      [40, -120_00],
+      [70, -2400_00],
+    ] as const) {
+      await createManualTransaction(ctx, {
+        accountId: account.id,
+        bookingDate: dayBefore(days),
+        amountMinor,
+        description: `Heatmap ${days}`,
+      });
+    }
+    const dashboard = await createDashboardRecord(ctx, { name: `Heatmap ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'By Account',
+      visualisation: 'table',
+      query: {
+        dateRange: { kind: 'last', count: 6, unit: 'month' },
+        rows: 'account',
+        columns: 'month',
+      },
+    });
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const heatmap = widgetCard(page, 'By Account').getByRole('table', { name: 'Heatmap' });
+  const row = heatmap.getByRole('row').filter({ hasText: accountName });
+  await expect(row.getByRole('link', { name: /: CHF -2'400\.00$/ })).toHaveText('2.4k');
+  await expect(row.getByRole('link', { name: "CHF -2'520.00" })).toBeVisible();
+
+  await row.getByRole('link', { name: /: CHF -120\.00$/ }).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?/);
+  await expect(page.getByRole('table', { name: 'Cell Transactions' })).toContainText('Heatmap 40');
 });
