@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { TILE_CLASS } from '@/components/surface';
@@ -73,9 +74,12 @@ function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
 export function WidgetCard({
   chapter,
   className = '',
+  toolbar,
 }: {
   chapter: StoryChapter;
   className?: string;
+  /** Edit mode's actions on this Widget, at the top of its card. */
+  toolbar?: ReactNode;
 }) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
@@ -85,6 +89,7 @@ export function WidgetCard({
       aria-labelledby={`chapter-${chapter.id}`}
       className={`${TILE_CLASS} flex flex-col gap-4 ${className}`}
     >
+      {toolbar}
       <div>
         <h2 id={`chapter-${chapter.id}`} className="font-medium">
           {chapter.name}

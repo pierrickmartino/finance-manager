@@ -1,22 +1,27 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ACCENT_BUTTON_CLASS } from '@/components/surface';
+import { widgetPickerOptions } from '@/lib/reporting/widget-picker';
 import { getServiceContext } from '@/server/app-context';
 import { listDashboards } from '@/server/services/dashboards';
 import { listWidgets } from '@/server/services/reporting';
-import { widgetPickerOptions } from '@/lib/reporting/widget-picker';
-import { editWidgetHref, findDashboard, loadStoryChapter } from '../../load';
+import { editWidgetHref, findDashboard, loadRecentActivity, loadStoryChapter } from '../../load';
 import { DashboardTabs } from '../../tabs';
-import { StoryEditor } from './story-editor';
+import { DashboardOverview } from '../overview/dashboard-overview';
+import { AddWidgetMenu, EmptyBoard } from './add-widget';
+import { EditBoard } from './edit-board';
 
 export const metadata: Metadata = { title: 'Edit Dashboard · Finance Manager' };
 
 /**
- * Edit mode of a Dashboard: its Story, still, with every Widget action on its chapter and a
- * place to add one between every two (ADR-0007). Values in CHF. "Done" returns to the Story.
+ * Edit mode of a Dashboard: its Story's own grid, edited in place (GLOSSARY: Edit mode,
+ * ADR-0010). The overview row stays fixed above the board; each card carries its actions, and
+ * Add Widget is in the header. Values in CHF. "Done" returns to the Story.
  */
 export default async function EditDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
-  const [dashboards, chapters, savedWidgets] = await Promise.all([
+  const [dashboards, chapters, recent, savedWidgets] = await Promise.all([
     listDashboards(ctx),
     Promise.all(
       dashboard.widgets.map(async (widget) => ({
@@ -24,23 +29,42 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
         editHref: editWidgetHref(widget),
       })),
     ),
+    loadRecentActivity(ctx),
     listWidgets(ctx),
   ]);
+  const choices = {
+    dashboardId: dashboard.id,
+    savedWidgets: widgetPickerOptions(savedWidgets, dashboards),
+  };
 
   return (
     <section className="flex flex-col gap-4">
       <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
-      <StoryEditor
-        // A new set of Widgets (added, duplicated, deleted) starts again from the server's order.
-        key={chapters
-          .map((chapter) => chapter.id)
-          .sort()
-          .join()}
-        dashboardId={dashboard.id}
+      <DashboardOverview
         dashboardName={dashboard.name}
-        storyHref={`/dashboards/${dashboard.id}`}
+        subtitle={<p>Editing</p>}
+        actions={
+          <>
+            {chapters.length > 0 && <AddWidgetMenu {...choices} />}
+            <Link href={`/dashboards/${dashboard.id}`} className={ACCENT_BUTTON_CLASS}>
+              Done
+            </Link>
+          </>
+        }
         chapters={chapters}
-        savedWidgets={widgetPickerOptions(savedWidgets, dashboards)}
+        recent={recent}
+        board={
+          <EditBoard
+            // A new set of Widgets (added, duplicated, removed) starts again from the server's board.
+            key={chapters
+              .map((chapter) => chapter.id)
+              .sort()
+              .join()}
+            dashboardId={dashboard.id}
+            chapters={chapters}
+          />
+        }
+        empty={<EmptyBoard {...choices} />}
       />
     </section>
   );

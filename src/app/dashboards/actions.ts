@@ -14,7 +14,8 @@ import {
   listDashboards,
   renameDashboard,
   reorderDashboards,
-  reorderDashboardWidgets,
+  saveDashboardLayout,
+  type CellInput,
 } from '@/server/services/dashboards';
 import { deleteWidget } from '@/server/services/reporting';
 import { moveBy } from '@/lib/reporting/order';
@@ -102,14 +103,13 @@ export async function deleteDashboardWidgetAction(widgetId: string, _previous: R
 }
 
 /**
- * Saves the Widgets' reading order after a move in the one-column Edit mode, by swapping their
- * places on the board (a stopgap until Edit mode is the grid). Writes no History.
+ * Saves the whole board after a drop, a resize or a keyboard step in Edit mode. Writes no
+ * History; the last save wins (ADR-0010).
  */
-export async function reorderWidgetsAction(
+export async function saveDashboardLayoutAction(
   dashboardId: string,
-  widgetIds: string[],
+  cells: CellInput[],
 ): Promise<ActionResult<void>> {
-  return runAction(async () =>
-    reorderDashboardWidgets(await getServiceContext(), dashboardId, widgetIds),
-  );
+  // No revalidation: the editor already shows the board, and refetching would rerun every Widget.
+  return runAction(async () => saveDashboardLayout(await getServiceContext(), dashboardId, cells));
 }

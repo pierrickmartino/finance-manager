@@ -1,8 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
+import { cardBox, dragCard, resizeCard } from './support/dashboards';
 
 /** The chapter titles, in the order the page tells them. */
 function chapterTitles(page: Page) {
   return page.locator('h2[id^="chapter-"]');
+}
+
+/** In Edit mode: adds the Account balances, from the empty Dashboard or from Add Widget. */
+async function addBalances(page: Page): Promise<void> {
+  const menu = page.getByText('Add Widget', { exact: true });
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole('form', { name: 'Add Account balances' }).getByRole('button').click();
 }
 
 /** Creates a Dashboard; it opens in Edit mode, still empty. */
@@ -12,11 +20,6 @@ async function createDashboard(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Create Dashboard' }).click();
   await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
   await expect(page.getByText('No Widgets yet')).toBeVisible();
-}
-
-/** Waits for the next server action (a POST) to answer. */
-function nextAction(page: Page) {
-  return page.waitForResponse((response) => response.request().method() === 'POST');
 }
 
 test('the starter Dashboard is the landing page: an overview row, then a card per Widget', async ({
@@ -48,10 +51,14 @@ test('a Dashboard opens as its Story; Edit mode lists the same Widgets in order,
   await expect(page).toHaveURL(/\/dashboards\/[^/]+\/edit$/);
   await expect(page.getByText('Editing', { exact: true })).toBeVisible();
   await expect(chapterTitles(page)).toHaveText(storyOrder);
-  // Which Widgets the hero comes from (none yet on an empty database).
-  await expect(page.getByText(/^(Hero: number from|No hero yet)/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Move Net cash flow up' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Edit Net cash flow' })).toBeVisible();
+  // The same overview row above the board, then each card with its toolbar.
+  await expect(page.getByRole('heading', { name: 'Recent activity', level: 2 })).toBeVisible();
+  const toolbar = page.getByRole('toolbar', { name: 'Net cash flow actions' });
+  await expect(toolbar.getByRole('button', { name: 'Move Net cash flow' })).toBeVisible();
+  await expect(toolbar.getByRole('link', { name: 'Edit Net cash flow' })).toBeVisible();
+  await expect(toolbar.getByRole('button', { name: 'Duplicate' })).toBeVisible();
+  await expect(toolbar.getByRole('button', { name: 'Remove' })).toBeVisible();
+  await expect(page.getByText('Add Widget', { exact: true })).toBeVisible();
 
   await page.getByRole('link', { name: 'Done' }).click();
   await expect(page).toHaveURL(/\/dashboards\/[^/]+$/);
@@ -81,48 +88,67 @@ test('add a stacked bar Widget from the empty Dashboard; the editor previews its
   await expect(chapterTitles(page)).toHaveText([widgetName]);
 });
 
-test('duplicate places the copy right after its original; the arrows reorder and the order persists', async ({
+test('drag a card by its handle and resize it from its corner; both views keep it after a reload', async ({
   page,
 }) => {
   const original = 'Account balances in CHF';
   const copy = `${original} (copy)`;
-  await createDashboard(page, `Order ${Date.now()}`);
-
-  await page
-    .getByRole('form', { name: 'Add Account balances as chapter 1' })
-    .getByRole('button')
-    .click();
+  await createDashboard(page, `Grid ${Date.now()}`);
+  await addBalances(page);
   await expect(chapterTitles(page)).toHaveText([original]);
   await page
     .getByRole('form', { name: `Duplicate ${original}` })
     .getByRole('button')
     .click();
   await expect(chapterTitles(page)).toHaveText([original, copy]);
+  // Balances start 4×6: the copy sits right of its original on the same row.
+  const before = { original: await cardBox(page, original), copy: await cardBox(page, copy) };
+  expect(before.copy.x).toBeGreaterThan(before.original.x + before.original.width);
+  expect(before.copy.y).toBeCloseTo(before.original.y, 0);
 
-  const saved = nextAction(page);
-  await page.getByRole('button', { name: `Move ${copy} up` }).click();
-  await saved;
-  await expect(chapterTitles(page)).toHaveText([copy, original]);
-  // At the top it can't go further up, so focus moves to its other arrow.
-  await expect(page.getByRole('button', { name: `Move ${copy} down` })).toBeFocused();
+  // Onto the copy's place: the copy is pushed down under it, and the first columns stay empty.
+  await dragCard(page, original, 4, 0);
+  // Two columns wider and two rows taller: the copy below is pushed further down.
+  await resizeCard(page, original, 2, 2);
+  // A Balances card can't go under 3 columns: shrinking the copy by 3 stops at 3.
+  await resizeCard(page, copy, -3, 0);
+
+  const expectSavedBoard = async () => {
+    const [moved, pushed] = [await cardBox(page, original), await cardBox(page, copy)];
+    expect(moved.x).toBeCloseTo(before.copy.x, 0);
+    expect(moved.width).toBeGreaterThan(before.original.width * 1.4);
+    expect(moved.height).toBeGreaterThan(before.original.height * 1.2);
+    expect(pushed.x).toBeCloseTo(moved.x, 0);
+    expect(pushed.y).toBeGreaterThan(moved.y + moved.height);
+    expect(pushed.width).toBeLessThan(before.copy.width);
+    expect(pushed.width).toBeGreaterThan(before.copy.width * 0.6);
+    return { moved, pushed };
+  };
+  const edited = await expectSavedBoard();
 
   await page.reload();
-  await expect(chapterTitles(page)).toHaveText([copy, original]);
+  await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  const reloaded = await expectSavedBoard();
+  expect(reloaded.moved.width).toBeCloseTo(edited.moved.width, 0);
+  expect(reloaded.moved.height).toBeCloseTo(edited.moved.height, 0);
+
+  // The Dashboard Story draws the same places and sizes.
   await page.getByRole('link', { name: 'Done' }).click();
-  await expect(chapterTitles(page)).toHaveText([copy, original]);
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  const story = await expectSavedBoard();
+  expect(story.moved.width).toBeCloseTo(edited.moved.width, 0);
+  expect(story.moved.height).toBeCloseTo(edited.moved.height, 0);
+  expect(story.pushed.y - story.moved.y).toBeCloseTo(edited.pushed.y - edited.moved.y, 0);
 });
 
-test('a Widget added from any slot goes in the first free spot; the board draws each card at its place', async ({
+test('a Widget added from Add Widget goes in the first free spot; removing one leaves its space', async ({
   page,
 }) => {
   const widgetName = `Free spot ${Date.now()}`;
-  await createDashboard(page, `Slots ${Date.now()}`);
+  await createDashboard(page, `Add ${Date.now()}`);
   const balances = 'Account balances in CHF';
   const copy = `${balances} (copy)`;
-  await page
-    .getByRole('form', { name: 'Add Account balances as chapter 1' })
-    .getByRole('button')
-    .click();
+  await addBalances(page);
   await expect(chapterTitles(page)).toHaveText([balances]);
   await page
     .getByRole('form', { name: `Duplicate ${balances}` })
@@ -130,9 +156,8 @@ test('a Widget added from any slot goes in the first free spot; the board draws 
     .click();
   await expect(chapterTitles(page)).toHaveText([balances, copy]);
 
-  // The first slot no longer means "first": every slot adds at the first free spot.
-  await page.getByText('Add chapter 1').click();
-  await page.getByRole('link', { name: 'New Widget' }).locator('visible=true').click();
+  await page.getByText('Add Widget', { exact: true }).click();
+  await page.getByRole('link', { name: 'New Widget' }).click();
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
   await expect(chapterTitles(page)).toHaveText([balances, copy, widgetName]);
@@ -141,11 +166,7 @@ test('a Widget added from any slot goes in the first free spot; the board draws 
   // to it, all on one row (4 columns each), the shorter cards not stretched to the taller one.
   await page.getByRole('link', { name: 'Done' }).click();
   await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
-  const box = async (name: string) => {
-    const found = await page.getByRole('region', { name, exact: true }).boundingBox();
-    if (!found) throw new Error(`No card for ${name}`);
-    return found;
-  };
+  const box = (name: string) => cardBox(page, name);
   let [original, duplicate, added] = [await box(balances), await box(copy), await box(widgetName)];
   expect(duplicate.x).toBeGreaterThan(original.x + original.width);
   expect(added.x).toBeGreaterThan(duplicate.x + duplicate.width);
@@ -159,6 +180,21 @@ test('a Widget added from any slot goes in the first free spot; the board draws 
   expect(duplicate.y).toBeGreaterThan(original.y + original.height);
   expect(added.y).toBeGreaterThan(duplicate.y + duplicate.height);
   expect(duplicate.x).toBeCloseTo(original.x, 0);
+
+  // Removing the copy from the grid leaves its space empty: the new Widget stays where it was.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByRole('link', { name: 'Edit Dashboard' }).click();
+  await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  const addedBefore = await box(widgetName);
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page
+    .getByRole('form', { name: `Remove ${copy}` })
+    .getByRole('button')
+    .click();
+  await expect(chapterTitles(page)).toHaveText([balances, widgetName]);
+  const addedAfter = await box(widgetName);
+  expect(addedAfter.x).toBeCloseTo(addedBefore.x, 0);
+  expect(addedAfter.y).toBeCloseTo(addedBefore.y, 0);
 });
 
 test('add an existing Widget from the Widgets page to a Dashboard as a copy', async ({ page }) => {
@@ -177,8 +213,8 @@ test('add an existing Widget from the Widgets page to a Dashboard as a copy', as
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
   await expect(chapterTitles(page)).toHaveText([widgetName]);
-  await page.getByText('Add chapter 2').click();
+  await page.getByText('Add Widget', { exact: true }).click();
   await expect(
-    page.getByRole('combobox', { name: 'Existing Widget' }).last().getByRole('option'),
+    page.getByRole('combobox', { name: 'Existing Widget' }).getByRole('option'),
   ).toContainText([`${widgetName} (No Dashboard)`, `${widgetName} (${dashboardName})`]);
 });

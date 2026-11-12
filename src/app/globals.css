@@ -114,3 +114,20 @@ body {
   background: var(--color-accent-tint);
   color: var(--color-ink);
 }
+
+/* Edit mode's grid (react-grid-layout, ADR-0010): where a dragged or resized card will land,
+   and the resize corner, in the accent instead of the library's own colours. */
+.dashboard-board .react-grid-item.react-grid-placeholder {
+  background: var(--color-accent-tint);
+  border: 2px dashed var(--color-accent-ink);
+  border-radius: var(--radius-3xl);
+  opacity: 1;
+}
+
+.dashboard-board .react-grid-item > .react-resizable-handle {
+  opacity: 1;
+}
+
+.dashboard-board .react-grid-item > .react-resizable-handle::after {
+  border-color: var(--color-ink-soft);
+}

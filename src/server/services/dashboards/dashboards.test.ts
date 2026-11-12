@@ -20,7 +20,7 @@ import {
   listDashboards,
   renameDashboard,
   reorderDashboards,
-  reorderDashboardWidgets,
+  saveDashboardLayout,
 } from '.';
 
 const t = setupTestDatabase();
@@ -135,36 +135,33 @@ describe('Widgets on a Dashboard', () => {
     ).rejects.toThrow('Dashboard not found');
   });
 
-  it('reorders the Widgets by swapping places, leaving no overlaps and writing no History', async () => {
+  it('saves a whole layout as given, gaps kept, writing no History', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
-    const tall = await addWidget(t.ctx, dashboard.id, {
-      name: 'Tall',
+    const trend = await addWidget(t.ctx, dashboard.id, {
+      name: 'Trend',
       query: SPENDING,
-      layout: { x: 0, y: 0, w: 4, h: 8 },
+      visualisation: 'line',
     });
-    const small = await addWidget(t.ctx, dashboard.id, {
-      name: 'Small',
+    const total = await addWidget(t.ctx, dashboard.id, {
+      name: 'Total',
       query: SPENDING,
-      layout: { x: 4, y: 0, w: 4, h: 3 },
-    });
-    const under = await addWidget(t.ctx, dashboard.id, {
-      name: 'Under',
-      query: SPENDING,
-      layout: { x: 4, y: 3, w: 4, h: 3 },
+      visualisation: 'number',
     });
     const historyBefore = await listHistory(t.ctx, {});
 
-    await reorderDashboardWidgets(t.ctx, dashboard.id, [small.id, tall.id, under.id]);
+    await saveDashboardLayout(t.ctx, dashboard.id, [
+      { id: trend.id, x: 2, y: 5, w: 10, h: 7 },
+      { id: total.id, x: 0, y: 0, w: 2, h: 2 },
+    ]);
 
     expect(await board(dashboard.id)).toEqual([
-      ['Small', { x: 0, y: 0, w: 4, h: 3 }],
-      ['Tall', { x: 4, y: 0, w: 4, h: 8 }],
-      ['Under', { x: 4, y: 8, w: 4, h: 3 }],
+      ['Total', { x: 0, y: 0, w: 2, h: 2 }],
+      ['Trend', { x: 2, y: 5, w: 10, h: 7 }],
     ]);
     expect(await listHistory(t.ctx, {})).toEqual(historyBefore);
   });
 
-  it('refuses an order that leaves out, repeats or adds a Widget', async () => {
+  it('refuses a layout that leaves out, repeats or adds a Widget, keeping the stored one', async () => {
     const home = await createDashboard(t.ctx, { name: 'Home' });
     const other = await createDashboard(t.ctx, { name: 'Other' });
     const a = await addWidget(t.ctx, home.id, { name: 'A', query: SPENDING });
@@ -172,16 +169,55 @@ describe('Widgets on a Dashboard', () => {
     const stranger = await addWidget(t.ctx, other.id, { name: 'X', query: SPENDING });
     const before = await board(home.id);
     const message = 'List every Widget of this Dashboard once';
+    const at = (id: string, y: number) => ({ id, x: 0, y, w: 4, h: 8 });
 
-    await expect(reorderDashboardWidgets(t.ctx, home.id, [b.id])).rejects.toThrow(message);
-    await expect(reorderDashboardWidgets(t.ctx, home.id, [b.id, b.id])).rejects.toThrow(message);
-    await expect(
-      reorderDashboardWidgets(t.ctx, home.id, [b.id, a.id, stranger.id]),
-    ).rejects.toThrow(message);
-    await expect(reorderDashboardWidgets(t.ctx, home.id, [b.id, stranger.id])).rejects.toThrow(
+    await expect(saveDashboardLayout(t.ctx, home.id, [at(b.id, 0)])).rejects.toThrow(message);
+    await expect(saveDashboardLayout(t.ctx, home.id, [at(b.id, 0), at(b.id, 8)])).rejects.toThrow(
       message,
     );
+    await expect(
+      saveDashboardLayout(t.ctx, home.id, [at(a.id, 0), at(b.id, 8), at(stranger.id, 16)]),
+    ).rejects.toThrow(message);
+    await expect(
+      saveDashboardLayout(t.ctx, home.id, [at(a.id, 0), at(stranger.id, 8)]),
+    ).rejects.toThrow(message);
     expect(await board(home.id)).toEqual(before);
+  });
+
+  it('refuses a card that leaves the columns, goes under its minimum or overlaps another', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    const trend = await addWidget(t.ctx, dashboard.id, {
+      name: 'Trend',
+      query: SPENDING,
+      visualisation: 'line',
+    });
+    const total = await addWidget(t.ctx, dashboard.id, {
+      name: 'Total',
+      query: SPENDING,
+      visualisation: 'number',
+    });
+    const before = await board(dashboard.id);
+    const save = (trendCell: WidgetLayout, totalCell: WidgetLayout = { x: 0, y: 10, w: 2, h: 2 }) =>
+      saveDashboardLayout(t.ctx, dashboard.id, [
+        { id: trend.id, ...trendCell },
+        { id: total.id, ...totalCell },
+      ]);
+
+    await expect(save({ x: 6, y: 0, w: 8, h: 6 })).rejects.toThrow(
+      'A Widget must fit in the 12 grid columns',
+    );
+    await expect(save({ x: 0, y: 0, w: 4.5, h: 6 })).rejects.toThrow();
+    // A trend can't be read under 4×4; a Number can (2×2).
+    await expect(save({ x: 0, y: 0, w: 3, h: 6 })).rejects.toThrow(
+      'Trend must be at least 4 columns wide and 4 rows tall',
+    );
+    await expect(save({ x: 0, y: 0, w: 8, h: 3 })).rejects.toThrow(
+      'Trend must be at least 4 columns wide and 4 rows tall',
+    );
+    await expect(save({ x: 0, y: 0, w: 8, h: 6 }, { x: 7, y: 5, w: 4, h: 3 })).rejects.toThrow(
+      'Trend and Total overlap',
+    );
+    expect(await board(dashboard.id)).toEqual(before);
   });
 
   it('duplicates a Widget at its size in the first free spot next to its original', async () => {

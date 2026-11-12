@@ -14,10 +14,19 @@ import {
   type WidgetInput,
   type WidgetLayout,
 } from '../reporting/widgets';
-import { reorderPlaces } from '@/lib/reporting/board';
-import { boardCells, freeLayout, initialSize, sizeOf, widgetLayoutInput } from './layout';
+import { findOverlaps, meetsMinimum, minimumSize } from '@/lib/reporting/board';
+import {
+  boardCells,
+  boardInput,
+  chapterSourceOf,
+  freeLayout,
+  initialSize,
+  sizeOf,
+  widgetLayoutInput,
+  type CellInput,
+} from './layout';
 
-export { GRID_COLUMNS, MAX_WIDGET_HEIGHT } from './layout';
+export { GRID_COLUMNS, MAX_WIDGET_HEIGHT, type CellInput } from './layout';
 export { seedStarterDashboard, STARTER_DASHBOARD_NAME } from './seed';
 
 /** A named set of Widgets, each placed and sized on its board (GLOSSARY: Dashboard). */
@@ -235,35 +244,50 @@ export async function copyWidgetToDashboard(
   });
 }
 
-const widgetIdsInput = z.array(z.uuid({ error: 'Unknown Widget' }));
-const WIDGET_ORDER_MISMATCH = 'List every Widget of this Dashboard once';
+const WIDGET_LIST_MISMATCH = 'List every Widget of this Dashboard once';
 
 /**
- * Puts a Dashboard's Widgets in the given reading order (every Widget listed once), the stopgap
- * for the one-column Edit mode: the nth Widget takes the place of the nth card, keeping its
- * size, and cards that then overlap are pushed down (ADR-0010). Layout isn't History (spec 117).
+ * Saves a Dashboard's whole board as the editor last left it: every Widget listed once, each
+ * inside the columns, at or above its chapter kind's minimum, with no two overlapping
+ * (ADR-0010). Writes every layout in one transaction; the last save wins. Layout isn't
+ * History (spec 117).
  */
-export async function reorderDashboardWidgets(
+export async function saveDashboardLayout(
   ctx: ServiceContext,
   dashboardId: string,
-  widgetIds: string[],
+  cells: CellInput[],
 ): Promise<void> {
-  const ids = parseInput(widgetIdsInput, widgetIds);
+  const board = parseInput(boardInput, cells);
   await withTransaction(ctx.db, async (tx) => {
     await findDashboard(tx, dashboardId, true);
-    const cells = boardCells(await findDashboardWidgets(tx, dashboardId));
-    const known = new Set(cells.map((cell) => cell.id));
+    const widgets = await findDashboardWidgets(tx, dashboardId);
+    const known = new Set(widgets.map((widget) => widget.id));
+    const ids = board.map((cell) => cell.id);
     const isEveryWidgetOnce =
       new Set(ids).size === ids.length &&
       ids.length === known.size &&
       ids.every((id) => known.has(id));
-    if (!isEveryWidgetOnce) throw new ValidationError(WIDGET_ORDER_MISMATCH);
-    const placed = reorderPlaces(cells, ids);
+    if (!isEveryWidgetOnce) throw new ValidationError(WIDGET_LIST_MISMATCH);
+    const byId = new Map(widgets.map((widget) => [widget.id, widget]));
+    for (const cell of board) {
+      const widget = byId.get(cell.id)!;
+      const min = minimumSize(await chapterSourceOf(ctx, widget));
+      if (!meetsMinimum(cell, min)) {
+        throw new ValidationError(
+          `${widget.name} must be at least ${min.w} columns wide and ${min.h} rows tall`,
+        );
+      }
+    }
+    const [overlap] = findOverlaps(board);
+    if (overlap) {
+      const [first, second] = overlap.map((id) => byId.get(id)!.name);
+      throw new ValidationError(`${first} and ${second} overlap`);
+    }
     await tx.query(
       `UPDATE widget w SET layout = item.layout
        FROM jsonb_to_recordset($1::jsonb) AS item(id uuid, layout jsonb)
        WHERE w.id = item.id`,
-      [JSON.stringify(placed.map(({ id, x, y, w, h }) => ({ id, layout: { x, y, w, h } })))],
+      [JSON.stringify(board.map(({ id, x, y, w, h }) => ({ id, layout: { x, y, w, h } })))],
     );
   });
 }

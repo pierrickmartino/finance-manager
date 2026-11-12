@@ -16,21 +16,31 @@ import { runSavedWidget, type Widget, type WidgetLayout } from '../reporting/wid
 export { GRID_COLUMNS, MAX_WIDGET_HEIGHT };
 const MAX_ROW = 10_000;
 
-export const widgetLayoutInput = z
-  .object({
-    x: z
-      .number()
-      .int()
-      .min(0)
-      .max(GRID_COLUMNS - 1),
-    y: z.number().int().min(0).max(MAX_ROW),
-    w: z.number().int().min(1).max(GRID_COLUMNS),
-    h: z.number().int().min(1).max(MAX_WIDGET_HEIGHT),
-  })
-  .strict()
-  .refine((layout) => layout.x + layout.w <= GRID_COLUMNS, {
-    message: `A Widget must fit in the ${GRID_COLUMNS} grid columns`,
-  });
+const layoutShape = {
+  x: z
+    .number()
+    .int()
+    .min(0)
+    .max(GRID_COLUMNS - 1),
+  y: z.number().int().min(0).max(MAX_ROW),
+  w: z.number().int().min(1).max(GRID_COLUMNS),
+  h: z.number().int().min(1).max(MAX_WIDGET_HEIGHT),
+};
+const FITS_COLUMNS = {
+  message: `A Widget must fit in the ${GRID_COLUMNS} grid columns`,
+};
+const fitsColumns = (layout: WidgetLayout): boolean => layout.x + layout.w <= GRID_COLUMNS;
+
+export const widgetLayoutInput = z.object(layoutShape).strict().refine(fitsColumns, FITS_COLUMNS);
+
+/** A whole board as the editor saves it: every Widget's card. */
+export const boardInput = z.array(
+  z
+    .object({ id: z.uuid({ error: 'Unknown Widget' }), ...layoutShape })
+    .strict()
+    .refine(fitsColumns, FITS_COLUMNS),
+);
+export type CellInput = z.input<typeof boardInput>[number];
 
 /** The cards of a Dashboard's Widgets on its board (a Widget without a layout has none). */
 export function boardCells(widgets: readonly Widget[]): Cell[] {
