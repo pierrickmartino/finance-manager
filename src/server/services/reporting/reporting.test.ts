@@ -518,6 +518,24 @@ describe('drill down into a cell', () => {
     });
   });
 
+  it('counts the Transactions it leaves out for want of an FX rate, within the cell', async () => {
+    await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month' } as const;
+
+    const all = await listCellTransactions(t.ctx, query, {});
+    const january = await listCellTransactions(t.ctx, query, { row: '2025-01' });
+    const february = await listCellTransactions(t.ctx, query, { row: '2025-02' });
+
+    // The EUR Transaction of 5 January predates every EUR rate.
+    expect(all.unconvertedCount).toBe(1);
+    expect(january).toMatchObject({
+      unconvertedCount: 1,
+      span: { from: '2025-01-01', to: '2025-01-31' },
+    });
+    expect(february.unconvertedCount).toBe(0);
+    expect(all.span).toEqual({ from: '2025-01-01', to: '2025-03-31' });
+  });
+
   it('pages through a cell, newest first', async () => {
     await dataset();
 
@@ -605,6 +623,24 @@ describe('split Transactions', () => {
       [2000, -15000, -12000, -3000],
     ]);
     expect(report.total).toBe(564949 - 930 - 25000);
+  });
+
+  it("says how many of a split Transaction's lines a Drill-down counts", async () => {
+    const { shopping } = await splitDataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: 'month', columns: 'categoryGroupType' },
+      { row: '2025-03', column: 'expense' },
+    );
+
+    // The Groceries and Restaurants lines are expense; the Salary line is income.
+    expect(
+      page.transactions.map((item) => [item.id, item.chfMinor, item.countedLineCount]),
+    ).toEqual([[shopping, -27000, 2]]);
+    expect(page.transactions[0]!.splitLines).toHaveLength(3);
+    const unsplit = await listCellTransactions(t.ctx, { dateRange: Q1_2025 }, { pageSize: 200 });
+    expect(unsplit.transactions.find((item) => item.id !== shopping)?.countedLineCount).toBeNull();
   });
 
   it('counts each line under its own Category group type, leaving Capital lines out', async () => {
