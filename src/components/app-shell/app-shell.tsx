@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { logoutAction } from '@/app/login/actions';
-import { VariantShell } from '@/app/prototype-layout/shells';
+import { VARIANT_FONTS } from '@/app/prototype-layout/fonts';
+import '@/app/prototype-layout/variants.css';
 import { LAYOUT_VARIANTS, parseVariant } from '@/app/prototype-layout/variant';
 import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { greetingFor } from './greeting';
@@ -114,35 +115,34 @@ interface AppShellProps {
 export function AppShell({ showNavigation, children }: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // PROTOTYPE (layout redesign): `?variant=A|B|C` swaps in a variant shell. Throwaway.
+  // PROTOTYPE (layout redesign): `?variant=A|B|C` goes full width and takes the variant's
+  // colour, font and rounding (src/app/prototype-layout). Throwaway.
   const variant = parseVariant(useSearchParams().get('variant'));
-  if (showNavigation && variant !== 'current') {
-    return (
-      <>
-        <VariantShell variant={variant} pathname={pathname}>
-          {children}
-        </VariantShell>
-        <PrototypeSwitcher variants={LAYOUT_VARIANTS} current={variant} />
-      </>
-    );
-  }
+  const isFullWidth = showNavigation && variant !== 'current';
 
   // The frame clips nothing (its corners come from the hero's own rounding): a menu that drops
   // past the end of a page must still be reachable, and sticky columns must stick.
-  const frame = showNavigation
-    ? 'relative mx-auto min-h-screen max-w-[1400px] bg-sunken md:min-h-[calc(100vh-3rem)] md:rounded-[28px] md:shadow-2xl md:shadow-hero/25'
-    : '';
+  const frame = !showNavigation
+    ? ''
+    : isFullWidth
+      ? 'relative min-h-screen bg-sunken'
+      : 'relative mx-auto min-h-screen max-w-[1400px] bg-sunken md:min-h-[calc(100vh-3rem)] md:rounded-[28px] md:shadow-2xl md:shadow-hero/25';
   const main = showNavigation
     ? 'mx-3 mb-6 rounded-3xl bg-paper px-4 py-8 shadow-xl shadow-hero/10 md:mx-8 md:mb-8 md:px-8'
     : 'mx-auto w-full max-w-5xl px-4 py-8 md:px-6';
+  const outer = !showNavigation
+    ? 'min-h-screen bg-paper'
+    : isFullWidth
+      ? `${VARIANT_FONTS[variant]} min-h-screen bg-sunken`
+      : 'min-h-screen bg-canvas md:p-6';
 
   return (
-    <div className={showNavigation ? 'min-h-screen bg-canvas md:p-6' : 'min-h-screen bg-paper'}>
+    <div className={outer} data-proto={isFullWidth ? variant : undefined}>
       <div className={frame}>
         {showNavigation && (
           <div
             aria-hidden="true"
-            className="bg-hero absolute inset-x-0 top-0 h-[600px] md:rounded-t-[28px]"
+            className={`bg-hero absolute inset-x-0 top-0 h-[600px] ${isFullWidth ? '' : 'md:rounded-t-[28px]'}`}
           />
         )}
         <div className="relative">

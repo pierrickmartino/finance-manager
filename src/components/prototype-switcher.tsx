@@ -7,6 +7,8 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 
+const STORAGE_KEY = 'prototype-variant';
+
 export interface PrototypeVariant {
   key: string;
   name: string;
@@ -37,6 +39,22 @@ export function PrototypeSwitcher({ variants, current }: PrototypeSwitcherProps)
     params.set('variant', next.key);
     router.replace(`${pathname}?${params}`, { scroll: false });
   };
+
+  // Remember the variant, so links that drop `?variant=` keep it on the next page.
+  const asked = searchParams.get('variant');
+  useEffect(() => {
+    try {
+      if (asked) sessionStorage.setItem(STORAGE_KEY, asked);
+      const remembered = sessionStorage.getItem(STORAGE_KEY);
+      if (!asked && remembered && remembered !== variants[0]!.key) {
+        const params = new URLSearchParams(searchParams);
+        params.set('variant', remembered);
+        router.replace(`${pathname}?${params}`, { scroll: false });
+      }
+    } catch {
+      // No storage (private window): the variant just lasts for this page.
+    }
+  }, [asked, pathname, router, searchParams, variants]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

@@ -5,8 +5,6 @@ import { checkCompleteness, type CompletenessEntry } from '@/server/services/com
 import { homeDashboard, listDashboards } from '@/server/services/dashboards';
 import { swissToday } from '@/server/services/fx/dates';
 import { findDashboard, loadRecentActivity, loadStoryChapter } from '../load';
-import { VariantDashboard } from '../../prototype-layout/dashboards';
-import { parseVariant } from '../../prototype-layout/variant';
 import { DashboardTabs } from '../tabs';
 import { CompletenessNotice } from './completeness-notice';
 import { DashboardOverview } from './overview/dashboard-overview';
@@ -19,15 +17,7 @@ export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
  * happens in Edit mode (./edit). The home Dashboard (the one the home page opens) also shows the
  * Completeness check (ADR-0008).
  */
-export default async function DashboardPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ variant?: string }>;
-}) {
-  // PROTOTYPE (layout redesign): `?variant=A|B|C` renders a variant layout. Throwaway.
-  const variant = parseVariant((await searchParams).variant);
+export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
   const [dashboards, chapters, recent, fmt] = await Promise.all([
@@ -41,27 +31,6 @@ export default async function DashboardPage({
       ? await checkCompleteness(ctx, { today: swissToday() })
       : null;
 
-  const notice = completeness && <CompletenessNotice entries={completeness} fmt={fmt} />;
-  if (variant !== 'current') {
-    return (
-      <VariantDashboard
-        variant={variant}
-        dashboardName={dashboard.name}
-        editHref={`/dashboards/${dashboard.id}/edit`}
-        chapters={chapters}
-        recent={recent}
-        notice={notice}
-        tabs={
-          <DashboardTabs
-            dashboards={dashboards}
-            currentId={dashboard.id}
-            query={`?variant=${variant}`}
-          />
-        }
-      />
-    );
-  }
-
   return (
     <section className="flex flex-col gap-4">
       <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
@@ -70,7 +39,7 @@ export default async function DashboardPage({
         editHref={`/dashboards/${dashboard.id}/edit`}
         chapters={chapters}
         recent={recent}
-        notice={notice}
+        notice={completeness && <CompletenessNotice entries={completeness} fmt={fmt} />}
       />
     </section>
   );

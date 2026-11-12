@@ -8,18 +8,12 @@ export type LayoutVariant = 'current' | 'A' | 'B' | 'C';
 
 export const LAYOUT_VARIANTS: PrototypeVariant[] = [
   { key: 'current', name: 'Today' },
-  { key: 'A', name: 'Ledger: sidebar, hairline grid' },
-  { key: 'B', name: 'Command: graphite bar, side rail' },
-  { key: 'C', name: 'Broadsheet: masthead, columns' },
+  { key: 'A', name: 'Midnight: navy, amber, Inter' },
+  { key: 'B', name: 'Graphite: charcoal, lime, Geist' },
+  { key: 'C', name: 'Forest: green, copper, Newsreader' },
 ];
 
 export function parseVariant(value: string | null | undefined): LayoutVariant {
   if (process.env.NODE_ENV === 'production') return 'current';
   return value === 'A' || value === 'B' || value === 'C' ? value : 'current';
-}
-
-/** Keeps the variant when following a link, so every page can be seen in the variant's shell. */
-export function withVariant(href: string, variant: LayoutVariant): string {
-  if (variant === 'current') return href;
-  return `${href}${href.includes('?') ? '&' : '?'}variant=${variant}`;
 }
