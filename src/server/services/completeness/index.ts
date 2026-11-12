@@ -3,7 +3,13 @@ import { listAccounts, type Account } from '../accounts';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { daysBetween } from '../fx/dates';
-import { dataEndOf, loadCoverage, type DaySpan, type ImportCoverage } from './coverage';
+import {
+  dataEndOf,
+  dataStartOf,
+  loadCoverage,
+  type DaySpan,
+  type ImportCoverage,
+} from './coverage';
 import { findGaps } from './gaps';
 import { findMismatches, type MismatchProblem } from './mismatch';
 
@@ -15,13 +21,16 @@ export type CheckedAccount = Pick<Account, 'id' | 'name' | 'bankName' | 'currenc
 /** One checked Account (GLOSSARY: Completeness check). */
 export interface CompletenessEntry {
   account: CheckedAccount;
+  /** The first day the Account's committed Imports cover; null when they cover none. */
+  dataStart: string | null;
   /** The last day the Account's committed Imports cover; null when they cover none. */
   dataEnd: string | null;
   /** Whole days from `dataEnd` to the `today` checked against; null without a data end. */
   daysSince: number | null;
   /**
    * Whether the Account is checked for freshness (it has an Import format). A manual-only
-   * Account is listed only for a mismatch, so its data end and days since are always null.
+   * Account is listed only for a mismatch, so its data start, data end and days since are always
+   * null.
    */
   isFreshnessChecked: boolean;
   problems: CompletenessProblem[];
@@ -121,6 +130,7 @@ interface Findings {
 function entryFor(account: Account, today: string, findings: Findings): CompletenessEntry {
   const isFreshnessChecked = account.importFormat !== null;
   const dataEnd = isFreshnessChecked ? dataEndOf(findings.imports ?? []) : null;
+  const dataStart = isFreshnessChecked ? dataStartOf(findings.imports ?? []) : null;
   const daysSince = dataEnd === null ? null : daysBetween(dataEnd, today);
   const freshness = isFreshnessChecked
     ? [
@@ -135,6 +145,7 @@ function entryFor(account: Account, today: string, findings: Findings): Complete
       bankName: account.bankName,
       currency: account.currency,
     },
+    dataStart,
     dataEnd,
     daysSince,
     isFreshnessChecked,

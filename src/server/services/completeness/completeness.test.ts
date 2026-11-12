@@ -95,6 +95,7 @@ describe('freshness', () => {
     expect(entries).toEqual([
       {
         account: { id: account.id, name: 'BCGE current', bankName: 'BCGE', currency: 'CHF' },
+        dataStart: '2025-10-01',
         dataEnd: '2025-10-31',
         daysSince: 10,
         isFreshnessChecked: true,
@@ -116,6 +117,31 @@ describe('freshness', () => {
     const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-31' });
 
     expect(entry).toMatchObject({ dataEnd: '2025-12-19', daysSince: 12, problems: [] });
+  });
+
+  it("starts an Account's data on the first day its earliest Import covers", async () => {
+    const account = await bcgeAccount();
+    await importFile(account, fixture(BCGE_NOVEMBER));
+    await importFile(account, fixture(BCGE_OCTOBER));
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-10' });
+
+    expect(entry).toMatchObject({ dataStart: '2025-10-01', dataEnd: '2025-11-30' });
+  });
+
+  it('falls back to the earliest Transaction date for the data start when the file states no period', async () => {
+    const account = await bcgeAccount();
+    await importFile(
+      account,
+      camtFile(account, [
+        { date: '2025-12-03', amount: '10.00' },
+        { date: '2025-12-19', amount: '12.50' },
+      ]),
+    );
+
+    const [entry] = await checkCompleteness(t.ctx, { today: '2025-12-31' });
+
+    expect(entry).toMatchObject({ dataStart: '2025-12-03', dataEnd: '2025-12-19' });
   });
 
   it('ignores an undone Import, so the data ends where the Imports still standing end', async () => {
@@ -151,12 +177,14 @@ describe('freshness', () => {
     expect(entries).toEqual([
       expect.objectContaining({
         account: expect.objectContaining({ id: neverImported.id }),
+        dataStart: null,
         dataEnd: null,
         daysSince: null,
         problems: [{ kind: 'never_imported' }],
       }),
       expect.objectContaining({
         account: expect.objectContaining({ id: allUndone.id }),
+        dataStart: null,
         dataEnd: null,
         daysSince: null,
         problems: [{ kind: 'never_imported' }],
@@ -177,12 +205,14 @@ describe('freshness', () => {
       // Imported, but nothing covered: no data end, so Stale rather than "No Import yet".
       expect.objectContaining({
         account: expect.objectContaining({ id: uncovered.id }),
+        dataStart: null,
         dataEnd: null,
         daysSince: null,
         problems: [{ kind: 'stale' }],
       }),
       expect.objectContaining({
         account: expect.objectContaining({ id: covered.id }),
+        dataStart: '2025-10-01',
         dataEnd: '2025-10-31',
         daysSince: 10,
         problems: [],
@@ -346,6 +376,7 @@ describe('mismatch', () => {
           bankName: 'BCGE BCGE savings',
           currency: 'CHF',
         },
+        dataStart: null,
         dataEnd: null,
         daysSince: null,
         isFreshnessChecked: false,
@@ -380,6 +411,7 @@ describe('mismatch', () => {
     expect(entries).toEqual([
       {
         account: { id: cash.id, name: 'BCGE cash', bankName: 'BCGE BCGE cash', currency: 'CHF' },
+        dataStart: null,
         dataEnd: null,
         daysSince: null,
         isFreshnessChecked: false,

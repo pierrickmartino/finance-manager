@@ -43,6 +43,18 @@ export async function loadCoverage(db: Queryable): Promise<Map<string, ImportCov
   return Map.groupBy(result.rows, (row) => row.accountId);
 }
 
+/**
+ * The data start of an Account's Imports: the first day any of them covers; null if none covers
+ * any. An Import with no start of its own (no statement start and no Transactions) starts at its
+ * end.
+ */
+export function dataStartOf(imports: readonly ImportCoverage[]): string | null {
+  return imports.reduce<string | null>((start, { from, to }) => {
+    const first = from ?? to;
+    return first !== null && (start === null || first < start) ? first : start;
+  }, null);
+}
+
 /** The data end of an Account's Imports: the last day any of them covers; null if none covers any. */
 export function dataEndOf(imports: readonly ImportCoverage[]): string | null {
   return imports.reduce<string | null>(
