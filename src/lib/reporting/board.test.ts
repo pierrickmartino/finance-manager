@@ -39,6 +39,7 @@ describe('Widget sizes', () => {
     expect(sizeKind(widget('query', 'number'))).toBe('number');
     expect(sizeKind(widget('account_balances', 'table'))).toBe('balances');
     expect(sizeKind(widget('query', 'donut'))).toBe('list');
+    expect(sizeKind(widget('query', 'table', 6))).toBe('grid');
     expect(sizeKind(widget('query', 'stacked_bar', 5))).toBe('list');
     expect(sizeKind(widget('query', 'line'))).toBe('chart');
     expect(sizeKind(widget('query', 'stacked_bar', 2))).toBe('chart');
@@ -50,6 +51,8 @@ describe('Widget sizes', () => {
     expect(defaultSize(widget('query', 'donut'))).toEqual({ w: 4, h: 8 });
     expect(defaultSize(widget('query', 'line'))).toEqual({ w: 8, h: 6 });
     expect(minimumSize(widget('query', 'line'))).toEqual({ w: 4, h: 4 });
+    expect(defaultSize(widget('query', 'table', 6))).toEqual({ w: 8, h: 8 });
+    expect(minimumSize(widget('query', 'table', 6))).toEqual({ w: 4, h: 5 });
   });
 
   it('sizes a new Widget card at its default', () => {

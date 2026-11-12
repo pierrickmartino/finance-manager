@@ -119,7 +119,7 @@ describe('Widgets on a Dashboard', () => {
     // The rest of the top row first, then a new row under the lowest-starting card.
     expect(number.layout).toEqual({ x: 8, y: 0, w: 4, h: 3 });
     expect(balances.layout).toEqual({ x: 8, y: 3, w: 4, h: 6 });
-    expect(table.layout).toEqual({ x: 0, y: 6, w: 4, h: 8 });
+    expect(table.layout).toEqual({ x: 0, y: 6, w: 8, h: 8 });
     expect(await listHistory(t.ctx, { entityType: 'widget', entityId: trend.id })).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ field: 'name', after: 'Trend' }),
@@ -474,7 +474,11 @@ describe('Widgets on a Dashboard', () => {
 
   it('copies a Standalone Widget onto a Dashboard at its default size in the first free spot, leaving the original', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
-    await addWidget(t.ctx, dashboard.id, { name: 'First', query: SPENDING });
+    await addWidget(t.ctx, dashboard.id, {
+      name: 'First',
+      query: SPENDING,
+      layout: { x: 0, y: 0, w: 4, h: 8 },
+    });
     const standalone = await createWidget(t.ctx, {
       name: 'Groceries',
       query: SPENDING,

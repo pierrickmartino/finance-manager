@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
+import type { ChartSource } from '@/lib/reporting/chart-data';
+import { compactValue, HEAT_LEVELS, toHeatmap } from '@/lib/reporting/heatmap';
 import {
   latestFullIndex,
   litTicks,
@@ -208,5 +210,98 @@ export function TickList({ items }: { items: TickItem[] }) {
         );
       })}
     </ul>
+  );
+}
+
+/** A table Widget's rows × columns as cells shaded by size, each a link to its Transactions. */
+export function HeatmapGrid({ data }: { data: ChartSource }) {
+  const fmt = useFormatter();
+  const full = (value: number) =>
+    data.measure === 'count' ? String(value) : fmt.amount(value, { currency: 'CHF' });
+  const map = toHeatmap(data);
+  return (
+    <figure className="min-h-0 overflow-x-auto">
+      <table aria-label="Heatmap" className="w-full border-separate border-spacing-1 text-xs">
+        <thead>
+          <tr>
+            <td />
+            {map.columns.map((column) => (
+              <th
+                key={column.fullLabel}
+                scope="col"
+                title={column.fullLabel}
+                className="px-1 text-center font-normal text-muted"
+              >
+                {column.isPartial ? `${column.label}*` : column.label}
+              </th>
+            ))}
+            {map.hasTotal && (
+              <th scope="col" className="px-1 text-right font-normal text-muted">
+                Total
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {map.rows.map((row) => (
+            <tr key={row.key}>
+              <th
+                scope="row"
+                title={row.label}
+                className="max-w-40 truncate pr-2 text-left font-medium"
+              >
+                {row.label}
+              </th>
+              {row.cells.map((cell, c) => {
+                const column = map.columns[c]!;
+                if (!cell) return <td key={column.fullLabel} className="rounded-md bg-sunken/60" />;
+                const level = HEAT_LEVELS[cell.level]!;
+                return (
+                  <td key={column.fullLabel} className="p-0">
+                    <Link
+                      href={cell.href}
+                      aria-label={`${row.label}, ${column.fullLabel}: ${full(cell.value)}`}
+                      title={full(cell.value)}
+                      className={`block min-w-12 rounded-md px-1 py-2 text-center tabular-nums hover:ring-2 hover:ring-accent ${level.isDark ? 'text-on-hero' : 'text-ink'} ${column.isPartial ? 'outline-2 -outline-offset-2 outline-hero-deep outline-dashed' : ''}`}
+                      style={{
+                        backgroundColor: `color-mix(in srgb, var(--color-hero-mid) ${level.mix}%, var(--color-surface))`,
+                      }}
+                    >
+                      {compactValue(cell.value, data.measure, map.isSigned)}
+                    </Link>
+                  </td>
+                );
+              })}
+              {map.hasTotal && (
+                <td className="pl-2 text-right font-semibold whitespace-nowrap tabular-nums">
+                  {row.total === null ? (
+                    <span className="text-faint">—</span>
+                  ) : (
+                    <Link href={row.totalHref} className="hover:underline">
+                      {full(row.total)}
+                    </Link>
+                  )}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <figcaption className="mt-2 flex items-center gap-2 text-xs text-muted">
+        <span className="flex gap-0.5" aria-hidden>
+          {HEAT_LEVELS.map((level) => (
+            <span
+              key={level.mix}
+              className="h-2 w-3 rounded-sm"
+              style={{
+                backgroundColor: `color-mix(in srgb, var(--color-hero-mid) ${level.mix}%, var(--color-surface))`,
+              }}
+            />
+          ))}
+        </span>
+        Darker is larger
+        {map.columns.some((column) => column.isPartial) && ' · * dashed: period still running'}
+      </figcaption>
+    </figure>
   );
 }

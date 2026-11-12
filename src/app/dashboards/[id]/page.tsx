@@ -9,14 +9,7 @@ import { swissToday } from '@/server/services/fx/dates';
 import { findDashboard, loadRecentActivity, loadStoryChapter } from '../load';
 import { DashboardTabs } from '../tabs';
 import { CompletenessNotice } from './completeness-notice';
-import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { DashboardOverview } from './overview/dashboard-overview';
-import {
-  IS_TABLE_PROTOTYPE_ENABLED,
-  TABLE_TOGGLES,
-  TABLE_VARIANTS,
-} from './overview/table-prototype/config';
-import { sampleChapters } from './overview/table-prototype/sample';
 import { WidgetBoard } from './overview/widget-board';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
@@ -27,27 +20,15 @@ export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
  * happens in Edit mode (./edit). The home Dashboard (the one the home page opens) also shows the
  * Completeness check (ADR-0008).
  */
-export default async function DashboardPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  // PROTOTYPE: ?sample= for ./overview/table-prototype.
-  searchParams: Promise<{ sample?: string }>;
-}) {
-  const { sample } = await searchParams;
+export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
-  const [dashboards, realChapters, recent, fmt] = await Promise.all([
+  const [dashboards, chapters, recent, fmt] = await Promise.all([
     listDashboards(ctx),
     Promise.all(dashboard.widgets.map((widget) => loadStoryChapter(ctx, widget))),
     loadRecentActivity(ctx),
     getFormatter(),
   ]);
-  const chapters =
-    IS_TABLE_PROTOTYPE_ENABLED && sample !== 'off'
-      ? [...realChapters, ...sampleChapters()]
-      : realChapters;
   const today = swissToday();
   const completeness: CompletenessEntry[] | null =
     homeDashboard(dashboards)?.id === dashboard.id ? await checkCompleteness(ctx, { today }) : null;
@@ -81,9 +62,6 @@ export default async function DashboardPage({
           </p>
         }
       />
-      {IS_TABLE_PROTOTYPE_ENABLED && (
-        <PrototypeSwitcher variants={TABLE_VARIANTS} toggles={TABLE_TOGGLES} />
-      )}
     </section>
   );
 }

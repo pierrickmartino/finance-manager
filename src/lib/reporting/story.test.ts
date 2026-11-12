@@ -140,6 +140,7 @@ describe('chapterKind', () => {
     ['a number Widget', widget({ visualisation: 'number', data: spending.data }), 'number'],
     ['Account balances', balances, 'share'],
     ['a donut', widget({ visualisation: 'donut', data: spending.data }), 'share'],
+    ['a table', widget({ visualisation: 'table', data: spending.data }), 'grid'],
     ['a line', widget({ visualisation: 'line', data: incomeVsExpense.data }), 'trend'],
     ['a stacked bar with two series', incomeVsExpense, 'bars'],
     ['a stacked bar with many series', spending, 'ranking'],
@@ -297,6 +298,7 @@ describe('shareParts', () => {
 describe('STORY_SHOWN_AS', () => {
   const kindWords: Record<string, string> = {
     share: 'share',
+    grid: 'heatmap',
     trend: 'trend',
     bars: 'bars',
     ranking: 'ranking',
