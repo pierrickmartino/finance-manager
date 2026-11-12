@@ -130,6 +130,10 @@ _Avoid_: Card, tile, report, saved Widget
 A Widget that sits on no Dashboard. Adding it to a Dashboard places a copy there; the Standalone Widget stays as it is.
 _Avoid_: Report, saved report
 
+**Drill-down**:
+The list of Transactions behind one reported number, filtered exactly as that number was, from which the number can be worked out: their sum, their count, or their sum over the periods averaged. A number derived from several others opens the Transactions behind all of them. Balances are checked on their Account, not by a Drill-down.
+_Avoid_: Breakdown, detail view, cell Transactions
+
 **Dashboard**:
 A named set of Widgets laid out on a board of 12 columns and fixed-height rows, each Widget with its own place and size (ADR-0010). It is read as its Dashboard Story and arranged in place in Edit mode. Each Widget sits on at most one Dashboard.
 
