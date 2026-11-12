@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react';
 import ReactGridLayout, { useContainerWidth, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import { FieldError } from '@/components/form';
@@ -11,6 +11,7 @@ import {
   readingOrder,
   type Cell,
 } from '@/lib/reporting/board';
+import { keyboardStep } from '@/lib/reporting/board-keys';
 import {
   BOARD_GAP_PX,
   BOARD_ROW_HEIGHT_PX,
@@ -59,6 +60,24 @@ interface GridEditorProps {
   chapters: EditorChapter[];
   cells: Cell[];
   onChange: (cells: Cell[]) => void;
+  /** Tells a screen reader what a keyboard step did. */
+  onAnnounce: (message: string) => void;
+}
+
+const KEYS_HINT_ID = 'board-keys-hint';
+
+/**
+ * Keeps focus on the card a keyboard step moved: the cards are in reading order, so a step can
+ * move the focused card's node, which drops its focus.
+ */
+function useRefocus(): (id: string) => void {
+  const [focusId, setFocusId] = useState<{ id: string } | null>(null);
+  useEffect(() => {
+    if (!focusId) return;
+    const card = document.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(focusId.id)}"]`);
+    if (card && document.activeElement !== card) card.focus();
+  }, [focusId]);
+  return (id) => setFocusId({ id });
 }
 
 /**
@@ -66,7 +85,7 @@ interface GridEditorProps {
  * Dashboard Story, each card dragged by its handle and resized from its bottom-right corner,
  * never under its chapter kind's minimum. Cards in the way are pushed down; nothing packs up.
  */
-function GridEditor({ chapters, cells, onChange }: GridEditorProps) {
+function GridEditor({ chapters, cells, onChange, onAnnounce }: GridEditorProps) {
   const { width, containerRef, mounted } = useContainerWidth();
   const [pushing] = useState(createPushDownCompactor);
   const placed = placedChapters(chapters, cells);
@@ -87,8 +106,27 @@ function GridEditor({ chapters, cells, onChange }: GridEditorProps) {
     pushing.end();
     onChange(layoutCells(final));
   };
+  const refocus = useRefocus();
+  const step = (chapter: EditorChapter, event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    const result = keyboardStep(cells, chapter.id, event, minimumSize(chapter));
+    if (!result) return;
+    event.preventDefault();
+    onChange(result.cells);
+    onAnnounce(result.announcement);
+    refocus(chapter.id);
+  };
   const cards = placed.map((chapter) => (
-    <div key={chapter.id}>
+    <div
+      key={chapter.id}
+      data-card-id={chapter.id}
+      role="group"
+      tabIndex={0}
+      aria-label={`Arrange ${chapter.name}`}
+      aria-describedby={KEYS_HINT_ID}
+      className="rounded-3xl"
+      onKeyDown={(event) => step(chapter, event)}
+    >
       <WidgetCard
         chapter={chapter}
         className="h-full overflow-auto"
@@ -106,6 +144,9 @@ function GridEditor({ chapters, cells, onChange }: GridEditorProps) {
 
   return (
     <div ref={containerRef}>
+      <p id={KEYS_HINT_ID} className="sr-only">
+        Arrow keys move this card one cell, Shift and arrow keys resize it.
+      </p>
       {mounted ? (
         <ReactGridLayout
           className="dashboard-board"
@@ -174,6 +215,10 @@ export function EditBoard({ dashboardId, chapters }: EditBoardProps) {
     chapters.flatMap((chapter) => (chapter.layout ? [{ id: chapter.id, ...chapter.layout }] : [])),
   );
   const { save, isSaving, error } = useLayoutSave(dashboardId, cells);
+  const [announcement, setAnnouncement] = useState('');
+  // The same words twice (a second press at an edge) change by a trailing space, so they are read again.
+  const announce = (message: string) =>
+    setAnnouncement((last) => (last === message ? `${message}\u00a0` : message));
   const change = (next: Cell[]) => {
     setCells(next);
     save(next);
@@ -186,9 +231,12 @@ export function EditBoard({ dashboardId, chapters }: EditBoardProps) {
           {isSaving ? 'Saving…' : ''}
         </p>
         {error && <FieldError message={error} />}
+        <p aria-live="polite" data-testid="board-announcement" className="sr-only">
+          {announcement}
+        </p>
       </div>
       {isWide ? (
-        <GridEditor chapters={chapters} cells={cells} onChange={change} />
+        <GridEditor chapters={chapters} cells={cells} onChange={change} onAnnounce={announce} />
       ) : (
         <StaticBoard chapters={placedChapters(chapters, cells)} isDraggable={false} />
       )}

@@ -63,6 +63,18 @@ export async function dragCard(page: Page, name: string, columns: number, rows: 
   await dragBy(page, handle, columns, rows);
 }
 
+/** In Edit mode at `lg` and up: the card itself, focused to move it with the keyboard. */
+export function arrangeCard(page: Page, name: string): Locator {
+  return page.getByRole('group', { name: `Arrange ${name}`, exact: true });
+}
+
+/** Presses a key on the focused card and waits for the board's save to answer. */
+export async function stepWithKey(page: Page, key: string): Promise<void> {
+  const saved = nextAction(page);
+  await page.keyboard.press(key);
+  expect((await saved).ok()).toBe(true);
+}
+
 /** In Edit mode: resizes a card from its bottom-right corner, by whole cells. */
 export async function resizeCard(page: Page, name: string, columns: number, rows: number) {
   const handle = page

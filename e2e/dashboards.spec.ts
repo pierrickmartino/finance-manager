@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { cardBox, dragCard, resizeCard } from './support/dashboards';
+import { arrangeCard, cardBox, dragCard, resizeCard, stepWithKey } from './support/dashboards';
 
 /** The chapter titles, in the order the page tells them. */
 function chapterTitles(page: Page) {
@@ -139,6 +139,51 @@ test('drag a card by its handle and resize it from its corner; both views keep i
   expect(story.moved.width).toBeCloseTo(edited.moved.width, 0);
   expect(story.moved.height).toBeCloseTo(edited.moved.height, 0);
   expect(story.pushed.y - story.moved.y).toBeCloseTo(edited.pushed.y - edited.moved.y, 0);
+});
+
+test('move and resize a focused card from the keyboard; each step is announced and kept after a reload', async ({
+  page,
+}) => {
+  const original = 'Account balances in CHF';
+  const copy = `${original} (copy)`;
+  await createDashboard(page, `Keys ${Date.now()}`);
+  await addBalances(page);
+  await page
+    .getByRole('form', { name: `Duplicate ${original}` })
+    .getByRole('button')
+    .click();
+  await expect(chapterTitles(page)).toHaveText([original, copy]);
+  const before = await cardBox(page, copy);
+
+  // The copy starts 4×6 at column 5, row 1 (right of its original).
+  const card = arrangeCard(page, copy);
+  const announced = page.getByTestId('board-announcement');
+  await card.focus();
+  await stepWithKey(page, 'ArrowRight');
+  await expect(announced).toHaveText('Moved to column 6, row 1');
+  await expect(card).toBeFocused();
+  await stepWithKey(page, 'ArrowRight');
+  await expect(announced).toHaveText('Moved to column 7, row 1');
+  await stepWithKey(page, 'Shift+ArrowDown');
+  await expect(announced).toHaveText('Resized to 4 by 7');
+  await expect(card).toBeFocused();
+  // At the top already: nothing moves, and it says so.
+  await page.keyboard.press('ArrowUp');
+  await expect(announced).toHaveText('Already at the top');
+
+  const expectSavedBoard = async () => {
+    const moved = await cardBox(page, copy);
+    expect(moved.x).toBeGreaterThan(before.x + 1.5 * (before.width / 4));
+    expect(moved.y).toBeCloseTo(before.y, 0);
+    expect(moved.height).toBeCloseTo(before.height + 60, 0);
+  };
+  await expectSavedBoard();
+  await page.reload();
+  await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  await expectSavedBoard();
+  await page.getByRole('link', { name: 'Done' }).click();
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  await expectSavedBoard();
 });
 
 test('a Widget added from Add Widget goes in the first free spot; removing one leaves its space', async ({
