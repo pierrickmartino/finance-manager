@@ -602,7 +602,7 @@ describe('drill down into a cell', () => {
     const page = await listCellTransactions(t.ctx, query, {
       row: { except: [] },
       column: restaurants.id,
-      change: true,
+      withPeriodSubtotals: true,
       pageSize: 1,
     });
     const plain = await listCellTransactions(t.ctx, query, { column: restaurants.id });

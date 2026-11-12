@@ -105,7 +105,7 @@ export function DonutRing({ data, money }: { data: ChartSource; money: Money }) 
             // The total opens the Widget's grand total: every Transaction in the ring.
             <Link
               href={data.hrefs.total}
-              className="pointer-events-auto flex flex-col items-center rounded-full px-2 hover:underline"
+              className="pointer-events-auto flex flex-col items-center rounded-md px-2 hover:underline"
             >
               <span className="text-xs text-muted">Total</span>
               <span className="font-display text-lg tracking-tight tabular-nums">

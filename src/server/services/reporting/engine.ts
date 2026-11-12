@@ -3,7 +3,7 @@ import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { swissToday } from '../fx/dates';
 import { ALL_HEADER, axisHeaders, type ReportHeader } from './headers';
-import { intersect, periodSpan, periodsIn, resolveRange, type DateSpan } from './periods';
+import { intersect, periodCount, periodSpan, resolveRange, type DateSpan } from './periods';
 import {
   isTimeAxis,
   widgetQueryInput,
@@ -170,14 +170,13 @@ function measureValue(
 }
 
 /** The number of `averagePer` periods one cell's `average` divides by (0 when it has none). */
-export function cellPeriodCount(
+function cellPeriodCount(
   query: WidgetQuery,
   range: DateSpan,
   row: ReportHeader,
   column: ReportHeader,
 ): number {
-  const span = cellSpan(query, range, row, column);
-  return span ? periodsIn(span, query.averagePer).length : 0;
+  return periodCount(cellSpan(query, range, row, column), query.averagePer);
 }
 
 /** What makes up a measured number: its CHF sum, its Transactions and its periods. */

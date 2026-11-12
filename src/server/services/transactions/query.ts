@@ -272,10 +272,11 @@ function buildConditions(input: ParsedQuery, matchSplitLines: boolean): SqlCondi
   } else if (input.transfer === 'exclude') {
     conditions.push('t.transfer_id IS NULL');
   }
-  if (input.fxRate === 'missing') {
-    conditions.push(`t.currency <> '${BASE_CURRENCY}' AND NOT EXISTS (
-      SELECT 1 FROM fx_rate r WHERE r.currency = t.currency AND r.date <= t.booking_date)`);
-  }
+  where(
+    (p) => `t.currency <> ${p} AND NOT EXISTS (
+      SELECT 1 FROM fx_rate r WHERE r.currency = t.currency AND r.date <= t.booking_date)`,
+    input.fxRate === 'missing' ? BASE_CURRENCY : undefined,
+  );
 
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }

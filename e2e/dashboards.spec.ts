@@ -424,7 +424,9 @@ test('a table Widget shows its rows and columns as a heatmap whose cells open th
 
   await row.getByRole('link', { name: /: CHF -120\.00$/ }).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?/);
-  await expect(page.getByRole('table', { name: 'Cell Transactions' })).toContainText('Heatmap 40');
+  await expect(page.getByRole('table', { name: 'Drill-down Transactions' })).toContainText(
+    'Heatmap 40',
+  );
 });
 
 test("a Donut Widget's card is a ring with the total inside; pointing at a part shows it", async ({

@@ -1,7 +1,7 @@
 import type { TimeAxis } from '@/server/services/reporting/query';
 import type { Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
-import { toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
+import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
 import { averaged, drillUrl } from './drill-link';
 
 /**
@@ -187,9 +187,12 @@ function periodAverage(
   period: TimeAxis,
 ): { value: number; href: string | null } {
   const value = divideRounded(sum(data.rowTotals.map((total) => total ?? 0)), data.rows.length);
-  const { drill } = data;
-  const isAverageOfRange = drill && data.measure === 'sum' && drill.query.rows === period;
-  return { value, href: isAverageOfRange ? drillUrl(averaged(drill, period), {}) : null };
+  const byPeriod = periodSumDrill(data);
+  const isAverageOfRange = byPeriod?.period === period;
+  return {
+    value,
+    href: byPeriod && isAverageOfRange ? drillUrl(averaged(byPeriod.drill, period), {}) : null,
+  };
 }
 
 /** The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`); months by default. */

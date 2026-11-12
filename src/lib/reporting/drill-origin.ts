@@ -11,7 +11,8 @@ import { queryToParams, type UrlParams } from './widget-params';
 export type DrillOrigin =
   { kind: 'dashboard'; id: string } | { kind: 'widget'; id: string } | { kind: 'editor' };
 
-const EDITOR: DrillOrigin = { kind: 'editor' };
+/** The Widget editor, with the query: where a Drill-down links back to by default. */
+export const EDITOR: DrillOrigin = { kind: 'editor' };
 const UUID = z.uuid();
 
 function first(value: string | string[] | undefined): string {

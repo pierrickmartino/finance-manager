@@ -1,4 +1,5 @@
 import { fractionDigits } from '@/lib/format';
+import { includesCapital } from '@/lib/reporting/capital';
 import { BASE_CURRENCY } from '../fx/constants';
 import { REPORTED_PAYEE_ID } from '../transactions/line-payee';
 import type { DateSpan } from './periods';
@@ -58,11 +59,6 @@ function filterConditions(query: WidgetQuery, params: SqlParams): string[] {
   anyOf(filters.currencies, (p) => `t.currency = ANY(${p}::bpchar[])`);
   if (!includesCapital(query)) conditions.push(`${GROUP_TYPE} IS DISTINCT FROM 'capital'`);
   return conditions;
-}
-
-/** Capital is excluded unless the query asks for it, directly or through its type filter. */
-export function includesCapital(query: WidgetQuery): boolean {
-  return query.includeCapital || (query.filters.categoryGroupTypes ?? []).includes('capital');
 }
 
 /**

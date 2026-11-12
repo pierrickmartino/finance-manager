@@ -5,7 +5,14 @@ import { swissToday } from '../fx/dates';
 import { listTransactionsByIds, type TransactionListItem } from '../transactions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../transactions/query';
 import { currenciesInUse, measureOf } from './engine';
-import { intersect, periodSpan, periodsIn, resolveRange, type DateSpan } from './periods';
+import {
+  intersect,
+  periodCount,
+  periodSpan,
+  periodsIn,
+  resolveRange,
+  type DateSpan,
+} from './periods';
 import {
   isTimeAxis,
   widgetQueryInput,
@@ -17,9 +24,16 @@ import {
 } from './query';
 import { axisCondition, axisExceptCondition, axisKey, baseCte, SqlParams } from './sql';
 
-import { isExcept, type AxisSelector, type CellRef } from './cell-ref';
+import { ends, isExcept, keptBy, type AxisSelector, type CellRef } from './cell-ref';
 
-export { isExcept, type AxisExcept, type AxisSelector, type CellRef } from './cell-ref';
+export {
+  ends,
+  isExcept,
+  keptBy,
+  type AxisExcept,
+  type AxisSelector,
+  type CellRef,
+} from './cell-ref';
 
 /** More keys than a chart ever keeps out of "Other". */
 const MAX_EXCEPT = 100;
@@ -31,7 +45,7 @@ const selectorInput = z
 const cellInput = z.object({
   row: selectorInput,
   column: selectorInput,
-  change: z.boolean().default(false),
+  withPeriodSubtotals: z.boolean().default(false),
   page: z.number().int().min(1, 'Page must be 1 or more').default(1),
   pageSize: z
     .number()
@@ -124,10 +138,7 @@ function cellConditions(query: WidgetQuery, cell: CellAxes, params: SqlParams): 
 
 /** The periods of a time axis in `span` that the selector keeps (all when absent), oldest first. */
 function keptPeriods(axis: TimeAxis, selector: AxisSelector | undefined, span: DateSpan): string[] {
-  const all = periodsIn(span, axis);
-  if (selector === undefined) return all;
-  if (isExcept(selector)) return all.filter((key) => !selector.except.includes(key));
-  return all.filter((key) => key === selector);
+  return keptBy(periodsIn(span, axis), (key) => key, selector);
 }
 
 /**
@@ -138,12 +149,10 @@ function drillSpan(query: WidgetQuery, range: DateSpan, cell: CellAxes): DateSpa
   let span: DateSpan | null = range.from > range.to ? null : range;
   for (const [axis, selector] of axesOf(query, cell)) {
     if (!span || !isTimeAxis(axis) || selector === undefined || selector === null) continue;
-    const kept = keptPeriods(axis, selector, range);
-    const [first, last] = [kept[0], kept.at(-1)];
-    span =
-      first && last
-        ? intersect(span, { from: periodSpan(first, axis).from, to: periodSpan(last, axis).to })
-        : null;
+    const kept = ends(keptPeriods(axis, selector, range));
+    span = kept
+      ? intersect(span, { from: periodSpan(kept[0], axis).from, to: periodSpan(kept[1], axis).to })
+      : null;
   }
   return span;
 }
@@ -162,6 +171,18 @@ interface CellAggregate {
   subtotals: PeriodSubtotal[] | null;
 }
 
+type ParsedCell = z.infer<typeof cellInput>;
+
+/** What a cell is read for: its query, its range and dates, and the page asked for. */
+interface CellRead {
+  query: WidgetQuery;
+  range: DateSpan;
+  span: DateSpan | null;
+  cell: ParsedCell;
+  /** The time axis to sum the cell per period of, or null for no subtotals. */
+  subtotalAxis: TimeAxis | null;
+}
+
 /**
  * Lists the Transactions behind one cell of a Widget query, newest first. They are read from
  * the same SQL as the report, so the cell's sum equals the sum of their CHF values, and come
@@ -174,75 +195,78 @@ export async function listCellTransactions(
 ): Promise<CellTransactionPage> {
   const query = parseInput(widgetQueryInput, queryInput);
   const cell = parseInput(cellInput, cellRef);
-  const { page, pageSize } = cell;
   const { range } = resolveRange(query.dateRange, swissToday());
   const span = drillSpan(query, range, cell);
-  const measured = {
-    measure: query.measure,
-    averagePer: query.averagePer,
-    periodCount: span ? periodsIn(span, query.averagePer).length : 0,
-    span,
-  };
-  const subtotalAxis = cell.change && isTimeAxis(query.rows) ? query.rows : null;
-  const subtotalsOf = (sums: PeriodSubtotal[]): PeriodSubtotal[] | null => {
-    if (!subtotalAxis) return null;
-    const byKey = new Map(sums.map((item) => [item.key, item.sumChfMinor]));
-    const keys = span ? keptPeriods(subtotalAxis, cell.row, span) : [];
-    return keys.toReversed().map((key) => ({ key, sumChfMinor: byKey.get(key) ?? 0 }));
-  };
-  const empty: CellTransactionPage = {
-    ...measured,
-    value: null,
-    transactions: [],
-    total: 0,
-    sumChfMinor: null,
-    unconvertedCount: 0,
-    subtotals: subtotalsOf([]),
-    page,
-    pageSize,
-    pageCount: 0,
-  };
-  if (span === null) return empty;
+  const subtotalAxis = cell.withPeriodSubtotals && isTimeAxis(query.rows) ? query.rows : null;
+  const read: CellRead = { query, range, span, cell, subtotalAxis };
+  if (span === null) return cellPage(read, null, []);
 
   const params = new SqlParams();
   const conditions = cellConditions(query, cell, params);
-  if (conditions === null) return empty;
-  const { total, sumMinor, unconverted, items, subtotals } = await queryCell(
+  if (conditions === null) return cellPage(read, null, []);
+  const aggregate = await queryCell(ctx, read, { conditions, params });
+  const transactions = await listTransactionsByIds(
     ctx,
-    query,
-    range,
-    conditions,
-    params,
-    { page, pageSize, subtotalAxis },
+    (aggregate.items ?? []).map((item) => item.id),
   );
-  const byId = new Map((items ?? []).map((item) => [item.id, item]));
-  const transactions = await listTransactionsByIds(ctx, [...byId.keys()]);
+  return cellPage(read, aggregate, transactions);
+}
+
+/**
+ * The page of a cell read: its number and what it's worked out from, and the listed
+ * Transactions with what each counts toward it. With no aggregate, the cell is empty.
+ */
+function cellPage(
+  { query, span, cell, subtotalAxis }: CellRead,
+  aggregate: CellAggregate | null,
+  listed: TransactionListItem[],
+): CellTransactionPage {
+  const { page, pageSize } = cell;
+  const total = aggregate?.total ?? 0;
+  const sumMinor = aggregate?.sumMinor ?? null;
+  const periods = periodCount(span, query.averagePer);
+  const keys = subtotalAxis && span ? keptPeriods(subtotalAxis, cell.row, span) : [];
+  const subtotals = subtotalAxis ? periodSubtotals(keys, aggregate) : null;
   return {
-    ...measured,
-    value: measureOf(query.measure, { sumMinor, count: total, periods: measured.periodCount }),
-    transactions: transactions.map((item) => {
-      const counted = byId.get(item.id)!;
-      return {
-        ...item,
-        chfMinor: counted.chfMinor,
-        countedLineCount: item.splitLines.length > 0 ? counted.lineCount : null,
-      };
-    }),
+    measure: query.measure,
+    averagePer: query.averagePer,
+    periodCount: periods,
+    span,
+    value: aggregate ? measureOf(query.measure, { sumMinor, count: total, periods }) : null,
+    transactions: countedTransactions(listed, aggregate?.items ?? []),
     total,
     sumChfMinor: sumMinor,
-    unconvertedCount: unconverted,
-    subtotals: subtotalsOf(subtotals ?? []),
+    unconvertedCount: aggregate?.unconverted ?? 0,
+    subtotals,
     page,
     pageSize,
     pageCount: Math.ceil(total / pageSize),
   };
 }
 
-interface CellPaging {
-  page: number;
-  pageSize: number;
-  /** The time axis to sum the cell per period of, or null for no subtotals. */
-  subtotalAxis: TimeAxis | null;
+/** Each kept period's sum, newest first (0 for a period no Transaction falls in). */
+function periodSubtotals(keys: string[], aggregate: CellAggregate | null): PeriodSubtotal[] {
+  const byKey = new Map((aggregate?.subtotals ?? []).map((item) => [item.key, item.sumChfMinor]));
+  return keys.toReversed().map((key) => ({ key, sumChfMinor: byKey.get(key) ?? 0 }));
+}
+
+/** The listed Transactions, each with the CHF value and the Split lines it counts in the cell. */
+function countedTransactions(listed: TransactionListItem[], rows: CellRow[]): CellTransaction[] {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return listed.map((item) => {
+    const counted = byId.get(item.id)!;
+    return {
+      ...item,
+      chfMinor: counted.chfMinor,
+      countedLineCount: item.splitLines.length > 0 ? counted.lineCount : null,
+    };
+  });
+}
+
+/** The cell's conditions, with the parameters they bind. */
+interface CellSql {
+  conditions: string[];
+  params: SqlParams;
 }
 
 /**
@@ -252,15 +276,12 @@ interface CellPaging {
  */
 async function queryCell(
   ctx: ServiceContext,
-  query: WidgetQuery,
-  range: DateSpan,
-  conditions: string[],
-  params: SqlParams,
-  { page, pageSize, subtotalAxis }: CellPaging,
+  { query, range, cell, subtotalAxis }: CellRead,
+  { conditions, params }: CellSql,
 ): Promise<CellAggregate> {
   const cte = baseCte(query, range, await currenciesInUse(ctx), params);
-  const limit = params.add(pageSize);
-  const offset = params.add((page - 1) * pageSize);
+  const limit = params.add(cell.pageSize);
+  const offset = params.add((cell.page - 1) * cell.pageSize);
   const where = (first: string) => [first, ...conditions].join(' AND ');
   const subtotals = subtotalAxis
     ? `(SELECT json_agg(json_build_object('key', s.key, 'sumChfMinor', s.sum_minor))

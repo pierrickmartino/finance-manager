@@ -74,7 +74,7 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   ).toBeVisible();
   await expect(page.getByRole('status')).toHaveText(`14 Transactions, total ${clicked}`);
   await expect(
-    page.getByRole('table', { name: 'Cell Transactions' }).locator('tbody tr'),
+    page.getByRole('table', { name: 'Drill-down Transactions' }).locator('tbody tr'),
   ).toHaveCount(14);
 
   // Back to the editor, and save it as a standalone Widget.
@@ -150,7 +150,7 @@ test("a Donut Widget's legend row opens the Drill-down behind its amount", async
   await expect(page).toHaveURL(/\/widgets\/drill\?/);
   await expect(page.getByRole('main')).toContainText('CHF -250.00');
   await expect(
-    page.getByRole('table', { name: 'Cell Transactions' }).locator('tbody tr'),
+    page.getByRole('table', { name: 'Drill-down Transactions' }).locator('tbody tr'),
   ).toHaveCount(1);
 });
 

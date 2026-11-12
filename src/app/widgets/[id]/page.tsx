@@ -6,10 +6,10 @@ import { FieldError } from '@/components/form';
 import { getServiceContext } from '@/server/app-context';
 import { NotFoundError } from '@/server/services/errors';
 import { getWidget, MEASURE_LABELS, type Widget } from '@/server/services/reporting';
-import { BALANCE_LINKS, editWidgetHref } from '../../dashboards/load';
+import { editWidgetHref, widgetLinks } from '../../dashboards/load';
 import { deleteWidgetAction } from '../actions';
 import { loadSavedWidget } from '../load';
-import { drillLinks, toPivotData } from '../pivot-data';
+import { toPivotData } from '../pivot-data';
 import { WidgetView } from '../widget-view';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
 
@@ -58,12 +58,7 @@ export default async function WidgetPage({ params }: { params: Promise<{ id: str
           report={report}
           title={widget.name}
           visualisation={widget.visualisation}
-          data={toPivotData(
-            report,
-            widget.source === 'account_balances'
-              ? BALANCE_LINKS
-              : drillLinks(report, { kind: 'widget', id: widget.id }),
-          )}
+          data={toPivotData(report, widgetLinks(widget, report, { kind: 'widget', id: widget.id }))}
         />
       )}
     </section>

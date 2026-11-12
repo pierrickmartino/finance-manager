@@ -116,7 +116,7 @@ const CELL_AXES = ['row', 'column'] as const;
 
 /**
  * Drill-down cell parameters: `row`, `column` (absent = the whole axis), or repeated `rowNot`,
- * `columnNot` for every key but those; `change=1`, `page`.
+ * `columnNot` for every key but those; `subtotals=1`, `page`.
  */
 export function cellToParams(cell: CellRef): URLSearchParams {
   const params = new URLSearchParams();
@@ -129,7 +129,7 @@ export function cellToParams(cell: CellRef): URLSearchParams {
       params.set(axis, selector ?? NONE);
     }
   }
-  if (cell.change) params.set('change', '1');
+  if (cell.withPeriodSubtotals) params.set('subtotals', '1');
   if (cell.page !== undefined && cell.page > 1) params.set('page', String(cell.page));
   return params;
 }
@@ -141,13 +141,14 @@ export function cellFromParams(params: UrlParams): CellRef {
     const except = all(params[`${axis}Not`]).map(keyOf);
     return except.length > 0 ? { except } : undefined;
   };
-  const cell: CellRef = {};
-  for (const axis of CELL_AXES) {
+  const axes = CELL_AXES.flatMap((axis) => {
     const value = selector(axis);
-    if (value !== undefined) cell[axis] = value;
-  }
-  if (first(params.change) === '1') cell.change = true;
+    return value === undefined ? [] : [[axis, value] as const];
+  });
   const page = Number(first(params.page));
-  cell.page = Number.isSafeInteger(page) && page >= 1 ? page : 1;
-  return cell;
+  return {
+    ...(Object.fromEntries(axes) as Pick<CellRef, 'row' | 'column'>),
+    ...(first(params.subtotals) === '1' ? { withPeriodSubtotals: true } : {}),
+    page: Number.isSafeInteger(page) && page >= 1 ? page : 1,
+  };
 }
