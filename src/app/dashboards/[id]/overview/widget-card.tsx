@@ -37,8 +37,8 @@ function shareItems(data: ChartSource, money: Money): TickItem[] {
   }));
 }
 
-/** The mark that suits the Widget: dots for in and out, bars per period, ticks for parts. */
-function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
+/** The mark that suits the Widget: dots for in and out, bars per period, ticks for parts. (Exported for the layout PROTOTYPE.) */
+export function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
   const { data } = chapter;
   if (!data) return null;
   if (data.rows.length === 0) return <p className="text-muted">No data in this date range yet.</p>;

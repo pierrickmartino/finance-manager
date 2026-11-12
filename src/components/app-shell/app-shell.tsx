@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { logoutAction } from '@/app/login/actions';
+import { VariantShell } from '@/app/prototype-layout/shells';
+import { LAYOUT_VARIANTS, parseVariant } from '@/app/prototype-layout/variant';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { greetingFor } from './greeting';
 import {
   HERO_ICON_BUTTON_CLASS,
@@ -111,6 +114,18 @@ interface AppShellProps {
 export function AppShell({ showNavigation, children }: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // PROTOTYPE (layout redesign): `?variant=A|B|C` swaps in a variant shell. Throwaway.
+  const variant = parseVariant(useSearchParams().get('variant'));
+  if (showNavigation && variant !== 'current') {
+    return (
+      <>
+        <VariantShell variant={variant} pathname={pathname}>
+          {children}
+        </VariantShell>
+        <PrototypeSwitcher variants={LAYOUT_VARIANTS} current={variant} />
+      </>
+    );
+  }
 
   // The frame clips nothing (its corners come from the hero's own rounding): a menu that drops
   // past the end of a page must still be reachable, and sticky columns must stick.
@@ -156,6 +171,7 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
       </div>
 
       {showNavigation && isMenuOpen && <MobileDrawer onClose={() => setIsMenuOpen(false)} />}
+      {showNavigation && <PrototypeSwitcher variants={LAYOUT_VARIANTS} current={variant} />}
     </div>
   );
 }

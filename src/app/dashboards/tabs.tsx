@@ -5,9 +5,12 @@ import type { Dashboard } from '@/server/services/dashboards';
 export function DashboardTabs({
   dashboards,
   currentId,
+  query = '',
 }: {
   dashboards: Dashboard[];
   currentId: string | null;
+  /** PROTOTYPE (layout redesign): carries `?variant=` along. */
+  query?: string;
 }) {
   return (
     <nav
@@ -17,7 +20,7 @@ export function DashboardTabs({
       {dashboards.map((dashboard) => (
         <Link
           key={dashboard.id}
-          href={`/dashboards/${dashboard.id}`}
+          href={`/dashboards/${dashboard.id}${query}`}
           aria-current={dashboard.id === currentId ? 'page' : undefined}
           className={`rounded-md px-3 py-1 ${
             dashboard.id === currentId ? 'bg-ink text-white' : 'text-ink-soft hover:bg-sunken'

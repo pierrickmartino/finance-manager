@@ -1,0 +1,111 @@
+/*
+ * PROTOTYPE (layout redesign, `?variant=`): each variant re-points the design tokens inside its
+ * own root, so every token utility (bg-paper, rounded-xl, font-display, the hero-* marks) takes
+ * the variant's look without touching globals.css. Throwaway; see ./README.md.
+ */
+
+[data-proto] {
+  font-family: var(--font-sans);
+}
+
+/* A, "Ledger": cool white and slate, one cobalt accent, near-square corners, IBM Plex. */
+[data-proto='A'] {
+  --font-sans: var(--proto-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--proto-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--proto-plex-mono), ui-monospace, monospace;
+
+  --color-paper: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-sunken: #eef0f4;
+  --color-rule: #dde1e8;
+  --color-rule-strong: #c5cbd5;
+  --color-faint: #9aa3b2;
+  --color-muted: #5f6b7c;
+  --color-ink-soft: #3d4757;
+  --color-ink: #121826;
+  --color-ink-hover: #2a3345;
+  --color-accent: #2f5bff;
+  --color-accent-ink: #1f45d6;
+  --color-accent-tint: #edf1ff;
+  /* The marks: cobalt instead of teal. */
+  --color-hero-deep: #10225e;
+  --color-hero: #1a3594;
+  --color-hero-mid: #2f5bff;
+  --color-hero-glow: #8aa3ff;
+  --color-hero-mist: #d4ddff;
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+}
+
+/* B, "Command": warm off-white under a graphite bar, violet accent, small radii, Inter Tight. */
+[data-proto='B'] {
+  --font-sans: var(--proto-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--proto-inter-tight), ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #f6f5f1;
+  --color-surface: #ffffff;
+  --color-sunken: #efede7;
+  --color-rule: #e4e1d8;
+  --color-rule-strong: #cfcbbf;
+  --color-faint: #a8a396;
+  --color-muted: #6e6a5f;
+  --color-ink-soft: #46433b;
+  --color-ink: #16151a;
+  --color-ink-hover: #34323b;
+  --color-accent: #6a4cff;
+  --color-accent-ink: #5233e6;
+  --color-accent-tint: #f0ecff;
+  --color-hero-deep: #241765;
+  --color-hero: #3a26a8;
+  --color-hero-mid: #6a4cff;
+  --color-hero-glow: #a896ff;
+  --color-hero-mist: #e0d9ff;
+  --color-on-hero: #ffffff;
+
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-3xl: 8px;
+}
+
+/* C, "Broadsheet": cream newsprint, forest green and ochre, square, Fraunces over Newsreader. */
+[data-proto='C'] {
+  --font-sans: var(--proto-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--proto-fraunces), Georgia, serif;
+  --font-serif: var(--proto-newsreader), Georgia, serif;
+
+  --color-paper: #f4efe4;
+  --color-surface: #faf7f0;
+  --color-sunken: #ebe4d4;
+  --color-rule: #d9cfbb;
+  --color-rule-strong: #bfb299;
+  --color-faint: #a59a84;
+  --color-muted: #6b604c;
+  --color-ink-soft: #3f382b;
+  --color-ink: #1c1913;
+  --color-ink-hover: #3a342a;
+  --color-accent: #c8862a;
+  --color-accent-ink: #8a5a14;
+  --color-accent-tint: #f6e9d2;
+  --color-hero-deep: #123d2e;
+  --color-hero: #1b5642;
+  --color-hero-mid: #2f7a5c;
+  --color-hero-glow: #c8862a;
+  --color-hero-mist: #dfe9df;
+  --color-positive: #2f6b3a;
+  --color-negative: #9e2b25;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+}
