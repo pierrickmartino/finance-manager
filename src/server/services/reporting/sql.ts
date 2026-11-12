@@ -1,4 +1,5 @@
 import { fractionDigits } from '@/lib/format';
+import { includesCapital } from '@/lib/reporting/capital';
 import { BASE_CURRENCY } from '../fx/constants';
 import { REPORTED_PAYEE_ID } from '../transactions/line-payee';
 import type { DateSpan } from './periods';
@@ -58,11 +59,6 @@ function filterConditions(query: WidgetQuery, params: SqlParams): string[] {
   anyOf(filters.currencies, (p) => `t.currency = ANY(${p}::bpchar[])`);
   if (!includesCapital(query)) conditions.push(`${GROUP_TYPE} IS DISTINCT FROM 'capital'`);
   return conditions;
-}
-
-/** Capital is excluded unless the query asks for it, directly or through its type filter. */
-export function includesCapital(query: WidgetQuery): boolean {
-  return query.includeCapital || (query.filters.categoryGroupTypes ?? []).includes('capital');
 }
 
 /**
@@ -158,4 +154,27 @@ export function axisCondition(axis: ReportAxis, key: string | null, params: SqlP
       : `EXISTS (SELECT 1 FROM ${tags} dt WHERE dt.tag_id = ${params.add(key)}::uuid)`;
   }
   return key === null ? `${axisKey(axis)} IS NULL` : `${axisKey(axis)} = ${params.add(key)}::text`;
+}
+
+/**
+ * Condition (over `report_base b`) selecting the reportable rows under every key of an axis but
+ * `keys` (`null` names the "none" bucket). Keys compare as text, so an unknown id matches none.
+ * On the Tag axis a row counts when one of its Tags is kept, as it counts under each Tag.
+ */
+export function axisExceptCondition(
+  axis: ReportAxis,
+  keys: readonly (string | null)[],
+  params: SqlParams,
+): string {
+  const left = params.add(keys.filter((key): key is string => key !== null));
+  const keepsNone = !keys.includes(null);
+  if (axis === 'tag') {
+    const tags = rowTags('b.id', 'b.line_id');
+    const kept = `EXISTS (SELECT 1 FROM ${tags} dt WHERE dt.tag_id::text <> ALL(${left}::text[]))`;
+    return keepsNone ? `(${kept} OR NOT EXISTS (SELECT 1 FROM ${tags} dt))` : kept;
+  }
+  const key = axisKey(axis);
+  return keepsNone
+    ? `(${key} IS NULL OR ${key} <> ALL(${left}::text[]))`
+    : `(${key} IS NOT NULL AND ${key} <> ALL(${left}::text[]))`;
 }

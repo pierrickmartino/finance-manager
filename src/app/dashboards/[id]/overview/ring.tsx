@@ -92,17 +92,27 @@ export function DonutRing({ data, money }: { data: ChartSource; money: Money }) 
             ))}
           </g>
         </svg>
-        <div
-          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center"
-          aria-hidden
-        >
-          <span className="max-w-24 truncate text-xs text-muted">
-            {shown ? shown.label : 'Total'}
-          </span>
-          <span className="font-display text-lg tracking-tight tabular-nums">
-            {money(shown ? shown.value : (data.total ?? 0))}
-          </span>
-          {shown && <span className="text-xs text-muted">{percent(shown.share)}</span>}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          {shown ? (
+            <span className="flex flex-col items-center" aria-hidden>
+              <span className="max-w-24 truncate text-xs text-muted">{shown.label}</span>
+              <span className="font-display text-lg tracking-tight tabular-nums">
+                {money(shown.value)}
+              </span>
+              <span className="text-xs text-muted">{percent(shown.share)}</span>
+            </span>
+          ) : (
+            // The total opens the Widget's grand total: every Transaction in the ring.
+            <Link
+              href={data.hrefs.total}
+              className="pointer-events-auto flex flex-col items-center rounded-md px-2 hover:underline"
+            >
+              <span className="text-xs text-muted">Total</span>
+              <span className="font-display text-lg tracking-tight tabular-nums">
+                {money(data.total ?? 0)}
+              </span>
+            </Link>
+          )}
         </div>
       </div>
       <ul className="flex min-w-48 flex-1 flex-col">

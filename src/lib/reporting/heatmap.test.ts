@@ -30,6 +30,7 @@ function source(
       columnTotals: columns.map((c) => `column:${c.label}`),
       total: 'total',
     },
+    drill: null,
   };
 }
 

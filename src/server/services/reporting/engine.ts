@@ -1,11 +1,13 @@
+import { divideRounded } from '@/lib/reporting/average';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import { swissToday } from '../fx/dates';
 import { ALL_HEADER, axisHeaders, type ReportHeader } from './headers';
-import { intersect, periodSpan, periodsIn, resolveRange, type DateSpan } from './periods';
+import { intersect, periodCount, periodSpan, resolveRange, type DateSpan } from './periods';
 import {
   isTimeAxis,
   widgetQueryInput,
+  type Measure,
   type ReportAxis,
   type WidgetQuery,
   type WidgetQueryInput,
@@ -159,16 +161,43 @@ function measureValue(
   row: ReportHeader,
   column: ReportHeader,
 ): number | null {
-  if (query.measure === 'count') return aggregate.count;
-  if (aggregate.sumMinor === null) return null;
-  if (query.measure === 'sum') return aggregate.sumMinor;
-  const span = cellSpan(query, range, row, column);
-  const periods = span ? periodsIn(span, query.averagePer).length : 0;
-  return periods === 0 ? null : divideRounded(aggregate.sumMinor, periods);
+  const periods = query.measure === 'average' ? cellPeriodCount(query, range, row, column) : 0;
+  return measureOf(query.measure, {
+    sumMinor: aggregate.sumMinor,
+    count: aggregate.count,
+    periods,
+  });
 }
 
-/** Integer division rounded half away from zero, like the CHF conversion. */
-function divideRounded(amount: number, by: number): number {
-  const quotient = Math.round(Math.abs(amount) / by);
-  return amount < 0 ? -quotient : quotient;
+/** The number of `averagePer` periods one cell's `average` divides by (0 when it has none). */
+function cellPeriodCount(
+  query: WidgetQuery,
+  range: DateSpan,
+  row: ReportHeader,
+  column: ReportHeader,
+): number {
+  return periodCount(cellSpan(query, range, row, column), query.averagePer);
+}
+
+/** What makes up a measured number: its CHF sum, its Transactions and its periods. */
+export interface MeasureParts {
+  sumMinor: number | null;
+  count: number;
+  /** The `averagePer` periods the `average` divides by. */
+  periods: number;
+}
+
+/**
+ * A cell's value under a measure: its sum, its count of Transactions, or its sum divided by its
+ * periods (rounded half away from zero). Null where no Transaction falls or no period is left.
+ */
+export function measureOf(
+  measure: Measure,
+  { sumMinor, count, periods }: MeasureParts,
+): number | null {
+  if (count === 0) return null;
+  if (measure === 'count') return count;
+  if (sumMinor === null) return null;
+  if (measure === 'sum') return sumMinor;
+  return periods === 0 ? null : divideRounded(sumMinor, periods);
 }

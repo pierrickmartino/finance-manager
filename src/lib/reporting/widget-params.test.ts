@@ -79,4 +79,29 @@ describe('Widget query URL parameters', () => {
     });
     expect(cellFromParams({})).toEqual({ page: 1 });
   });
+
+  it('round-trips "every key but these" and a change through URL parameters', () => {
+    const cell = {
+      row: { except: ['2025-03'] },
+      column: { except: [TAG, null] },
+      withPeriodSubtotals: true,
+    };
+
+    const params = cellToParams(cell);
+
+    expect(params.toString()).toBe(`rowNot=2025-03&columnNot=${TAG}&columnNot=none&subtotals=1`);
+    expect(cellFromParams(Object.fromEntries(group(params)))).toEqual({ ...cell, page: 1 });
+  });
+
+  it('reads "every key but none" as every key, the whole axis', () => {
+    expect(cellToParams({ row: { except: [] } }).toString()).toBe('');
+  });
 });
+
+/** URL parameters as Next.js passes them: a repeated name as an array. */
+function group(params: URLSearchParams): [string, string | string[]][] {
+  return [...new Set(params.keys())].map((name) => {
+    const values = params.getAll(name);
+    return [name, values.length === 1 ? values[0]! : values];
+  });
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ReportHeader } from '@/server/services/reporting';
 import type { ChartSource } from './chart-data';
+import { cellFromParams, DEFAULT_WIDGET_QUERY } from './widget-params';
 import {
   findMonthFlows,
   latestFullIndex,
@@ -42,6 +43,7 @@ function source(
       columnTotals: columns.map((c) => `column:${c}`),
       total: 'total',
     },
+    drill: null,
   };
 }
 
@@ -115,6 +117,55 @@ describe('findMonthFlows', () => {
   it('is null when no Widget holds income and expense', () => {
     expect(findMonthFlows([widget('empty', null)])).toBeNull();
   });
+
+  it('links what was kept to the grand total, and the latest full month to that month only', () => {
+    const partial = source(
+      ['2025-01', '2025-02', '2025-03'],
+      ['expense', 'income'],
+      [
+        [-600_00, 1000_00],
+        [-900_00, 1000_00],
+        [-30_00, 0],
+      ],
+      { lastIsPartial: true },
+    );
+
+    const found = findMonthFlows([widget('flow', partial)]);
+
+    expect(found).toMatchObject({ href: 'total', latestHref: 'row:2025-02' });
+  });
+
+  it("opens the insight's change on the expense of every full month, subtotalled", () => {
+    const drillable: ChartSource = {
+      ...source(
+        ['2025-01', '2025-02', '2025-03'],
+        ['expense', 'income'],
+        [
+          [-600_00, 1000_00],
+          [-900_00, 1000_00],
+          [-30_00, 0],
+        ],
+        { lastIsPartial: true },
+      ),
+      drill: {
+        query: { ...DEFAULT_WIDGET_QUERY, rows: 'month', columns: 'categoryGroupType' },
+        origin: { kind: 'dashboard', id: '0b6f4c1e-3a52-4d8e-9a7e-1f2d3c4b5a60' },
+      },
+    };
+
+    const { changeHref } = findMonthFlows([widget('flow', drillable)])!;
+
+    const params = new URL(changeHref!, 'http://localhost').searchParams;
+    expect(cellFromParams(Object.fromEntries(params))).toEqual({
+      row: { except: ['2025-03'] },
+      column: 'expense',
+      withPeriodSubtotals: true,
+      page: 1,
+    });
+    expect(params.get('origin')).toBe('dashboard');
+    // Without Drill-downs there is nothing to open.
+    expect(findMonthFlows([widget('flow', flowSource)])?.changeHref).toBeNull();
+  });
 });
 
 describe('spendingInsight', () => {
@@ -124,8 +175,11 @@ describe('spendingInsight', () => {
 
     expect(insight).toEqual({
       headline: 'Spending is easing.',
-      detail:
-        'Mar came in 60% below your monthly average, and you kept 49% of everything that came in.',
+      detail: [
+        'Mar came in ',
+        '60% below',
+        ' your monthly average, and you kept 49% of everything that came in.',
+      ],
     });
   });
 
@@ -133,7 +187,8 @@ describe('spendingInsight', () => {
     const insight = spendingInsight([month('Jan', 1000_00, 500_00), month('Feb', 1000_00, 750_00)]);
 
     expect(insight?.headline).toBe('Spending is running high.');
-    expect(insight?.detail).toMatch(/^Feb came in 50% above your monthly average/);
+    expect(insight?.detail.join('')).toMatch(/^Feb came in 50% above your monthly average/);
+    expect(insight?.detail[1]).toBe('50% above');
   });
 
   it('leaves the month still running out', () => {
@@ -143,7 +198,7 @@ describe('spendingInsight', () => {
       month('Mar', 0, 50_00, true),
     ]);
 
-    expect(insight?.detail).toMatch(/^Feb came in 20% below/);
+    expect(insight?.detail.join('')).toMatch(/^Feb came in 20% below/);
   });
 
   it('is null with fewer than two full months to compare', () => {

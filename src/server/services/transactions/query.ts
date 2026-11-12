@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CATEGORY_GROUP_TYPES } from '../categories/model';
+import { BASE_CURRENCY } from '../fx/constants';
 import { REPORTED_PAYEE_ID } from './line-payee';
 import { IS_SPLIT, splitLineExists } from './split-guard';
 
@@ -37,6 +38,8 @@ export const UNCLASSIFIED_CONDITION = `t.category_id IS NULL AND t.transfer_id I
  */
 export const TRANSFER_FILTERS = ['only', 'exclude'] as const;
 export type TransferFilter = (typeof TRANSFER_FILTERS)[number];
+
+export const FX_RATE_FILTERS = ['missing'] as const;
 
 /** A filter field that is absent when blank (empty or only spaces). */
 function optional<S extends z.ZodType>(schema: S) {
@@ -86,6 +89,11 @@ const transactionFilterFields = {
   transfer: optional(
     z.enum(TRANSFER_FILTERS, { error: 'Transfer filter must be only or exclude' }),
   ),
+  /**
+   * `missing`: only Transactions in a foreign Currency with no FX rate on or before their
+   * booking date, the ones reports leave out (ADR-0002).
+   */
+  fxRate: optional(z.enum(FX_RATE_FILTERS, { error: 'FX rate filter must be missing' })),
   /**
    * Normalised raw description, as the Unclassified groups key them. Not blank-stripped: the
    * empty key is the group of Transactions with no description.
@@ -264,6 +272,11 @@ function buildConditions(input: ParsedQuery, matchSplitLines: boolean): SqlCondi
   } else if (input.transfer === 'exclude') {
     conditions.push('t.transfer_id IS NULL');
   }
+  where(
+    (p) => `t.currency <> ${p} AND NOT EXISTS (
+      SELECT 1 FROM fx_rate r WHERE r.currency = t.currency AND r.date <= t.booking_date)`,
+    input.fxRate === 'missing' ? BASE_CURRENCY : undefined,
+  );
 
   return { sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '', params };
 }

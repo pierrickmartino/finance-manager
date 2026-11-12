@@ -1,5 +1,6 @@
 import type { ReportHeader } from '@/server/services/reporting';
-import type { ChartSource } from './chart-data';
+import { periodSumDrill, type ChartSource } from './chart-data';
+import { drillUrl } from './drill-link';
 import type { StoryWidget } from './story';
 
 /**
@@ -27,11 +28,13 @@ export interface PeriodValue {
 
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
-/**
- * Income and expense per row, when the source has one positive and one negative column
- * (an income-vs-expense Widget); null otherwise.
- */
-export function monthFlows(data: ChartSource): MonthFlow[] | null {
+interface FlowSlots {
+  incomeSlot: number;
+  expenseSlot: number;
+}
+
+/** Which column holds the income and which the expense, or null for another kind of source. */
+function flowSlots(data: ChartSource): FlowSlots | null {
   if (data.columns.length !== 2) return null;
   const [first, second] = data.columnTotals;
   if (first == null || second == null) return null;
@@ -40,6 +43,19 @@ export function monthFlows(data: ChartSource): MonthFlow[] | null {
   if ((data.columnTotals[incomeSlot] ?? 0) <= 0 || (data.columnTotals[expenseSlot] ?? 0) >= 0) {
     return null;
   }
+  return { incomeSlot, expenseSlot };
+}
+
+/**
+ * Income and expense per row, when the source has one positive and one negative column
+ * (an income-vs-expense Widget); null otherwise.
+ */
+export function monthFlows(data: ChartSource): MonthFlow[] | null {
+  const slots = flowSlots(data);
+  return slots ? flowsOf(data, slots) : null;
+}
+
+function flowsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): MonthFlow[] {
   return data.rows.map((row, r) => {
     const income = data.cells[r]?.[incomeSlot] ?? 0;
     const expense = 0 - (data.cells[r]?.[expenseSlot] ?? 0);
@@ -47,40 +63,85 @@ export function monthFlows(data: ChartSource): MonthFlow[] | null {
   });
 }
 
+/** The months of an income-vs-expense Widget, and where its figures drill down. */
+export interface FoundMonthFlows {
+  widgetId: string;
+  months: MonthFlow[];
+  /** All its Transactions: income and expense net to what was kept over the months. */
+  href: string;
+  /** The latest full month's Transactions (null when every month is still running). */
+  latestHref: string | null;
+  /** The expense of every full month, subtotalled per month, for the insight's change. */
+  changeHref: string | null;
+}
+
+/**
+ * The expense of the full months, with a subtotal per month: what the insight's change is
+ * worked out from. Only for a sum whose rows are periods, as the subtotals are per period.
+ */
+function changeHref(data: ChartSource, expenseSlot: number): string | null {
+  const byPeriod = periodSumDrill(data);
+  if (!byPeriod) return null;
+  const partial = data.rows.filter((row) => row.isPartial).map((row) => row.key);
+  return drillUrl(byPeriod.drill, {
+    row: { except: partial },
+    column: data.columns[expenseSlot]!.key,
+    withPeriodSubtotals: true,
+  });
+}
+
 /** The months of the first Widget that holds income and expense, or null. */
-export function findMonthFlows(
-  widgets: StoryWidget[],
-): { widgetId: string; months: MonthFlow[]; href: string } | null {
+export function findMonthFlows(widgets: StoryWidget[]): FoundMonthFlows | null {
   for (const widget of widgets) {
-    const months = widget.data ? monthFlows(widget.data) : null;
-    if (widget.data && months) {
-      return { widgetId: widget.id, months, href: widget.data.hrefs.total };
-    }
+    const data = widget.data;
+    const slots = data ? flowSlots(data) : null;
+    if (!data || !slots) continue;
+    const latest = latestFullIndex(data.rows);
+    return {
+      widgetId: widget.id,
+      months: flowsOf(data, slots),
+      href: data.hrefs.total,
+      latestHref: latest === -1 ? null : (data.hrefs.rowTotals[latest] ?? null),
+      changeHref: changeHref(data, slots.expenseSlot),
+    };
   }
   return null;
 }
 
 const percent = (share: number): string => `${Math.round(Math.abs(share) * 100)}%`;
 
+/** How far `latest` is from the average of `before`, as a share of it (0 when that is 0). */
+export function changeOverAverage(latest: number, before: number[]): number {
+  const average = sum(before) / before.length;
+  return average === 0 ? 0 : (latest - average) / average;
+}
+
 /**
  * The insight callout: how the latest full month's spending compares with the full months
- * before it, and the share of income kept over them all. Null without two full months.
+ * before it, and the share of income kept over them all. Null without two full months. Its
+ * detail comes in three parts, the change in the middle, so the change can link on its own.
  */
-export function spendingInsight(months: MonthFlow[]): { headline: string; detail: string } | null {
+export function spendingInsight(
+  months: MonthFlow[],
+): { headline: string; detail: [before: string, change: string, after: string] } | null {
   const full = months.filter((month) => !month.isPartial);
   const latest = full.at(-1);
   if (!latest || full.length < 2) return null;
   const before = full.slice(0, -1);
-  const average = sum(before.map((month) => month.expense)) / before.length;
-  const change = average === 0 ? 0 : (latest.expense - average) / average;
+  const change = changeOverAverage(
+    latest.expense,
+    before.map((month) => month.expense),
+  );
   const income = sum(full.map((month) => month.income));
   const kept = income === 0 ? 0 : (income - sum(full.map((month) => month.expense))) / income;
   const isEasing = change <= 0;
   return {
     headline: isEasing ? 'Spending is easing.' : 'Spending is running high.',
-    detail:
-      `${latest.label} came in ${percent(change)} ${isEasing ? 'below' : 'above'} your monthly ` +
-      `average, and you kept ${percent(kept)} of everything that came in.`,
+    detail: [
+      `${latest.label} came in `,
+      `${percent(change)} ${isEasing ? 'below' : 'above'}`,
+      ` your monthly average, and you kept ${percent(kept)} of everything that came in.`,
+    ],
   };
 }
 

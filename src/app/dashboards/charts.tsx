@@ -24,6 +24,7 @@ import {
   toSeriesChart,
   toSingleNumber,
   type ChartSource,
+  type DonutSlice,
   type SeriesChart,
 } from '@/lib/reporting/chart-data';
 import type { Measure } from '@/server/services/reporting';
@@ -184,7 +185,44 @@ export function StackedBarWidgetChart({ data, title }: ChartProps) {
   );
 }
 
-/** Donut: the parts of the total; each slice drills down. Sized by magnitude. */
+interface DonutLegendProps {
+  slices: DonutSlice[];
+  title: string;
+  palette: ChartPalette;
+  money: (value: number) => string;
+}
+
+/** The donut's parts with their signed amounts; each row links to its slice's Drill-down. */
+function DonutLegend({ slices, title, palette, money }: DonutLegendProps) {
+  return (
+    <ul aria-label={`${title} legend`} className="flex flex-col">
+      {slices.map((slice) => {
+        const row = (
+          <span className="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-2 py-1">
+            <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" aria-hidden>
+              <circle cx={5} cy={5} r={5} fill={palette.series[slice.slot]} />
+            </svg>
+            <span className="truncate">{slice.label}</span>
+            <span className="text-muted tabular-nums">{money(slice.signedValue)}</span>
+          </span>
+        );
+        return (
+          <li key={slice.label}>
+            {slice.href ? (
+              <Link href={slice.href} className="block rounded-lg hover:bg-sunken">
+                {row}
+              </Link>
+            ) : (
+              row
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Donut: the parts of the total; each slice and its legend row drills down. Sized by magnitude. */
 export function DonutWidgetChart({ data, title }: ChartProps) {
   const router = useRouter();
   const palette = CHART_PALETTE;
@@ -206,6 +244,9 @@ export function DonutWidgetChart({ data, title }: ChartProps) {
             align="right"
             verticalAlign="middle"
             wrapperStyle={{ fontSize: 12, color: palette.text }}
+            content={() => (
+              <DonutLegend slices={slices} title={title} palette={palette} money={format.value} />
+            )}
           />
           <Pie
             data={slices}

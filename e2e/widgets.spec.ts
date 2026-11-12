@@ -1,6 +1,12 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { createAccount } from '../src/server/services/accounts';
+import { createBank } from '../src/server/services/banks';
+import { addDays, swissToday } from '../src/server/services/fx/dates';
+import { createWidget } from '../src/server/services/reporting';
+import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { openAccountPage, openNewAccountForm } from './support/accounts';
+import { withServices } from './support/services';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -58,14 +64,17 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Full screen' })).toBeVisible();
 
-  // Drill into the cell: all 14 October Transactions are unclassified.
-  await pivot.getByRole('link', { name: /^Oct 2025, Unclassified: / }).click();
+  // Drill into the cell: all 14 October Transactions are unclassified, and the headline's
+  // total is the number clicked.
+  const cell = pivot.getByRole('link', { name: /^Oct 2025, Unclassified: / });
+  const clicked = (await cell.getAttribute('aria-label'))!.replace(/^.*: /, '');
+  await cell.click();
   await expect(
     page.getByRole('heading', { name: 'Transactions in Oct 2025 · Unclassified' }),
   ).toBeVisible();
-  await expect(page.getByRole('status')).toContainText('14 Transactions');
+  await expect(page.getByRole('status')).toHaveText(`14 Transactions, total ${clicked}`);
   await expect(
-    page.getByRole('table', { name: 'Cell Transactions' }).locator('tbody tr'),
+    page.getByRole('table', { name: 'Drill-down Transactions' }).locator('tbody tr'),
   ).toHaveCount(14);
 
   // Back to the editor, and save it as a standalone Widget.
@@ -77,6 +86,72 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
   await expect(
     page.getByRole('table', { name: 'Pivot' }).getByRole('rowheader', { name: 'Oct 2025' }),
   ).toBeVisible();
+
+  // From the standalone Widget, the Drill-down leads back to it.
+  await page
+    .getByRole('table', { name: 'Pivot' })
+    .getByRole('link', { name: /^Oct 2025, Unclassified: / })
+    .click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=widget/);
+  await page.getByRole('link', { name: 'Back to the Widget' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: widgetName })).toBeVisible();
+});
+
+test("a Donut Widget's legend row opens the Drill-down behind its amount", async ({ page }) => {
+  const suffix = Date.now();
+  const widgetName = `Legend ${suffix}`;
+  const widgetId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Legend bank ${suffix}` });
+    const account = (name: string) =>
+      createAccount(ctx, {
+        bankId: bank.id,
+        name,
+        currency: 'CHF',
+        iban: null,
+        kind: 'current',
+        importFormat: null,
+        openingBalanceMinor: 0,
+      });
+    const rent = await account(`Rent ${suffix}`);
+    const food = await account(`Food ${suffix}`);
+    const today = swissToday();
+    for (const [accountId, amountMinor] of [
+      [rent.id, -75_000],
+      [food.id, -25_000],
+    ] as const) {
+      await createManualTransaction(ctx, {
+        accountId,
+        bookingDate: addDays(today, -3),
+        amountMinor,
+        description: `Legend spend ${suffix}`,
+      });
+    }
+    const widget = await createWidget(ctx, {
+      name: widgetName,
+      query: {
+        dateRange: { kind: 'fixed', from: addDays(today, -10), to: today },
+        rows: 'account',
+        columns: null,
+        filters: { accountIds: [rent.id, food.id] },
+      },
+      visualisation: 'donut',
+    });
+    return widget.id;
+  });
+
+  await page.goto(`/widgets/${widgetId}`);
+  const legend = page.getByRole('list', { name: `${widgetName} legend` });
+  const foodRow = legend.getByRole('link', { name: new RegExp(`Food ${suffix}`) });
+  await expect(foodRow).toContainText('CHF -250.00');
+
+  // From the keyboard: focus the row and follow it.
+  await foodRow.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/widgets\/drill\?/);
+  await expect(page.getByRole('main')).toContainText('CHF -250.00');
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).locator('tbody tr'),
+  ).toHaveCount(1);
 });
 
 test('old Reports links redirect to the Widgets pages, keeping the query', async ({ page }) => {

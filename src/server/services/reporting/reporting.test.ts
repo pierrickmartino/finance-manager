@@ -8,7 +8,13 @@ import { createCategory, createCategoryGroup, type Category } from '../categorie
 import { editClassification, splitTransaction, type ClassificationChanges } from '../transactions';
 import { listAccountBalances } from '../accounts/balances';
 import { linkTransfer, splitLineSide, transactionSide, unlinkTransfer } from '../transfers';
-import { listCellTransactions, runWidgetQuery, type CellRef, type WidgetQueryInput } from '.';
+import {
+  listCellTransactions,
+  MEASURES,
+  runWidgetQuery,
+  type CellRef,
+  type WidgetQueryInput,
+} from '.';
 
 const t = setupTestDatabase();
 
@@ -406,25 +412,34 @@ describe('date ranges', () => {
 });
 
 /** Every cell, row total, column total and the grand total equal the sum of their list. */
+/**
+ * Every cell, row total, column total and the grand total of the query, under each measure:
+ * the Drill-down lists exactly the Transactions behind the number (their CHF values add up to
+ * its sum, their count is its count) and its headline value equals the number clicked.
+ */
 async function expectDrillDownConsistent(query: WidgetQueryInput): Promise<void> {
-  const report = await runWidgetQuery(t.ctx, query);
-  const listed = async (cell: CellRef) => {
-    const page = await listCellTransactions(t.ctx, query, { ...cell, pageSize: 200 });
-    const sum = page.transactions.reduce((total, item) => total + item.chfMinor, 0);
-    expect(page.sumChfMinor).toBe(page.total === 0 ? null : sum);
-    expect(page.transactions).toHaveLength(page.total);
-    return page.total === 0 ? null : sum;
-  };
-  for (const [r, row] of report.rows.entries()) {
-    for (const [c, column] of report.columns.entries()) {
-      expect(await listed({ row: row.key, column: column.key })).toBe(report.cells[r]![c]);
+  for (const measure of MEASURES) {
+    const measured = { ...query, measure };
+    const report = await runWidgetQuery(t.ctx, measured);
+    const listed = async (cell: CellRef) => {
+      const page = await listCellTransactions(t.ctx, measured, { ...cell, pageSize: 200 });
+      const sum = page.transactions.reduce((total, item) => total + item.chfMinor, 0);
+      expect(page.measure).toBe(measure);
+      expect(page.sumChfMinor).toBe(page.total === 0 ? null : sum);
+      expect(page.transactions).toHaveLength(page.total);
+      return page.value;
+    };
+    for (const [r, row] of report.rows.entries()) {
+      for (const [c, column] of report.columns.entries()) {
+        expect(await listed({ row: row.key, column: column.key })).toBe(report.cells[r]![c]);
+      }
+      expect(await listed({ row: row.key })).toBe(report.rowTotals[r]);
     }
-    expect(await listed({ row: row.key })).toBe(report.rowTotals[r]);
+    for (const [c, column] of report.columns.entries()) {
+      expect(await listed({ column: column.key })).toBe(report.columnTotals[c]);
+    }
+    expect(await listed({})).toBe(report.total);
   }
-  for (const [c, column] of report.columns.entries()) {
-    expect(await listed({ column: column.key })).toBe(report.columnTotals[c]);
-  }
-  expect(await listed({})).toBe(report.total);
 }
 
 describe('drill down into a cell', () => {
@@ -455,6 +470,38 @@ describe('drill down into a cell', () => {
     ]);
   });
 
+  it('gives an average its sum, its count and the periods it divides by', async () => {
+    const { groceries } = await dataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: null, columns: 'category', measure: 'average' },
+      { column: groceries.id },
+    );
+
+    // Groceries over Q1: -194.00 in January and -80.00 in February, over 3 months.
+    expect(page).toMatchObject({
+      measure: 'average',
+      averagePer: 'month',
+      total: 4,
+      sumChfMinor: -27400,
+      periodCount: 3,
+      value: -9133,
+    });
+  });
+
+  it('counts each Transaction once for the count measure', async () => {
+    await dataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: 'month', measure: 'count' },
+      { row: '2025-01' },
+    );
+
+    expect(page).toMatchObject({ measure: 'count', total: 4, value: 4 });
+  });
+
   it('adds up, cell by cell, for month × Category', async () => {
     await dataset();
     await expectDrillDownConsistent({ dateRange: Q1_2025, rows: 'month', columns: 'category' });
@@ -469,6 +516,24 @@ describe('drill down into a cell', () => {
       columns: 'quarter',
       includeCapital: true,
     });
+  });
+
+  it('counts the Transactions it leaves out for want of an FX rate, within the cell', async () => {
+    await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month' } as const;
+
+    const all = await listCellTransactions(t.ctx, query, {});
+    const january = await listCellTransactions(t.ctx, query, { row: '2025-01' });
+    const february = await listCellTransactions(t.ctx, query, { row: '2025-02' });
+
+    // The EUR Transaction of 5 January predates every EUR rate.
+    expect(all.unconvertedCount).toBe(1);
+    expect(january).toMatchObject({
+      unconvertedCount: 1,
+      span: { from: '2025-01-01', to: '2025-01-31' },
+    });
+    expect(february.unconvertedCount).toBe(0);
+    expect(all.span).toEqual({ from: '2025-01-01', to: '2025-03-31' });
   });
 
   it('pages through a cell, newest first', async () => {
@@ -490,6 +555,65 @@ describe('drill down into a cell', () => {
     expect(page.sumChfMinor).toBe(564949);
     const pastTheEnd = await listCellTransactions(t.ctx, { dateRange: Q1_2025 }, { page: 9 });
     expect(pastTheEnd).toMatchObject({ total: 7, sumChfMinor: 564949, transactions: [] });
+  });
+
+  it('lists every key of an axis but the ones named, as "Other" folds them', async () => {
+    const { salary, groceries } = await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month', columns: 'category' } as const;
+    const report = await runWidgetQuery(t.ctx, query);
+    const others = (values: (number | null)[], left: (string | null)[]) =>
+      values
+        .filter((_, c) => !left.includes(report.columns[c]!.key))
+        .reduce<number>((total, value) => total + (value ?? 0), 0);
+
+    const january = await listCellTransactions(t.ctx, query, {
+      row: '2025-01',
+      column: { except: [salary.id] },
+    });
+    const allYear = await listCellTransactions(t.ctx, query, {
+      column: { except: [groceries.id, null] },
+    });
+
+    expect(january.value).toBe(others(report.cells[0]!, [salary.id]));
+    expect(january.transactions.reduce((total, item) => total + item.chfMinor, 0)).toBe(
+      january.value,
+    );
+    // The "none" bucket (Unclassified) is named too, so its -30.00 stays out.
+    expect(allYear.value).toBe(others(report.columnTotals, [groceries.id, null]));
+    expect(allYear.transactions.every((item) => item.category !== null)).toBe(true);
+  });
+
+  it('narrows the dates of "every month but these" to the months it keeps', async () => {
+    await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month', measure: 'average' } as const;
+    const report = await runWidgetQuery(t.ctx, { ...query, measure: 'sum' });
+
+    const page = await listCellTransactions(t.ctx, query, { row: { except: ['2025-03'] } });
+
+    expect(page.span).toEqual({ from: '2025-01-01', to: '2025-02-28' });
+    expect(page.periodCount).toBe(2);
+    expect(page.sumChfMinor).toBe(report.rowTotals[0]! + report.rowTotals[1]!);
+  });
+
+  it('subtotals each whole period, newest first, when asked for a change', async () => {
+    const { restaurants } = await dataset();
+    const query = { dateRange: Q1_2025, rows: 'month', columns: 'category' } as const;
+
+    const page = await listCellTransactions(t.ctx, query, {
+      row: { except: [] },
+      column: restaurants.id,
+      withPeriodSubtotals: true,
+      pageSize: 1,
+    });
+    const plain = await listCellTransactions(t.ctx, query, { column: restaurants.id });
+
+    // Restaurants only spent in February (EUR -50.00 → -46.51); the other months count as 0.
+    expect(page.subtotals).toEqual([
+      { key: '2025-03', sumChfMinor: 0 },
+      { key: '2025-02', sumChfMinor: -4651 },
+      { key: '2025-01', sumChfMinor: 0 },
+    ]);
+    expect(plain.subtotals).toBeNull();
   });
 });
 
@@ -558,6 +682,24 @@ describe('split Transactions', () => {
       [2000, -15000, -12000, -3000],
     ]);
     expect(report.total).toBe(564949 - 930 - 25000);
+  });
+
+  it("says how many of a split Transaction's lines a Drill-down counts", async () => {
+    const { shopping } = await splitDataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: 'month', columns: 'categoryGroupType' },
+      { row: '2025-03', column: 'expense' },
+    );
+
+    // The Groceries and Restaurants lines are expense; the Salary line is income.
+    expect(
+      page.transactions.map((item) => [item.id, item.chfMinor, item.countedLineCount]),
+    ).toEqual([[shopping, -27000, 2]]);
+    expect(page.transactions[0]!.splitLines).toHaveLength(3);
+    const unsplit = await listCellTransactions(t.ctx, { dateRange: Q1_2025 }, { pageSize: 200 });
+    expect(unsplit.transactions.find((item) => item.id !== shopping)?.countedLineCount).toBeNull();
   });
 
   it('counts each line under its own Category group type, leaving Capital lines out', async () => {

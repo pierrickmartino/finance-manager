@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { chapterKind, chapterStory, type StoryWidget } from '@/lib/reporting/story';
+import { FigureLink } from '../figure-link';
 import { PeriodBars, RankedBars, ShareBand, TrendChart } from './chapter-charts';
 import { STORY } from './palette';
 import { useIsStill } from './stillness';
@@ -100,9 +101,9 @@ export function Chapter({ chapter, index, isUnruled = false }: ChapterProps) {
         {story.lead && (
           <p className="mt-6 font-display text-4xl leading-[1.05] tracking-tight md:text-5xl">
             {story.lead.headline}
-            <span className="mt-2 block" style={{ color: STORY.accent }}>
-              {story.lead.detail}
-            </span>
+            <FigureLink href={story.lead.href} className="mt-2 block underline-offset-4">
+              <span style={{ color: STORY.accent }}>{story.lead.detail}</span>
+            </FigureLink>
           </p>
         )}
         {story.facts.length > 0 && (
@@ -112,7 +113,9 @@ export function Chapter({ chapter, index, isUnruled = false }: ChapterProps) {
                 <dt className="text-sm" style={{ color: STORY.muted }}>
                   {fact.label}
                 </dt>
-                <dd className="text-lg tabular-nums">{fact.value}</dd>
+                <dd className="text-lg tabular-nums">
+                  <FigureLink href={fact.href}>{fact.value}</FigureLink>
+                </dd>
               </div>
             ))}
           </dl>

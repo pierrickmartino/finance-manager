@@ -1,5 +1,8 @@
+import type { TimeAxis } from '@/server/services/reporting/query';
 import type { Visualisation, WidgetSource } from '@/server/services/reporting';
-import { toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
+import { divideRounded } from './average';
+import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
+import { averaged, drillUrl } from './drill-link';
 
 /**
  * The Dashboard Story: a Dashboard told top to bottom, one chapter per Widget, under a hero
@@ -30,9 +33,19 @@ export interface StoryHero {
   sources: { value: string; flow: string | null };
 }
 
+/**
+ * What a chapter says. Each figure links to its Drill-down (GLOSSARY), whose working gives the
+ * same figure; null where it has none (Account balances).
+ */
 export interface ChapterStory {
-  lead: { headline: string; detail: string } | null;
-  facts: { label: string; value: string }[];
+  lead: { headline: string; detail: string; href: string | null } | null;
+  facts: StoryFact[];
+}
+
+export interface StoryFact {
+  label: string;
+  value: string;
+  href: string | null;
 }
 
 type Money = (minor: number) => string;
@@ -121,7 +134,7 @@ export function shareParts(
 
 /**
  * Each series' total over the period (e.g. per Category), largest magnitude first, with its
- * drill-down. The folded "Other" series links nowhere.
+ * drill-down ("Other": every column but the ranked ones).
  */
 export function rankedTotals(
   data: ChartSource,
@@ -132,10 +145,7 @@ export function rankedTotals(
     .map((series) => {
       const [group, name] = splitPath(series.label);
       const value = sum(chart.points.map((point) => point.values[series.key] ?? 0));
-      const isFolded =
-        chart.series.length < data.columns.length && series.slot === chart.series.length - 1;
-      const href = isFolded ? null : (data.hrefs.columnTotals[series.slot] ?? null);
-      return { group, name, value, href };
+      return { group, name, value, href: chart.totalHrefs[series.key] ?? null };
     })
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, limit);
@@ -149,6 +159,7 @@ function shareStory(data: ChartSource, money: Money): ChapterStory {
     lead: {
       headline: `${Math.round(top.share * 100)}% sits in ${top.label}`,
       detail: `${money(top.value)} of ${money(whole)}`,
+      href: top.href,
     },
     facts: [],
   };
@@ -156,7 +167,7 @@ function shareStory(data: ChartSource, money: Money): ChapterStory {
 
 /** The words for the period each row stands for, so a yearly Widget doesn't speak of months. */
 interface PeriodWords {
-  noun: string;
+  noun: TimeAxis;
   adjective: string;
 }
 
@@ -164,7 +175,25 @@ const PERIOD_WORDS = {
   month: { noun: 'month', adjective: 'Monthly' },
   quarter: { noun: 'quarter', adjective: 'Quarterly' },
   year: { noun: 'year', adjective: 'Yearly' },
-} as const satisfies Record<string, PeriodWords>;
+} as const satisfies Record<TimeAxis, PeriodWords>;
+
+/**
+ * The average of the row totals over the rows, rounded as the engine rounds, and its
+ * Drill-down: the whole range as an average per row period. The link is there only where the
+ * Drill-down works out that same number: a sum whose rows are those periods.
+ */
+function periodAverage(
+  data: ChartSource,
+  period: TimeAxis,
+): { value: number; href: string | null } {
+  const value = divideRounded(sum(data.rowTotals.map((total) => total ?? 0)), data.rows.length);
+  const byPeriod = periodSumDrill(data);
+  const isAverageOfRange = byPeriod?.period === period;
+  return {
+    value,
+    href: byPeriod && isAverageOfRange ? drillUrl(averaged(byPeriod.drill, period), {}) : null,
+  };
+}
 
 /** The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`); months by default. */
 function periodWords(data: ChartSource): PeriodWords {
@@ -179,24 +208,32 @@ function periodWords(data: ChartSource): PeriodWords {
 function flowStory(data: ChartSource, money: Money): ChapterStory {
   const { noun } = periodWords(data);
   const chart = toSeriesChart(data);
-  const columnOf = (sign: 1 | -1) =>
+  const slotOf = (sign: 1 | -1) =>
     chart.series.find((series) =>
       chart.points.some((point) => sign * (point.values[series.key] ?? 0) > 0),
-    )!.key;
-  const [incomeKey, expenseKey] = [columnOf(1), columnOf(-1)];
-  const income = chart.points.map((point) => point.values[incomeKey] ?? 0);
-  const expense = chart.points.map((point) => -(point.values[expenseKey] ?? 0));
+    )!.slot;
+  const [incomeSlot, expenseSlot] = [slotOf(1), slotOf(-1)];
+  const income = data.rows.map((_, r) => data.cells[r]?.[incomeSlot] ?? 0);
+  const expense = data.rows.map((_, r) => -(data.cells[r]?.[expenseSlot] ?? 0));
   const most = (values: number[]) => values.indexOf(Math.max(...values));
+  const [inMost, outMost] = [most(income), most(expense)];
   const month = (index: number) => chart.points[index]!.label;
-  const kept = Math.round((sum(income) - sum(expense)) / chart.points.length);
+  const cellHref = (r: number, slot: number) => data.hrefs.cells[r]?.[slot] ?? null;
+  // Income and expense together net to what was kept: the rows' totals.
+  const kept = periodAverage(data, noun);
   return {
     lead: {
-      headline: `Most came in: ${month(most(income))}`,
-      detail: money(income[most(income)]!),
+      headline: `Most came in: ${month(inMost)}`,
+      detail: money(income[inMost]!),
+      href: cellHref(inMost, incomeSlot),
     },
     facts: [
-      { label: `Most went out: ${month(most(expense))}`, value: money(expense[most(expense)]!) },
-      { label: `Kept per ${noun}, on average`, value: money(kept) },
+      {
+        label: `Most went out: ${month(outMost)}`,
+        value: money(expense[outMost]!),
+        href: cellHref(outMost, expenseSlot),
+      },
+      { label: `Kept per ${noun}, on average`, value: money(kept.value), href: kept.href },
     ],
   };
 }
@@ -205,9 +242,8 @@ function flowStory(data: ChartSource, money: Money): ChapterStory {
 function periodStory(widget: StoryWidget, data: ChartSource, money: Money): ChapterStory {
   const { noun, adjective } = periodWords(data);
   const chart = toSeriesChart(data);
-  const totals = chart.points.map((point) =>
-    sum(Object.values(point.values).map((value) => value ?? 0)),
-  );
+  // The rows' own totals, as their Drill-downs add up (summing cells counts a Tag twice).
+  const totals = data.rows.map((_, r) => data.rowTotals[r] ?? 0);
   const isSpending = totals.every((value) => value <= 0);
   // Spending is negative: rank by magnitude so "heaviest" means the most spent.
   const ranked = isSpending ? totals.map(Math.abs) : totals;
@@ -218,22 +254,26 @@ function periodStory(widget: StoryWidget, data: ChartSource, money: Money): Chap
   const [topLabel, lowLabel] = isSpending
     ? [`Heaviest ${noun}`, `Lightest ${noun}`]
     : [`Best net ${noun}`, `Weakest ${noun}`];
-  const average = Math.round(sum(totals) / totals.length);
-  const month = (index: number) => chart.points[index]!.label;
-  const peak = { label: `${topLabel}: ${month(top)}`, value: money(totals[top]!) };
+  const average = periodAverage(data, noun);
+  const period = (index: number, label: string): StoryFact => ({
+    label: `${label}: ${chart.points[index]!.label}`,
+    value: money(totals[index]!),
+    href: data.hrefs.rowTotals[index] ?? null,
+  });
+  const peak = period(top, topLabel);
   const facts = [
-    { label: `${lowLabel}: ${month(low)}`, value: money(totals[low]!) },
-    { label: `${adjective} average`, value: money(average) },
+    period(low, lowLabel),
+    { label: `${adjective} average`, value: money(average.value), href: average.href },
   ];
 
   if (chapterKind(widget) === 'ranking') {
     const [leader] = rankedTotals(data, 1);
     return {
-      lead: { headline: `${leader!.name} leads`, detail: money(leader!.value) },
+      lead: { headline: `${leader!.name} leads`, detail: money(leader!.value), href: leader!.href },
       facts: [peak, ...facts],
     };
   }
-  return { lead: { headline: peak.label, detail: peak.value }, facts };
+  return { lead: { headline: peak.label, detail: peak.value, href: peak.href }, facts };
 }
 
 /** What a chapter says about its Widget, in plain language; the chart shows the rest. */

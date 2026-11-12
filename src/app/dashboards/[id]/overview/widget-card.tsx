@@ -8,6 +8,7 @@ import { TILE_CLASS } from '@/components/surface';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { monthFlows, periodValues } from '@/lib/reporting/overview';
 import { chapterKind, chapterStory, rankedTotals, shareParts } from '@/lib/reporting/story';
+import { FigureLink } from '../figure-link';
 import type { StoryChapter } from '../story/chapter';
 import { DotMatrix, HeatmapGrid, MonthBars, TickList, type TickItem } from './marks';
 import { DonutRing } from './ring';
@@ -100,7 +101,9 @@ export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps
         {story.lead && (
           <>
             <p className="mt-1 text-sm text-muted">{story.lead.headline}</p>
-            <p className="font-display text-3xl tracking-tight tabular-nums">{story.lead.detail}</p>
+            <p className="font-display text-3xl tracking-tight tabular-nums">
+              <FigureLink href={story.lead.href}>{story.lead.detail}</FigureLink>
+            </p>
           </>
         )}
       </div>
@@ -114,7 +117,9 @@ export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps
           {story.facts.map((fact) => (
             <div key={fact.label}>
               <dt className="text-xs text-muted">{fact.label}</dt>
-              <dd className="text-sm tabular-nums">{fact.value}</dd>
+              <dd className="text-sm tabular-nums">
+                <FigureLink href={fact.href}>{fact.value}</FigureLink>
+              </dd>
             </div>
           ))}
         </dl>

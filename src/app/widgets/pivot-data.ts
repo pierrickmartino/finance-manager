@@ -1,12 +1,22 @@
 import type { ChartSource } from '@/lib/reporting/chart-data';
-import { cellToParams, queryToParams } from '@/lib/reporting/widget-params';
+import { drillUrl, type DrillTarget } from '@/lib/reporting/drill-link';
+import { EDITOR, type DrillOrigin } from '@/lib/reporting/drill-origin';
 import type { CellRef, ReportHeader, ReportTable } from '@/server/services/reporting';
 
-/** The drill-down page of one cell of a Widget query. */
-export function drillHref(report: ReportTable, cell: CellRef): string {
-  const params = queryToParams(report.query);
-  for (const [name, value] of cellToParams(cell)) params.set(name, value);
-  return `/widgets/drill?${params}`;
+/**
+ * Where a report's values link: `hrefOf` gives each cell's link, and `drill` is where the
+ * values a chart works out itself (an "Other", an average) drill down, or null when they
+ * don't (Account balances).
+ */
+export interface PivotLinks {
+  hrefOf: (cell: CellRef) => string;
+  drill: DrillTarget | null;
+}
+
+/** Every value's Drill-down, opened from `origin`. */
+export function drillLinks(report: ReportTable, origin: DrillOrigin = EDITOR): PivotLinks {
+  const drill = { query: report.query, origin };
+  return { hrefOf: (cell) => drillUrl(drill, cell), drill };
 }
 
 /** The cell key for a header, or undefined (the whole axis) when the report has no such axis. */
@@ -15,12 +25,13 @@ function key(axis: unknown, header: ReportHeader): string | null | undefined {
 }
 
 /**
- * The engine's table with a link for every value: by default its drill-down to the
- * Transactions; `hrefOf` links elsewhere (the Account balances link to each Account).
+ * The engine's table with a link for every value: by default its Drill-down from the editor;
+ * `links` link elsewhere (a Drill-down from a Dashboard or a Widget with `drillLinks`, or the
+ * Account balances to each Account).
  */
 export function toPivotData(
   report: ReportTable,
-  hrefOf: (cell: CellRef) => string = (cell) => drillHref(report, cell),
+  { hrefOf, drill }: PivotLinks = drillLinks(report),
 ): ChartSource {
   const row = (header: ReportHeader) => key(report.query.rows, header);
   const column = (header: ReportHeader) => key(report.query.columns, header);
@@ -40,5 +51,6 @@ export function toPivotData(
       columnTotals: report.columns.map((c) => hrefOf({ column: column(c) })),
       total: hrefOf({}),
     },
+    drill,
   };
 }

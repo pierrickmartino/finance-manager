@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ReportHeader } from '@/server/services/reporting';
+import type { ReportAxis, ReportHeader } from '@/server/services/reporting';
 import type { ChartSource } from './chart-data';
+import { cellFromParams, DEFAULT_WIDGET_QUERY } from './widget-params';
 import {
   chapterKind,
   chapterStory,
@@ -33,7 +34,26 @@ function source(rows: string[], columns: string[], cells: (number | null)[][]): 
       columnTotals: columns.map((c) => `column:${c}`),
       total: 'total',
     },
+    drill: null,
   };
+}
+
+/** The same source, its Drill-downs those of a query with these axes. */
+function drillable(data: ChartSource, rows: ReportAxis, columns: ReportAxis): ChartSource {
+  return {
+    ...data,
+    drill: { query: { ...DEFAULT_WIDGET_QUERY, rows, columns }, origin: { kind: 'editor' } },
+  };
+}
+
+/** The cell a Drill-down link opens, and the measure it opens it with. */
+function drillOf(href: string | null | undefined) {
+  const params = new URL(href!, 'http://localhost').searchParams;
+  const grouped: Record<string, string | string[]> = {};
+  for (const name of new Set(params.keys())) {
+    grouped[name] = name.endsWith('Not') ? params.getAll(name) : params.get(name)!;
+  }
+  return { cell: cellFromParams(grouped), measure: params.get('measure'), per: params.get('per') };
 }
 
 function widget(overrides: Partial<StoryWidget> & Pick<StoryWidget, 'data'>): StoryWidget {
@@ -153,18 +173,43 @@ describe('chapterStory', () => {
   it('names the leading Category, then the heaviest and lightest months of spending', () => {
     const story = chapterStory(spending, money);
 
-    expect(story.lead).toEqual({ headline: 'Rent leads', detail: 'CHF -6000' });
+    expect(story.lead).toEqual({
+      headline: 'Rent leads',
+      detail: 'CHF -6000',
+      href: 'column:Home › Rent',
+    });
     expect(story.facts).toEqual([
-      { label: 'Heaviest month: Feb', value: 'CHF -3400' },
-      { label: 'Lightest month: Mar', value: 'CHF -2400' },
-      { label: 'Monthly average', value: 'CHF -2800' },
+      { label: 'Heaviest month: Feb', value: 'CHF -3400', href: 'row:Feb' },
+      { label: 'Lightest month: Mar', value: 'CHF -2400', href: 'row:Mar' },
+      // Without Drill-downs (the fixture has none), an average has nowhere to open.
+      { label: 'Monthly average', value: 'CHF -2800', href: null },
     ]);
+  });
+
+  it('opens the monthly average on the whole range, as an average per month', () => {
+    const monthly = drillable(
+      source(['2025-01', '2025-02', '2025-03'], ['Rent'], [[-500_00], [-900_00], [-701_00]]),
+      'month',
+      'category',
+    );
+
+    const average = chapterStory(widget({ data: monthly }), money).facts.at(-1)!;
+
+    expect(average.value).toBe('CHF -700.33');
+    expect(drillOf(average.href)).toEqual({ cell: { page: 1 }, measure: 'average', per: 'month' });
+  });
+
+  it('rounds the average half away from zero, as the Drill-down does', () => {
+    // -5 over 2 months is -2.5: the engine's average is -3.
+    const odd = widget({ data: source(['2025-01', '2025-02'], ['Net'], [[-2], [-3]]) });
+
+    expect(chapterStory(odd, String).facts.at(-1)?.value).toBe('-3');
   });
 
   it('rounds the monthly average to whole minor units, as the formatter requires', () => {
     const odd = widget({ data: source(['Jan', 'Feb', 'Mar'], ['Net'], [[100], [100], [101]]) });
 
-    expect(chapterStory(odd, String).facts.at(-1)).toEqual({
+    expect(chapterStory(odd, String).facts.at(-1)).toMatchObject({
       label: 'Monthly average',
       value: '100',
     });
@@ -177,18 +222,51 @@ describe('chapterStory', () => {
 
     const story = chapterStory(netFlow, money);
 
-    expect(story.lead).toEqual({ headline: 'Best net month: Mar', detail: 'CHF 800' });
-    expect(story.facts[0]).toEqual({ label: 'Weakest month: Feb', value: 'CHF 100' });
+    expect(story.lead).toEqual({
+      headline: 'Best net month: Mar',
+      detail: 'CHF 800',
+      href: 'row:Mar',
+    });
+    expect(story.facts[0]).toEqual({
+      label: 'Weakest month: Feb',
+      value: 'CHF 100',
+      href: 'row:Feb',
+    });
   });
 
   it('tells income vs. expense by its biggest months in and out, not by the net', () => {
     const story = chapterStory(incomeVsExpense, money);
 
-    expect(story.lead).toEqual({ headline: 'Most came in: Mar', detail: 'CHF 1500' });
+    expect(story.lead).toEqual({
+      headline: 'Most came in: Mar',
+      detail: 'CHF 1500',
+      href: 'cell:Mar/Income',
+    });
     expect(story.facts).toEqual([
-      { label: 'Most went out: Feb', value: 'CHF 900' },
-      { label: 'Kept per month, on average', value: 'CHF 433.33' },
+      { label: 'Most went out: Feb', value: 'CHF 900', href: 'cell:Feb/Expense' },
+      { label: 'Kept per month, on average', value: 'CHF 433.33', href: null },
     ]);
+  });
+
+  it('opens what was kept per month on income and expense together, averaged per month', () => {
+    const flow = drillable(
+      source(
+        ['2025-01', '2025-02'],
+        ['income', 'expense'],
+        [
+          [1000_00, -600_00],
+          [1000_00, -900_00],
+        ],
+      ),
+      'month',
+      'categoryGroupType',
+    );
+
+    const kept = chapterStory(widget({ visualisation: 'stacked_bar', data: flow }), money)
+      .facts[1]!;
+
+    expect(kept.value).toBe('CHF 250');
+    expect(drillOf(kept.href)).toEqual({ cell: { page: 1 }, measure: 'average', per: 'month' });
   });
 
   it('leaves months without any spending out of the lightest month', () => {
@@ -199,7 +277,7 @@ describe('chapterStory', () => {
 
     const story = chapterStory(quiet, money);
 
-    expect(story.facts[0]).toEqual({ label: 'Lightest month: Mar', value: 'CHF -300' });
+    expect(story.facts[0]).toMatchObject({ label: 'Lightest month: Mar', value: 'CHF -300' });
   });
 
   it('speaks of years when the Widget rows are years', () => {
@@ -210,8 +288,8 @@ describe('chapterStory', () => {
 
     const story = chapterStory(yearly, money);
 
-    expect(story.lead).toEqual({ headline: 'Heaviest year: 2024', detail: 'CHF -900' });
-    expect(story.facts).toEqual([
+    expect(story.lead).toMatchObject({ headline: 'Heaviest year: 2024', detail: 'CHF -900' });
+    expect(story.facts).toMatchObject([
       { label: 'Lightest year: 2023', value: 'CHF -500' },
       { label: 'Yearly average', value: 'CHF -700' },
     ]);
@@ -224,8 +302,8 @@ describe('chapterStory', () => {
 
     const story = chapterStory(quarterly, money);
 
-    expect(story.lead).toEqual({ headline: 'Best net quarter: 2025-Q1', detail: 'CHF 400' });
-    expect(story.facts).toEqual([
+    expect(story.lead).toMatchObject({ headline: 'Best net quarter: 2025-Q1', detail: 'CHF 400' });
+    expect(story.facts).toMatchObject([
       { label: 'Weakest quarter: 2025-Q2', value: 'CHF 100' },
       { label: 'Quarterly average', value: 'CHF 250' },
     ]);
@@ -246,13 +324,16 @@ describe('chapterStory', () => {
 
     const story = chapterStory(yearly, money);
 
-    expect(story.facts.at(-1)).toEqual({ label: 'Kept per year, on average', value: 'CHF 400' });
+    expect(story.facts.at(-1)).toMatchObject({
+      label: 'Kept per year, on average',
+      value: 'CHF 400',
+    });
   });
 
   it('says how much of the whole sits in the largest part', () => {
     const story = chapterStory(balances, money);
 
-    expect(story.lead).toEqual({
+    expect(story.lead).toMatchObject({
       headline: '60% sits in UBS · Savings',
       detail: 'CHF 6000 of CHF 10000',
     });
@@ -272,13 +353,18 @@ describe('rankedTotals', () => {
       { group: 'Living', name: 'Groceries', value: -1300_00, href: 'column:Living › Groceries' },
     ]);
   });
-  it('gives the folded "Other" series no link', () => {
+  it('opens the folded "Other" series on every column but the ranked ones', () => {
     const columns = Array.from({ length: 9 }, (_, index) => `C${index}`);
-    const data = source(['Jan'], columns, [columns.map((_, index) => -(index + 1) * 100)]);
+    const data = drillable(
+      source(['2025-01'], columns, [columns.map((_, index) => -(index + 1) * 100)]),
+      'month',
+      'category',
+    );
 
     const other = rankedTotals(data, 9).find((item) => item.name === 'Other');
 
-    expect(other).toEqual({ group: 'Other', name: 'Other', value: -1700, href: null });
+    expect(other).toMatchObject({ group: 'Other', name: 'Other', value: -1700 });
+    expect(drillOf(other!.href).cell).toEqual({ column: { except: columns.slice(0, 7) }, page: 1 });
   });
 });
 

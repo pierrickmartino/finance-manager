@@ -20,6 +20,7 @@ export const SEARCH_FIELDS = [
   'groupType',
   'unclassified',
   'transfer',
+  'fxRate',
 ] as const;
 
 export type SearchValues = Record<(typeof SEARCH_FIELDS)[number], string>;
@@ -77,6 +78,7 @@ export function readTransactionSearch(
     groupType: values.groupType,
     unclassified: values.unclassified === 'true' ? true : undefined,
     transfer: values.transfer,
+    fxRate: values.fxRate,
     amountMin: amountMin ?? undefined,
     amountMax: amountMax ?? undefined,
     page,

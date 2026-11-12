@@ -1,14 +1,20 @@
 import 'server-only';
 import { notFound } from 'next/navigation';
 import type { ChartSource } from '@/lib/reporting/chart-data';
+import type { DrillOrigin } from '@/lib/reporting/drill-origin';
 import { queryToParams } from '@/lib/reporting/widget-params';
 import type { ServiceContext } from '@/server/services/context';
 import { getDashboard, type DashboardWithWidgets } from '@/server/services/dashboards';
 import { NotFoundError, ServiceError } from '@/server/services/errors';
-import { runSavedWidget, type CellRef, type Widget } from '@/server/services/reporting';
+import {
+  runSavedWidget,
+  type CellRef,
+  type ReportTable,
+  type Widget,
+} from '@/server/services/reporting';
 import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
-import { toPivotData } from '../widgets/pivot-data';
+import { drillLinks, toPivotData, type PivotLinks } from '../widgets/pivot-data';
 import type { RecentActivity } from './[id]/overview/overview-row';
 import type { BoardChapter } from './[id]/overview/widget-board';
 
@@ -21,15 +27,32 @@ export interface WidgetView {
 
 /** An Account balance links to its Account, the total to the Accounts page. */
 export function balanceHref(cell: CellRef): string {
-  return cell.row ? `/accounts/${cell.row}` : '/accounts';
+  return typeof cell.row === 'string' ? `/accounts/${cell.row}` : '/accounts';
 }
 
-/** Runs a Widget into what its visualisation draws (drill-down links included). */
+/** Account balances aren't Transactions: no Drill-down, only their Accounts. */
+export const BALANCE_LINKS: PivotLinks = { hrefOf: balanceHref, drill: null };
+
+/** Where a saved Widget's values link: its Drill-downs from `origin`, or the balances' Accounts. */
+export function widgetLinks(
+  widget: Pick<Widget, 'source'>,
+  report: ReportTable,
+  origin: DrillOrigin,
+): PivotLinks {
+  return widget.source === 'account_balances' ? BALANCE_LINKS : drillLinks(report, origin);
+}
+
+/**
+ * Runs a Widget into what its visualisation draws, Drill-down links included: they lead back
+ * to its Dashboard's Story, or to the Widget's own page when it stands alone.
+ */
 export async function loadWidgetView(ctx: ServiceContext, widget: Widget): Promise<WidgetView> {
   try {
     const report = await runSavedWidget(ctx, widget);
-    const data =
-      widget.source === 'account_balances' ? toPivotData(report, balanceHref) : toPivotData(report);
+    const origin: DrillOrigin = widget.dashboardId
+      ? { kind: 'dashboard', id: widget.dashboardId }
+      : { kind: 'widget', id: widget.id };
+    const data = toPivotData(report, widgetLinks(widget, report, origin));
     return { data, unconvertedCount: report.unconvertedCount, error: null };
   } catch (error: unknown) {
     if (error instanceof ServiceError) {

@@ -14,7 +14,7 @@ import {
   type Widget,
 } from '@/server/services/reporting';
 import { NotFoundError } from '@/server/services/errors';
-import { balanceHref } from '../../dashboards/load';
+import { BALANCE_LINKS } from '../../dashboards/load';
 import { saveWidgetAction } from '../actions';
 import { loadQueryFormLists, loadReport } from '../load';
 import { AutoSubmitForm } from '../auto-submit-form';
@@ -86,7 +86,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   if (widget) hidden.widget = widget.id;
   else if (dashboardId) hidden.dashboard = dashboardId;
   const title = widget?.name ?? 'New Widget';
-  const pivot = report ? toPivotData(report, isBalances ? balanceHref : undefined) : null;
+  const pivot = report ? toPivotData(report, isBalances ? BALANCE_LINKS : undefined) : null;
   const backHref = dashboardId ? `/dashboards/${dashboardId}/edit` : '/widgets';
 
   const visualisationSection = (

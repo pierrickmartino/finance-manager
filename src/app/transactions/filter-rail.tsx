@@ -100,6 +100,15 @@ export function FilterRail({ values, lists }: FilterRailProps) {
           />
           Unclassified only
         </label>
+        <label className="flex items-center gap-2 self-end py-1.5 text-sm">
+          <input
+            type="checkbox"
+            name="fxRate"
+            value="missing"
+            defaultChecked={values.fxRate === 'missing'}
+          />
+          No FX rate yet
+        </label>
       </div>
       <p className="text-xs text-muted">
         Amounts are signed: expenses are negative, so &quot;Amount to&quot; 0 lists only expenses.
