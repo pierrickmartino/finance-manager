@@ -1,9 +1,9 @@
 import { z } from 'zod';
+import { GRID_COLUMNS, MAX_WIDGET_HEIGHT } from '@/lib/reporting/board';
 import type { WidgetLayout } from '../reporting';
 
-/** The bounds a stored layout is checked against (from the former grid: 12 columns, rows). */
-export const GRID_COLUMNS = 12;
-export const MAX_WIDGET_HEIGHT = 40;
+/** The bounds a stored layout is checked against: the board's (ADR-0010). */
+export { GRID_COLUMNS, MAX_WIDGET_HEIGHT };
 const MAX_ROW = 10_000;
 
 /** The size stored with a new Widget. */

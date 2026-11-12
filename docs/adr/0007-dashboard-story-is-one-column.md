@@ -1,5 +1,5 @@
 ---
-status: accepted (its "one column" view superseded by ADR-0009)
+status: accepted (its "one column" view superseded by ADR-0009; "Widgets have no size, a Dashboard is an ordered list" superseded by ADR-0010)
 ---
 
 # A Dashboard is one column of chapters, edited in place

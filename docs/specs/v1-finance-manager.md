@@ -158,7 +158,7 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 ### Dashboards and Widgets
 
 97. As the user, I want several named Dashboards, so that I can keep separate views (overview, health costs, a vacation).
-98. As the user, I want to add, remove, move and resize Widgets by drag-and-drop on a Dashboard, so that each Dashboard shows what I care about. _Superseded by ADR-0007: Widgets are added, removed and reordered in place in the Dashboard Story; they have no size._
+98. As the user, I want to add, remove, move and resize Widgets by drag-and-drop on a Dashboard, so that each Dashboard shows what I care about. _Resolved by ADR-0010 (after ADR-0007 had set it aside): each Widget's card has a place and a size on a 12-column board, dragged and resized in Edit mode._
 99. As the user, I want each Widget to be a saved query with its own filters (Account, Category group, Category, Payee, Tag, Category group type, Currency), so that Widgets are independent.
 100. As the user, I want a Widget's date range to be either live (for example "last 12 months", "year to date") or fixed (from–to), so that some Widgets move with time and others don't.
 101. As the user, I want live ranges to cover complete periods only, with the current partial period shown separately or flagged, so that this month doesn't look like a sudden drop.

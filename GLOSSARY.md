@@ -131,8 +131,12 @@ A Widget that sits on no Dashboard. Adding it to a Dashboard places a copy there
 _Avoid_: Report, saved report
 
 **Dashboard**:
-A named, user-ordered set of Widgets, read as its Dashboard Story and edited in place as an ordered list of chapters (Edit mode). Each Widget sits on at most one Dashboard.
+A named set of Widgets laid out on a board of 12 columns and fixed-height rows, each Widget with its own place and size (ADR-0010). It is read as its Dashboard Story and arranged in place in Edit mode. Each Widget sits on at most one Dashboard.
 
 **Dashboard Story**:
-A Dashboard read as a grid of cards: an overview row (the headline amount, the latest month's insight, the most recent Transactions), then one card per Widget in the Dashboard's order, left to right and top to bottom, each saying in words what its chart shows. Edit mode shows the same Widgets as one column of chapters, in that order.
+A Dashboard read as a grid of cards: an overview row (the headline amount, the latest month's insight, the most recent Transactions), then the board, with one card per Widget drawn at the Widget's place and size, each saying in words what its chart shows. On narrow screens the cards read as one column, top to bottom then left to right.
 _Avoid_: Report, overview page, presentation
+
+**Edit mode**:
+The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History.
+_Avoid_: Layout editor, design mode
