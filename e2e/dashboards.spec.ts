@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { cardBox, dragCard, resizeCard } from './support/dashboards';
+import { cardBox, dragCard, nextAction, resizeCard } from './support/dashboards';
 
 /** The chapter titles, in the order the page tells them. */
 function chapterTitles(page: Page) {
@@ -195,6 +195,53 @@ test('a Widget added from Add Widget goes in the first free spot; removing one l
   const addedAfter = await box(widgetName);
   expect(addedAfter.x).toBeCloseTo(addedBefore.x, 0);
   expect(addedAfter.y).toBeCloseTo(addedBefore.y, 0);
+});
+
+test('below lg Edit mode is one column with up/down moves that swap places on the grid', async ({
+  page,
+}) => {
+  const original = 'Account balances in CHF';
+  const copy = `${original} (copy)`;
+  await createDashboard(page, `Narrow ${Date.now()}`);
+  await addBalances(page);
+  await page
+    .getByRole('form', { name: `Duplicate ${original}` })
+    .getByRole('button')
+    .click();
+  await expect(chapterTitles(page)).toHaveText([original, copy]);
+  const wide = { original: await cardBox(page, original), copy: await cardBox(page, copy) };
+  expect(wide.copy.x).toBeGreaterThan(wide.original.x + wide.original.width);
+
+  // One column in reading order, with no drag or resize handles.
+  await page.setViewportSize({ width: 600, height: 900 });
+  const [first, second] = [await cardBox(page, original), await cardBox(page, copy)];
+  expect(second.y).toBeGreaterThan(first.y + first.height);
+  expect(second.x).toBeCloseTo(first.x, 0);
+  await expect(page.getByRole('button', { name: `Move ${original}`, exact: true })).toHaveCount(0);
+  await expect(page.locator('.react-resizable-handle')).toHaveCount(0);
+
+  // The first card can't go up, the last can't go down.
+  const moveButton = (name: string, direction: 'up' | 'down') =>
+    page.getByRole('button', { name: `Move ${name} ${direction}`, exact: true });
+  await expect(moveButton(original, 'up')).toBeDisabled();
+  await expect(moveButton(copy, 'down')).toBeDisabled();
+
+  // Up swaps the copy with its original; focus stays on the arrow that moved it.
+  const saved = nextAction(page);
+  await moveButton(copy, 'up').click();
+  expect((await saved).ok()).toBe(true);
+  await expect(chapterTitles(page)).toHaveText([copy, original]);
+  await expect(moveButton(copy, 'up')).toBeFocused();
+  await expect(moveButton(copy, 'up')).toBeDisabled();
+
+  // At lg, after a reload, the two have swapped places on the grid.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.reload();
+  await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  const swapped = { original: await cardBox(page, original), copy: await cardBox(page, copy) };
+  expect(swapped.copy.x).toBeCloseTo(wide.original.x, 0);
+  expect(swapped.original.x).toBeCloseTo(wide.copy.x, 0);
+  expect(swapped.copy.y).toBeCloseTo(swapped.original.y, 0);
 });
 
 test('changing a Widget to a chart that needs more room grows its card on the Story', async ({

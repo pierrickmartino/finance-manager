@@ -138,5 +138,5 @@ A Dashboard read as a grid of cards: an overview row (the headline amount, the l
 _Avoid_: Report, overview page, presentation
 
 **Edit mode**:
-The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History.
+The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History. On narrow screens the board is one column in reading order, with no dragging or resizing: a card moves up or down instead, swapping places with its neighbour.
 _Avoid_: Layout editor, design mode

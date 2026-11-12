@@ -9,6 +9,7 @@ import {
   MAX_WIDGET_HEIGHT,
   minimumSize,
   readingOrder,
+  swapInReadingOrder,
   type Cell,
 } from '@/lib/reporting/board';
 import {
@@ -18,7 +19,7 @@ import {
   type BoardChapter,
 } from '../overview/widget-board';
 import { WidgetCard } from '../overview/widget-card';
-import { CardToolbar, DRAG_HANDLE_CLASS } from './card-toolbar';
+import { CardToolbar, DRAG_HANDLE_CLASS, type MoveDirection } from './card-toolbar';
 import { createPushDownCompactor, layoutCells } from './push-down-compactor';
 import { useLayoutSave } from './use-layout-save';
 
@@ -134,25 +135,38 @@ function GridEditor({ chapters, cells, onChange }: GridEditorProps) {
   );
 }
 
-/** The board as the Dashboard Story draws it, each card with its toolbar. */
-function StaticBoard({
-  chapters,
-  isDraggable,
-}: {
+interface StaticBoardProps {
+  /** In reading order. */
   chapters: EditorChapter[];
   isDraggable: boolean;
-}) {
+  /** Given, each card gets up/down moves that swap it with its reading-order neighbour. */
+  onMove?: (id: string, direction: MoveDirection) => void;
+}
+
+/** The board as the Dashboard Story draws it, each card with its toolbar. */
+function StaticBoard({ chapters, isDraggable, onMove }: StaticBoardProps) {
+  const last = chapters.length - 1;
   return (
     <WidgetBoard
       chapters={chapters}
-      toolbar={(chapter) => (
-        <CardToolbar
-          widgetId={chapter.id}
-          name={chapter.name}
-          editHref={chapter.editHref}
-          isDraggable={isDraggable}
-        />
-      )}
+      toolbar={(chapter) => {
+        const index = chapters.indexOf(chapter);
+        return (
+          <CardToolbar
+            widgetId={chapter.id}
+            name={chapter.name}
+            editHref={chapter.editHref}
+            isDraggable={isDraggable}
+            moves={
+              onMove && {
+                canMoveUp: index > 0,
+                canMoveDown: index < last,
+                onMove: (direction) => onMove(chapter.id, direction),
+              }
+            }
+          />
+        );
+      }}
     />
   );
 }
@@ -166,7 +180,8 @@ interface EditBoardProps {
 /**
  * Edit mode's board (GLOSSARY: Edit mode). At `lg` and above it is the grid, dragged and
  * resized in place; each drop or resize saves the whole board at once, without History, with a
- * quiet status and an inline error. Below `lg` it is the Story's one column, not draggable.
+ * quiet status and an inline error. Below `lg` it is the Story's one column, not draggable:
+ * each card moves up or down instead, swapping places with its reading-order neighbour.
  */
 export function EditBoard({ dashboardId, chapters }: EditBoardProps) {
   const isWide = useIsWide();
@@ -190,7 +205,11 @@ export function EditBoard({ dashboardId, chapters }: EditBoardProps) {
       {isWide ? (
         <GridEditor chapters={chapters} cells={cells} onChange={change} />
       ) : (
-        <StaticBoard chapters={placedChapters(chapters, cells)} isDraggable={false} />
+        <StaticBoard
+          chapters={placedChapters(chapters, cells)}
+          isDraggable={false}
+          onMove={(id, direction) => change(swapInReadingOrder(cells, id, direction))}
+        />
       )}
     </div>
   );
