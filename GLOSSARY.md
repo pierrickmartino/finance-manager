@@ -63,7 +63,7 @@ _Avoid_: Bank balance
 A Statement balance entered by hand, for Accounts whose exports contain no balances.
 
 **Completeness check**:
-The standing check that every imported Account's data is current, has no Gaps, and adds up to its latest Statement balance.
+The standing check that every imported Account's data is current and has no Gaps, and that every Account with Transactions adds up to its latest Statement balance.
 _Avoid_: Data health, import check, freshness
 
 **Gap**:

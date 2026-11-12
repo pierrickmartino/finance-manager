@@ -161,6 +161,15 @@ export async function listBalanceSnapshots(
   return result.rows;
 }
 
+/** Each Account's newest Balance snapshot, checked against the computed balance. */
+export async function listLatestBalanceSnapshots(ctx: ServiceContext): Promise<SnapshotCheck[]> {
+  const result = await ctx.db.query<SnapshotCheck>(
+    `SELECT DISTINCT ON ("accountId") * FROM (${SELECT_CHECK}) checks
+     ORDER BY "accountId", date DESC`,
+  );
+  return result.rows;
+}
+
 /** Every Balance snapshot that disagrees with its Account's computed balance, newest first. */
 export async function listSnapshotMismatches(ctx: ServiceContext): Promise<SnapshotCheck[]> {
   const result = await ctx.db.query<SnapshotCheck>(

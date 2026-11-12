@@ -1,3 +1,4 @@
+import { WARNING_NOTICE_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { RateStatus } from '@/server/services/fx';
 
@@ -12,10 +13,7 @@ export function RateStatusNotice({ status, fmt }: { status: RateStatus; fmt: For
         {status.latestRateDate && ` · newest ECB rate ${fmt.date(status.latestRateDate)}`}
       </p>
       {status.isStale && (
-        <p
-          role="alert"
-          className="rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning"
-        >
+        <p role="alert" className={WARNING_NOTICE_CLASS}>
           FX rates are stale: {status.staleReason}. CHF values may be out of date.
         </p>
       )}

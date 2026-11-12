@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { PILL_BUTTON_CLASS } from '@/components/surface';
 import type { StoryChapter } from '../story/chapter';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
@@ -9,6 +10,11 @@ interface DashboardOverviewProps {
   editHref: string;
   chapters: StoryChapter[];
   recent: RecentActivity[];
+  /**
+   * Shown between the title and the grid, outside the Story itself: the home Dashboard's
+   * Completeness check (ADR-0008). A server component, so it stays server-rendered.
+   */
+  notice?: ReactNode;
 }
 
 /**
@@ -21,6 +27,7 @@ export function DashboardOverview({
   editHref,
   chapters,
   recent,
+  notice,
 }: DashboardOverviewProps) {
   return (
     <div className="flex flex-col gap-5">
@@ -35,6 +42,7 @@ export function DashboardOverview({
           Edit Dashboard
         </Link>
       </header>
+      {notice}
       {chapters.length === 0 ? (
         <p className="py-16 text-lg text-muted">
           No Widgets yet.{' '}
