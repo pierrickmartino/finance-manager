@@ -87,8 +87,15 @@ export async function checkCompleteness(
     listAccounts(ctx).then((all) => all.filter((account) => account.archivedAt === null)),
     loadCoverage(ctx.db),
   ]);
+  // Gaps are a freshness problem, so only Accounts with an Import format are searched for them.
+  const freshnessCoverage = new Map(
+    accounts.flatMap((account) => {
+      const imports = coverageById.get(account.id);
+      return account.importFormat !== null && imports ? [[account.id, imports] as const] : [];
+    }),
+  );
   const [gapsById, mismatches] = await Promise.all([
-    findGaps(ctx.db, coverageById),
+    findGaps(ctx.db, freshnessCoverage),
     findMismatches(ctx, accounts, coverageById),
   ]);
   const entries = accounts

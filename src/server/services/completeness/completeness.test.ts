@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
-import { archiveAccount, createAccount, type Account, type AccountInput } from '../accounts';
+import {
+  archiveAccount,
+  createAccount,
+  updateAccount,
+  type Account,
+  type AccountInput,
+} from '../accounts';
 import { createBank } from '../banks';
 import { recordBalanceSnapshot } from '../balance-snapshots';
 import { commitImport, previewImport, undoImport, type Import } from '../imports';
@@ -317,6 +323,37 @@ describe('mismatch', () => {
     });
   });
 
+  it("still checks an Import's closing balance after the Account's Import format is removed", async () => {
+    const account = await bcgeAccount({ name: 'BCGE savings' });
+    // A statement with no entries, opening and closing at zero: the Account has no Transactions,
+    // so its Import format can still be removed afterwards.
+    await importFile(account, emptyStatement(account, '2025-10-01', '2025-10-31'));
+    await updateAccount(t.ctx, account.id, { ...accountInputOf(account), importFormat: null });
+    await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-10-15',
+      amountMinor: -300,
+      description: 'Fee',
+    });
+
+    const entries = await checkCompleteness(t.ctx, { today: '2025-11-10' });
+
+    expect(entries).toEqual([
+      {
+        account: {
+          id: account.id,
+          name: 'BCGE savings',
+          bankName: 'BCGE BCGE savings',
+          currency: 'CHF',
+        },
+        dataEnd: null,
+        daysSince: null,
+        isFreshnessChecked: false,
+        problems: [{ kind: 'mismatch', differenceMinor: -300, statementDate: '2025-10-31' }],
+      },
+    ]);
+  });
+
   it('lists a manual-only Account only when its Balance snapshot drifts, and never as Stale', async () => {
     const cash = await bcgeAccount({ name: 'BCGE cash', iban: null, importFormat: null });
     await createManualTransaction(t.ctx, {
@@ -404,6 +441,40 @@ describe('mismatch', () => {
 });
 
 /** A CAMT file for `account` covering `from` to `to`, with one entry booked on `from`. */
+/** A CHF CAMT.053 statement for `account` with no entries, opening and closing at zero. */
+function emptyStatement(
+  account: Account,
+  from: string,
+  to: string,
+): { fileName: string; content: Uint8Array } {
+  const balance = (code: string, date: string): string =>
+    `<Bal><Tp><CdOrPrtry><Cd>${code}</Cd></CdOrPrtry></Tp><Amt Ccy="CHF">0.00</Amt>` +
+    `<CdtDbtInd>CRDT</CdtDbtInd><Dt><Dt>${date}</Dt></Dt></Bal>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08">
+  <BkToCstmrStmt><Stmt>
+    <FrToDt><FrDtTm>${from}T00:00:00</FrDtTm><ToDtTm>${to}T23:59:59</ToDtTm></FrToDt>
+    <Acct><Id><IBAN>${account.iban}</IBAN></Id><Ccy>CHF</Ccy></Acct>
+    ${balance('OPBD', from)}
+    ${balance('CLBD', to)}
+  </Stmt></BkToCstmrStmt>
+</Document>`;
+  return { fileName: 'empty.xml', content: new TextEncoder().encode(xml) };
+}
+
+function accountInputOf(account: Account): AccountInput {
+  return {
+    bankId: account.bankId,
+    name: account.name,
+    currency: account.currency,
+    iban: account.iban,
+    kind: account.kind,
+    importFormat: account.importFormat,
+    openingBalanceMinor: account.openingBalanceMinor,
+    openingDate: account.openingDate,
+  };
+}
+
 function periodFile(
   account: Account,
   from: string,

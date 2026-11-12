@@ -6,7 +6,7 @@ export interface DaySpan {
   to: string;
 }
 
-/** One committed Import of a checked Account: what it covers and the balance it closes on. */
+/** One committed Import of a non-archived Account: what it covers and the balance it closes on. */
 export interface ImportCoverage {
   accountId: string;
   /** Its statement start, or else its earliest Transaction date; null when it has neither. */
@@ -18,9 +18,10 @@ export interface ImportCoverage {
 }
 
 /**
- * Each committed Import of a non-archived Account with an Import format, with its coverage: its
- * statement period, a missing start or end falling back to that Import's earliest or latest
- * Transaction date. Undone Imports cover nothing, so they are left out.
+ * Each committed Import of a non-archived Account, with its coverage: its statement period, a
+ * missing start or end falling back to that Import's earliest or latest Transaction date. Undone
+ * Imports cover nothing, so they are left out. Accounts whose Import format was removed keep
+ * their Imports here, so their closing balances are still checked for a mismatch.
  */
 const SELECT_COVERAGE = `
   SELECT i.account_id AS "accountId",
@@ -34,9 +35,9 @@ const SELECT_COVERAGE = `
     SELECT min(booking_date) AS first, max(booking_date) AS last
     FROM "transaction" WHERE import_id = i.id
   ) t
-  WHERE i.undone_at IS NULL AND a.archived_at IS NULL AND a.import_format IS NOT NULL`;
+  WHERE i.undone_at IS NULL AND a.archived_at IS NULL`;
 
-/** The committed Imports of every checked Account, grouped by Account id. */
+/** The committed Imports of every non-archived Account, grouped by Account id. */
 export async function loadCoverage(db: Queryable): Promise<Map<string, ImportCoverage[]>> {
   const result = await db.query<ImportCoverage>(SELECT_COVERAGE);
   return Map.groupBy(result.rows, (row) => row.accountId);
