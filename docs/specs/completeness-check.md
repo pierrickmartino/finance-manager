@@ -8,13 +8,13 @@ Every Import is reconciled when I preview it, but nothing tells me later that my
 
 ## Solution
 
-A Completeness check runs whenever I open the home Dashboard and shows its result as a compact notice above the Hero (ADR-0008). For each imported Account it shows the day its data ends and how many days ago that was. It flags an Account that is Stale, has a Gap, or no longer adds up to its latest Statement balance. When everything is fine, the notice is a single neutral line. When anything is wrong, it opens on its own, uses the `warning` token, and links each problem to the Account it concerns.
+A Completeness check runs whenever I open the home Dashboard and shows its result as a compact notice above the Dashboard's grid of cards (ADR-0008). For each imported Account it shows the day its data ends and how many days ago that was. It flags an Account that is Stale, has a Gap, or no longer adds up to its latest Statement balance. When everything is fine, the notice is a single neutral line. When anything is wrong, it opens on its own, uses the `warning` token, and links each problem to the Account it concerns.
 
 ## User Stories
 
 ### Where it appears
 
-1. As the user, I want the home Dashboard to show a Completeness check above its Hero, so that I see whether my data can be trusted before I read any report.
+1. As the user, I want the home Dashboard to show a Completeness check above its grid of cards, so that I see whether my data can be trusted before I read any report.
 2. As the user, I want the Completeness check only on the Dashboard that the home page opens, so that my other Dashboards stay uncluttered.
 3. As the user, I want the Completeness check to stay outside the Dashboard Story, so that I cannot delete, reorder or copy it like a Widget.
 4. As the user, I want the Completeness check to reflect my data as it is when the page loads, so that a fix I just made shows up on my next visit.
@@ -70,7 +70,7 @@ A Completeness check runs whenever I open the home Dashboard and shows its resul
 
 ## Implementation Decisions
 
-- **Placement (ADR-0008).** A server-rendered notice above the Hero, rendered only on the Dashboard the home route redirects to. It is not a Widget, has no Widget source, and leaves the Dashboard Story of ADR-0007 unchanged.
+- **Placement (ADR-0008).** A server-rendered notice above the Dashboard's grid of cards, rendered only on the Dashboard the home route redirects to. It is not a Widget, has no Widget source, and leaves the Dashboard's cards (ADR-0009) unchanged.
 - **New Completeness check service.** It is a deep module with one entry point, `checkCompleteness(ctx, { today })`. It returns one entry per checked Account: the Account's identity and Currency, the data end date (or none), days since, and a list of problems. Problems are a tagged union: `mismatch` (difference in minor units and the Statement balance date), `gap` (first and last day), `stale`, `never_imported`. The caller passes `today`; the service never reads the clock.
 - **No stored state.** The service computes everything on each request from Accounts, Imports, Transactions and Balance snapshots. There are no schema changes.
 - **Scope.** Freshness and Gaps cover non-archived Accounts that have an Import format. The mismatch check covers every non-archived Account that has at least one Transaction and at least one Statement balance.

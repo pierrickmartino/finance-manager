@@ -23,6 +23,8 @@ export const CARD_CLASS = 'rounded-xl border border-rule bg-surface shadow-sm';
  */
 export const WARNING_NOTICE_CLASS =
   'rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning';
+/** A card of the Dashboard's grid: rounder and roomier than CARD_CLASS. */
+export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 
 // Buttons --------------------------------------------------------------------------------------
 
@@ -41,6 +43,9 @@ export const SECONDARY_BUTTON_CLASS =
 /** The compact secondary button of dense lists and rows. */
 export const SMALL_BUTTON_CLASS =
   'rounded-md border border-rule-strong bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-sunken disabled:opacity-40';
+/** A rounded action on the Dashboard's tiles (Edit Dashboard, See the Transactions). */
+export const PILL_BUTTON_CLASS =
+  'rounded-full border border-rule bg-surface px-4 py-1.5 text-sm font-medium text-ink shadow-sm hover:bg-sunken';
 /** A quiet action that sits inside a row or toolbar. */
 export const GHOST_BUTTON_CLASS =
   'rounded-md px-2 py-1 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink disabled:opacity-30';

@@ -79,7 +79,7 @@ function EntryRow({ entry, fmt }: { entry: CompletenessEntry; fmt: Formatter }) 
 }
 
 /**
- * The Completeness check's notice above the home Dashboard's Hero (ADR-0008). One neutral line
+ * The Completeness check's notice above the home Dashboard's grid of cards (ADR-0008). One neutral line
  * when every Account is current, its list collapsed; open, as a warning notice announced as an
  * alert when any Account needs attention, with only the problem rows in the warning token. A
  * native disclosure: no client script.

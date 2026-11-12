@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { NAV_GROUPS, findCurrentPage, isActive } from './navigation';
+import { NAV_GROUPS, PRIMARY_LINKS, findCurrentPage, isActive, overflowGroups } from './navigation';
 
 describe('isActive', () => {
   test('matches the exact path', () => {
@@ -57,5 +57,44 @@ describe('NAV_GROUPS', () => {
       ]),
     );
     expect(hrefs).toHaveLength(12);
+  });
+});
+
+describe('PRIMARY_LINKS', () => {
+  test('are the four pills of the top bar, in order', () => {
+    expect(PRIMARY_LINKS.map((link) => link.href)).toEqual([
+      '/dashboards',
+      '/transactions',
+      '/accounts',
+      '/categories',
+    ]);
+  });
+});
+
+describe('overflowGroups', () => {
+  test('keeps every other destination, in its group, for the More menu', () => {
+    const groups = overflowGroups();
+
+    expect(groups.map((group) => group.label)).toEqual(['Overview', 'Money', 'Organize', 'System']);
+    expect(groups.flatMap((group) => group.links.map((link) => link.href))).toEqual([
+      '/widgets',
+      '/unclassified',
+      '/payees',
+      '/tags',
+      '/rules',
+      '/banks',
+      '/history',
+      '/settings',
+    ]);
+  });
+
+  test('together with the pills, covers every destination exactly once', () => {
+    const hrefs = [
+      ...PRIMARY_LINKS.map((link) => link.href),
+      ...overflowGroups().flatMap((group) => group.links.map((link) => link.href)),
+    ];
+    const all = NAV_GROUPS.flatMap((group) => group.links.map((link) => link.href));
+
+    expect([...hrefs].sort()).toEqual([...all].sort());
   });
 });

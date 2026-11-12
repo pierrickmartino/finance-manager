@@ -153,7 +153,7 @@ export function StoryEditor({
           style={{ background: STORY.paper, color: STORY.ink, colorScheme: 'light' }}
         >
           <header
-            className="sticky top-14 z-10 flex flex-wrap items-center justify-between gap-3 border-b py-3"
+            className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b py-3"
             style={{ background: STORY.paper, borderColor: STORY.rule }}
           >
             <div className="flex items-baseline gap-3">

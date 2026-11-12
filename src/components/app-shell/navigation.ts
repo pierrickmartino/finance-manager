@@ -65,3 +65,20 @@ export function findCurrentPage(pathname: string): CurrentPage | null {
   }
   return null;
 }
+
+/** The top bar's pills: the pages used most. Every other page sits in the More menu. */
+const PRIMARY_HREFS = ['/dashboards', '/transactions', '/accounts', '/categories'];
+
+const ALL_LINKS = NAV_GROUPS.flatMap((group) => group.links);
+
+export const PRIMARY_LINKS: NavLink[] = PRIMARY_HREFS.flatMap((href) =>
+  ALL_LINKS.filter((link) => link.href === href),
+);
+
+/** The More menu: every page that isn't a pill, still in its group. */
+export function overflowGroups(): NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    label: group.label,
+    links: group.links.filter((link) => !PRIMARY_HREFS.includes(link.href)),
+  })).filter((group) => group.links.length > 0);
+}

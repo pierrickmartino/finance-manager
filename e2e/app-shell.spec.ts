@@ -1,102 +1,80 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-test('the sidebar groups every page and marks the current one', async ({ page }) => {
+test('the top bar marks the current page among its pills, and the hero says where you are', async ({
+  page,
+}) => {
   await page.goto('/transactions');
 
   const nav = page.getByRole('navigation', { name: 'Main' });
-  for (const group of ['Overview', 'Money', 'Organize', 'System']) {
-    await expect(nav.getByRole('list', { name: group })).toBeVisible();
+  for (const name of ['Dashboards', 'Transactions', 'Accounts', 'Categories']) {
+    await expect(nav.getByRole('link', { name })).toBeVisible();
   }
   await expect(nav.getByRole('link', { name: 'Transactions' })).toHaveAttribute(
     'aria-current',
     'page',
   );
   await expect(page.getByTestId('breadcrumb')).toHaveText('Money/Transactions');
+  await expect(page.getByText(/^Good (morning|afternoon|evening)\.$/)).toBeVisible();
 
-  await nav.getByRole('link', { name: 'Payees' }).click();
+  await nav.getByRole('link', { name: 'Accounts' }).click();
 
-  await expect(page).toHaveURL(/\/payees$/);
-  await expect(nav.getByRole('link', { name: 'Payees' })).toHaveAttribute('aria-current', 'page');
+  await expect(page).toHaveURL(/\/accounts$/);
+  await expect(nav.getByRole('link', { name: 'Accounts' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: 'Transactions' })).not.toHaveAttribute('aria-current');
-  await expect(page.getByTestId('breadcrumb')).toHaveText('Organize/Payees');
+  await expect(page.getByTestId('breadcrumb')).toHaveText('Money/Accounts');
 });
 
-test.describe('collapsing the sidebar', () => {
-  const sidebar = (page: Page) => page.getByTestId('sidebar');
-  const pin = (page: Page) => page.getByRole('button', { name: 'Pin menu' });
+test('More holds every other page, by group, and closes when a link is followed', async ({
+  page,
+}) => {
+  await page.goto('/transactions');
+  const more = page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'More' });
 
-  test('unpinning leaves a rail that peeks open on hover and is remembered', async ({ page }) => {
-    await page.goto('/transactions');
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'pinned');
-    await expect(pin(page)).toHaveAttribute('aria-pressed', 'true');
+  await more.click();
+  await expect(more).toHaveAttribute('aria-expanded', 'true');
+  for (const group of ['Overview', 'Money', 'Organize', 'System']) {
+    await expect(page.getByRole('list', { name: group })).toBeVisible();
+  }
 
-    await pin(page).click();
-    await page.mouse.move(900, 400);
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'rail');
-    await expect(pin(page)).toBeHidden();
+  await page.getByRole('list', { name: 'Organize' }).getByRole('link', { name: 'Payees' }).click();
 
-    // Every link stays reachable by name from the rail, and shows its icon.
-    const nav = page.getByRole('navigation', { name: 'Main' });
-    await expect(nav.getByRole('link', { name: 'Payees' }).locator('svg')).toBeVisible();
-    await nav.getByRole('link', { name: 'Payees' }).hover();
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'peeking');
-    await expect(pin(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page).toHaveURL(/\/payees$/);
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('breadcrumb')).toHaveText('Organize/Payees');
 
-    await page.mouse.move(900, 400);
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'rail');
+  await more.click();
+  await expect(
+    page.getByRole('list', { name: 'Organize' }).getByRole('link', { name: 'Payees' }),
+  ).toHaveAttribute('aria-current', 'page');
+  await page.keyboard.press('Escape');
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+  await expect(more).toBeFocused();
+});
 
-    await page.reload();
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'rail');
+test("the hero's actions lead to the Accounts to import into and the unclassified inbox", async ({
+  page,
+}) => {
+  await page.goto('/categories');
 
-    await nav.getByRole('link', { name: 'Payees' }).hover();
-    await pin(page).click();
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'pinned');
-    await page.reload();
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'pinned');
-  });
+  await page.getByRole('link', { name: 'Review unclassified' }).click();
+  await expect(page).toHaveURL(/\/unclassified$/);
 
-  test('following a link from the peek closes it', async ({ page }) => {
-    await page.goto('/transactions');
-    await pin(page).click();
-    await page.mouse.move(900, 400);
-
-    const nav = page.getByRole('navigation', { name: 'Main' });
-    await nav.getByRole('link', { name: 'Payees' }).click();
-
-    await expect(page).toHaveURL(/\/payees$/);
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'rail');
-    await expect(nav.getByRole('link', { name: 'Payees' })).toHaveAttribute('aria-current', 'page');
-  });
-
-  test('the keyboard opens the peek on focus and Escape closes it', async ({ page }) => {
-    await page.goto('/transactions');
-    await pin(page).click();
-    await page.mouse.move(900, 400);
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'rail');
-
-    await page
-      .getByRole('navigation', { name: 'Main' })
-      .getByRole('link', { name: 'Accounts' })
-      .focus();
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'peeking');
-
-    await page.keyboard.press('Escape');
-    await expect(sidebar(page)).toHaveAttribute('data-state', 'rail');
-  });
+  await page.getByRole('link', { name: 'Import statement' }).click();
+  await expect(page).toHaveURL(/\/accounts$/);
 });
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('the sidebar is a drawer opened from the top bar', async ({ page }) => {
+  test('every page is in a drawer opened from the top bar', async ({ page }) => {
     await page.goto('/transactions');
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeHidden();
 
     await page.getByRole('button', { name: 'Open menu' }).click();
     const drawer = page.getByRole('dialog', { name: 'Menu' });
-    await drawer.getByRole('link', { name: 'Categories' }).click();
+    await drawer.getByRole('link', { name: 'Payees' }).click();
 
-    await expect(page).toHaveURL(/\/categories$/);
+    await expect(page).toHaveURL(/\/payees$/);
     await expect(drawer).toBeHidden();
 
     await page.getByRole('button', { name: 'Open menu' }).click();
