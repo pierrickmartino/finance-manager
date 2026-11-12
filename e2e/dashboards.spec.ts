@@ -5,6 +5,7 @@ import {
   addWidget,
   createDashboard as createDashboardRecord,
 } from '../src/server/services/dashboards';
+import { addDays, swissToday } from '../src/server/services/fx/dates';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import {
   arrangeCard,
@@ -424,4 +425,69 @@ test('a table Widget shows its rows and columns as a heatmap whose cells open th
   await row.getByRole('link', { name: /: CHF -120\.00$/ }).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?/);
   await expect(page.getByRole('table', { name: 'Cell Transactions' })).toContainText('Heatmap 40');
+});
+
+test("a Donut Widget's card is a ring with the total inside; pointing at a part shows it", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Ring bank ${suffix}` });
+    const account = (name: string) =>
+      createAccount(ctx, {
+        bankId: bank.id,
+        name,
+        currency: 'CHF',
+        iban: null,
+        kind: 'current',
+        importFormat: null,
+        openingBalanceMinor: 0,
+      });
+    const rent = await account(`Rent ${suffix}`);
+    const food = await account(`Food ${suffix}`);
+    const today = swissToday();
+    for (const [accountId, amountMinor] of [
+      [rent.id, -75_000],
+      [food.id, -25_000],
+    ] as const) {
+      await createManualTransaction(ctx, {
+        accountId,
+        bookingDate: addDays(today, -3),
+        amountMinor,
+        description: 'Ring spend',
+      });
+    }
+    const dashboard = await createDashboardRecord(ctx, { name: `Ring ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Spend by Account',
+      query: {
+        dateRange: { kind: 'fixed', from: addDays(today, -10), to: today },
+        rows: 'account',
+        columns: null,
+        filters: { accountIds: [rent.id, food.id] },
+      },
+      visualisation: 'donut',
+    });
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  // The card, not the overview's headline tile, which takes the first Widget's name too.
+  const card = page
+    .getByRole('region', { name: 'Spend by Account', exact: true })
+    .and(page.locator('[aria-labelledby^="chapter-"]'));
+  const hole = card.locator('figure > div').first();
+  await expect(hole).toContainText('Total');
+  await expect(hole).toContainText(/1.000/);
+
+  const rentRow = card.getByRole('link', { name: new RegExp(`Rent ${suffix}`) });
+  await expect(rentRow).toContainText('75%');
+  await expect(card.getByRole('link', { name: new RegExp(`Food ${suffix}`) })).toContainText('25%');
+
+  await rentRow.hover();
+  await expect(hole).toContainText(`Rent ${suffix}`);
+  await expect(hole).toContainText('75%');
+
+  await rentRow.click();
+  await expect(page).toHaveURL(/\/widgets\/drill/);
 });

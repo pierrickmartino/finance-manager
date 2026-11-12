@@ -139,7 +139,7 @@ describe('chapterKind', () => {
   it.each([
     ['a number Widget', widget({ visualisation: 'number', data: spending.data }), 'number'],
     ['Account balances', balances, 'share'],
-    ['a donut', widget({ visualisation: 'donut', data: spending.data }), 'share'],
+    ['a donut', widget({ visualisation: 'donut', data: spending.data }), 'ring'],
     ['a table', widget({ visualisation: 'table', data: spending.data }), 'grid'],
     ['a line', widget({ visualisation: 'line', data: incomeVsExpense.data }), 'trend'],
     ['a stacked bar with two series', incomeVsExpense, 'bars'],
@@ -303,6 +303,7 @@ describe('STORY_SHOWN_AS', () => {
     bars: 'bars',
     ranking: 'ranking',
     number: 'number',
+    ring: 'ring',
   };
 
   it('names the chapter each visualisation becomes', () => {
