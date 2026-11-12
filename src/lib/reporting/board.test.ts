@@ -15,6 +15,7 @@ import {
   readingOrder,
   reorderPlaces,
   sizeKind,
+  swapInReadingOrder,
   threeAcross,
   WIDGET_SIZES,
 } from './board';
@@ -329,5 +330,45 @@ describe('reorderPlaces', () => {
       cell('wide', 0, 3, 12, 4),
     ]);
     expect(findOverlaps(placed)).toEqual([]);
+  });
+});
+
+describe('swapInReadingOrder', () => {
+  it('swaps a card with the next one in reading order by swapping their places', () => {
+    const board = [cell('a', 0, 0, 4, 6), cell('b', 4, 0, 4, 6), cell('c', 8, 0, 4, 3)];
+
+    expect(swapInReadingOrder(board, 'b', 'down')).toEqual([
+      cell('a', 0, 0, 4, 6),
+      cell('b', 8, 0, 4, 6),
+      cell('c', 4, 0, 4, 3),
+    ]);
+  });
+
+  it('swaps a card with the one before it, across rows', () => {
+    const board = [cell('a', 0, 0, 4, 3), cell('b', 8, 0, 4, 3), cell('c', 0, 3, 4, 3)];
+
+    expect(swapInReadingOrder(board, 'c', 'up')).toEqual([
+      cell('a', 0, 0, 4, 3),
+      cell('b', 0, 3, 4, 3),
+      cell('c', 8, 0, 4, 3),
+    ]);
+  });
+
+  it('pushes the card that lands later down, so the swap shows in reading order', () => {
+    const board = [cell('a', 0, 0, 4, 3), cell('b', 4, 0, 8, 6)];
+
+    const swapped = swapInReadingOrder(board, 'a', 'down');
+
+    expect(swapped).toEqual([cell('a', 4, 6, 4, 3), cell('b', 0, 0, 8, 6)]);
+    expect(findOverlaps(swapped)).toEqual([]);
+    expect(readingOrder(swapped).map((c) => c.id)).toEqual(['b', 'a']);
+  });
+
+  it('leaves the board as it is at either end or for an unknown card', () => {
+    const board = [cell('a', 0, 0, 4, 3), cell('b', 4, 0, 4, 3)];
+
+    expect(swapInReadingOrder(board, 'a', 'up')).toEqual(board);
+    expect(swapInReadingOrder(board, 'b', 'down')).toEqual(board);
+    expect(swapInReadingOrder(board, 'z', 'down')).toEqual(board);
   });
 });

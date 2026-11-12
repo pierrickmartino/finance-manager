@@ -1,3 +1,4 @@
+import { isSameOrder, moveBy } from './order';
 import { chapterKind, type ChapterSource } from './story';
 
 /**
@@ -221,6 +222,20 @@ export function reorderPlaces<T extends Cell>(cells: readonly T[], ids: readonly
     return { ...cell, x: Math.min(place.x, GRID_COLUMNS - cell.w), y: place.y };
   });
   return ids[0] === undefined ? swapped : pushDown(swapped, ids[0]);
+}
+
+/**
+ * Card `id` swapped with its neighbour in reading order, before it (`up`) or after it (`down`),
+ * by swapping their places (as `reorderPlaces` does); the board as it is at either end.
+ */
+export function swapInReadingOrder<T extends Cell>(
+  cells: readonly T[],
+  id: string,
+  direction: 'up' | 'down',
+): T[] {
+  const ids = readingOrder(cells).map((cell) => cell.id);
+  const order = moveBy(ids, id, direction === 'up' ? -1 : 1);
+  return isSameOrder(order, ids) ? [...cells] : reorderPlaces(cells, order);
 }
 
 const ACROSS = 3;
