@@ -276,7 +276,7 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 
 ## Out of Scope
 
-- Budgeting of any kind (envelopes, targets, rollover) and forecasting.
+- Budgeting of any kind (envelopes, targets, rollover) and forecasting. The one exception is a Recurring payment's next expected date, which describes its past pattern and is never totalled into future cash flow (see `recurring-payments.md`).
 - AI or LLM features of any kind.
 - Itemised credit card Accounts (the first v2 item); card spending stays a lump sum.
 - ~~Split transactions, so loan and leasing interest isn't tracked separately.~~ Now planned (ADR-0004).
@@ -289,7 +289,7 @@ A self-hosted, single-user web app (Next.js, PostgreSQL, Tailwind, hosted on Rai
 - MT940.
 - A native mobile app; the web UI is responsive but desktop-first.
 - Multiple users or sharing.
-- Recurring or scheduled Transactions.
+- Scheduling or creating Transactions in advance. Recurring payments are only recognised from Transactions already recorded (see `recurring-payments.md`, ADR-0011).
 - Undoing a Rule run.
 - Receipts and attachments.
 - UI translation; English only.
