@@ -112,8 +112,14 @@ An ordered condition-to-action pair that classifies Transactions. For each field
 _Avoid_: Filter, automation
 
 **Recurring payment**:
-One Payee's series of expenses of a similar amount at a regular cadence, recognised from Transactions and Split lines already recorded. A Payee may have several; a price change continues the same series. It is never scheduled or entered in advance.
+One Payee's series of expenses of a similar amount at a regular cadence, recognised from Transactions and Split lines already recorded. A Payee may have several; a price change continues the same series. It is never scheduled or entered in advance. One the user has dismissed stays out of view until restored.
 _Avoid_: Subscription, standing order, regular charge
+
+**Missed**:
+The state of a Recurring payment whose next expected date, plus a grace of a quarter of its cadence, has passed without a charge, while its Account's data reaches past that grace.
+
+**Ended**:
+The state of a Recurring payment with no charge for two full cadences. A later matching charge makes it active again.
 
 ### History
 
