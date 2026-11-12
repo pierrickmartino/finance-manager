@@ -8,7 +8,13 @@ import { createCategory, createCategoryGroup, type Category } from '../categorie
 import { editClassification, splitTransaction, type ClassificationChanges } from '../transactions';
 import { listAccountBalances } from '../accounts/balances';
 import { linkTransfer, splitLineSide, transactionSide, unlinkTransfer } from '../transfers';
-import { listCellTransactions, runWidgetQuery, type CellRef, type WidgetQueryInput } from '.';
+import {
+  listCellTransactions,
+  MEASURES,
+  runWidgetQuery,
+  type CellRef,
+  type WidgetQueryInput,
+} from '.';
 
 const t = setupTestDatabase();
 
@@ -406,25 +412,34 @@ describe('date ranges', () => {
 });
 
 /** Every cell, row total, column total and the grand total equal the sum of their list. */
+/**
+ * Every cell, row total, column total and the grand total of the query, under each measure:
+ * the Drill-down lists exactly the Transactions behind the number (their CHF values add up to
+ * its sum, their count is its count) and its headline value equals the number clicked.
+ */
 async function expectDrillDownConsistent(query: WidgetQueryInput): Promise<void> {
-  const report = await runWidgetQuery(t.ctx, query);
-  const listed = async (cell: CellRef) => {
-    const page = await listCellTransactions(t.ctx, query, { ...cell, pageSize: 200 });
-    const sum = page.transactions.reduce((total, item) => total + item.chfMinor, 0);
-    expect(page.sumChfMinor).toBe(page.total === 0 ? null : sum);
-    expect(page.transactions).toHaveLength(page.total);
-    return page.total === 0 ? null : sum;
-  };
-  for (const [r, row] of report.rows.entries()) {
-    for (const [c, column] of report.columns.entries()) {
-      expect(await listed({ row: row.key, column: column.key })).toBe(report.cells[r]![c]);
+  for (const measure of MEASURES) {
+    const measured = { ...query, measure };
+    const report = await runWidgetQuery(t.ctx, measured);
+    const listed = async (cell: CellRef) => {
+      const page = await listCellTransactions(t.ctx, measured, { ...cell, pageSize: 200 });
+      const sum = page.transactions.reduce((total, item) => total + item.chfMinor, 0);
+      expect(page.measure).toBe(measure);
+      expect(page.sumChfMinor).toBe(page.total === 0 ? null : sum);
+      expect(page.transactions).toHaveLength(page.total);
+      return page.value;
+    };
+    for (const [r, row] of report.rows.entries()) {
+      for (const [c, column] of report.columns.entries()) {
+        expect(await listed({ row: row.key, column: column.key })).toBe(report.cells[r]![c]);
+      }
+      expect(await listed({ row: row.key })).toBe(report.rowTotals[r]);
     }
-    expect(await listed({ row: row.key })).toBe(report.rowTotals[r]);
+    for (const [c, column] of report.columns.entries()) {
+      expect(await listed({ column: column.key })).toBe(report.columnTotals[c]);
+    }
+    expect(await listed({})).toBe(report.total);
   }
-  for (const [c, column] of report.columns.entries()) {
-    expect(await listed({ column: column.key })).toBe(report.columnTotals[c]);
-  }
-  expect(await listed({})).toBe(report.total);
 }
 
 describe('drill down into a cell', () => {
@@ -453,6 +468,38 @@ describe('drill down into a cell', () => {
       ['2025-01-11', 'CA', -10000, 'EUR', -9400, 'Groceries'],
       ['2025-01-10', 'UBS', -12000, 'CHF', -12000, 'Groceries'],
     ]);
+  });
+
+  it('gives an average its sum, its count and the periods it divides by', async () => {
+    const { groceries } = await dataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: null, columns: 'category', measure: 'average' },
+      { column: groceries.id },
+    );
+
+    // Groceries over Q1: -194.00 in January and -80.00 in February, over 3 months.
+    expect(page).toMatchObject({
+      measure: 'average',
+      averagePer: 'month',
+      total: 4,
+      sumChfMinor: -27400,
+      periodCount: 3,
+      value: -9133,
+    });
+  });
+
+  it('counts each Transaction once for the count measure', async () => {
+    await dataset();
+
+    const page = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: 'month', measure: 'count' },
+      { row: '2025-01' },
+    );
+
+    expect(page).toMatchObject({ measure: 'count', total: 4, value: 4 });
   });
 
   it('adds up, cell by cell, for month × Category', async () => {

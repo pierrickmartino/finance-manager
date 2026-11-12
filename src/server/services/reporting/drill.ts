@@ -4,9 +4,16 @@ import { parseInput } from '../errors';
 import { swissToday } from '../fx/dates';
 import { listTransactionsByIds, type TransactionListItem } from '../transactions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../transactions/query';
-import { currenciesInUse } from './engine';
+import { cellPeriodCount, currenciesInUse, measureOf } from './engine';
+import { ALL_HEADER, type ReportHeader } from './headers';
 import { resolveRange } from './periods';
-import { widgetQueryInput, type ReportAxis, type WidgetQueryInput } from './query';
+import {
+  widgetQueryInput,
+  type Measure,
+  type ReportAxis,
+  type TimeAxis,
+  type WidgetQueryInput,
+} from './query';
 import { axisCondition, baseCte, SqlParams } from './sql';
 
 /**
@@ -42,6 +49,13 @@ export interface CellTransaction extends TransactionListItem {
 }
 
 export interface CellTransactionPage {
+  /** The measure of the number drilled into, and the period its `average` divides by. */
+  measure: Measure;
+  averagePer: TimeAxis;
+  /** The number drilled into: it equals the report's value for this cell. */
+  value: number | null;
+  /** The `averagePer` periods in the cell's dates: what its `average` divides the sum by. */
+  periodCount: number;
   transactions: CellTransaction[];
   /** Transactions in the cell, across all pages. */
   total: number;
@@ -73,8 +87,21 @@ export async function listCellTransactions(
   const query = parseInput(widgetQueryInput, queryInput);
   const cell = parseInput(cellInput, cellRef);
   const { page, pageSize } = cell;
-  const empty = { transactions: [], total: 0, sumChfMinor: null, page, pageSize, pageCount: 0 };
   const { range } = resolveRange(query.dateRange, swissToday());
+  const header = (key: string | null | undefined): ReportHeader =>
+    key === undefined ? ALL_HEADER : { key, label: '', isPartial: false };
+  const periodCount = cellPeriodCount(query, range, header(cell.row), header(cell.column));
+  const measured = { measure: query.measure, averagePer: query.averagePer, periodCount };
+  const empty: CellTransactionPage = {
+    ...measured,
+    value: null,
+    transactions: [],
+    total: 0,
+    sumChfMinor: null,
+    page,
+    pageSize,
+    pageCount: 0,
+  };
   if (range.from > range.to) return empty;
 
   const params = new SqlParams();
@@ -116,6 +143,8 @@ export async function listCellTransactions(
   const chf = new Map((items ?? []).map((item) => [item.id, item.chfMinor]));
   const transactions = await listTransactionsByIds(ctx, [...chf.keys()]);
   return {
+    ...measured,
+    value: measureOf(query.measure, { sumMinor, count: total, periods: periodCount }),
     transactions: transactions.map((item) => ({ ...item, chfMinor: chf.get(item.id)! })),
     total,
     sumChfMinor: sumMinor,
