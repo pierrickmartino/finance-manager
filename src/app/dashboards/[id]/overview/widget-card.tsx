@@ -10,6 +10,8 @@ import { monthFlows, periodValues } from '@/lib/reporting/overview';
 import { chapterKind, chapterStory, rankedTotals, shareParts } from '@/lib/reporting/story';
 import type { StoryChapter } from '../story/chapter';
 import { DotMatrix, MonthBars, TickList, type TickItem } from './marks';
+import { usePrototypeVariant } from '@/components/prototype-switcher';
+import { TREND_VARIANTS, TrendPrototype } from './trend-prototype';
 
 /** How many parts a ranking card lists. */
 const RANKING_LIMIT = 6;
@@ -40,6 +42,7 @@ function shareItems(data: ChartSource, money: Money): TickItem[] {
 
 /** The mark that suits the Widget: dots for in and out, bars per period, ticks for parts. */
 function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
+  const variant = usePrototypeVariant(TREND_VARIANTS);
   const { data } = chapter;
   if (!data) return null;
   if (data.rows.length === 0) return <p className="text-muted">No data in this date range yet.</p>;
@@ -59,7 +62,13 @@ function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
       return <TickList items={shareItems(data, money)} />;
     case 'ranking':
       return <TickList items={rankingItems(data, money)} />;
-    case 'trend':
+    case 'trend': {
+      // PROTOTYPE: line-card variants (./trend-prototype.tsx); `current` falls through below.
+      const proto = <TrendPrototype variant={variant} data={data} />;
+      if (variant !== 'current') return proto;
+      const months = monthFlows(data);
+      return months ? <DotMatrix months={months} /> : <MonthBars periods={periodValues(data)} />;
+    }
     case 'bars': {
       const months = monthFlows(data);
       return months ? <DotMatrix months={months} /> : <MonthBars periods={periodValues(data)} />;

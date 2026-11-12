@@ -11,6 +11,7 @@ import { DashboardTabs } from '../tabs';
 import { CompletenessNotice } from './completeness-notice';
 import { DashboardOverview } from './overview/dashboard-overview';
 import { WidgetBoard } from './overview/widget-board';
+import { TrendPrototypeSwitcher } from './overview/trend-prototype';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 
@@ -62,6 +63,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
           </p>
         }
       />
+      {/* PROTOTYPE: line-card variants, see ./overview/trend-prototype.tsx */}
+      <TrendPrototypeSwitcher />
     </section>
   );
 }
