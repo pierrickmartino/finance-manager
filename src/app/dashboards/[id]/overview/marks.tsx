@@ -11,7 +11,7 @@ import {
 } from '@/lib/reporting/overview';
 
 /**
- * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the hero's teal,
+ * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the hero's navy,
  * with the latest full period hatched. Amounts in minor units, shown in CHF.
  */
 
@@ -80,7 +80,7 @@ function DotColumn({ value, max, tone }: { value: number; max: number; tone: str
   );
 }
 
-/** Each period a pair of dot columns: what came in (deep teal) and what went out (light). */
+/** Each period a pair of dot columns: what came in (deep navy) and what went out (light). */
 export function DotMatrix({ months }: { months: MonthFlow[] }) {
   const money = useMoney();
   const max = Math.max(1, ...months.flatMap((month) => [month.income, month.expense]));

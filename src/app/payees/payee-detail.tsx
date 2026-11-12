@@ -35,7 +35,7 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
             {transactionsLabel(transactionCount)}
           </Link>
           {transactionCount === 0 && (
-            <span className="rounded-full bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
+            <span className="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
               Unused
             </span>
           )}

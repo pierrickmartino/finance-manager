@@ -34,7 +34,7 @@ export function TransactionHeader({ transaction, badges, fmt, actions }: Transac
     >
       <span
         aria-hidden="true"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sunken text-lg font-semibold text-ink-soft"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-sunken text-lg font-semibold text-ink-soft"
       >
         {name.slice(0, 1).toUpperCase()}
       </span>
@@ -53,7 +53,7 @@ export function TransactionHeader({ transaction, badges, fmt, actions }: Transac
             {badges.map((badge) => (
               <li
                 key={badge.label}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${TONE_CLASS[badge.tone]}`}
+                className={`rounded-md px-2.5 py-0.5 text-xs font-medium ${TONE_CLASS[badge.tone]}`}
               >
                 {badge.label}
               </li>

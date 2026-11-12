@@ -79,7 +79,7 @@ export function CategoryLabel({ transaction }: { transaction: TransactionListIte
   return (
     <>
       {label}{' '}
-      <span className="rounded-full bg-info-tint px-2 py-0.5 text-xs whitespace-nowrap text-info">
+      <span className="rounded-md bg-info-tint px-2 py-0.5 text-xs whitespace-nowrap text-info">
         {PARTLY_TRANSFER}
       </span>
     </>

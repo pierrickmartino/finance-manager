@@ -112,7 +112,7 @@ export function RuleList({ groups, groupBy, total, selectedId, query, drag }: Ru
                   )}
                   {label}
                 </span>
-                <span className="rounded-full bg-sunken px-2 text-xs tabular-nums text-ink-soft">
+                <span className="rounded-md bg-sunken px-2 text-xs tabular-nums text-ink-soft">
                   {group.rules.length}
                   <span className="sr-only"> Rules</span>
                 </span>

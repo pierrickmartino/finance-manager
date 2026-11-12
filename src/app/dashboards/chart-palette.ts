@@ -7,8 +7,8 @@
  */
 export const CHART_PALETTE = {
   series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
-  text: '#71717a',
-  grid: '#e4e4e7',
+  text: '#66708a',
+  grid: '#e1e5ec',
   surface: '#ffffff',
 } as const;
 

@@ -17,4 +17,4 @@ The overview row is not made of Widgets, as the Completeness check is not (ADR-0
 
 - Each Widget's card picks its mark from its chapter kind: dots in and out for income vs. expense, bars per period for a trend or other bars (the latest full period hatched), a ticked list for a ranking or a share, one number for a number. The sentences are still the chapter's (`chapterStory`).
 - Edit mode stays one still column of chapters, with its move, insert and edit actions; its order is the grid's reading order.
-- The cards draw in the hero's teal; the design system now allows that teal in the Dashboard's cards (docs/design-system.md).
+- The cards draw in the hero's teal; the design system now allows that teal in the Dashboard's cards (docs/design-system.md). Since the "Midnight" restyle the hero is navy, and the cards follow it.

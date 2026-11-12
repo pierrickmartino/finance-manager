@@ -61,7 +61,7 @@ export function NetWorthCard({ chapters }: { chapters: StoryChapter[] }) {
   );
 }
 
-/** One sentence on how the latest full month compares, in the hero's teal. */
+/** One sentence on how the latest full month compares, in the hero's navy. */
 export function InsightCard({ chapters }: { chapters: StoryChapter[] }) {
   const flow = findMonthFlows(chapters);
   const insight = flow ? spendingInsight(flow.months) : null;
@@ -79,7 +79,7 @@ export function InsightCard({ chapters }: { chapters: StoryChapter[] }) {
       </div>
       <Link
         href={flow.href}
-        className="mt-6 self-start rounded-full bg-on-hero px-5 py-2.5 text-sm font-medium text-hero shadow-lg hover:bg-on-hero/90"
+        className="mt-6 self-start rounded-lg bg-on-hero px-5 py-2.5 text-sm font-medium text-hero shadow-lg hover:bg-on-hero/90"
       >
         See the Transactions
       </Link>
@@ -87,7 +87,7 @@ export function InsightCard({ chapters }: { chapters: StoryChapter[] }) {
   );
 }
 
-/** Monogram tones, from the hero's teal and the ink: decoration, never meaning. */
+/** Monogram tones, from the hero's navy and the ink: decoration, never meaning. */
 // Not `bg-hero`: that name is the hero's gradient utility (globals.css), not its flat colour.
 const MONOGRAM_TONES = ['bg-hero-deep', 'bg-hero-mid', 'bg-hero-glow', 'bg-ink-soft'];
 
@@ -121,7 +121,7 @@ export function RecentActivityCard({ recent }: { recent: RecentActivity[] }) {
               >
                 <span
                   aria-hidden
-                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-on-hero ${monogramTone(transaction.name)}`}
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-semibold text-on-hero ${monogramTone(transaction.name)}`}
                 >
                   {transaction.name.charAt(0).toUpperCase()}
                 </span>

@@ -2,39 +2,40 @@
 
 /*
  * Finance Manager design system: the Dashboard Story's style, app-wide (docs/design-system.md).
- * Ink and one vermilion accent on paper, a serif for display, a sans for everything read
- * and operated. Light only, by choice: no dark theme, whatever the system setting.
+ * "Midnight": ink and one amber accent on cool paper under a navy hero; Inter for everything,
+ * Inter Tight for display; small radii. Light only, by choice: no dark theme, whatever the
+ * system setting.
  *
  * Tokens become Tailwind utilities: bg-paper, text-ink, border-rule, text-accent-ink, font-display…
  * Use these, never raw palette classes (zinc-*, emerald-*…), so the look stays in one place.
  */
 @theme {
   /* Neutrals: the page, what sits on it, and the ink written on both. */
-  --color-paper: #fafafa; /* page background */
+  --color-paper: #f7f8fa; /* page background */
   --color-surface: #ffffff; /* cards, inputs, menus */
-  --color-sunken: #f4f4f5; /* hover, selected rows, tracks */
-  --color-rule: #e4e4e7; /* borders and dividers */
-  --color-rule-strong: #d4d4d8; /* control borders */
-  --color-faint: #a1a1aa; /* placeholders, disabled, decorative marks (not body text) */
-  --color-muted: #71717a; /* secondary text: labels, hints, metadata */
-  --color-ink-soft: #52525b; /* tertiary headings, quiet controls */
-  --color-ink: #18181b; /* text and primary buttons */
-  --color-ink-hover: #3f3f46; /* primary button hover */
+  --color-sunken: #eef1f5; /* hover, selected rows, tracks; also behind the page panel */
+  --color-rule: #e1e5ec; /* borders and dividers */
+  --color-rule-strong: #cdd3dd; /* control borders */
+  --color-faint: #a1a9b8; /* placeholders, disabled, decorative marks (not body text) */
+  --color-muted: #66708a; /* secondary text: labels, hints, metadata (AA on paper and sunken) */
+  --color-ink-soft: #46506a; /* tertiary headings, quiet controls */
+  --color-ink: #141a2b; /* text and primary buttons */
+  --color-ink-hover: #2c3550; /* primary button hover */
 
-  /* The accent: vermilion. Fill for marks and large numbers; accent-ink for text and links. */
-  --color-accent: #ff4f1f;
-  --color-accent-ink: #c93a10; /* AA on paper, surface and accent-tint */
-  --color-accent-tint: #fff1ec; /* selected navigation, highlighted rows */
+  /* The accent: amber. The fill is too light for text or controls on white (2:1): use it on the
+     hero and for marks only. accent-ink is for text, links, the focus ring and controls. */
+  --color-accent: #f5a623;
+  --color-accent-ink: #9a5b00; /* AA on paper, surface and accent-tint */
+  --color-accent-tint: #fff5e3; /* selected navigation, highlighted rows */
 
-  /* The hero: the deep-teal band at the top of every signed-in page, and the canvas around the
-     app's frame. Atmosphere only, never meaning: the accent stays vermilion. */
-  --color-hero-deep: #0a2f3c;
-  --color-hero: #0f4352; /* also text on the hero's white buttons (AA) */
-  --color-hero-mid: #1f6577;
-  --color-hero-glow: #3b8597;
-  --color-hero-mist: #a9c7cf;
+  /* The hero: the navy band at the top of every signed-in page. Atmosphere only, never meaning:
+     the accent stays amber. */
+  --color-hero-deep: #0a1630;
+  --color-hero: #13254d; /* also text on the hero's white buttons (AA) */
+  --color-hero-mid: #284a8a;
+  --color-hero-glow: #4f78c4;
+  --color-hero-mist: #b7c7e6;
   --color-on-hero: #ffffff; /* text and outlines on the hero */
-  --color-canvas: #e9ecee; /* behind the app's frame */
 
   /* Meaning, kept apart from the accent: never use these for decoration. */
   --color-positive: #047857;
@@ -47,15 +48,27 @@
   --color-info: #0369a1;
   --color-info-tint: #f0f9ff;
 
-  /* Type: a serif for display (page titles, headline amounts), a sans for the rest. */
-  --font-display: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  /* Type: Inter for everything, Inter Tight for display (page titles, headline amounts). The
+     font files come from next/font in the root layout, which sets --font-inter and
+     --font-inter-tight on <html>. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter-tight), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Corners: small. Cards top out at 10px; buttons and pills at 8px (rounded-lg). Keep
+     rounded-full for things that are round by nature: dots, toggles, progress tracks. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
 }
 
 :root {
   color-scheme: light;
 }
 
-/* The hero's backdrop: deep teal at the top, lit from the top right, fading into the page. */
+/* The hero's backdrop: deep navy at the top, lit from the top right, fading into the page. */
 @utility bg-hero {
   background:
     radial-gradient(120% 90% at 85% 10%, var(--color-hero-glow) 0%, transparent 55%),
@@ -70,7 +83,7 @@
   mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
 }
 
-/* The Dashboard's insight card: the hero's teal, lit from the lower right. */
+/* The Dashboard's insight card: the hero's navy, lit from the lower right. */
 @utility bg-insight {
   background:
     radial-gradient(120% 120% at 100% 100%, var(--color-hero-mist) 0%, transparent 45%),
@@ -78,7 +91,7 @@
     linear-gradient(135deg, var(--color-hero-mid), var(--color-hero-deep));
 }
 
-/* The period a Dashboard card points out (the latest full month): hatched teal. */
+/* The period a Dashboard card points out (the latest full month): hatched navy. */
 @utility bg-hatch {
   background: repeating-linear-gradient(
     135deg,
@@ -91,9 +104,9 @@ body {
   @apply bg-paper text-ink antialiased;
 }
 
-/* One visible focus style everywhere, in the accent. */
+/* One visible focus style everywhere, in the accent's ink (the fill is too light on white). */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
 }
 
