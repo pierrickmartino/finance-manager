@@ -77,6 +77,11 @@ export function periodsIn(span: DateSpan, unit: TimeAxis): string[] {
   return keys;
 }
 
+/** How many periods of `unit` overlap the span (0 for none): what an `average` divides by. */
+export function periodCount(span: DateSpan | null, unit: TimeAxis): number {
+  return span ? periodsIn(span, unit).length : 0;
+}
+
 /** The overlap of two spans, or null when they don't overlap. */
 export function intersect(a: DateSpan, b: DateSpan): DateSpan | null {
   const from = a.from > b.from ? a.from : b.from;

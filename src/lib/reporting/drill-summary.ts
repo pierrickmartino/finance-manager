@@ -1,7 +1,7 @@
 import type { CellTransactionPage } from '@/server/services/reporting/drill';
-import type { TimeAxis, WidgetQuery } from '@/server/services/reporting/query';
-import { includesCapital } from '@/server/services/reporting/sql';
+import type { WidgetQuery } from '@/server/services/reporting/query';
 import { divideRounded } from './average';
+import { includesCapital } from './capital';
 import { changeOverAverage } from './overview';
 import { queryFilterLists, type FilterChoices } from './query-filters';
 
@@ -16,11 +16,11 @@ export type DrillNumber = Pick<
   'measure' | 'averagePer' | 'value' | 'periodCount' | 'total' | 'sumChfMinor'
 >;
 
-const PERIOD_NAMES: Record<TimeAxis, string> = { month: 'month', quarter: 'quarter', year: 'year' };
-
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+/** "1 Transaction", "14 Transactions". */
+export const plural = (count: number, word: string): string =>
+  `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /**
  * The number clicked, worked out from the Transactions listed: "14 Transactions, total CHF
@@ -32,7 +32,7 @@ export function drillHeadline(number: DrillNumber, formatChf: (minor: number) =>
   if (total === 0 || value === null) return 'No Transactions';
   if (measure === 'count') return plural(total, 'Transaction');
   if (measure === 'sum') return `${plural(total, 'Transaction')}, total ${formatChf(value)}`;
-  const period = PERIOD_NAMES[number.averagePer];
+  const period = number.averagePer;
   return `${formatChf(sumChfMinor ?? 0)} ÷ ${plural(number.periodCount, period)} = ${formatChf(value)} / ${period}`;
 }
 

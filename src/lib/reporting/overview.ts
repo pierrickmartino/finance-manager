@@ -1,6 +1,5 @@
 import type { ReportHeader } from '@/server/services/reporting';
-import { isTimeAxis } from '@/server/services/reporting/query';
-import type { ChartSource } from './chart-data';
+import { periodSumDrill, type ChartSource } from './chart-data';
 import { drillUrl } from './drill-link';
 import type { StoryWidget } from './story';
 
@@ -29,8 +28,13 @@ export interface PeriodValue {
 
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
+interface FlowSlots {
+  incomeSlot: number;
+  expenseSlot: number;
+}
+
 /** Which column holds the income and which the expense, or null for another kind of source. */
-function flowSlots(data: ChartSource): { incomeSlot: number; expenseSlot: number } | null {
+function flowSlots(data: ChartSource): FlowSlots | null {
   if (data.columns.length !== 2) return null;
   const [first, second] = data.columnTotals;
   if (first == null || second == null) return null;
@@ -48,8 +52,10 @@ function flowSlots(data: ChartSource): { incomeSlot: number; expenseSlot: number
  */
 export function monthFlows(data: ChartSource): MonthFlow[] | null {
   const slots = flowSlots(data);
-  if (!slots) return null;
-  const { incomeSlot, expenseSlot } = slots;
+  return slots ? flowsOf(data, slots) : null;
+}
+
+function flowsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): MonthFlow[] {
   return data.rows.map((row, r) => {
     const income = data.cells[r]?.[incomeSlot] ?? 0;
     const expense = 0 - (data.cells[r]?.[expenseSlot] ?? 0);
@@ -74,31 +80,30 @@ export interface FoundMonthFlows {
  * worked out from. Only for a sum whose rows are periods, as the subtotals are per period.
  */
 function changeHref(data: ChartSource, expenseSlot: number): string | null {
-  const { drill } = data;
-  if (!drill || data.measure !== 'sum' || !isTimeAxis(drill.query.rows)) return null;
+  const byPeriod = periodSumDrill(data);
+  if (!byPeriod) return null;
   const partial = data.rows.filter((row) => row.isPartial).map((row) => row.key);
-  return drillUrl(drill, {
+  return drillUrl(byPeriod.drill, {
     row: { except: partial },
     column: data.columns[expenseSlot]!.key,
-    change: true,
+    withPeriodSubtotals: true,
   });
 }
 
 /** The months of the first Widget that holds income and expense, or null. */
 export function findMonthFlows(widgets: StoryWidget[]): FoundMonthFlows | null {
   for (const widget of widgets) {
-    const slots = widget.data ? flowSlots(widget.data) : null;
-    if (widget.data && slots) {
-      const data = widget.data;
-      const latest = latestFullIndex(data.rows);
-      return {
-        widgetId: widget.id,
-        months: monthFlows(data)!,
-        href: data.hrefs.total,
-        latestHref: latest === -1 ? null : (data.hrefs.rowTotals[latest] ?? null),
-        changeHref: changeHref(data, slots.expenseSlot),
-      };
-    }
+    const data = widget.data;
+    const slots = data ? flowSlots(data) : null;
+    if (!data || !slots) continue;
+    const latest = latestFullIndex(data.rows);
+    return {
+      widgetId: widget.id,
+      months: flowsOf(data, slots),
+      href: data.hrefs.total,
+      latestHref: latest === -1 ? null : (data.hrefs.rowTotals[latest] ?? null),
+      changeHref: changeHref(data, slots.expenseSlot),
+    };
   }
   return null;
 }

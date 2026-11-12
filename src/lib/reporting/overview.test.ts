@@ -159,7 +159,7 @@ describe('findMonthFlows', () => {
     expect(cellFromParams(Object.fromEntries(params))).toEqual({
       row: { except: ['2025-03'] },
       column: 'expense',
-      change: true,
+      withPeriodSubtotals: true,
       page: 1,
     });
     expect(params.get('origin')).toBe('dashboard');

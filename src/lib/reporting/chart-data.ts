@@ -1,6 +1,6 @@
 import type { CellRef } from '@/server/services/reporting/cell-ref';
 import type { ReportHeader } from '@/server/services/reporting/headers';
-import type { Measure } from '@/server/services/reporting/query';
+import { isTimeAxis, type Measure, type TimeAxis } from '@/server/services/reporting/query';
 import { drillUrl, type DrillTarget } from './drill-link';
 
 /**
@@ -61,6 +61,20 @@ function foldedHref(
 export const MAX_SERIES = 8;
 export const OTHER_LABEL = 'Other';
 
+/**
+ * The source's Drill-downs and the period its rows are, when a Drill-down can sum its values
+ * per row period: a sum whose rows are periods (the subtotals of a change, an average over the
+ * rows). Null otherwise.
+ */
+export function periodSumDrill(
+  data: Pick<ChartSource, 'drill' | 'measure'>,
+): { drill: DrillTarget; period: TimeAxis } | null {
+  const { drill } = data;
+  if (!drill || data.measure !== 'sum') return null;
+  const rows = drill.query.rows;
+  return isTimeAxis(rows) ? { drill, period: rows as TimeAxis } : null;
+}
+
 /** One series of a line or stacked bar chart; `slot` is its categorical colour (0-based). */
 export interface ChartSeries {
   key: string;
@@ -100,34 +114,34 @@ export function toSeriesChart(data: ChartSource): SeriesChart {
   const isFolded = data.columns.length > MAX_SERIES;
   const kept = isFolded ? MAX_SERIES - 1 : data.columns.length;
   const keptColumns = data.columns.slice(0, kept);
-  const series: ChartSeries[] = keptColumns.map((column, index) => ({
-    key: `s${index}`,
-    label: headerLabel(column),
-    slot: index,
-  }));
-  const totalHrefs: Record<string, string | null> = Object.fromEntries(
-    keptColumns.map((_, c) => [`s${c}`, data.hrefs.columnTotals[c] ?? null]),
+  const keyOf = (slot: number) => `s${slot}`;
+  /** A value per series key: each kept column's, then (when folded) "Other"'s. */
+  const bySeries = <T>(keptValues: T[], otherValue: () => T): Record<string, T> =>
+    Object.fromEntries([
+      ...keptValues.map((value, slot) => [keyOf(slot), value] as const),
+      ...(isFolded ? [[keyOf(kept), otherValue()] as const] : []),
+    ]);
+  const series: ChartSeries[] = [
+    ...keptColumns.map((column, slot) => ({ key: keyOf(slot), label: headerLabel(column), slot })),
+    ...(isFolded ? [{ key: keyOf(kept), label: OTHER_LABEL, slot: kept }] : []),
+  ];
+  const totalHrefs = bySeries(
+    keptColumns.map((_, c) => data.hrefs.columnTotals[c] ?? null),
+    () => foldedHref(data, 'columns', keptColumns),
   );
-  if (isFolded) {
-    series.push({ key: `s${kept}`, label: OTHER_LABEL, slot: kept });
-    totalHrefs[`s${kept}`] = foldedHref(data, 'columns', keptColumns);
-  }
-
   const points = data.rows.map((row, r) => {
     const cells = data.cells[r] ?? [];
-    const values: Record<string, number | null> = {};
-    const hrefs: Record<string, string | null> = {};
-    for (let c = 0; c < kept; c++) {
-      values[`s${c}`] = cells[c] ?? null;
-      hrefs[`s${c}`] = data.hrefs.cells[r]?.[c] ?? null;
-    }
-    if (isFolded) {
-      values[`s${kept}`] = sumOrNull(cells.slice(kept));
-      hrefs[`s${kept}`] = foldedHref(data, 'columns', keptColumns, {
-        row: cellKey(data, 'rows', row),
-      });
-    }
-    return { label: headerLabel(row), values, hrefs };
+    return {
+      label: headerLabel(row),
+      values: bySeries(
+        keptColumns.map((_, c) => cells[c] ?? null),
+        () => sumOrNull(cells.slice(kept)),
+      ),
+      hrefs: bySeries(
+        keptColumns.map((_, c) => data.hrefs.cells[r]?.[c] ?? null),
+        () => foldedHref(data, 'columns', keptColumns, { row: cellKey(data, 'rows', row) }),
+      ),
+    };
   });
   return { series, points, totalHrefs };
 }

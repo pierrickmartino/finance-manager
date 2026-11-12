@@ -1,8 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FieldError } from '@/components/form';
-import { backLink, originFromParams } from '@/lib/reporting/drill-origin';
-import { changeWorking, drillFilterLine, drillHeadline } from '@/lib/reporting/drill-summary';
+import { drillUrl, unconvertedUrl, type DrillTarget } from '@/lib/reporting/drill-link';
+import { backLink, originFromParams, type BackLink } from '@/lib/reporting/drill-origin';
+import {
+  changeWorking,
+  drillFilterLine,
+  drillHeadline,
+  plural,
+} from '@/lib/reporting/drill-summary';
 import { cellFromParams, queryFromParams, type UrlParams } from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
 import { splitLabel } from '@/app/transactions/transaction-display';
@@ -11,8 +17,10 @@ import type { Formatter } from '@/lib/format';
 import { getFormatter } from '@/server/formatter';
 import { ServiceError } from '@/server/services/errors';
 import {
+  ends,
   isExcept,
   isTimeAxis,
+  keptBy,
   listCellTransactions,
   type AxisSelector,
   type CellRef,
@@ -24,12 +32,14 @@ import {
   type WidgetQueryInput,
 } from '@/server/services/reporting';
 import { loadQueryFormLists, loadReport } from '../load';
-import { drillHref } from '../pivot-data';
+import type { QueryFormLists } from '../query-form';
 import { PAGE_TITLE_CLASS, WARNING_NOTICE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Drill-down · Finance Manager' };
 
 const CELL = 'px-3 py-2 text-left align-top';
+
+type Chf = (minor: number) => string;
 
 async function loadCell(
   query: WidgetQueryInput,
@@ -63,9 +73,9 @@ function describeSelector(
 ): string | null {
   if (selector === undefined) return null;
   if (!isExcept(selector)) return headerLabel(headers, selector);
-  const kept = (headers ?? []).filter((header) => !selector.except.includes(header.key));
-  if (isTimeAxis(axis ?? null) && kept.length > 0) {
-    const [first, last] = [kept[0]!, kept.at(-1)!];
+  const kept = ends(keptBy(headers ?? [], (header) => header.key, selector));
+  if (isTimeAxis(axis ?? null) && kept) {
+    const [first, last] = kept;
     return first === last ? first.label : `${first.label} to ${last.label}`;
   }
   if (selector.except.length === 0) return 'All';
@@ -86,7 +96,7 @@ function describeCell(report: ReportTable | null, cell: CellRef): string {
 function changeLine(
   page: CellTransactionPage,
   report: ReportTable | null,
-  chf: (minor: number) => string,
+  chf: Chf,
 ): string | null {
   if (!page.subtotals) return null;
   const labelled = page.subtotals.map((period) => ({
@@ -94,21 +104,6 @@ function changeLine(
     sumChfMinor: period.sumChfMinor,
   }));
   return changeWorking(labelled, chf);
-}
-
-/**
- * The Transactions List filtered to the ones the cell leaves out for want of an FX rate: the
- * cell's dates, and its Account when the Widget is filtered to one.
- */
-function unconvertedHref(page: CellTransactionPage, report: ReportTable): string {
-  const params = new URLSearchParams({ fxRate: 'missing' });
-  if (page.span) {
-    params.set('from', page.span.from);
-    params.set('to', page.span.to);
-  }
-  const accounts = report.query.filters.accountIds ?? [];
-  if (accounts.length === 1) params.set('accountId', accounts[0]!);
-  return `/transactions?${params}`;
 }
 
 /**
@@ -120,74 +115,122 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
   const query = queryFromParams(params);
   const cell = cellFromParams(params);
   const origin = originFromParams(params);
-  const back = backLink(origin, query);
   const fmt = await getFormatter();
   const [{ report }, { page, error }, lists] = await Promise.all([
     loadReport(query),
     loadCell(query, cell),
     loadQueryFormLists(),
   ]);
-  const chf = (minor: number) => fmt.amount(minor, { currency: 'CHF' });
-  const change = page ? changeLine(page, report, chf) : null;
 
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className={PAGE_TITLE_CLASS}>Transactions in {describeCell(report, cell)}</h1>
-          <Link href={back.href} className="text-sm underline">
-            {back.label}
-          </Link>
+          <BackTo {...backLink(origin, query)} />
         </div>
-        {report && (
-          <p aria-label="Filters" className="text-sm text-muted">
-            {drillFilterLine(
-              report.query,
-              lists,
-              report.range.from <= report.range.to
-                ? `${fmt.date(report.range.from)} to ${fmt.date(report.range.to)}`
-                : 'No complete period yet',
-            ).join(' · ')}
-          </p>
-        )}
+        {report && <FilterLine report={report} lists={lists} fmt={fmt} />}
       </div>
       {error && <FieldError message={error} />}
       {page && (
-        <>
-          <p role="status" className="text-lg text-ink tabular-nums">
-            {change ?? drillHeadline(page, chf)}
-          </p>
-          {change && (
-            <p className="-mt-4 text-sm text-muted tabular-nums">{drillHeadline(page, chf)}</p>
-          )}
-          {page.unconvertedCount > 0 && report && (
-            <p role="alert" className={`${WARNING_NOTICE_CLASS} text-sm`}>
-              {page.unconvertedCount} Transaction{page.unconvertedCount === 1 ? '' : 's'} left out:
-              no FX rate yet.{' '}
-              <Link href={unconvertedHref(page, report)} className="underline">
-                See {page.unconvertedCount === 1 ? 'it' : 'them'} in Transactions
-              </Link>
-            </p>
-          )}
-          <CellTable transactions={page.transactions} fmt={fmt} />
-          {page.pageCount > 1 && report && (
-            <nav aria-label="Pages" className="flex items-center gap-4 text-sm">
-              {page.page > 1 && (
-                <Link href={drillHref(report, { ...cell, page: page.page - 1 }, origin)}>
-                  Previous
-                </Link>
-              )}
-              <span>
-                Page {page.page} of {page.pageCount}
-              </span>
-              {page.page < page.pageCount && (
-                <Link href={drillHref(report, { ...cell, page: page.page + 1 }, origin)}>Next</Link>
-              )}
-            </nav>
-          )}
-        </>
+        <DrillBody
+          page={page}
+          report={report}
+          drill={report && { query: report.query, origin }}
+          cell={cell}
+          fmt={fmt}
+        />
       )}
     </section>
+  );
+}
+
+function BackTo({ href, label }: BackLink) {
+  return (
+    <Link href={href} className="text-sm underline">
+      {label}
+    </Link>
+  );
+}
+
+interface FilterLineProps {
+  report: ReportTable;
+  lists: QueryFormLists;
+  fmt: Formatter;
+}
+
+/** The period and the filters the number was counted under. */
+function FilterLine({ report, lists, fmt }: FilterLineProps) {
+  const { from, to } = report.range;
+  const period = from <= to ? `${fmt.date(from)} to ${fmt.date(to)}` : 'No complete period yet';
+  return (
+    <p aria-label="Filters" className="text-sm text-muted">
+      {drillFilterLine(report.query, lists, period).join(' · ')}
+    </p>
+  );
+}
+
+interface DrillBodyProps {
+  page: CellTransactionPage;
+  report: ReportTable | null;
+  /** Where the other pages of the Drill-down lead; null without a report. */
+  drill: DrillTarget | null;
+  cell: CellRef;
+  fmt: Formatter;
+}
+
+/** The number worked out, what it leaves out, and its Transactions, page by page. */
+function DrillBody({ page, report, drill, cell, fmt }: DrillBodyProps) {
+  const chf: Chf = (minor) => fmt.amount(minor, { currency: 'CHF' });
+  const change = changeLine(page, report, chf);
+  return (
+    <>
+      <p role="status" className="text-lg text-ink tabular-nums">
+        {change ?? drillHeadline(page, chf)}
+      </p>
+      {change && (
+        <p className="-mt-4 text-sm text-muted tabular-nums">{drillHeadline(page, chf)}</p>
+      )}
+      {page.unconvertedCount > 0 && report && (
+        <UnconvertedNotice
+          count={page.unconvertedCount}
+          href={unconvertedUrl(report.query, cell, page.span)}
+        />
+      )}
+      <CellTable transactions={page.transactions} fmt={fmt} />
+      {page.pageCount > 1 && drill && (
+        <Pager page={page} hrefOf={(number) => drillUrl(drill, { ...cell, page: number })} />
+      )}
+    </>
+  );
+}
+
+/** How many Transactions the number leaves out for want of an FX rate, and where to see them. */
+function UnconvertedNotice({ count, href }: { count: number; href: string }) {
+  return (
+    <p role="alert" className={`${WARNING_NOTICE_CLASS} text-sm`}>
+      {plural(count, 'Transaction')} left out: no FX rate yet.{' '}
+      <Link href={href} className="underline">
+        See {count === 1 ? 'it' : 'them'} in Transactions
+      </Link>
+    </p>
+  );
+}
+
+interface PagerProps {
+  page: CellTransactionPage;
+  hrefOf: (page: number) => string;
+}
+
+function Pager({ page, hrefOf }: PagerProps) {
+  return (
+    <nav aria-label="Pages" className="flex items-center gap-4 text-sm">
+      {page.page > 1 && <Link href={hrefOf(page.page - 1)}>Previous</Link>}
+      <span>
+        Page {page.page} of {page.pageCount}
+      </span>
+      {page.page < page.pageCount && <Link href={hrefOf(page.page + 1)}>Next</Link>}
+    </nav>
   );
 }
 
@@ -198,7 +241,7 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
 function CellTable({ transactions, fmt }: { transactions: CellTransaction[]; fmt: Formatter }) {
   return (
     <div className="overflow-x-auto">
-      <table aria-label="Cell Transactions" className="w-full text-sm">
+      <table aria-label="Drill-down Transactions" className="w-full text-sm">
         <thead className="border-b border-rule">
           <tr>
             <th className={CELL}>Date</th>

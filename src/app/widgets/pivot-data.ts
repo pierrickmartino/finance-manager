@@ -1,21 +1,7 @@
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { drillUrl, type DrillTarget } from '@/lib/reporting/drill-link';
-import type { DrillOrigin } from '@/lib/reporting/drill-origin';
+import { EDITOR, type DrillOrigin } from '@/lib/reporting/drill-origin';
 import type { CellRef, ReportHeader, ReportTable } from '@/server/services/reporting';
-
-const EDITOR: DrillOrigin = { kind: 'editor' };
-
-/**
- * The Drill-down of one cell of a Widget query, which links back to `origin` (by default the
- * editor, with the query).
- */
-export function drillHref(
-  report: ReportTable,
-  cell: CellRef,
-  origin: DrillOrigin = EDITOR,
-): string {
-  return drillUrl({ query: report.query, origin }, cell);
-}
 
 /**
  * Where a report's values link: `hrefOf` gives each cell's link, and `drill` is where the

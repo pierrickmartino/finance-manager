@@ -5,7 +5,9 @@
  */
 export { runWidgetQuery, type ReportTable } from './engine';
 export {
+  ends,
   isExcept,
+  keptBy,
   listCellTransactions,
   type AxisExcept,
   type AxisSelector,

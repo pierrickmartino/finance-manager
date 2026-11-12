@@ -81,11 +81,15 @@ describe('Widget query URL parameters', () => {
   });
 
   it('round-trips "every key but these" and a change through URL parameters', () => {
-    const cell = { row: { except: ['2025-03'] }, column: { except: [TAG, null] }, change: true };
+    const cell = {
+      row: { except: ['2025-03'] },
+      column: { except: [TAG, null] },
+      withPeriodSubtotals: true,
+    };
 
     const params = cellToParams(cell);
 
-    expect(params.toString()).toBe(`rowNot=2025-03&columnNot=${TAG}&columnNot=none&change=1`);
+    expect(params.toString()).toBe(`rowNot=2025-03&columnNot=${TAG}&columnNot=none&subtotals=1`);
     expect(cellFromParams(Object.fromEntries(group(params)))).toEqual({ ...cell, page: 1 });
   });
 
