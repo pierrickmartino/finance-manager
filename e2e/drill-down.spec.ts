@@ -71,7 +71,7 @@ test('the overview row and a Story card open Drill-downs whose headline is the n
     "2'520",
   );
   await page.locator('section[aria-labelledby="overview-headline"] a').click();
-  await expect(page).toHaveURL(/\/widgets\/drill\?.*from=dashboard/);
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=dashboard/);
   await expect(page.getByRole('status')).toHaveText("2 Transactions, total CHF -2'520.00");
   await expect(page.getByLabel('Filters')).toContainText(`Accounts: ${bankName} · ${accountName}`);
   await expect(page.getByLabel('Filters')).toContainText('Capital left out · Transfers left out');
@@ -97,7 +97,7 @@ test('the overview row and a Story card open Drill-downs whose headline is the n
 });
 
 test('a forged origin falls back to the editor', async ({ page }) => {
-  await page.goto('/widgets/drill?from=https%3A%2F%2Fexample.com&fromId=..%2F..%2Fsettings');
+  await page.goto('/widgets/drill?origin=https%3A%2F%2Fexample.com&originId=..%2F..%2Fsettings');
 
   await expect(page.getByRole('link', { name: 'Back to the editor' })).toHaveAttribute(
     'href',

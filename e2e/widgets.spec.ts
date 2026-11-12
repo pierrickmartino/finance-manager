@@ -92,7 +92,7 @@ test('builds a month × Category pivot, drills into a cell and saves it as a Wid
     .getByRole('table', { name: 'Pivot' })
     .getByRole('link', { name: /^Oct 2025, Unclassified: / })
     .click();
-  await expect(page).toHaveURL(/\/widgets\/drill\?.*from=widget/);
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=widget/);
   await page.getByRole('link', { name: 'Back to the Widget' }).click();
   await expect(page.getByRole('heading', { level: 1, name: widgetName })).toBeVisible();
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WIDGET_QUERY } from './widget-params';
+import { DEFAULT_WIDGET_QUERY, queryToParams } from './widget-params';
 import { backLink, originFromParams, originToParams, type DrillOrigin } from './drill-origin';
 
 const DASHBOARD = '0b6f4c1e-3a52-4d8e-9a7e-1f2d3c4b5a60';
@@ -18,19 +18,30 @@ describe('Drill-down origin', () => {
       expect(originFromParams(params)).toEqual(origin);
     }
     expect(Object.fromEntries(originToParams({ kind: 'dashboard', id: DASHBOARD }))).toEqual({
-      from: 'dashboard',
-      fromId: DASHBOARD,
+      origin: 'dashboard',
+      originId: DASHBOARD,
     });
+  });
+
+  it('never shares a parameter with the Widget query, so a fixed range keeps its dates', () => {
+    const query = {
+      ...DEFAULT_WIDGET_QUERY,
+      dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' },
+    } as const;
+    const params = queryToParams(query);
+    const origin = originToParams({ kind: 'widget', id: WIDGET });
+
+    for (const name of origin.keys()) expect(params.has(name)).toBe(false);
   });
 
   it('falls back to the editor on an unknown type, a malformed id or a path', () => {
     for (const params of [
       {},
-      { from: 'admin', fromId: DASHBOARD },
-      { from: 'dashboard', fromId: 'not-a-uuid' },
-      { from: 'dashboard' },
-      { from: 'widget', fromId: `${WIDGET}/../../settings` },
-      { from: 'https://example.com', fromId: DASHBOARD },
+      { origin: 'admin', originId: DASHBOARD },
+      { origin: 'dashboard', originId: 'not-a-uuid' },
+      { origin: 'dashboard' },
+      { origin: 'widget', originId: `${WIDGET}/../../settings` },
+      { origin: 'https://example.com', originId: DASHBOARD },
     ]) {
       expect(originFromParams(params)).toEqual({ kind: 'editor' });
     }
