@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (its "one column" view superseded by ADR-0009)
 ---
 
 # A Dashboard is one column of chapters, edited in place
