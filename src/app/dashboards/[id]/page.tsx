@@ -8,6 +8,7 @@ import { homeDashboard, listDashboards } from '@/server/services/dashboards';
 import { swissToday } from '@/server/services/fx/dates';
 import { findDashboard, loadRecentActivity, loadStoryChapter } from '../load';
 import { DashboardTabs } from '../tabs';
+import { AttentionPrototype, IS_PROTOTYPE_ENABLED } from './attention-prototype';
 import { CompletenessNotice } from './completeness-notice';
 import { DashboardOverview } from './overview/dashboard-overview';
 import { WidgetBoard } from './overview/widget-board';
@@ -20,7 +21,15 @@ export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
  * happens in Edit mode (./edit). The home Dashboard (the one the home page opens) also shows the
  * Completeness check (ADR-0008).
  */
-export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  // PROTOTYPE: ?variant= and ?sample= for ./attention-prototype.
+  searchParams: Promise<{ variant?: string; sample?: string }>;
+}) {
+  const { variant, sample } = await searchParams;
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
   const [dashboards, chapters, recent, fmt] = await Promise.all([
@@ -49,7 +58,20 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
         }
         chapters={chapters}
         recent={recent}
-        notice={completeness && <CompletenessNotice entries={completeness} fmt={fmt} />}
+        notice={
+          completeness &&
+          (IS_PROTOTYPE_ENABLED ? (
+            <AttentionPrototype
+              realEntries={completeness}
+              variant={variant}
+              sample={sample}
+              fmt={fmt}
+              today={swissToday()}
+            />
+          ) : (
+            <CompletenessNotice entries={completeness} fmt={fmt} />
+          ))
+        }
         board={<WidgetBoard chapters={chapters} />}
         empty={
           <p className="py-16 text-lg text-muted">
