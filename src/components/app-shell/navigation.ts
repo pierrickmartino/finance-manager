@@ -29,6 +29,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Money',
     links: [
       { href: '/transactions', label: 'Transactions', icon: 'transactions' },
+      { href: '/recurring-payments', label: 'Recurring payments', icon: 'recurring' },
       { href: '/unclassified', label: 'Unclassified', icon: 'inbox' },
       { href: '/accounts', label: 'Accounts', icon: 'accounts' },
     ],
