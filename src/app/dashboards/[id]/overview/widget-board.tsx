@@ -22,6 +22,13 @@ function placement(layout: WidgetLayout | null): CSSProperties | undefined {
   } as CSSProperties;
 }
 
+interface WidgetBoardProps<T extends BoardChapter> {
+  /** In reading order. */
+  chapters: T[];
+  /** Edit mode's actions on each card. */
+  toolbar?: (chapter: T) => ReactNode;
+}
+
 /**
  * The Dashboard's board (ADR-0010). At `lg` and above, each Widget's card is drawn at its
  * stored place and size on a 12-column grid of fixed-height rows, gaps kept; content that
@@ -29,14 +36,7 @@ function placement(layout: WidgetLayout | null): CSSProperties | undefined {
  * (`chapters` come in reading order: by row, then column), which is also the order screen
  * readers follow at every width.
  */
-export function WidgetBoard<T extends BoardChapter>({
-  chapters,
-  toolbar,
-}: {
-  chapters: T[];
-  /** Edit mode's actions on each card. */
-  toolbar?: (chapter: T) => ReactNode;
-}) {
+export function WidgetBoard<T extends BoardChapter>({ chapters, toolbar }: WidgetBoardProps<T>) {
   return (
     <div
       className="dashboard-board flex flex-col gap-5 lg:grid lg:grid-cols-12"

@@ -184,7 +184,7 @@ describe('Widgets on a Dashboard', () => {
     expect(await board(home.id)).toEqual(before);
   });
 
-  it('refuses a card that leaves the columns, goes under its minimum or overlaps another', async () => {
+  it('refuses a card that leaves the columns or rows, goes under its minimum or overlaps another', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
     const trend = await addWidget(t.ctx, dashboard.id, {
       name: 'Trend',
@@ -205,6 +205,9 @@ describe('Widgets on a Dashboard', () => {
 
     await expect(save({ x: 6, y: 0, w: 8, h: 6 })).rejects.toThrow(
       'A Widget must fit in the 12 grid columns',
+    );
+    await expect(save({ x: 0, y: 9_996, w: 8, h: 6 })).rejects.toThrow(
+      "A Widget must fit in the board's 10000 rows",
     );
     await expect(save({ x: 0, y: 0, w: 4.5, h: 6 })).rejects.toThrow();
     // A trend can't be read under 4×4; a Number can (2×2).
@@ -253,6 +256,26 @@ describe('Widgets on a Dashboard', () => {
         expect.objectContaining({ field: 'name', after: 'Spending (copy)' }),
       ]),
     );
+  });
+
+  it('gives the copy of a Dashboard Widget without a layout its default size in the first free spot', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    await addWidget(t.ctx, dashboard.id, {
+      name: 'Top',
+      query: SPENDING,
+      layout: { x: 0, y: 0, w: 12, h: 3 },
+    });
+    const unplaced = await addWidget(t.ctx, dashboard.id, {
+      name: 'Total',
+      query: SPENDING,
+      visualisation: 'number',
+    });
+    await t.ctx.db.query('UPDATE widget SET layout = NULL WHERE id = $1', [unplaced.id]);
+
+    const copy = await duplicateWidget(t.ctx, unplaced.id);
+
+    // A Number's default size (4×3), at the bottom of the board.
+    expect(copy).toMatchObject({ dashboardId: dashboard.id, layout: { x: 0, y: 3, w: 4, h: 3 } });
   });
 
   it('duplicates a Dashboard with its Widgets and their layouts, as one Batch', async () => {
@@ -394,6 +417,25 @@ describe('Widgets on a Dashboard', () => {
       ['Trend', trend.layout],
       ['Below', below.layout],
     ]);
+  });
+
+  it('leaves a card as it is when an edit keeps its chart kind, even under the minimum', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    const trend = await addWidget(t.ctx, dashboard.id, {
+      name: 'Trend',
+      query: SPENDING,
+      visualisation: 'line',
+      // Under a trend's minimum (4×4), as a layout given on creation can be.
+      layout: { x: 0, y: 0, w: 2, h: 2 },
+    });
+
+    const renamed = await updateWidget(t.ctx, trend.id, {
+      name: 'Spending trend',
+      query: SPENDING,
+      visualisation: 'line',
+    });
+
+    expect(renamed.layout).toEqual({ x: 0, y: 0, w: 2, h: 2 });
   });
 
   it('leaves a Standalone Widget without a layout when its chart type changes', async () => {

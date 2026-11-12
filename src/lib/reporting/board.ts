@@ -1,4 +1,3 @@
-import { isSameOrder, moveBy } from './order';
 import { chapterKind, type ChapterSource } from './story';
 
 /**
@@ -8,6 +7,8 @@ import { chapterKind, type ChapterSource } from './story';
  */
 export const GRID_COLUMNS = 12;
 export const MAX_WIDGET_HEIGHT = 40;
+/** How many rows the board has: every card ends on or above its last row. */
+export const MAX_BOARD_ROWS = 10_000;
 
 export interface Size {
   w: number;
@@ -19,6 +20,35 @@ export interface Cell extends Size {
   id: string;
   x: number;
   y: number;
+}
+
+/** Where a card sits and how big it is, without its id: a Widget's stored layout. */
+export type Place = Omit<Cell, 'id'>;
+
+/** The cards of things that may sit on the board (a Widget, a chapter); one without a layout has none. */
+export function boardCells(items: readonly { id: string; layout: Place | null }[]): Cell[] {
+  return items.flatMap(({ id, layout }) =>
+    layout ? [{ id, x: layout.x, y: layout.y, w: layout.w, h: layout.h }] : [],
+  );
+}
+
+/** A card's place and size alone. */
+export function placeOf({ x, y, w, h }: Place): Place {
+  return { x, y, w, h };
+}
+
+/** Whether two cards sit in the same place at the same size. */
+export function isSamePlace(a: Place, b: Place): boolean {
+  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
+/** A board as a value: the same cards in any order give the same key. */
+export function boardKey(cells: readonly Cell[]): string {
+  return JSON.stringify(
+    [...cells]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map(({ id, x, y, w, h }) => [id, x, y, w, h]),
+  );
 }
 
 /** What a card's size is chosen by: what it shows, coarser than its chapter kind. */
@@ -47,7 +77,7 @@ export function minimumSize(widget: ChapterSource): Size {
   return { ...WIDGET_SIZES[sizeKind(widget)].min };
 }
 
-/** Whole cells, inside the 12 columns, from row 0, at most the maximum height. */
+/** Whole cells, inside the 12 columns and the board's rows, at most the maximum height. */
 export function isInBounds(cell: Cell): boolean {
   const { x, y, w, h } = cell;
   return (
@@ -57,6 +87,7 @@ export function isInBounds(cell: Cell): boolean {
     w >= 1 &&
     h >= 1 &&
     x + w <= GRID_COLUMNS &&
+    y + h <= MAX_BOARD_ROWS &&
     h <= MAX_WIDGET_HEIGHT
   );
 }
@@ -92,15 +123,16 @@ function clearBelow(cell: Cell, placed: readonly Cell[]): Cell {
 }
 
 /**
- * The board with the card `id` kept where it is and every card in its way pushed down, and
- * anything then in their way too. Nothing moves up, so gaps are kept. Order is kept.
+ * The board with the cards `ids` kept where they are (each clearing the ones before it, if it
+ * must) and every other card in their way pushed down, and anything then in their way too.
+ * Nothing moves up, so gaps are kept. Order is kept.
  */
-export function pushDown<T extends Cell>(cells: readonly T[], id: string): T[] {
-  const fixed = cells.find((cell) => cell.id === id);
-  if (!fixed) return [...cells];
-  const placed: Cell[] = [fixed];
+function pushDownAround<T extends Cell>(cells: readonly T[], ids: readonly string[]): T[] {
+  const placed: Cell[] = [];
   const moved = new Map<string, number>();
-  for (const cell of readingOrder(cells.filter((c) => c.id !== id))) {
+  const fixed = ids.flatMap((id) => cells.filter((cell) => cell.id === id));
+  const others = readingOrder(cells.filter((cell) => !ids.includes(cell.id)));
+  for (const cell of [...fixed, ...others]) {
     const cleared = clearBelow(cell, placed);
     placed.push(cleared);
     if (cleared.y !== cell.y) moved.set(cell.id, cleared.y);
@@ -109,6 +141,14 @@ export function pushDown<T extends Cell>(cells: readonly T[], id: string): T[] {
     const y = moved.get(cell.id);
     return y === undefined ? cell : { ...cell, y };
   });
+}
+
+/**
+ * The board with the card `id` kept where it is and every card in its way pushed down, and
+ * anything then in their way too. Nothing moves up, so gaps are kept. Order is kept.
+ */
+export function pushDown<T extends Cell>(cells: readonly T[], id: string): T[] {
+  return pushDownAround(cells, [id]);
 }
 
 export interface Spot {
@@ -161,7 +201,10 @@ const STEP: Record<Direction, Spot> = {
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(Math.max(value, low), high);
 
-/** The board with card `id` changed by `change`, the cards then in its way pushed down. */
+/**
+ * The board with card `id` changed by `change`, the cards then in its way pushed down; the
+ * board as it is when that would push a card past the last row.
+ */
 function replaceAndPush<T extends Cell>(
   cells: readonly T[],
   id: string,
@@ -170,15 +213,18 @@ function replaceAndPush<T extends Cell>(
   const card = cells.find((cell) => cell.id === id);
   if (!card) return [...cells];
   const changed = change(card);
-  if (changed.x === card.x && changed.y === card.y && changed.w === card.w && changed.h === card.h)
-    return [...cells];
-  return pushDown(
+  if (isSamePlace(changed, card)) return [...cells];
+  const pushed = pushDown(
     cells.map((cell) => (cell.id === id ? changed : cell)),
     id,
   );
+  return pushed.every((cell) => bottom(cell) <= MAX_BOARD_ROWS) ? pushed : [...cells];
 }
 
-/** Card `id` moved one cell, kept inside the board's edges; cards in its way are pushed down. */
+/**
+ * Card `id` moved one cell, kept inside the board's edges and rows; cards in its way are pushed
+ * down.
+ */
 export function moveCard<T extends Cell>(
   cells: readonly T[],
   id: string,
@@ -188,7 +234,7 @@ export function moveCard<T extends Cell>(
   return replaceAndPush(cells, id, (card) => ({
     ...card,
     x: clamp(card.x + step.x, 0, GRID_COLUMNS - card.w),
-    y: Math.max(card.y + step.y, 0),
+    y: clamp(card.y + step.y, 0, MAX_BOARD_ROWS - card.h),
   }));
 }
 
@@ -208,34 +254,35 @@ export function growToMinimum<T extends Cell>(cells: readonly T[], id: string, m
   });
 }
 
-/**
- * The board put in the reading order `ids` (every card once): the nth card in `ids` takes the
- * place of the nth card in reading order, keeping its size (moved left if it would pass the
- * right edge), and cards that then overlap are pushed down. Order is kept.
- */
-export function reorderPlaces<T extends Cell>(cells: readonly T[], ids: readonly string[]): T[] {
-  const places = readingOrder(cells);
-  const placeOf = new Map(ids.map((id, index) => [id, places[index]]));
-  const swapped = cells.map((cell) => {
-    const place = placeOf.get(cell.id);
-    if (!place) return cell;
-    return { ...cell, x: Math.min(place.x, GRID_COLUMNS - cell.w), y: place.y };
-  });
-  return ids[0] === undefined ? swapped : pushDown(swapped, ids[0]);
-}
+/** Up or down in reading order: how a card moves in the one column below `lg`. */
+export type VerticalDirection = Extract<Direction, 'up' | 'down'>;
 
 /**
- * Card `id` swapped with its neighbour in reading order, before it (`up`) or after it (`down`),
- * by swapping their places (as `reorderPlaces` does); the board as it is at either end.
+ * Card `id` swapped with its neighbour in reading order, before it (`up`) or after it (`down`):
+ * each takes the other's place (moved left if it would pass the right edge) and keeps it; the
+ * one taking the later place goes below the other only if they would overlap, and every other
+ * card in their way is pushed down. The board as it is at either end.
  */
 export function swapInReadingOrder<T extends Cell>(
   cells: readonly T[],
   id: string,
-  direction: 'up' | 'down',
+  direction: VerticalDirection,
 ): T[] {
-  const ids = readingOrder(cells).map((cell) => cell.id);
-  const order = moveBy(ids, id, direction === 'up' ? -1 : 1);
-  return isSameOrder(order, ids) ? [...cells] : reorderPlaces(cells, order);
+  const order = readingOrder(cells);
+  const index = order.findIndex((cell) => cell.id === id);
+  const card = order[index];
+  const other = order[direction === 'up' ? index - 1 : index + 1];
+  if (!card || !other) return [...cells];
+  const [first, second] = direction === 'up' ? [card, other] : [other, card];
+  const placeOf = new Map([
+    [card.id, other],
+    [other.id, card],
+  ]);
+  const swapped = cells.map((cell) => {
+    const place = placeOf.get(cell.id);
+    return place ? { ...cell, x: Math.min(place.x, GRID_COLUMNS - cell.w), y: place.y } : cell;
+  });
+  return pushDownAround(swapped, [first.id, second.id]);
 }
 
 const ACROSS = 3;
@@ -265,7 +312,7 @@ export function threeAcross(items: readonly { id: string; h: number }[]): Cell[]
 
 /**
  * Card `id` grown or shrunk one cell from its bottom-right corner, kept between `min` and the
- * board's right edge and maximum height; cards in its way are pushed down.
+ * board's right edge, last row and maximum height; cards in its way are pushed down.
  */
 export function resizeCard<T extends Cell>(
   cells: readonly T[],
@@ -277,6 +324,10 @@ export function resizeCard<T extends Cell>(
   return replaceAndPush(cells, id, (card) => ({
     ...card,
     w: clamp(card.w + step.x, Math.min(min.w, card.w), GRID_COLUMNS - card.x),
-    h: clamp(card.h + step.y, Math.min(min.h, card.h), MAX_WIDGET_HEIGHT),
+    h: clamp(
+      card.h + step.y,
+      Math.min(min.h, card.h),
+      Math.min(MAX_WIDGET_HEIGHT, MAX_BOARD_ROWS - card.y),
+    ),
   }));
 }

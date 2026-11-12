@@ -3,10 +3,13 @@
 import Link from 'next/link';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ActionForm } from '@/components/action-form';
-import { GHOST_BUTTON_CLASS } from '@/components/surface';
+import { DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
+import type { VerticalDirection } from '@/lib/reporting/board';
 import { deleteDashboardWidgetAction, duplicateWidgetAction } from '../../actions';
 
 const TOOLBAR_BUTTON = `${GHOST_BUTTON_CLASS} text-xs`;
+/** Remove, sized and padded like the toolbar's other actions. */
+const TOOLBAR_DANGER_BUTTON = `${DANGER_BUTTON_CLASS} rounded-md px-2 py-1 text-xs`;
 
 /** The class react-grid-layout drags a card by: only its handle starts a drag. */
 export const DRAG_HANDLE_CLASS = 'card-drag-handle';
@@ -22,27 +25,30 @@ interface CardToolbarProps {
   moves?: CardMoves;
 }
 
-export type MoveDirection = 'up' | 'down';
-
 export interface CardMoves {
   canMoveUp: boolean;
   canMoveDown: boolean;
-  onMove: (direction: MoveDirection) => void;
+  onMove: (direction: VerticalDirection) => void;
 }
 
-const ARROWS: Record<MoveDirection, string> = { up: '↑', down: '↓' };
+const ARROW_GLYPHS: Record<VerticalDirection, string> = { up: '↑', down: '↓' };
+
+interface MoveButtonsProps {
+  name: string;
+  moves: CardMoves;
+}
 
 /**
  * Up and down, each disabled at its end of the board (with `aria-disabled`, so the arrow that
  * just moved the card to an end keeps focus). Focus goes back to the arrow after the card has
  * moved in the DOM.
  */
-function MoveButtons({ name, moves }: { name: string; moves: CardMoves }) {
+function MoveButtons({ name, moves }: MoveButtonsProps) {
   const up = useRef<HTMLButtonElement>(null);
   const down = useRef<HTMLButtonElement>(null);
   const buttons = { up, down };
   // A new object per move, so a second move the same way refocuses too.
-  const [moved, setMoved] = useState<{ direction: MoveDirection } | null>(null);
+  const [moved, setMoved] = useState<{ direction: VerticalDirection } | null>(null);
   useLayoutEffect(() => {
     if (moved) (moved.direction === 'up' ? up : down).current?.focus();
   }, [moved]);
@@ -62,7 +68,7 @@ function MoveButtons({ name, moves }: { name: string; moves: CardMoves }) {
       }}
       className={`${TOOLBAR_BUTTON} aria-disabled:cursor-default aria-disabled:opacity-30 aria-disabled:hover:bg-transparent`}
     >
-      <span aria-hidden>{ARROWS[direction]}</span>
+      <span aria-hidden>{ARROW_GLYPHS[direction]}</span>
     </button>
   ));
 }
@@ -100,7 +106,7 @@ export function CardToolbar({ widgetId, name, editHref, isDraggable, moves }: Ca
         label={`Remove ${name}`}
         confirmMessage={`Remove the Widget "${name}"?`}
       >
-        <button type="submit" className={`${TOOLBAR_BUTTON} text-negative hover:text-negative`}>
+        <button type="submit" className={TOOLBAR_DANGER_BUTTON}>
           Remove
         </button>
       </ActionForm>

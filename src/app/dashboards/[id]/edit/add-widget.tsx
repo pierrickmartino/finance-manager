@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRef } from 'react';
 import { ActionForm } from '@/components/action-form';
+import { INPUT_CLASS } from '@/components/named-list';
 import { CARD_CLASS, PILL_BUTTON_CLASS, SMALL_BUTTON_CLASS } from '@/components/surface';
 import type { WidgetPickerOption } from '@/lib/reporting/widget-picker';
 import { addBalancesWidgetAction, copyWidgetToDashboardAction } from '../../actions';
@@ -37,11 +38,7 @@ export function AddWidgetChoices({ dashboardId, savedWidgets }: AddWidgetProps) 
           label="Add an existing Widget"
           className="flex items-center gap-2"
         >
-          <select
-            name="widgetId"
-            aria-label="Existing Widget"
-            className="rounded-md border border-rule-strong bg-surface px-2 py-1 text-xs"
-          >
+          <select name="widgetId" aria-label="Existing Widget" className={`${INPUT_CLASS} text-xs`}>
             {savedWidgets.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}

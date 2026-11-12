@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Cell } from './board';
+import { type Cell, MAX_BOARD_ROWS } from './board';
 import { keyboardStep } from './board-keys';
 
 const cell = (id: string, x: number, y: number, w: number, h: number): Cell => ({ id, x, y, w, h });
@@ -56,6 +56,31 @@ describe('keyboardStep', () => {
     expect(step(smallest, 'ArrowUp')?.announcement).toBe('Already as short as it can be');
     expect(step(widest, 'ArrowRight')?.announcement).toBe('Already at the right edge');
     expect(step(widest, 'ArrowDown')?.announcement).toBe('Already as tall as it can be');
+  });
+
+  it("refuses a step down past the board's last row, and says it is at the bottom", () => {
+    const last = MAX_BOARD_ROWS - 6;
+    const atBottom = [cell('a', 0, last, 4, 6)];
+    const step = (board: Cell[], shiftKey: boolean) =>
+      keyboardStep(board, 'a', { key: 'ArrowDown', shiftKey }, min);
+
+    expect(step(atBottom, false)).toEqual({
+      cells: atBottom,
+      announcement: 'Already at the bottom',
+    });
+    expect(step(atBottom, true)).toEqual({
+      cells: atBottom,
+      announcement: 'Already at the bottom',
+    });
+  });
+
+  it('refuses a step down that would push another card past the last row', () => {
+    const board = [cell('a', 0, MAX_BOARD_ROWS - 10, 4, 6), cell('b', 0, MAX_BOARD_ROWS - 4, 4, 4)];
+
+    expect(keyboardStep(board, 'a', { key: 'ArrowDown', shiftKey: false }, min)).toEqual({
+      cells: board,
+      announcement: 'Already at the bottom',
+    });
   });
 
   it('ignores keys other than the arrows', () => {

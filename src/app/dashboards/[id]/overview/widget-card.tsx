@@ -67,20 +67,18 @@ function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
   }
 }
 
-/**
- * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
- * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
- */
-export function WidgetCard({
-  chapter,
-  className = '',
-  toolbar,
-}: {
+interface WidgetCardProps {
   chapter: StoryChapter;
   className?: string;
   /** Edit mode's actions on this Widget, at the top of its card. */
   toolbar?: ReactNode;
-}) {
+}
+
+/**
+ * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
+ * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
+ */
+export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const story = chapterStory(chapter, money);

@@ -1,6 +1,14 @@
 import { z } from 'zod';
-import { growToMinimum, minimumSize, type Size } from '@/lib/reporting/board';
-import type { ChapterSource } from '@/lib/reporting/story';
+import {
+  boardCells,
+  growToMinimum,
+  isSamePlace,
+  minimumSize,
+  placeOf,
+  type Cell,
+  type Size,
+} from '@/lib/reporting/board';
+import { chapterKind, type ChapterSource } from '@/lib/reporting/story';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ServiceError } from '../errors';
@@ -163,9 +171,9 @@ export async function createWidget(ctx: ServiceContext, input: WidgetInput): Pro
 
 /**
  * Replaces a Widget's name, query and visualisation, with History. A Widget on a Dashboard
- * whose card is now smaller than its chapter kind's minimum grows to it, pushing the cards in
- * its way down (ADR-0010), in the same transaction. A card is never shrunk, and the layout
- * change isn't History (spec 117).
+ * whose chapter kind changes grows to its new kind's minimum if its card is now smaller,
+ * pushing the cards in its way down (ADR-0010), in the same transaction and under the
+ * Dashboard's lock. A card is never shrunk, and the layout change isn't History (spec 117).
  */
 export async function updateWidget(
   ctx: ServiceContext,
@@ -173,15 +181,11 @@ export async function updateWidget(
   input: WidgetInput,
 ): Promise<Widget> {
   const values = parseInput(widgetInput, input);
-  const current = await findWidget(ctx.db, id);
-  // Worked out before the transaction: a stacked bar's kind depends on running its query.
-  const minimum =
-    current.dashboardId && current.layout
-      ? minimumSize(await chapterSourceOf(ctx, { ...current, ...values }))
-      : null;
+  const { dashboardId } = await findWidget(ctx.db, id);
   return mutate(ctx, async ({ tx, history }) => {
-    if (current.dashboardId) {
-      await tx.query('SELECT 1 FROM dashboard WHERE id = $1 FOR UPDATE', [current.dashboardId]);
+    // The Dashboard first, then the Widget: the dashboards service's lock order.
+    if (dashboardId) {
+      await tx.query('SELECT 1 FROM dashboard WHERE id = $1 FOR UPDATE', [dashboardId]);
     }
     const before = await findWidget(tx, id, true);
     await tx.query(`UPDATE widget SET name = $2, query = $3, visualisation = $4 WHERE id = $1`, [
@@ -190,13 +194,28 @@ export async function updateWidget(
       JSON.stringify(values.query),
       values.visualisation,
     ]);
-    if (minimum && before.dashboardId && before.layout) {
-      await growCardToMinimum(tx, before.dashboardId, id, minimum);
+    if (before.dashboardId && before.layout) {
+      const minimum = await newMinimum(ctx, before, { ...before, ...values });
+      if (minimum) await growCardToMinimum(tx, before.dashboardId, id, minimum);
     }
     const after = await findWidget(tx, id);
     await history.record('widget', id, widgetSnapshot(before), widgetSnapshot(after));
     return after;
   });
+}
+
+/**
+ * The minimum a Widget's card must now have, or null when the edit kept its chapter kind. A
+ * stacked bar's kind depends on its data, so its query runs (on the pool: it reads no row the
+ * edit has locked).
+ */
+async function newMinimum(
+  ctx: ServiceContext,
+  before: Widget,
+  after: Widget,
+): Promise<Size | null> {
+  const [was, now] = await Promise.all([chapterSourceOf(ctx, before), chapterSourceOf(ctx, after)]);
+  return chapterKind(was) === chapterKind(now) ? null : minimumSize(now);
 }
 
 /** Grows a Widget's card to `minimum` on its Dashboard's board and stores every card that moved. */
@@ -206,19 +225,18 @@ async function growCardToMinimum(
   id: string,
   minimum: Size,
 ): Promise<void> {
-  const cells = (await findDashboardWidgets(tx, dashboardId)).flatMap((widget) =>
-    widget.layout ? [{ id: widget.id, ...widget.layout }] : [],
-  );
+  const cells = boardCells(await findDashboardWidgets(tx, dashboardId));
   const placed = growToMinimum(cells, id, minimum);
-  const moved = placed.filter((cell, index) => {
-    const was = cells[index]!;
-    return cell.x !== was.x || cell.y !== was.y || cell.w !== was.w || cell.h !== was.h;
-  });
-  if (moved.length === 0) return;
-  const layouts = moved.map((cell) => ({
-    id: cell.id,
-    layout: { x: cell.x, y: cell.y, w: cell.w, h: cell.h },
-  }));
+  await writeLayouts(
+    tx,
+    placed.filter((cell, index) => !isSamePlace(cell, cells[index]!)),
+  );
+}
+
+/** Stores each card's place and size as its Widget's layout, in one statement. */
+export async function writeLayouts(tx: Queryable, cells: readonly Cell[]): Promise<void> {
+  if (cells.length === 0) return;
+  const layouts = cells.map((cell) => ({ id: cell.id, layout: placeOf(cell) }));
   await tx.query(
     `UPDATE widget w SET layout = item.layout
      FROM jsonb_to_recordset($1::jsonb) AS item(id uuid, layout jsonb)

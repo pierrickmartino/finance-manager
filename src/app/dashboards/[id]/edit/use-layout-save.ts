@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import type { Cell } from '@/lib/reporting/board';
+import { boardKey, type Cell } from '@/lib/reporting/board';
 import { saveDashboardLayoutAction } from '../../actions';
 
 export interface LayoutSave {
@@ -9,15 +9,6 @@ export interface LayoutSave {
   save: (cells: readonly Cell[]) => void;
   isSaving: boolean;
   error: string | null;
-}
-
-/** A board as a value: the same cards in any order give the same key. */
-function boardKey(cells: readonly Cell[]): string {
-  return JSON.stringify(
-    [...cells]
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .map(({ id, x, y, w, h }) => [id, x, y, w, h]),
-  );
 }
 
 /**

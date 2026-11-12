@@ -5,28 +5,28 @@ import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import type { HistorySnapshot } from '../history';
 import {
+  chapterSourceOf,
   findDashboardWidgets,
   findWidget,
   insertWidget,
   removeWidget,
   widgetInput,
+  writeLayouts,
   type Widget,
   type WidgetInput,
   type WidgetLayout,
 } from '../reporting/widgets';
-import { findOverlaps, meetsMinimum, minimumSize } from '@/lib/reporting/board';
 import {
   boardCells,
-  boardInput,
-  chapterSourceOf,
-  freeLayout,
-  initialSize,
-  sizeOf,
-  widgetLayoutInput,
-  type CellInput,
-} from './layout';
+  defaultSize,
+  findOverlaps,
+  meetsMinimum,
+  minimumSize,
+  type Cell,
+} from '@/lib/reporting/board';
+import { boardInput, freeLayout, widgetLayoutInput, type CellInput } from './layout';
 
-export { GRID_COLUMNS, MAX_WIDGET_HEIGHT, type CellInput } from './layout';
+export type { CellInput } from './layout';
 export { seedStarterDashboard, STARTER_DASHBOARD_NAME } from './seed';
 
 /** A named set of Widgets, each placed and sized on its board (GLOSSARY: Dashboard). */
@@ -192,7 +192,7 @@ export async function addWidget(
   const values = parseInput(widgetInput, input);
   const source = parseInput(z.enum(['query', 'account_balances']).default('query'), input.source);
   const given = input.layout ? parseInput(widgetLayoutInput, input.layout) : null;
-  const size = given ? sizeOf(given) : await initialSize(ctx, { ...values, source });
+  const size = given ?? defaultSize(await chapterSourceOf(ctx, { ...values, source }));
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
     const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
@@ -207,21 +207,20 @@ export async function addWidget(
 
 /**
  * Copies a Widget (query and visualisation) onto the same Dashboard, at its size, in the first
- * free spot next to or below the original.
+ * free spot next to or below the original; one without a layout gets its default size, in the
+ * first free spot at the bottom. A Standalone Widget's copy is standalone too.
  */
 export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<Widget> {
   return mutate(ctx, async (scope) => {
     const widget = await findWidget(scope.tx, id);
     const copy = { ...widget, name: copyName(widget.name) };
-    if (!widget.dashboardId || !widget.layout) {
-      return insertWidget(scope, { ...copy, layout: null });
-    }
+    if (!widget.dashboardId) return insertWidget(scope, { ...copy, layout: null });
     await findDashboard(scope.tx, widget.dashboardId, true);
     const cells = boardCells(await findDashboardWidgets(scope.tx, widget.dashboardId));
-    return insertWidget(scope, {
-      ...copy,
-      layout: freeLayout(cells, sizeOf(widget.layout), widget.id),
-    });
+    const layout = widget.layout
+      ? freeLayout(cells, widget.layout, widget.id)
+      : freeLayout(cells, defaultSize(await chapterSourceOf(ctx, widget)));
+    return insertWidget(scope, { ...copy, layout });
   });
 }
 
@@ -236,7 +235,7 @@ export async function copyWidgetToDashboard(
   dashboardId: string,
 ): Promise<Widget> {
   const widget = await findWidget(ctx.db, widgetId);
-  const size = widget.layout ? sizeOf(widget.layout) : await initialSize(ctx, widget);
+  const size = widget.layout ?? defaultSize(await chapterSourceOf(ctx, widget));
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
     const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
@@ -245,6 +244,46 @@ export async function copyWidgetToDashboard(
 }
 
 const WIDGET_LIST_MISMATCH = 'List every Widget of this Dashboard once';
+
+/** Refuses a board that doesn't list every Widget of the Dashboard exactly once. */
+function assertEveryWidgetOnce(widgets: readonly Widget[], board: readonly Cell[]): void {
+  const known = new Set(widgets.map((widget) => widget.id));
+  const ids = board.map((cell) => cell.id);
+  const isEveryWidgetOnce =
+    new Set(ids).size === ids.length &&
+    ids.length === known.size &&
+    ids.every((id) => known.has(id));
+  if (!isEveryWidgetOnce) throw new ValidationError(WIDGET_LIST_MISMATCH);
+}
+
+/**
+ * Refuses the first card under its chapter kind's minimum. Only a stacked bar's kind needs its
+ * query run, so the kinds are worked out together rather than one after another.
+ */
+async function assertMinimums(
+  ctx: ServiceContext,
+  byId: ReadonlyMap<string, Widget>,
+  board: readonly Cell[],
+): Promise<void> {
+  const widgets = board.map((cell) => byId.get(cell.id)!);
+  const minimums = await Promise.all(
+    widgets.map(async (widget) => minimumSize(await chapterSourceOf(ctx, widget))),
+  );
+  const index = board.findIndex((cell, i) => !meetsMinimum(cell, minimums[i]!));
+  if (index < 0) return;
+  const { w, h } = minimums[index]!;
+  throw new ValidationError(
+    `${widgets[index]!.name} must be at least ${w} columns wide and ${h} rows tall`,
+  );
+}
+
+/** Refuses a board where two cards share a cell. */
+function assertNoOverlap(byId: ReadonlyMap<string, Widget>, board: readonly Cell[]): void {
+  const [overlap] = findOverlaps(board);
+  if (!overlap) return;
+  const [first, second] = overlap.map((id) => byId.get(id)!.name);
+  throw new ValidationError(`${first} and ${second} overlap`);
+}
 
 /**
  * Saves a Dashboard's whole board as the editor last left it: every Widget listed once, each
@@ -261,33 +300,10 @@ export async function saveDashboardLayout(
   await withTransaction(ctx.db, async (tx) => {
     await findDashboard(tx, dashboardId, true);
     const widgets = await findDashboardWidgets(tx, dashboardId);
-    const known = new Set(widgets.map((widget) => widget.id));
-    const ids = board.map((cell) => cell.id);
-    const isEveryWidgetOnce =
-      new Set(ids).size === ids.length &&
-      ids.length === known.size &&
-      ids.every((id) => known.has(id));
-    if (!isEveryWidgetOnce) throw new ValidationError(WIDGET_LIST_MISMATCH);
+    assertEveryWidgetOnce(widgets, board);
     const byId = new Map(widgets.map((widget) => [widget.id, widget]));
-    for (const cell of board) {
-      const widget = byId.get(cell.id)!;
-      const min = minimumSize(await chapterSourceOf(ctx, widget));
-      if (!meetsMinimum(cell, min)) {
-        throw new ValidationError(
-          `${widget.name} must be at least ${min.w} columns wide and ${min.h} rows tall`,
-        );
-      }
-    }
-    const [overlap] = findOverlaps(board);
-    if (overlap) {
-      const [first, second] = overlap.map((id) => byId.get(id)!.name);
-      throw new ValidationError(`${first} and ${second} overlap`);
-    }
-    await tx.query(
-      `UPDATE widget w SET layout = item.layout
-       FROM jsonb_to_recordset($1::jsonb) AS item(id uuid, layout jsonb)
-       WHERE w.id = item.id`,
-      [JSON.stringify(board.map(({ id, x, y, w, h }) => ({ id, layout: { x, y, w, h } })))],
-    );
+    await assertMinimums(ctx, byId, board);
+    assertNoOverlap(byId, board);
+    await writeLayouts(tx, board);
   });
 }

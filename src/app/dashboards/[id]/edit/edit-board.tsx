@@ -1,16 +1,26 @@
 'use client';
 
-import { type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react';
-import ReactGridLayout, { useContainerWidth, type Layout } from 'react-grid-layout';
+import {
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+import ReactGridLayout, { useContainerWidth, type Compactor, type Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import { FieldError } from '@/components/form';
 import {
+  boardCells,
   GRID_COLUMNS,
   MAX_WIDGET_HEIGHT,
   minimumSize,
+  placeOf,
   readingOrder,
   swapInReadingOrder,
   type Cell,
+  type VerticalDirection,
 } from '@/lib/reporting/board';
 import { keyboardStep } from '@/lib/reporting/board-keys';
 import {
@@ -20,7 +30,7 @@ import {
   type BoardChapter,
 } from '../overview/widget-board';
 import { WidgetCard } from '../overview/widget-card';
-import { CardToolbar, DRAG_HANDLE_CLASS, type MoveDirection } from './card-toolbar';
+import { CardToolbar, DRAG_HANDLE_CLASS } from './card-toolbar';
 import { createPushDownCompactor, layoutCells } from './push-down-compactor';
 import { useLayoutSave } from './use-layout-save';
 
@@ -52,17 +62,17 @@ function placedChapters(chapters: readonly EditorChapter[], cells: readonly Cell
   const byId = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   return readingOrder(cells).flatMap((cell) => {
     const chapter = byId.get(cell.id);
-    const { x, y, w, h } = cell;
-    return chapter ? [{ ...chapter, layout: { x, y, w, h } }] : [];
+    return chapter ? [{ ...chapter, layout: placeOf(cell) }] : [];
   });
 }
 
-interface GridEditorProps {
-  chapters: EditorChapter[];
-  cells: Cell[];
-  onChange: (cells: Cell[]) => void;
-  /** Tells a screen reader what a keyboard step did. */
-  onAnnounce: (message: string) => void;
+/** The chapters as react-grid-layout items, each kept between its minimum and the tallest card. */
+function gridLayout(placed: readonly EditorChapter[]): Layout {
+  return placed.flatMap(({ id, layout, ...chapter }) => {
+    if (!layout) return [];
+    const min = minimumSize(chapter);
+    return [{ i: id, ...placeOf(layout), minW: min.w, minH: min.h, maxH: MAX_WIDGET_HEIGHT }];
+  });
 }
 
 const KEYS_HINT_ID = 'board-keys-hint';
@@ -81,34 +91,19 @@ function useRefocus(): (id: string) => void {
   return (id) => setFocusId({ id });
 }
 
-/**
- * The board as a react-grid-layout grid: 12 columns of fixed-height rows, the same gaps as the
- * Dashboard Story, each card dragged by its handle and resized from its bottom-right corner,
- * never under its chapter kind's minimum. Cards in the way are pushed down; nothing packs up.
- */
-function GridEditor({ chapters, cells, onChange, onAnnounce }: GridEditorProps) {
-  const { width, containerRef, mounted } = useContainerWidth();
-  const [pushing] = useState(createPushDownCompactor);
-  const placed = placedChapters(chapters, cells);
-  const layout: Layout = placed.map((chapter) => {
-    const min = minimumSize(chapter);
-    return {
-      i: chapter.id,
-      ...chapter.layout,
-      minW: min.w,
-      minH: min.h,
-      maxH: MAX_WIDGET_HEIGHT,
-    };
-  });
-  const begin = (current: Layout, item: { i: string } | null) => {
-    if (item) pushing.begin(item.i, current);
-  };
-  const end = (final: Layout) => {
-    pushing.end();
-    onChange(layoutCells(final));
-  };
+interface BoardChange {
+  cells: Cell[];
+  onChange: (cells: Cell[]) => void;
+  /** Tells a screen reader what a keyboard step did. */
+  onAnnounce: (message: string) => void;
+}
+
+type KeyStep = (chapter: EditorChapter, event: KeyboardEvent<HTMLElement>) => void;
+
+/** A focused card's arrow keys: a move or resize of one cell, saved, announced, focus kept. */
+function useKeyboardStep({ cells, onChange, onAnnounce }: BoardChange): KeyStep {
   const refocus = useRefocus();
-  const step = (chapter: EditorChapter, event: KeyboardEvent<HTMLDivElement>) => {
+  return (chapter, event) => {
     if (event.target !== event.currentTarget) return;
     const result = keyboardStep(cells, chapter.id, event, minimumSize(chapter));
     if (!result) return;
@@ -117,7 +112,15 @@ function GridEditor({ chapters, cells, onChange, onAnnounce }: GridEditorProps) 
     onAnnounce(result.announcement);
     refocus(chapter.id);
   };
-  const cards = placed.map((chapter) => (
+}
+
+/**
+ * A card of the grid: focusable to step it from the keyboard, dragged by its toolbar's handle.
+ * A plain element, not a component: react-grid-layout gives its direct children their place,
+ * class and resize corner.
+ */
+function arrangeableCard(chapter: EditorChapter, onKeyStep: KeyStep): ReactElement {
+  return (
     <div
       key={chapter.id}
       data-card-id={chapter.id}
@@ -126,7 +129,7 @@ function GridEditor({ chapters, cells, onChange, onAnnounce }: GridEditorProps) 
       aria-label={`Arrange ${chapter.name}`}
       aria-describedby={KEYS_HINT_ID}
       className="rounded-3xl"
-      onKeyDown={(event) => step(chapter, event)}
+      onKeyDown={(event) => onKeyStep(chapter, event)}
     >
       <WidgetCard
         chapter={chapter}
@@ -141,7 +144,74 @@ function GridEditor({ chapters, cells, onChange, onAnnounce }: GridEditorProps) 
         }
       />
     </div>
-  ));
+  );
+}
+
+interface BoardGridProps {
+  width: number;
+  layout: Layout;
+  /** A drag or resize of card `id` starts on the board `layout`. */
+  onGestureStart: (id: string, layout: Layout) => void;
+  /** The drag or resize ended on the board `layout`. */
+  onGestureEnd: (layout: Layout) => void;
+  compactor: Compactor;
+  children: ReactNode;
+}
+
+/** react-grid-layout set to the board: the Dashboard Story's columns, rows and gaps. */
+function BoardGrid({
+  width,
+  layout,
+  onGestureStart,
+  onGestureEnd,
+  compactor,
+  children,
+}: BoardGridProps) {
+  const start = (current: Layout, item: { i: string } | null) => {
+    if (item) onGestureStart(item.i, current);
+  };
+  return (
+    <ReactGridLayout
+      className="dashboard-board"
+      width={width}
+      layout={layout}
+      gridConfig={{
+        cols: GRID_COLUMNS,
+        rowHeight: BOARD_ROW_HEIGHT_PX,
+        margin: [BOARD_GAP_PX, BOARD_GAP_PX],
+        containerPadding: [0, 0],
+      }}
+      dragConfig={{ handle: `.${DRAG_HANDLE_CLASS}` }}
+      resizeConfig={{ handles: ['se'] }}
+      compactor={compactor}
+      onDragStart={start}
+      onDragStop={onGestureEnd}
+      onResizeStart={start}
+      onResizeStop={onGestureEnd}
+    >
+      {children}
+    </ReactGridLayout>
+  );
+}
+
+interface GridEditorProps extends BoardChange {
+  chapters: EditorChapter[];
+}
+
+/**
+ * The board as a react-grid-layout grid: 12 columns of fixed-height rows, the same gaps as the
+ * Dashboard Story, each card dragged by its handle and resized from its bottom-right corner,
+ * never under its chapter kind's minimum. Cards in the way are pushed down; nothing packs up.
+ */
+function GridEditor({ chapters, ...change }: GridEditorProps) {
+  const { width, containerRef, mounted } = useContainerWidth();
+  const [pushing] = useState(createPushDownCompactor);
+  const onKeyStep = useKeyboardStep(change);
+  const placed = placedChapters(chapters, change.cells);
+  const end = (final: Layout) => {
+    pushing.end();
+    change.onChange(layoutCells(final));
+  };
 
   return (
     <div ref={containerRef}>
@@ -149,26 +219,15 @@ function GridEditor({ chapters, cells, onChange, onAnnounce }: GridEditorProps) 
         Arrow keys move this card one cell, Shift and arrow keys resize it.
       </p>
       {mounted ? (
-        <ReactGridLayout
-          className="dashboard-board"
+        <BoardGrid
           width={width}
-          layout={layout}
-          gridConfig={{
-            cols: GRID_COLUMNS,
-            rowHeight: BOARD_ROW_HEIGHT_PX,
-            margin: [BOARD_GAP_PX, BOARD_GAP_PX],
-            containerPadding: [0, 0],
-          }}
-          dragConfig={{ handle: `.${DRAG_HANDLE_CLASS}` }}
-          resizeConfig={{ handles: ['se'] }}
+          layout={gridLayout(placed)}
+          onGestureStart={pushing.begin}
+          onGestureEnd={end}
           compactor={pushing.compactor}
-          onDragStart={(current, item) => begin(current, item)}
-          onDragStop={(final) => end(final)}
-          onResizeStart={(current, item) => begin(current, item)}
-          onResizeStop={(final) => end(final)}
         >
-          {cards}
-        </ReactGridLayout>
+          {placed.map((chapter) => arrangeableCard(chapter, onKeyStep))}
+        </BoardGrid>
       ) : (
         <StaticBoard chapters={placed} isDraggable />
       )}
@@ -181,7 +240,7 @@ interface StaticBoardProps {
   chapters: EditorChapter[];
   isDraggable: boolean;
   /** Given, each card gets up/down moves that swap it with its reading-order neighbour. */
-  onMove?: (id: string, direction: MoveDirection) => void;
+  onMove?: (id: string, direction: VerticalDirection) => void;
 }
 
 /** The board as the Dashboard Story draws it, each card with its toolbar. */
@@ -220,20 +279,19 @@ interface EditBoardProps {
 
 /**
  * Edit mode's board (GLOSSARY: Edit mode). At `lg` and above it is the grid, dragged and
- * resized in place, or stepped from the keyboard (announced in a live region); each change saves the whole board at once, without History, with a
- * quiet status and an inline error. Below `lg` it is the Story's one column, not draggable:
- * each card moves up or down instead, swapping places with its reading-order neighbour.
+ * resized in place, or stepped from the keyboard (announced in a live region); each change
+ * saves the whole board at once, without History, with a quiet status and an inline error.
+ * Below `lg` it is the Story's one column, not draggable: each card moves up or down instead,
+ * swapping places with its reading-order neighbour.
  */
 export function EditBoard({ dashboardId, chapters }: EditBoardProps) {
   const isWide = useIsWide();
-  const [cells, setCells] = useState<Cell[]>(() =>
-    chapters.flatMap((chapter) => (chapter.layout ? [{ id: chapter.id, ...chapter.layout }] : [])),
-  );
+  const [cells, setCells] = useState<Cell[]>(() => boardCells(chapters));
   const { save, isSaving, error } = useLayoutSave(dashboardId, cells);
   const [announcement, setAnnouncement] = useState('');
   // The same words twice (a second press at an edge) change by a trailing space, so they are read again.
   const announce = (message: string) =>
-    setAnnouncement((last) => (last === message ? `${message}\u00a0` : message));
+    setAnnouncement((last) => (last === message ? `${message} ` : message));
   const change = (next: Cell[]) => {
     setCells(next);
     save(next);
