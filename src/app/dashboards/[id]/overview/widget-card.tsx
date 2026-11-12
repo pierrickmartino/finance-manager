@@ -10,6 +10,8 @@ import { monthFlows, periodValues } from '@/lib/reporting/overview';
 import { chapterKind, chapterStory, rankedTotals, shareParts } from '@/lib/reporting/story';
 import type { StoryChapter } from '../story/chapter';
 import { DotMatrix, MonthBars, TickList, type TickItem } from './marks';
+// PROTOTYPE: stacked-bar card variants (./stacked-prototype).
+import { usePrototypeBody, usePrototypeChapter } from './stacked-prototype';
 
 /** How many parts a ranking card lists. */
 const RANKING_LIMIT = 6;
@@ -78,9 +80,11 @@ interface WidgetCardProps {
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps) {
+export function WidgetCard({ chapter: realChapter, className = '', toolbar }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
+  const chapter = usePrototypeChapter(realChapter);
+  const prototypeBody = usePrototypeBody(chapter, money);
   const story = chapterStory(chapter, money);
   return (
     <section
@@ -103,7 +107,7 @@ export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps
       {chapter.unconvertedCount > 0 && (
         <p className="text-sm text-warning">{chapter.unconvertedCount} left out: no FX rate yet.</p>
       )}
-      <CardBody chapter={chapter} money={money} />
+      {prototypeBody ?? <CardBody chapter={chapter} money={money} />}
       {story.facts.length > 0 && (
         <dl className="grid grid-cols-2 gap-3 border-t border-rule pt-3">
           {story.facts.map((fact) => (

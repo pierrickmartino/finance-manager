@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { WidgetLayout } from '@/server/services/reporting';
 import type { StoryChapter } from '../story/chapter';
+import { StackedPrototypeSwitcher } from './stacked-prototype';
 import { WidgetCard } from './widget-card';
 
 /** A Widget's chapter with its card's place and size on the board. */
@@ -55,6 +56,8 @@ export function WidgetBoard<T extends BoardChapter>({ chapters, toolbar }: Widge
           />
         </div>
       ))}
+      {/* PROTOTYPE: ./stacked-prototype's variant bar. */}
+      <StackedPrototypeSwitcher chapters={chapters} />
     </div>
   );
 }
