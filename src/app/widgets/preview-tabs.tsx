@@ -1,21 +1,20 @@
 'use client';
 
 import { useId, useState, type ReactNode } from 'react';
-import { STORY } from '../dashboards/[id]/story/palette';
 
-type Pane = 'story' | 'data';
+type Pane = 'card' | 'data';
 
 const PANES: { id: Pane; label: string }[] = [
-  { id: 'story', label: 'Story' },
+  { id: 'card', label: 'Card' },
   { id: 'data', label: 'Data' },
 ];
 
 /**
- * The Widget editor's preview: the chapter the Widget becomes in the Dashboard Story, and the
- * raw table behind it to check the query. Both panes are drawn; only the chosen one shows.
+ * The Widget editor's preview: the card the Widget becomes on its Dashboard, and the raw table
+ * behind it to check the query. Both panes are drawn; only the chosen one shows.
  */
-export function PreviewTabs({ story, data }: { story: ReactNode; data: ReactNode }) {
-  const [pane, setPane] = useState<Pane>('story');
+export function PreviewTabs({ card, data }: { card: ReactNode; data: ReactNode }) {
+  const [pane, setPane] = useState<Pane>('card');
   const baseId = useId();
   return (
     <div className="flex flex-col gap-3">
@@ -29,11 +28,7 @@ export function PreviewTabs({ story, data }: { story: ReactNode; data: ReactNode
             aria-selected={pane === item.id}
             aria-controls={`${baseId}-${item.id}`}
             onClick={() => setPane(item.id)}
-            className="rounded-md border-b-2 px-3 py-1 text-sm font-medium"
-            style={{
-              borderColor: pane === item.id ? STORY.accent : 'transparent',
-              color: pane === item.id ? STORY.ink : STORY.muted,
-            }}
+            className="rounded-md border-b-2 border-transparent px-3 py-1 text-sm font-medium text-muted aria-selected:border-accent-ink aria-selected:text-ink"
           >
             {item.label}
           </button>
@@ -47,7 +42,7 @@ export function PreviewTabs({ story, data }: { story: ReactNode; data: ReactNode
           aria-labelledby={`${baseId}-${item.id}-tab`}
           hidden={pane !== item.id}
         >
-          {item.id === 'story' ? story : data}
+          {item.id === 'card' ? card : data}
         </div>
       ))}
     </div>
