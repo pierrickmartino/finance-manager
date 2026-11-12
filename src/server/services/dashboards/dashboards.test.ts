@@ -285,6 +285,97 @@ describe('Widgets on a Dashboard', () => {
     );
   });
 
+  it('grows a Widget to the minimum of its new chart type and pushes the cards below down, recording only the edit', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    const total = await addWidget(t.ctx, dashboard.id, {
+      name: 'Total',
+      query: SPENDING,
+      visualisation: 'number',
+      layout: { x: 0, y: 0, w: 3, h: 2 },
+    });
+    await addWidget(t.ctx, dashboard.id, {
+      name: 'Beside',
+      query: SPENDING,
+      visualisation: 'line',
+      layout: { x: 4, y: 0, w: 8, h: 6 },
+    });
+    await addWidget(t.ctx, dashboard.id, {
+      name: 'Below',
+      query: SPENDING,
+      visualisation: 'number',
+      layout: { x: 0, y: 2, w: 4, h: 3 },
+    });
+    const historyBefore = await listHistory(t.ctx, {});
+
+    // A Number (minimum 2×2) becomes a Line (a trend: minimum 4×4).
+    const updated = await updateWidget(t.ctx, total.id, {
+      name: 'Total',
+      query: SPENDING,
+      visualisation: 'line',
+    });
+
+    expect(updated.layout).toEqual({ x: 0, y: 0, w: 4, h: 4 });
+    expect(await board(dashboard.id)).toEqual([
+      ['Total', { x: 0, y: 0, w: 4, h: 4 }],
+      ['Beside', { x: 4, y: 0, w: 8, h: 6 }],
+      ['Below', { x: 0, y: 4, w: 4, h: 3 }],
+    ]);
+    const historyAfter = await listHistory(t.ctx, {});
+    const added = historyAfter.slice(0, historyAfter.length - historyBefore.length);
+    expect(added).toEqual([
+      expect.objectContaining({
+        entityId: total.id,
+        field: 'visualisation',
+        before: 'number',
+        after: 'line',
+      }),
+    ]);
+  });
+
+  it('keeps a Widget its size when its new chart type needs no more room', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+    const trend = await addWidget(t.ctx, dashboard.id, {
+      name: 'Trend',
+      query: SPENDING,
+      visualisation: 'line',
+    });
+    const below = await addWidget(t.ctx, dashboard.id, {
+      name: 'Below',
+      query: SPENDING,
+      layout: { x: 0, y: 6, w: 4, h: 8 },
+    });
+
+    // A Line (8×6) becomes a Number (minimum 2×2): never shrunk.
+    await updateWidget(t.ctx, trend.id, {
+      name: 'Trend',
+      query: SPENDING,
+      visualisation: 'number',
+    });
+    // A Table (4×8, minimum 3×5) becomes a Donut (also a list: same minimum).
+    await updateWidget(t.ctx, below.id, { name: 'Below', query: SPENDING, visualisation: 'donut' });
+
+    expect(await board(dashboard.id)).toEqual([
+      ['Trend', trend.layout],
+      ['Below', below.layout],
+    ]);
+  });
+
+  it('leaves a Standalone Widget without a layout when its chart type changes', async () => {
+    const standalone = await createWidget(t.ctx, {
+      name: 'Groceries',
+      query: SPENDING,
+      visualisation: 'number',
+    });
+
+    const updated = await updateWidget(t.ctx, standalone.id, {
+      name: 'Groceries',
+      query: SPENDING,
+      visualisation: 'line',
+    });
+
+    expect(updated.layout).toBeNull();
+  });
+
   it('deletes a Widget, leaving its space empty and the other layouts as they were', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
     const first = await addWidget(t.ctx, dashboard.id, { name: 'First', query: SPENDING });

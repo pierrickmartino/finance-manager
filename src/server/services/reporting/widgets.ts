@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { growToMinimum, minimumSize, type Size } from '@/lib/reporting/board';
+import type { ChapterSource } from '@/lib/reporting/story';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
-import { NotFoundError, parseInput } from '../errors';
+import { NotFoundError, parseInput, ServiceError } from '../errors';
 import type { HistorySnapshot, JsonValue } from '../history';
 import { runAccountBalances } from './balances';
 import { runWidgetQuery, type ReportTable } from './engine';
@@ -159,14 +161,28 @@ export async function createWidget(ctx: ServiceContext, input: WidgetInput): Pro
   return mutate(ctx, (scope) => insertWidget(scope, values));
 }
 
-/** Replaces a Widget's name, query and visualisation. */
+/**
+ * Replaces a Widget's name, query and visualisation, with History. A Widget on a Dashboard
+ * whose card is now smaller than its chapter kind's minimum grows to it, pushing the cards in
+ * its way down (ADR-0010), in the same transaction. A card is never shrunk, and the layout
+ * change isn't History (spec 117).
+ */
 export async function updateWidget(
   ctx: ServiceContext,
   id: string,
   input: WidgetInput,
 ): Promise<Widget> {
   const values = parseInput(widgetInput, input);
+  const current = await findWidget(ctx.db, id);
+  // Worked out before the transaction: a stacked bar's kind depends on running its query.
+  const minimum =
+    current.dashboardId && current.layout
+      ? minimumSize(await chapterSourceOf(ctx, { ...current, ...values }))
+      : null;
   return mutate(ctx, async ({ tx, history }) => {
+    if (current.dashboardId) {
+      await tx.query('SELECT 1 FROM dashboard WHERE id = $1 FOR UPDATE', [current.dashboardId]);
+    }
     const before = await findWidget(tx, id, true);
     await tx.query(`UPDATE widget SET name = $2, query = $3, visualisation = $4 WHERE id = $1`, [
       id,
@@ -174,10 +190,41 @@ export async function updateWidget(
       JSON.stringify(values.query),
       values.visualisation,
     ]);
+    if (minimum && before.dashboardId && before.layout) {
+      await growCardToMinimum(tx, before.dashboardId, id, minimum);
+    }
     const after = await findWidget(tx, id);
     await history.record('widget', id, widgetSnapshot(before), widgetSnapshot(after));
     return after;
   });
+}
+
+/** Grows a Widget's card to `minimum` on its Dashboard's board and stores every card that moved. */
+async function growCardToMinimum(
+  tx: Queryable,
+  dashboardId: string,
+  id: string,
+  minimum: Size,
+): Promise<void> {
+  const cells = (await findDashboardWidgets(tx, dashboardId)).flatMap((widget) =>
+    widget.layout ? [{ id: widget.id, ...widget.layout }] : [],
+  );
+  const placed = growToMinimum(cells, id, minimum);
+  const moved = placed.filter((cell, index) => {
+    const was = cells[index]!;
+    return cell.x !== was.x || cell.y !== was.y || cell.w !== was.w || cell.h !== was.h;
+  });
+  if (moved.length === 0) return;
+  const layouts = moved.map((cell) => ({
+    id: cell.id,
+    layout: { x: cell.x, y: cell.y, w: cell.w, h: cell.h },
+  }));
+  await tx.query(
+    `UPDATE widget w SET layout = item.layout
+     FROM jsonb_to_recordset($1::jsonb) AS item(id uuid, layout jsonb)
+     WHERE w.id = item.id`,
+    [JSON.stringify(layouts)],
+  );
 }
 
 export async function deleteWidget(ctx: ServiceContext, id: string): Promise<void> {
@@ -202,6 +249,28 @@ export async function runSavedWidget(
   return widget.source === 'account_balances'
     ? runAccountBalances(ctx, widget.query)
     : runWidgetQuery(ctx, widget.query);
+}
+
+/**
+ * What decides a Widget's chapter kind, as the Dashboard Story reads it. Only a stacked bar
+ * depends on its data (how many series it has), so only a stacked bar's query is run; one that
+ * fails to run counts as having no series.
+ */
+export async function chapterSourceOf(
+  ctx: ServiceContext,
+  widget: Pick<Widget, 'source' | 'query' | 'visualisation'>,
+): Promise<ChapterSource> {
+  const { source, visualisation } = widget;
+  if (source !== 'query' || visualisation !== 'stacked_bar') {
+    return { source, visualisation, data: null };
+  }
+  try {
+    const report = await runSavedWidget(ctx, widget);
+    return { source, visualisation, data: { columns: report.columns } };
+  } catch (error: unknown) {
+    if (error instanceof ServiceError) return { source, visualisation, data: null };
+    throw error;
+  }
 }
 
 /** Runs a saved Widget. */

@@ -161,6 +161,49 @@ test('a Widget added from any slot goes in the first free spot; the board draws 
   expect(duplicate.x).toBeCloseTo(original.x, 0);
 });
 
+test('changing a Widget to a chart that needs more room grows its card on the Story', async ({
+  page,
+}) => {
+  const widgetName = `Grow ${Date.now()}`;
+  await createDashboard(page, `Grow ${Date.now()}`);
+  await page.getByRole('link', { name: 'New Widget' }).click();
+  await page.getByRole('group', { name: 'Visualisation' }).getByText('Single number').click();
+  await page.getByLabel('Widget name').fill(widgetName);
+  await page.getByRole('button', { name: 'Save Widget' }).click();
+  await expect(chapterTitles(page)).toHaveText([widgetName]);
+
+  // A Single number also heads the overview row; the card is its chapter.
+  const card = page
+    .getByRole('region', { name: widgetName, exact: true })
+    .and(page.locator('[aria-labelledby^="chapter-"]'));
+  const cardHeight = async () => {
+    const found = await card.boundingBox();
+    if (!found) throw new Error(`No card for ${widgetName}`);
+    return found.height;
+  };
+  await page.getByRole('link', { name: 'Done' }).click();
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  const numberHeight = await cardHeight();
+
+  // A Single number is 3 rows high; a Line needs at least 4.
+  await page.getByRole('link', { name: 'Edit Dashboard' }).click();
+  await page.getByRole('link', { name: `Edit ${widgetName}` }).click();
+  await page
+    .getByRole('group', { name: 'Visualisation' })
+    .locator('label')
+    .filter({ hasText: /^Line/ })
+    .click();
+  await expect(page).toHaveURL(/[?&]vis=line/);
+  await expect(page.getByRole('radio', { name: /^Line/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Update Widget' }).click();
+  await expect(chapterTitles(page)).toHaveText([widgetName]);
+  await page.getByRole('link', { name: 'Done' }).click();
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+
+  // One more 40px row and one 20px gap.
+  expect(await cardHeight()).toBeCloseTo(numberHeight + 60, 0);
+});
+
 test('add an existing Widget from the Widgets page to a Dashboard as a copy', async ({ page }) => {
   const dashboardName = `Saved ${Date.now()}`;
   const widgetName = `Standalone ${Date.now()}`;
