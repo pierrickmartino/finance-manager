@@ -111,6 +111,10 @@ _Avoid_: Uncategorised, inbox
 An ordered condition-to-action pair that classifies Transactions. For each field, the first matching Rule wins; a manual edit always beats any Rule.
 _Avoid_: Filter, automation
 
+**Recurring payment**:
+One Payee's series of expenses of a similar amount at a regular cadence, recognised from Transactions and Split lines already recorded. A Payee may have several; a price change continues the same series. It is never scheduled or entered in advance.
+_Avoid_: Subscription, standing order, regular charge
+
 ### History
 
 **History entry**:
