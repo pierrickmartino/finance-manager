@@ -39,10 +39,11 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
 
   return (
     <section className="flex flex-col gap-4">
-      <DashboardChrome name="dashboard-tabs">
+      <DashboardChrome part="dashboard-tabs" dashboardId={dashboard.id}>
         <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
       </DashboardChrome>
       <DashboardOverview
+        dashboardId={dashboard.id}
         dashboardName={dashboard.name}
         subtitle={<p>Editing</p>}
         actions={

@@ -1,8 +1,9 @@
-import { ViewTransition, type ReactNode } from 'react';
+import { ViewTransition, type ReactElement, type ReactNode } from 'react';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
 import type { StoryChapter } from '../story/chapter';
 
 interface DashboardOverviewProps {
+  dashboardId: string;
   dashboardName: string;
   /** Under the name: what the Dashboard tells, or that it's being edited. */
   subtitle: ReactNode;
@@ -33,9 +34,11 @@ interface DashboardOverviewProps {
  * place (`DashboardChrome`) while the board crossfades from one layout to the other. The board
  * is one element: its cards don't morph, since Edit mode's grid places them with transforms.
  * Only that move animates (`share`, the same name leaving one page and entering the other):
- * changes within a page, such as an edit or a card streaming in, swap in place.
+ * changes within a page, such as an edit or a card streaming in, swap in place. The names carry
+ * the Dashboard's id, so opening another Dashboard shares none and swaps with no animation.
  */
 export function DashboardOverview({
+  dashboardId,
   dashboardName,
   subtitle,
   actions,
@@ -44,10 +47,10 @@ export function DashboardOverview({
   overview,
   board,
   empty,
-}: DashboardOverviewProps) {
+}: DashboardOverviewProps): ReactElement {
   return (
     <div className="flex flex-col gap-5">
-      <DashboardChrome name="dashboard-header">
+      <DashboardChrome part="dashboard-header" dashboardId={dashboardId}>
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-display text-3xl tracking-tight">{dashboardName}</h1>
@@ -58,15 +61,38 @@ export function DashboardOverview({
       </DashboardChrome>
       {notice}
       {!isEmpty && (
-        <DashboardChrome name="dashboard-overview">
+        <DashboardChrome part="dashboard-overview" dashboardId={dashboardId}>
           <OverviewRow>{overview}</OverviewRow>
         </DashboardChrome>
       )}
-      <ViewTransition name="dashboard-board" share="auto" default="none">
+      <ViewTransition
+        name={dashboardTransitionName('dashboard-board', dashboardId)}
+        share="auto"
+        default="none"
+      >
         {isEmpty ? empty : board}
       </ViewTransition>
     </div>
   );
+}
+
+/** The parts `DashboardChrome` holds still. */
+export type DashboardChromePart = 'dashboard-tabs' | 'dashboard-header' | 'dashboard-overview';
+
+/** Every part of a Dashboard page that moves between its Story and Edit mode. */
+type DashboardPart = DashboardChromePart | 'dashboard-board';
+
+/** A part's view-transition name: the same on the Dashboard's Story and Edit mode only. */
+function dashboardTransitionName(part: DashboardPart, dashboardId: string): string {
+  return `${part}-${dashboardId}`;
+}
+
+interface DashboardChromeProps {
+  part: DashboardChromePart;
+  /** The Dashboard shown: the part is shared only with the same Dashboard's other view. */
+  dashboardId: string;
+  /** One element: the part held still. */
+  children: ReactNode;
 }
 
 /**
@@ -74,9 +100,17 @@ export function DashboardOverview({
  * crossfades: its new look replaces the old at once, with no move and no fade (the
  * `dashboard-chrome` view-transition class in `globals.css`).
  */
-export function DashboardChrome({ name, children }: { name: string; children: ReactNode }) {
+export function DashboardChrome({
+  part,
+  dashboardId,
+  children,
+}: DashboardChromeProps): ReactElement {
   return (
-    <ViewTransition name={name} share="dashboard-chrome" default="none">
+    <ViewTransition
+      name={dashboardTransitionName(part, dashboardId)}
+      share="dashboard-chrome"
+      default="none"
+    >
       {children}
     </ViewTransition>
   );

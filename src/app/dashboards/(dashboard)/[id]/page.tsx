@@ -37,10 +37,11 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
 
   return (
     <section className="flex flex-col gap-4">
-      <DashboardChrome name="dashboard-tabs">
+      <DashboardChrome part="dashboard-tabs" dashboardId={dashboard.id}>
         <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
       </DashboardChrome>
       <DashboardOverview
+        dashboardId={dashboard.id}
         dashboardName={dashboard.name}
         subtitle={<p>Where you stand, where it went, and what changed this month.</p>}
         actions={

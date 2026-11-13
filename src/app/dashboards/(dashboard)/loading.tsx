@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { PageSkeleton } from '@/components/page-skeleton';
 
 /**
@@ -6,6 +7,6 @@ import { PageSkeleton } from '@/components/page-skeleton';
  * the Story and Edit mode of the same one keeps the page on screen until the other is ready,
  * so the board crossfades between the two instead of passing through a skeleton (ADR-0012).
  */
-export default function Loading() {
+export default function Loading(): ReactElement {
   return <PageSkeleton label="Loading the Dashboard" />;
 }
