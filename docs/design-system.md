@@ -32,6 +32,8 @@ Type: `font-display` (Inter Tight) for page titles, section titles and headline 
 
 Corners: the radius scale itself is small (`rounded-md` 6px, `rounded-lg`/`xl`/`2xl` 8px, `rounded-3xl` 10px). Buttons, pills and avatars use `rounded-lg`, badges `rounded-md`. Keep `rounded-full` for things that are round by nature: dots, toggles, progress tracks.
 
+Motion: route navigations animate with View Transitions (ADR-0012). `--motion-duration-nav` (250ms) and `--motion-ease-nav` (`cubic-bezier(0.16, 1, 0.3, 1)`) are plain CSS variables on `:root` in `globals.css`, not utilities, and are the defaults of every `::view-transition-group/old/new(*)`. A page names the elements that move with React's `<ViewTransition>`; an override of the duration or easing uses these tokens. Under reduced motion every view transition is instant: one global rule sets `animation: none` on its pseudo-elements.
+
 ## Primitives (`surface.ts`)
 
 | Primitive | Use for |
@@ -43,7 +45,7 @@ Corners: the radius scale itself is small (`rounded-md` 6px, `rounded-lg`/`xl`/`
 | `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch. Put it on the notice itself, never on rows inside it; mark problem rows with `text-warning`. |
 | `BADGE_CLASS[tone]` | A short label beside a row's name: `warning` asks for attention (Missed, a price increase), `info` is neutral status (New, "Not yet imported"), `neutral` a plain fact. `rounded-md`, never decoration. |
 | `TILE_CLASS` | A card of the Dashboard's grid (the overview row and each Widget). |
-| `PLACEHOLDER_CLASS` | A quiet block standing in for content still loading: a Dashboard card's chart or line of text while its query runs. Pulses gently, still under reduced motion; its container carries `aria-busy`. |
+| `PLACEHOLDER_CLASS` | A quiet block standing in for content still loading: a Dashboard card's chart or line of text while its query runs. Pulses gently, and holds still under reduced motion (`motion-safe:animate-pulse`); its container carries `aria-busy`. |
 | `PILL_BUTTON_CLASS` | A pill-shaped action beside or on the Dashboard's tiles (Edit Dashboard). |
 | `PRIMARY_BUTTON_CLASS` | The view's main action, one per view where possible. |
 | `ACCENT_BUTTON_CLASS` | The main action of the Dashboard Story's own views: Done in Edit mode, Save in the Widget editor. |
