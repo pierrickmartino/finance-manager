@@ -24,6 +24,15 @@ describe('yearlyCostWorking', () => {
     ).toBe('CHF 21.90 × 12');
   });
 
+  it('shows a quarterly series times 4', () => {
+    expect(
+      yearlyCostWorking(
+        { currency: 'CHF', lastAmountMinor: 120000, chargesPerYear: 4, yearlyCost: null },
+        fmt,
+      ),
+    ).toBe("CHF 1'200.00 × 4");
+  });
+
   it('adds the FX rate used for a series in another Currency', () => {
     expect(
       yearlyCostWorking(
@@ -73,5 +82,11 @@ describe('yearlyCostWorking', () => {
 describe('cadenceLabel', () => {
   it('reads monthly in sentence case', () => {
     expect(cadenceLabel('monthly')).toBe('Monthly');
+  });
+
+  it('reads the longer cadences in sentence case', () => {
+    expect(cadenceLabel('quarterly')).toBe('Quarterly');
+    expect(cadenceLabel('half-yearly')).toBe('Half-yearly');
+    expect(cadenceLabel('yearly')).toBe('Yearly');
   });
 });

@@ -43,7 +43,12 @@ export function yearlyCostWorking(
   return `${working} at ${rateText} ${BASE_CURRENCY}/${payment.currency}`;
 }
 
-const CADENCE_LABELS = { monthly: 'Monthly' } as const satisfies Record<Cadence, string>;
+const CADENCE_LABELS = {
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  'half-yearly': 'Half-yearly',
+  yearly: 'Yearly',
+} as const satisfies Record<Cadence, string>;
 
 export function cadenceLabel(cadence: Cadence): string {
   return CADENCE_LABELS[cadence];

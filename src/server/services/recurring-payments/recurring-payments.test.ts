@@ -6,6 +6,7 @@ import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { editClassification, type ClassificationChanges } from '../transactions';
+import { addDays } from '../fx/dates';
 import { linkTransfer } from '../transfers';
 import { listRecurringPayments } from '.';
 
@@ -149,6 +150,127 @@ describe('the monthly interval and charge count', () => {
     const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-03-10' });
 
     expect(recurringPayments).toEqual([]);
+  });
+});
+
+/** Charges of `amount` from `start`, each the given number of days after the one before. */
+function spaced(start: string, gaps: number[], amount: number): Charge[] {
+  const dates = gaps.reduce((all, gap) => [...all, addDays(all.at(-1)!, gap)], [start]);
+  return monthly(dates, amount);
+}
+
+describe('the quarterly, half-yearly and yearly cadences', () => {
+  const TODAY = '2028-06-01';
+
+  async function cadencesOf(gaps: number[]): Promise<string[]> {
+    await charges(await account(), 'Insurer', spaced('2025-07-01', gaps, -45000));
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: TODAY });
+    return recurringPayments.map((payment) => payment.cadence);
+  }
+
+  it('accepts gaps of 74 and 109 days as quarterly', async () => {
+    expect(await cadencesOf([74, 109])).toEqual(['quarterly']);
+  });
+
+  it('does not recognise a quarterly series with a gap of 73 days', async () => {
+    expect(await cadencesOf([91, 73])).toEqual([]);
+  });
+
+  it('does not recognise a quarterly series with a gap of 110 days', async () => {
+    expect(await cadencesOf([110, 91])).toEqual([]);
+  });
+
+  it('needs three quarterly charges: two a quarter apart are not a Recurring payment', async () => {
+    expect(await cadencesOf([91])).toEqual([]);
+  });
+
+  it('accepts gaps of 147 and 219 days as half-yearly', async () => {
+    expect(await cadencesOf([147, 219])).toEqual(['half-yearly']);
+  });
+
+  it('does not recognise a half-yearly series with a gap of 146 days', async () => {
+    expect(await cadencesOf([146])).toEqual([]);
+  });
+
+  it('does not recognise a half-yearly series with a gap of 220 days', async () => {
+    expect(await cadencesOf([220])).toEqual([]);
+  });
+
+  it('recognises two charges half a year apart', async () => {
+    expect(await cadencesOf([182])).toEqual(['half-yearly']);
+  });
+
+  it('accepts gaps of 293 and 438 days as yearly', async () => {
+    expect(await cadencesOf([293, 438])).toEqual(['yearly']);
+  });
+
+  it('does not recognise a yearly series with a gap of 292 days', async () => {
+    expect(await cadencesOf([292])).toEqual([]);
+  });
+
+  it('does not recognise a yearly series with a gap of 439 days', async () => {
+    expect(await cadencesOf([439])).toEqual([]);
+  });
+
+  it('recognises two charges a year apart', async () => {
+    expect(await cadencesOf([365])).toEqual(['yearly']);
+  });
+
+  it('never recognises a single charge', async () => {
+    expect(await cadencesOf([])).toEqual([]);
+  });
+
+  it('does not recognise a series whose gaps fit different cadences', async () => {
+    expect(await cadencesOf([91, 182])).toEqual([]);
+  });
+
+  it('gives a half-yearly series 2 charges a year and expects the next 6 months on', async () => {
+    await charges(await account(), 'Car tax', monthly(['2024-08-31', '2025-02-28'], -30000));
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-03-15' });
+
+    expect(recurringPayments).toMatchObject([
+      {
+        cadence: 'half-yearly',
+        chargesPerYear: 2,
+        nextExpectedDate: '2025-08-28',
+        yearlyCost: { amountMinor: 60000 },
+      },
+    ]);
+  });
+
+  it('gives a yearly series 1 charge a year and expects the next 12 months on', async () => {
+    await charges(await account(), 'Card fee', monthly(['2023-02-28', '2024-02-29'], -9000));
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2024-03-15' });
+
+    expect(recurringPayments).toMatchObject([
+      {
+        cadence: 'yearly',
+        chargesPerYear: 1,
+        nextExpectedDate: '2025-02-28',
+        yearlyCost: { amountMinor: 9000 },
+      },
+    ]);
+  });
+
+  it('gives a quarterly series 4 charges a year and expects the next 3 months on', async () => {
+    await charges(
+      await account(),
+      'Health insurer',
+      monthly(['2025-05-31', '2025-08-31', '2025-11-30'], -120000),
+    );
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-12-15' });
+
+    expect(recurringPayments).toMatchObject([
+      {
+        cadence: 'quarterly',
+        chargesPerYear: 4,
+        nextExpectedDate: '2026-02-28',
+        yearlyCost: { amountMinor: 480000 },
+      },
+    ]);
   });
 });
 
