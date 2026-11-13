@@ -66,6 +66,30 @@
 
 :root {
   color-scheme: light;
+
+  /*
+   * Navigation motion (ADR-0012): how long a route navigation's view transition takes, and
+   * its ease-out. Plain variables, not @theme: no utility is generated from them.
+   */
+  --motion-duration-nav: 250ms;
+  --motion-ease-nav: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Every view transition defaults to the navigation motion; a named element may override it. */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--motion-duration-nav);
+  animation-timing-function: var(--motion-ease-nav);
+}
+
+/* Reduced motion: the swap is instant, whatever an element's own transition says. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /* The hero's backdrop: deep navy at the top, lit from the top right, fading into the page. */
