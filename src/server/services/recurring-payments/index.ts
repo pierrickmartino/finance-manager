@@ -15,6 +15,7 @@ export {
   type Cadence,
 } from './cadences';
 export type { Charge, ChargeKind } from './charges';
+export { listRecurringPaymentCharges, type ChargeRef, type RecurringPaymentDrill } from './drill';
 
 /**
  * Where a Recurring payment stands. Only `active` for now; Missed, "Not yet imported", Ended

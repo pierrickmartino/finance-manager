@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createFormatter, DEFAULT_DISPLAY_SETTINGS } from '@/lib/format';
-import { aroundDate, cadenceLabel, yearlyCostWorking } from './view';
+import { aroundDate, cadenceLabel, chargeFromParams, drillHref, yearlyCostWorking } from './view';
 
 const fmt = createFormatter(DEFAULT_DISPLAY_SETTINGS);
 
@@ -67,6 +67,28 @@ describe('yearlyCostWorking', () => {
         dot,
       ),
     ).toBe('EUR 9,99 × 12 at 0,93 CHF/EUR');
+  });
+});
+
+describe('the Drill-down link', () => {
+  const LAST = '2b8e6f3a-5c74-4fa0-9c90-3b4f5e6d7c82';
+  const charges = [
+    { kind: 'transaction', id: '1c7a5d2f-4b63-4e9f-8b8f-2a3e4d5c6b71' },
+    { kind: 'transaction', id: LAST },
+  ] as const;
+
+  it('names the series by its latest charge and reads that charge back', () => {
+    const href = drillHref({ charges });
+
+    expect(href).toBe(`/recurring-payments/drill?charge=transaction%3A${LAST}`);
+    const params = Object.fromEntries(new URL(href, 'http://localhost').searchParams);
+    expect(chargeFromParams(params)).toEqual({ kind: 'transaction', id: LAST });
+  });
+
+  it('reads nothing back from a missing or malformed charge', () => {
+    for (const params of [{}, { charge: LAST }, { charge: 'transaction:' }, { charge: ':x' }]) {
+      expect(chargeFromParams(params)).toBeNull();
+    }
   });
 });
 

@@ -7,7 +7,8 @@ import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { editClassification, type ClassificationChanges } from '../transactions';
 import { linkTransfer } from '../transfers';
-import { listRecurringPayments } from '.';
+import { NotFoundError } from '../errors';
+import { listRecurringPaymentCharges, listRecurringPayments } from '.';
 
 const t = setupTestDatabase();
 
@@ -437,5 +438,56 @@ describe('yearly cost and next expected date', () => {
     const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-02-10' });
 
     expect(recurringPayments).toMatchObject([{ nextExpectedDate: '2025-02-28' }]);
+  });
+});
+
+describe("a Recurring payment's Drill-down", () => {
+  const TODAY = '2025-03-20';
+
+  /** Swisscom's two series: 49.00 on the 15th and 79.00 on the 16th, ids in each oldest first. */
+  async function twoSeries(): Promise<{ mobile: string[]; internet: string[] }> {
+    const ids = await charges(await account(), 'Swisscom', [
+      { date: '2025-01-15', amount: -4900 },
+      { date: '2025-01-16', amount: -7900 },
+      { date: '2025-02-15', amount: -4900 },
+      { date: '2025-02-16', amount: -7900 },
+      { date: '2025-03-15', amount: -4900 },
+      { date: '2025-03-16', amount: -7900 },
+    ]);
+    return {
+      mobile: ids.filter((_, index) => index % 2 === 0),
+      internet: ids.filter((_, index) => index % 2 === 1),
+    };
+  }
+
+  it("lists exactly the series' charges, newest first, from any one of them", async () => {
+    const { mobile } = await twoSeries();
+
+    const drill = await listRecurringPaymentCharges(t.ctx, {
+      today: TODAY,
+      charge: { kind: 'transaction', id: mobile[1]! },
+    });
+
+    expect(drill.recurringPayment).toMatchObject({
+      payee: { name: 'Swisscom' },
+      lastAmountMinor: 4900,
+    });
+    expect(drill.transactions.map((item) => [item.id, item.amountMinor])).toEqual([
+      [mobile[2], -4900],
+      [mobile[1], -4900],
+      [mobile[0], -4900],
+    ]);
+  });
+
+  it('is not found for a charge that is in no Recurring payment', async () => {
+    await twoSeries();
+    const [stray] = await charges(await account(), 'Kiosk', [{ date: '2025-03-01', amount: -500 }]);
+
+    await expect(
+      listRecurringPaymentCharges(t.ctx, {
+        today: TODAY,
+        charge: { kind: 'transaction', id: stray! },
+      }),
+    ).rejects.toThrow(NotFoundError);
   });
 });
