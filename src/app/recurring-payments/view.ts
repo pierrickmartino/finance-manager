@@ -2,6 +2,7 @@ import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { NUMBER_FORMATS, type Formatter } from '@/lib/format';
 import type {
   Cadence,
+  CadenceRule,
   RecurringPayment,
   RecurringPaymentFlag,
   RecurringPaymentState,
@@ -48,10 +49,33 @@ export function yearlyCostWorking(
   return `${working} at ${rateText} ${BASE_CURRENCY}/${payment.currency}`;
 }
 
-const CADENCE_LABELS = { monthly: 'Monthly' } as const satisfies Record<Cadence, string>;
+const CADENCE_LABELS = {
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  'half-yearly': 'Half-yearly',
+  yearly: 'Yearly',
+} as const satisfies Record<Cadence, string>;
 
 export function cadenceLabel(cadence: Cadence): string {
   return CADENCE_LABELS[cadence];
+}
+
+/** "a and b", or "a, b and c". */
+function listText(items: readonly string[]): string {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+}
+
+/**
+ * The fewest charges each cadence needs, as the empty state says it, grouped by count in the
+ * order of `rules`: "at least 3 charges for monthly and quarterly, 2 for half-yearly and yearly".
+ */
+export function minimumChargesText(rules: readonly CadenceRule[]): string {
+  const groups = [...Map.groupBy(rules, (rule) => rule.minCharges)];
+  const parts = groups.map(([count, group], index) => {
+    const cadences = listText(group.map((rule) => cadenceLabel(rule.cadence).toLowerCase()));
+    return `${count}${index === 0 ? ' charges' : ''} for ${cadences}`;
+  });
+  return `at least ${parts.join(', ')}`;
 }
 
 /** A short label beside a Recurring payment, in a meaning token: attention or neutral status. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFormatter, DEFAULT_DISPLAY_SETTINGS } from '@/lib/format';
-import { aroundDate, badgesOf, cadenceLabel, yearlyCostWorking } from './view';
+import { CADENCES } from '@/server/services/recurring-payments';
+import { aroundDate, badgesOf, cadenceLabel, minimumChargesText, yearlyCostWorking } from './view';
 
 const fmt = createFormatter(DEFAULT_DISPLAY_SETTINGS);
 
@@ -22,6 +23,15 @@ describe('yearlyCostWorking', () => {
         fmt,
       ),
     ).toBe('CHF 21.90 × 12');
+  });
+
+  it('shows a quarterly series times 4', () => {
+    expect(
+      yearlyCostWorking(
+        { currency: 'CHF', lastAmountMinor: 120000, chargesPerYear: 4, yearlyCost: null },
+        fmt,
+      ),
+    ).toBe("CHF 1'200.00 × 4");
   });
 
   it('adds the FX rate used for a series in another Currency', () => {
@@ -73,6 +83,20 @@ describe('yearlyCostWorking', () => {
 describe('cadenceLabel', () => {
   it('reads monthly in sentence case', () => {
     expect(cadenceLabel('monthly')).toBe('Monthly');
+  });
+
+  it('reads the longer cadences in sentence case', () => {
+    expect(cadenceLabel('quarterly')).toBe('Quarterly');
+    expect(cadenceLabel('half-yearly')).toBe('Half-yearly');
+    expect(cadenceLabel('yearly')).toBe('Yearly');
+  });
+});
+
+describe('minimumChargesText', () => {
+  it('names the fewest charges each cadence needs, grouped by count', () => {
+    expect(minimumChargesText(CADENCES)).toBe(
+      'at least 3 charges for monthly and quarterly, 2 for half-yearly and yearly',
+    );
   });
 });
 

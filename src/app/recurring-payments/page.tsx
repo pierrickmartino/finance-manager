@@ -12,7 +12,14 @@ import {
   WINDOW_MONTHS,
   type RecurringPayment,
 } from '@/server/services/recurring-payments';
-import { aroundDate, badgesOf, cadenceLabel, yearlyCostWorking, type Badge } from './view';
+import {
+  aroundDate,
+  badgesOf,
+  cadenceLabel,
+  minimumChargesText,
+  yearlyCostWorking,
+  type Badge,
+} from './view';
 
 export const metadata: Metadata = { title: 'Recurring payments · Finance Manager' };
 
@@ -156,15 +163,14 @@ function PaymentRow({ payment, today, fmt }: PaymentRowProps) {
 }
 
 function EmptyState() {
-  const monthly = CADENCES.find((rule) => rule.cadence === 'monthly')!;
   return (
     <div className={`${CARD_CLASS} flex flex-col gap-2 px-4 py-6 text-sm`}>
       <p className="font-medium">No Recurring payments recognised yet.</p>
       <p className="text-muted">
         A Recurring payment is a Payee&apos;s expense of a similar amount (within{' '}
-        {AMOUNT_TOLERANCE * 100}% of the previous charge) booked every month, from at least{' '}
-        {monthly.minCharges} charges in the last {WINDOW_MONTHS} months. Only Transactions
-        classified under an Expense Category and with a Payee count.
+        {AMOUNT_TOLERANCE * 100}% of the previous charge) booked every month, quarter, half-year or
+        year, from {minimumChargesText(CADENCES)} in the last {WINDOW_MONTHS} months. Only
+        Transactions and Split lines classified under an Expense Category and with a Payee count.
       </p>
     </div>
   );
