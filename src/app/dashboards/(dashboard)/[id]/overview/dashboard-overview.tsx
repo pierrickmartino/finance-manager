@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { ViewTransition, type ReactNode } from 'react';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
 import type { StoryChapter } from '../story/chapter';
 
@@ -28,6 +28,12 @@ interface DashboardOverviewProps {
  * (the headline number, the month's insight, recent activity) in its own band, then the board,
  * each Widget's card at its place and size (ADR-0010). Edit mode draws the same page with its
  * own controls. Light only; values in CHF.
+ *
+ * Moving between the Story and Edit mode (ADR-0012), the header and the overview row stay in
+ * place (`DashboardChrome`) while the board crossfades from one layout to the other. The board
+ * is one element: its cards don't morph, since Edit mode's grid places them with transforms.
+ * Only that move animates (`share`, the same name leaving one page and entering the other):
+ * changes within a page, such as an edit or a card streaming in, swap in place.
  */
 export function DashboardOverview({
   dashboardName,
@@ -41,23 +47,38 @@ export function DashboardOverview({
 }: DashboardOverviewProps) {
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight">{dashboardName}</h1>
-          <div className="mt-1 text-muted">{subtitle}</div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
-      </header>
+      <DashboardChrome name="dashboard-header">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl tracking-tight">{dashboardName}</h1>
+            <div className="mt-1 text-muted">{subtitle}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        </header>
+      </DashboardChrome>
       {notice}
-      {isEmpty ? (
-        empty
-      ) : (
-        <>
+      {!isEmpty && (
+        <DashboardChrome name="dashboard-overview">
           <OverviewRow>{overview}</OverviewRow>
-          {board}
-        </>
+        </DashboardChrome>
       )}
+      <ViewTransition name="dashboard-board" share="auto" default="none">
+        {isEmpty ? empty : board}
+      </ViewTransition>
     </div>
+  );
+}
+
+/**
+ * A part of the Dashboard page that the Story and Edit mode share, held still while the board
+ * crossfades: its new look replaces the old at once, with no move and no fade (the
+ * `dashboard-chrome` view-transition class in `globals.css`).
+ */
+export function DashboardChrome({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <ViewTransition name={name} share="dashboard-chrome" default="none">
+      {children}
+    </ViewTransition>
   );
 }
 

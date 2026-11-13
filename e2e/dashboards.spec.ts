@@ -17,6 +17,7 @@ import {
   widgetCard,
 } from './support/dashboards';
 import { withServices } from './support/services';
+import { viewTransitionAnimationsDuring } from './support/view-transitions';
 
 /** The chapter titles, in the order the page tells them. */
 function chapterTitles(page: Page) {
@@ -80,6 +81,69 @@ test('a Dashboard opens as its Story; Edit mode lists the same Widgets in order,
   await page.getByRole('link', { name: 'Done' }).click();
   await expect(page).toHaveURL(/\/dashboards\/[^/]+$/);
   await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+});
+
+/**
+ * Story → Edit mode → Done → back → forward, each step checked to land on the right page.
+ * Returns how many view-transition animations each step moved (ADR-0012), in order. React's
+ * own 0ms bookkeeping animations on the pseudo-elements don't count: they move nothing.
+ */
+async function switchStoryAndEditMode(page: Page): Promise<number[]> {
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  const toEdit = async () => {
+    await expect(page).toHaveURL(/\/dashboards\/[^/]+\/edit$/);
+    await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Done' })).toBeVisible();
+  };
+  const toStory = async () => {
+    await expect(page).toHaveURL(/\/dashboards\/[^/]+$/);
+    await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+    await expect(chapterTitles(page).first()).toBeVisible();
+  };
+  const steps: (() => Promise<unknown>)[] = [
+    async () => {
+      await page.getByRole('link', { name: 'Edit Dashboard' }).click();
+      await toEdit();
+    },
+    async () => {
+      await page.getByRole('link', { name: 'Done' }).click();
+      await toStory();
+    },
+    async () => {
+      await page.goBack();
+      await toEdit();
+    },
+    async () => {
+      await page.goForward();
+      await toStory();
+    },
+  ];
+  const counts: number[] = [];
+  for (const step of steps) {
+    const animations = await viewTransitionAnimationsDuring(page, step);
+    counts.push(animations.filter((animation) => animation.duration > 0).length);
+  }
+  return counts;
+}
+
+test('Edit Dashboard and Done both crossfade the board; back and forward land on the right page', async ({
+  page,
+}) => {
+  const [toEdit, toStory] = await switchStoryAndEditMode(page);
+
+  // Back and forward aren't checked for motion: React commits a history traversal at once,
+  // without a view transition, when the page is already in the router's cache.
+  expect(toEdit).toBeGreaterThan(0);
+  expect(toStory).toBeGreaterThan(0);
+});
+
+test('under reduced motion the Story and Edit mode swap with no animation', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  const counts = await switchStoryAndEditMode(page);
+
+  expect(counts).toEqual([0, 0, 0, 0]);
 });
 
 test('add a stacked bar Widget from the empty Dashboard; the editor previews its card', async ({

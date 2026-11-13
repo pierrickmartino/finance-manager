@@ -139,6 +139,17 @@ body {
   color: var(--color-ink);
 }
 
+/* A Dashboard's shared chrome (header, tabs, overview row) between its Story and Edit mode
+   (ADR-0012): the new look replaces the old at once, so only the board crossfades. */
+::view-transition-group(.dashboard-chrome),
+::view-transition-new(.dashboard-chrome) {
+  animation: none;
+}
+
+::view-transition-old(.dashboard-chrome) {
+  display: none;
+}
+
 /* Edit mode's grid (react-grid-layout, ADR-0010): where a dragged or resized card will land,
    and the resize corner, in the accent instead of the library's own colours. */
 .dashboard-board .react-grid-item.react-grid-placeholder {

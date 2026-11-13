@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { boardKey, type Cell } from '@/lib/reporting/board';
-import { saveDashboardLayoutAction } from '../../actions';
+import { saveDashboardLayoutAction } from '../../../actions';
 
 export interface LayoutSave {
   /** Saves the whole board, unless it is the board last saved. */
