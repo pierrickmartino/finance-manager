@@ -1,10 +1,14 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { CARD_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { TransactionDetail } from '@/server/services/transactions';
 import { amountClass, transactionName } from '../transaction-display';
 import { TransactionMorph } from '../transaction-morph';
+import {
+  DETAIL_HEADER_CLASS,
+  DETAIL_HEADER_INITIAL_CLASS,
+  DETAIL_HEADER_TITLE_CLASS,
+} from './detail-layout';
 import type { BadgeTone, StatusBadge } from './transaction-badges';
 
 const TONE_CLASS: Record<BadgeTone, string> = {
@@ -30,17 +34,14 @@ export function TransactionHeader({ transaction, badges, fmt, actions }: Transac
   const name = transactionName(transaction);
   return (
     <TransactionMorph transactionId={transaction.id} part="detail">
-      <header
-        aria-label="Transaction"
-        className={`${CARD_CLASS} flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4`}
-      >
+      <header aria-label="Transaction" className={DETAIL_HEADER_CLASS}>
         <span
           aria-hidden="true"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-sunken text-lg font-semibold text-ink-soft"
+          className={`${DETAIL_HEADER_INITIAL_CLASS} grid place-items-center bg-sunken text-lg font-semibold text-ink-soft`}
         >
           {name.slice(0, 1).toUpperCase()}
         </span>
-        <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
+        <div className={DETAIL_HEADER_TITLE_CLASS}>
           <h1 className="line-clamp-2 text-lg font-semibold break-words" title={name}>
             {name}
           </h1>
