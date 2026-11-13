@@ -303,6 +303,10 @@ test('below lg Edit mode is one column with up/down moves that swap places on th
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.reload();
   await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  // Polled: right after the reload the grid may not have measured its width yet.
+  await expect
+    .poll(async () => Math.round((await cardBox(page, copy)).x))
+    .toBe(Math.round(wide.original.x));
   const swapped = { original: await cardBox(page, original), copy: await cardBox(page, copy) };
   expect(swapped.copy.x).toBeCloseTo(wide.original.x, 0);
   expect(swapped.original.x).toBeCloseTo(wide.copy.x, 0);
