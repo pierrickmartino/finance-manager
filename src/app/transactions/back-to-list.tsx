@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore, type ReactElement } from 'react';
+import { createRememberedValue } from '@/lib/remembered-value';
 
 const LIST_HREF = '/transactions';
 
@@ -9,20 +10,16 @@ const LIST_HREF = '/transactions';
  * The Transactions list the user last looked at (its search, page and selection), kept for the
  * session's client-side navigations only. A full page load starts again from the plain list.
  */
-let lastListHref = LIST_HREF;
-const listeners = new Set<() => void>();
+const lastList = createRememberedValue(LIST_HREF);
 
-function subscribe(onChange: () => void): () => void {
-  listeners.add(onChange);
-  return () => listeners.delete(onChange);
+interface RememberTransactionsListProps {
+  /** The list page's own URL: its search, page and selection. */
+  href: string;
 }
 
 /** Records `href` as the list to go back to; renders nothing. Put it on the list page. */
-export function RememberTransactionsList({ href }: { href: string }) {
-  useEffect(() => {
-    lastListHref = href;
-    for (const listener of listeners) listener();
-  }, [href]);
+export function RememberTransactionsList({ href }: RememberTransactionsListProps): null {
+  useEffect(() => lastList.remember(href), [href]);
   return null;
 }
 
@@ -31,12 +28,8 @@ export function RememberTransactionsList({ href }: { href: string }) {
  * Transaction detail's header morphs back into its row or preview (ADR-0012). Browser back
  * lands on the same list, without the morph: React runs history traversals synchronously.
  */
-export function BackToTransactions() {
-  const href = useSyncExternalStore(
-    subscribe,
-    () => lastListHref,
-    () => LIST_HREF,
-  );
+export function BackToTransactions(): ReactElement {
+  const href = useSyncExternalStore(lastList.subscribe, lastList.get, () => LIST_HREF);
   return (
     <Link href={href} className="text-sm text-muted hover:underline">
       ← Transactions

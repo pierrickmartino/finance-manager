@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:dev": "E2E_SERVER=dev playwright test",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts up",
     "db:migrate:down": "tsx --env-file-if-exists=.env.local scripts/migrate.ts down",
     "db:new-migration": "tsx scripts/new-migration.ts",

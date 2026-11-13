@@ -2,10 +2,8 @@ import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openAccountPage, openNewAccountForm } from './support/accounts';
 import { openTransaction } from './support/transactions';
-import {
-  viewTransitionAnimationsDuring,
-  type ViewTransitionAnimation,
-} from './support/view-transitions';
+import { breakpointPx } from '../src/lib/breakpoints';
+import { viewTransitionMotionDuring } from './support/view-transitions';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -13,9 +11,9 @@ const UBS_OCTOBER = path.join(
 );
 
 /** Tailwind's `xl` and up: the Transaction preview shows beside the list. */
-const WIDE = { width: 1280, height: 800 };
-/** Below `xl`: no preview, a row opens its Transaction detail. */
-const NARROW = { width: 1024, height: 768 };
+const WIDE = { width: breakpointPx('xl'), height: 800 };
+/** Below `xl` (at `lg`): no preview, a row opens its Transaction detail. */
+const NARROW = { width: breakpointPx('lg'), height: 768 };
 
 test('searches imported Transactions and opens one with its bank fields and History', async ({
   page,
@@ -87,53 +85,49 @@ test('searches imported Transactions and opens one with its bank fields and Hist
 
 test.describe('opening a Transaction morphs it into its Transaction detail', () => {
   test('below xl, the tapped row expands into the detail and shrinks back', async ({ page }) => {
-    const warnings = duplicateNameWarnings(page);
     const accountName = await importUbsAccount(page, 'Morph narrow');
     await page.setViewportSize(NARROW);
     const rows = await listAccount(page, accountName);
 
-    const opening = await motionDuring(page, async () => {
+    const opening = await viewTransitionMotionDuring(page, async () => {
       await rows.nth(1).getByRole('link').click();
       await detailShown(page);
     });
     expect(opening.length).toBeGreaterThan(0);
 
-    const back = await motionDuring(page, async () => {
+    const back = await viewTransitionMotionDuring(page, async () => {
       await backToList(page);
       await listShown(rows);
     });
     expect(back.length).toBeGreaterThan(0);
-    expect(warnings).toEqual([]);
   });
 
   test('at xl, "Open & classify" expands the preview into the detail and back; picking a row is instant', async ({
     page,
   }) => {
-    const warnings = duplicateNameWarnings(page);
     const accountName = await importUbsAccount(page, 'Morph wide');
     await page.setViewportSize(WIDE);
     const rows = await listAccount(page, accountName);
     const preview = page.getByRole('complementary', { name: 'Transaction preview' });
 
-    const picking = await motionDuring(page, async () => {
+    const picking = await viewTransitionMotionDuring(page, async () => {
       await rows.nth(1).getByRole('link').click();
       await expect(rows.nth(1).getByRole('link')).toHaveAttribute('aria-current', 'true');
     });
     expect(picking).toEqual([]);
 
-    const opening = await motionDuring(page, async () => {
+    const opening = await viewTransitionMotionDuring(page, async () => {
       await preview.getByRole('link', { name: 'Open & classify' }).click();
       await detailShown(page);
     });
     expect(opening.length).toBeGreaterThan(0);
 
-    const back = await motionDuring(page, async () => {
+    const back = await viewTransitionMotionDuring(page, async () => {
       await backToList(page);
       await listShown(rows);
       await expect(preview).toBeVisible();
     });
     expect(back.length).toBeGreaterThan(0);
-    expect(warnings).toEqual([]);
   });
 
   test('under reduced motion, opening and going back swap instantly at both widths', async ({
@@ -145,7 +139,7 @@ test.describe('opening a Transaction morphs it into its Transaction detail', () 
 
     await page.setViewportSize(WIDE);
     const rows = await listAccount(page, accountName);
-    const wide = await motionDuring(page, async () => {
+    const wide = await viewTransitionMotionDuring(page, async () => {
       await preview.getByRole('link', { name: 'Open & classify' }).click();
       await detailShown(page);
       await backToList(page);
@@ -155,13 +149,46 @@ test.describe('opening a Transaction morphs it into its Transaction detail', () 
 
     await page.setViewportSize(NARROW);
     await expect(preview).toBeHidden();
-    const narrow = await motionDuring(page, async () => {
+    const narrow = await viewTransitionMotionDuring(page, async () => {
       await rows.first().getByRole('link').click();
       await detailShown(page);
       await backToList(page);
       await listShown(rows);
     });
     expect(narrow).toEqual([]);
+  });
+
+  test('a Transaction is never named twice at once: at either width, or across xl', async ({
+    page,
+  }) => {
+    test.skip(
+      process.env.E2E_SERVER !== 'dev',
+      'React reports two mounted <ViewTransition>s sharing a name only in development builds: run with `pnpm test:e2e:dev`',
+    );
+    const warnings = duplicateNameWarnings(page);
+    const accountName = await importUbsAccount(page, 'Morph names');
+    const preview = page.getByRole('complementary', { name: 'Transaction preview' });
+
+    await page.setViewportSize(NARROW);
+    const rows = await listAccount(page, accountName);
+    await rows.nth(1).getByRole('link').click();
+    await detailShown(page);
+    await backToList(page);
+    await listShown(rows);
+
+    // Across xl the name moves from the row to the preview's header.
+    await page.setViewportSize(WIDE);
+    await expect(preview).toBeVisible();
+    await rows.nth(2).getByRole('link').click();
+    await expect(rows.nth(2).getByRole('link')).toHaveAttribute('aria-current', 'true');
+    await preview.getByRole('link', { name: 'Open & classify' }).click();
+    await detailShown(page);
+    await backToList(page);
+    await listShown(rows);
+    await page.setViewportSize(NARROW);
+    await expect(preview).toBeHidden();
+
+    expect(warnings).toEqual([]);
   });
 });
 
@@ -201,18 +228,6 @@ async function listAccount(page: Page, accountName: string): Promise<Locator> {
   // its width; a click before then just opens the Transaction.
   await page.waitForLoadState('networkidle');
   return rows;
-}
-
-/**
- * The view-transition animations that moved something while `action` ran. React adds instant
- * (0ms) housekeeping animations to the root's pseudo-elements, even under reduced motion.
- */
-async function motionDuring(
-  page: Page,
-  action: () => Promise<unknown>,
-): Promise<ViewTransitionAnimation[]> {
-  const animations = await viewTransitionAnimationsDuring(page, action);
-  return animations.filter((animation) => animation.duration > 0);
 }
 
 /** The Transaction detail has loaded: its content, not only its skeleton. */
