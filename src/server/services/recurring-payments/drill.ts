@@ -3,7 +3,7 @@ import type { ServiceContext } from '../context';
 import { NotFoundError, parseInput } from '../errors';
 import { listTransactionsByIds, type TransactionListItem } from '../transactions';
 import type { Charge } from './charges';
-import { listRecurringPayments, type RecurringPayment } from '.';
+import { listRecurringPayments, type RecurringPayment } from './list';
 
 /** A Recurring payment's Drill-down: the series and the Transactions of its charges. */
 export interface RecurringPaymentDrill {
