@@ -101,7 +101,11 @@ describe('the Dashboard grid migration', () => {
       standalone: null,
     });
 
-    await migrate(url, { direction: 'down', quiet: true });
+    // Roll back down to and including the grid migration (later ones first, if any).
+    for (;;) {
+      const [rolledBack] = await migrate(url, { direction: 'down', quiet: true });
+      if (!rolledBack || rolledBack === GRID_MIGRATION) break;
+    }
 
     // Back to Story order: the nth Widget in reading order at y n, x 0, its size kept.
     expect(await layouts()).toEqual({
