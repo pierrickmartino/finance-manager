@@ -41,6 +41,7 @@ Corners: the radius scale itself is small (`rounded-md` 6px, `rounded-lg`/`xl`/`
 | `HEADLINE_AMOUNT_CLASS` | The number a page is about: an Account's balance, a Bank's total, the selected Transaction's amount. |
 | `CARD_CLASS` | A separate object: a list, a detail panel, a Widget. Not every block. |
 | `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch. Put it on the notice itself, never on rows inside it; mark problem rows with `text-warning`. |
+| `BADGE_CLASS[tone]` | A short label beside a row's name: `warning` asks for attention (Missed, a price increase), `info` is neutral status (New, "Not yet imported"), `neutral` a plain fact. `rounded-md`, never decoration. |
 | `TILE_CLASS` | A card of the Dashboard's grid (the overview row and each Widget). |
 | `PILL_BUTTON_CLASS` | A pill-shaped action beside or on the Dashboard's tiles (Edit Dashboard). |
 | `PRIMARY_BUTTON_CLASS` | The view's main action, one per view where possible. |

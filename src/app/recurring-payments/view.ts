@@ -1,4 +1,5 @@
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
+import type { BadgeTone } from '@/components/surface';
 import { NUMBER_FORMATS, type Formatter } from '@/lib/format';
 import type { UrlParams } from '@/lib/reporting/widget-params';
 import {
@@ -99,10 +100,10 @@ export function minimumChargesText(rules: readonly CadenceRule[]): string {
   return `at least ${parts.join(', ')}`;
 }
 
-/** A short label beside a Recurring payment, in a meaning token: attention or neutral status. */
+/** A short label beside a Recurring payment, in a meaning tone: attention or neutral status. */
 export interface Badge {
   label: string;
-  tone: 'warning' | 'info';
+  tone: Extract<BadgeTone, 'warning' | 'info'>;
 }
 
 const STATE_BADGES = {

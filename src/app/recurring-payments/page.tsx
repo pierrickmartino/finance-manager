@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ActionForm } from '@/components/action-form';
 import {
+  BADGE_CLASS,
   CARD_CLASS,
   HEADLINE_AMOUNT_CLASS,
   PAGE_TITLE_CLASS,
@@ -29,7 +30,6 @@ import {
   drillHref,
   minimumChargesText,
   yearlyCostWorking,
-  type Badge,
 } from './view';
 
 export const metadata: Metadata = { title: 'Recurring payments · Finance Manager' };
@@ -135,12 +135,6 @@ function EndedSection({
     </section>
   );
 }
-
-const BADGE_CLASS = {
-  warning:
-    'rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset',
-  info: 'rounded-md bg-info-tint px-2 py-0.5 text-xs text-info',
-} as const satisfies Record<Badge['tone'], string>;
 
 interface PaymentRowProps {
   payment: RecurringPayment;
