@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FieldError } from '@/components/form';
 import { drillUrl, unconvertedUrl, type DrillTarget } from '@/lib/reporting/drill-link';
-import { backLink, originFromParams, type BackLink } from '@/lib/reporting/drill-origin';
+import { backLink, originFromParams } from '@/lib/reporting/drill-origin';
 import {
   changeWorking,
   drillFilterLine,
@@ -11,8 +11,6 @@ import {
 } from '@/lib/reporting/drill-summary';
 import { cellFromParams, queryFromParams, type UrlParams } from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
-import { splitLabel } from '@/app/transactions/transaction-display';
-import { categoryLabel } from '@/lib/classification';
 import type { Formatter } from '@/lib/format';
 import { getFormatter } from '@/server/formatter';
 import { ServiceError } from '@/server/services/errors';
@@ -32,12 +30,11 @@ import {
   type WidgetQueryInput,
 } from '@/server/services/reporting';
 import { loadQueryFormLists, loadReport } from '../load';
+import { BackTo, DrillTable, type DrillTableColumn } from './drill-table';
 import type { QueryFormLists } from '../query-form';
 import { PAGE_TITLE_CLASS, WARNING_NOTICE_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Drill-down · Finance Manager' };
-
-const CELL = 'px-3 py-2 text-left align-top';
 
 type Chf = (minor: number) => string;
 
@@ -145,14 +142,6 @@ export default async function DrillPage({ searchParams }: { searchParams: Promis
   );
 }
 
-function BackTo({ href, label }: BackLink) {
-  return (
-    <Link href={href} className="text-sm underline">
-      {label}
-    </Link>
-  );
-}
-
 interface FilterLineProps {
   report: ReportTable;
   lists: QueryFormLists;
@@ -234,58 +223,32 @@ function Pager({ page, hrefOf }: PagerProps) {
   );
 }
 
+/** What a Transaction adds to the number, in CHF, with how many of a split one's lines count. */
+function countedColumn(fmt: Formatter): DrillTableColumn<CellTransaction> {
+  return {
+    heading: 'Counted (CHF)',
+    cell: (transaction) => (
+      <>
+        {fmt.amount(transaction.chfMinor, { currency: 'CHF' })}
+        {transaction.countedLineCount !== null && (
+          <span className="block text-xs text-muted">
+            {transaction.countedLineCount} of {transaction.splitLines.length} lines
+          </span>
+        )}
+      </>
+    ),
+  };
+}
+
+interface CellTableProps {
+  transactions: CellTransaction[];
+  fmt: Formatter;
+}
+
 /**
  * The listed Transactions. "Counted (CHF)" is what each one adds to the number: for a split
  * Transaction, only its lines in the cell, so it can differ from the native Amount.
  */
-function CellTable({ transactions, fmt }: { transactions: CellTransaction[]; fmt: Formatter }) {
-  return (
-    <div className="overflow-x-auto">
-      <table aria-label="Drill-down Transactions" className="w-full text-sm">
-        <thead className="border-b border-rule">
-          <tr>
-            <th className={CELL}>Date</th>
-            <th className={CELL}>Account</th>
-            <th className={CELL}>Description</th>
-            <th className={CELL}>Payee</th>
-            <th className={CELL}>Category</th>
-            <th className={`${CELL} text-right`}>Amount</th>
-            <th className={`${CELL} text-right`}>Counted (CHF)</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-rule">
-          {transactions.map((transaction) => (
-            <tr key={transaction.id}>
-              <td className={`${CELL} whitespace-nowrap tabular-nums`}>
-                {fmt.date(transaction.bookingDate)}
-              </td>
-              <td className={CELL}>{transaction.accountName}</td>
-              <td className={CELL}>
-                <Link href={`/transactions/${transaction.id}`} className="hover:underline">
-                  {transaction.rawDescription || '(no description)'}
-                </Link>
-              </td>
-              <td className={CELL}>{transaction.payee?.name ?? '—'}</td>
-              <td className={CELL}>
-                {transaction.category
-                  ? categoryLabel(transaction.category)
-                  : (splitLabel(transaction) ?? 'Unclassified')}
-              </td>
-              <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
-                {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
-              </td>
-              <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>
-                {fmt.amount(transaction.chfMinor, { currency: 'CHF' })}
-                {transaction.countedLineCount !== null && (
-                  <span className="block text-xs text-muted">
-                    {transaction.countedLineCount} of {transaction.splitLines.length} lines
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function CellTable({ transactions, fmt }: CellTableProps) {
+  return <DrillTable transactions={transactions} fmt={fmt} extraColumn={countedColumn(fmt)} />;
 }

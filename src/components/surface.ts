@@ -26,6 +26,18 @@ export const WARNING_NOTICE_CLASS =
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 
+const BADGE_BASE = 'rounded-md px-2 py-0.5 text-xs font-medium';
+/**
+ * A short label beside a row's name (Missed, New), by tone: `warning` asks for attention,
+ * `info` is neutral status, `neutral` is a plain fact. Tones carry meaning, never decoration.
+ */
+export const BADGE_CLASS = {
+  warning: `${BADGE_BASE} bg-warning-tint text-warning ring-1 ring-warning-rule ring-inset`,
+  info: `${BADGE_BASE} bg-info-tint text-info`,
+  neutral: `${BADGE_BASE} bg-sunken text-ink-soft`,
+} as const;
+export type BadgeTone = keyof typeof BADGE_CLASS;
+
 // Buttons --------------------------------------------------------------------------------------
 
 /** The page's main action. One per view where possible. */

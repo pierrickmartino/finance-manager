@@ -68,6 +68,20 @@ A Recurring payments page recognises, from Transactions already recorded, each P
   - Styled with `docs/design-system.md` tokens and the `surface.ts` primitives.
 - **Docs.** The glossary defines Recurring payment, Missed and Ended. The v1 spec's Out of Scope list is narrowed: forecasting is still out except a Recurring payment's next expected date, and scheduled Transactions are still out.
 
+## Decisions and Clarifications
+
+Settled while building it (#128–#132):
+
+- **The total includes "Not yet imported" series.** They are active series whose import is late, so they still cost the user.
+- **Any Gap between the last charge and the end of the grace gives "Not yet imported"**, because a charge could hide in it. Missed needs the data to reach beyond the grace's last day.
+- **Refunds are not charges.** A positive amount under an Expense Category is left out.
+- **No FX rate, no yearly cost.** The series shows "No FX rate yet", is left out of the total and sorts last.
+- **The working shows the FX rate** for a series not in CHF ("EUR 9.99 × 12 at 0.93 CHF/EUR").
+- **"around <date>" adds the year** when it isn't the current year.
+- **The Drill-down has its own page** (`/recurring-payments/drill`), using the existing list-Transactions-by-id read and the new origin's back link.
+- **Ended rows can be dismissed too**, as well as active ones.
+- **An off-cadence gap breaks a series**: every gap between charges must fit the cadence.
+
 ## Testing Decisions
 
 - As in the other specs: test external behaviour through the public service functions against the real test database, asserting what the user sees.

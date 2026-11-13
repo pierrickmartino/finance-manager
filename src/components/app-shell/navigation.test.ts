@@ -45,6 +45,7 @@ describe('NAV_GROUPS', () => {
         '/dashboards',
         '/widgets',
         '/transactions',
+        '/recurring-payments',
         '/unclassified',
         '/accounts',
         '/categories',
@@ -56,7 +57,7 @@ describe('NAV_GROUPS', () => {
         '/settings',
       ]),
     );
-    expect(hrefs).toHaveLength(12);
+    expect(hrefs).toHaveLength(13);
   });
 });
 
@@ -78,6 +79,7 @@ describe('overflowGroups', () => {
     expect(groups.map((group) => group.label)).toEqual(['Overview', 'Money', 'Organize', 'System']);
     expect(groups.flatMap((group) => group.links.map((link) => link.href))).toEqual([
       '/widgets',
+      '/recurring-payments',
       '/unclassified',
       '/payees',
       '/tags',
