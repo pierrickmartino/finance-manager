@@ -56,23 +56,28 @@ export interface RecurringPaymentList {
 
 const listInput = z.object({ today: z.iso.date() });
 
-function yearlyCostOf(
-  rates: RateTable,
-  currency: string,
-  lastAmountMinor: number,
-  perYear: number,
-  date: string,
-): ChfValue | null {
+interface YearlyCostInput {
+  rates: RateTable;
+  currency: string;
+  lastAmountMinor: number;
+  chargesPerYear: number;
+  /** The last charge's date, whose rate (or the most recent earlier one) applies. */
+  date: string;
+}
+
+function yearlyCostOf(input: YearlyCostInput): ChfValue | null {
+  const { rates, currency, lastAmountMinor, date } = input;
   const rate = rates.rateOn(currency, date);
   if (!rate) return null;
-  return { amountMinor: toChfMinor(lastAmountMinor * perYear, currency, rate.rateToChf), rate };
+  const amountMinor = toChfMinor(lastAmountMinor * input.chargesPerYear, currency, rate.rateToChf);
+  return { amountMinor, rate };
 }
 
 /**
  * What a series is judged against: FX rates, each imported Account's data, the dismissed charges
  * (charge key to dismissal id), and today.
  */
-interface Context {
+interface JudgementBasis {
   rates: RateTable;
   accountData: ReadonlyMap<string, AccountData>;
   dismissed: ReadonlyMap<string, string>;
@@ -81,7 +86,7 @@ interface Context {
 
 function toRecurringPayment(
   series: RecognisedSeries,
-  { rates, accountData, dismissed, today }: Context,
+  { rates, accountData, dismissed, today }: JudgementBasis,
 ): RecurringPayment {
   const last = series.charges.at(-1)!;
   const previous = series.charges.at(-2)!;
@@ -96,7 +101,13 @@ function toRecurringPayment(
     previousAmountMinor: previous.amountMinor,
     lastChargeDate: last.bookingDate,
     nextExpectedDate,
-    yearlyCost: yearlyCostOf(rates, series.currency, last.amountMinor, perYear, last.bookingDate),
+    yearlyCost: yearlyCostOf({
+      rates,
+      currency: series.currency,
+      lastAmountMinor: last.amountMinor,
+      chargesPerYear: perYear,
+      date: last.bookingDate,
+    }),
     state: stateOf({
       rule: series.rule,
       lastChargeDate: last.bookingDate,
@@ -111,17 +122,20 @@ function toRecurringPayment(
       today,
     }),
     dismissalId: dismissalOf(dismissed, series.charges),
-    charges: series.charges.map(
-      ({ kind, id, transactionId, accountId, bookingDate, amountMinor }) => ({
-        kind,
-        id,
-        transactionId,
-        accountId,
-        bookingDate,
-        amountMinor,
-      }),
-    ),
+    charges: series.charges.map(toCharge),
   };
+}
+
+/** A loaded charge without what grouped it into its series. */
+function toCharge({
+  kind,
+  id,
+  transactionId,
+  accountId,
+  bookingDate,
+  amountMinor,
+}: Charge): Charge {
+  return { kind, id, transactionId, accountId, bookingDate, amountMinor };
 }
 
 function byYearlyCost(a: RecurringPayment, b: RecurringPayment): number {
