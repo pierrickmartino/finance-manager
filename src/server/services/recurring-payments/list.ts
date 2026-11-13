@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
+import type { PayeeRef } from '../payees/model';
 import { loadRateTable, toChfMinor, type ChfValue, type RateTable } from '../fx';
 import { chargesPerYear, WINDOW_MONTHS, type Cadence } from './cadences';
 import { loadCharges, type Charge } from './charges';
@@ -12,7 +13,7 @@ import { flagsOf, stateOf, type RecurringPaymentFlag, type RecurringPaymentState
 
 /** A Recurring payment (GLOSSARY): one recognised series of a Payee's charges. */
 export interface RecurringPayment {
-  payee: { id: string; name: string };
+  payee: PayeeRef;
   /** The Currency of its charges, which its amounts are in. */
   currency: string;
   cadence: Cadence;

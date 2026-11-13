@@ -1,11 +1,12 @@
 import { daysBetween } from '../fx/dates';
+import type { PayeeRef } from '../payees/model';
 import { CADENCES, continuesAmount, fitsInterval, type CadenceRule } from './cadences';
 import type { LoadedCharge } from './charges';
 import { isEndedOn } from './states';
 
 /** A run of one Payee's charges in one Currency, each within the amount tolerance of the last. */
 export interface ChargeSeries {
-  payee: { id: string; name: string };
+  payee: PayeeRef;
   currency: string;
   /** Oldest first. */
   charges: LoadedCharge[];
