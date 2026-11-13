@@ -10,8 +10,10 @@ import {
   SMALL_BUTTON_CLASS,
 } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
+import { plural } from '@/lib/reporting/drill-summary';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
+import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { swissToday } from '@/server/services/fx/dates';
 import {
   AMOUNT_TOLERANCE,
@@ -21,6 +23,7 @@ import {
   listRecurringPayments,
   WINDOW_MONTHS,
   type RecurringPayment,
+  type RecurringPaymentList,
 } from '@/server/services/recurring-payments';
 import { dismissRecurringPaymentAction, restoreRecurringPaymentAction } from './actions';
 import {
@@ -29,6 +32,7 @@ import {
   cadenceLabel,
   drillHref,
   minimumChargesText,
+  sectionsOf,
   yearlyCostWorking,
 } from './view';
 
@@ -44,13 +48,7 @@ export default async function RecurringPaymentsPage() {
   const ctx = await getServiceContext();
   const today = swissToday();
   const [list, fmt] = await Promise.all([listRecurringPayments(ctx, { today }), getFormatter()]);
-  const { totalYearlyCostMinor } = list;
-  const isKept = (payment: RecurringPayment) => payment.dismissalId === null;
-  const recurringPayments = list.recurringPayments.filter(isKept);
-  const ended = list.ended.filter(isKept);
-  const dismissed = [...list.recurringPayments, ...list.ended].filter(
-    (payment) => !isKept(payment),
-  );
+  const isEmpty = list.recurringPayments.length === 0 && list.ended.length === 0;
 
   return (
     <section className="flex flex-col gap-6">
@@ -60,55 +58,79 @@ export default async function RecurringPaymentsPage() {
           Recognised from your recorded expenses. Nothing is scheduled or entered in advance.
         </p>
       </header>
-
-      {list.recurringPayments.length === 0 && list.ended.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <>
-          <section aria-label="Yearly cost" className="flex flex-col gap-1">
-            <p className="text-sm text-muted">Yearly cost</p>
-            <p className={HEADLINE_AMOUNT_CLASS}>
-              {fmt.amount(totalYearlyCostMinor, { currency: 'CHF' })}
-            </p>
-            <p className="text-sm text-muted">
-              {recurringPayments.length} Recurring payment
-              {recurringPayments.length === 1 ? '' : 's'}
-            </p>
-          </section>
-          {recurringPayments.length > 0 && (
-            <ul aria-label="Recurring payments" className={`${CARD_CLASS} divide-y divide-rule`}>
-              {recurringPayments.map((payment) => (
-                <PaymentRow
-                  key={paymentKey(payment)}
-                  payment={payment}
-                  today={today}
-                  fmt={fmt}
-                  action={<DismissButton payment={payment} />}
-                />
-              ))}
-            </ul>
-          )}
-          {ended.length > 0 && <EndedSection ended={ended} today={today} fmt={fmt} />}
-          <DismissedSection payments={dismissed} today={today} fmt={fmt} />
-        </>
-      )}
+      {isEmpty ? <EmptyState /> : <PaymentSections list={list} today={today} fmt={fmt} />}
     </section>
+  );
+}
+
+/** What every row needs to say when and how much. */
+interface RowContext {
+  today: string;
+  fmt: Formatter;
+}
+
+interface PaymentSectionsProps extends RowContext {
+  list: RecurringPaymentList;
+}
+
+/** The total, the listed series, then the collapsed Ended and Dismissed sections. */
+function PaymentSections({ list, today, fmt }: PaymentSectionsProps) {
+  const { recurringPayments, ended, dismissed } = sectionsOf(list);
+  return (
+    <>
+      <section aria-label="Yearly cost" className="flex flex-col gap-1">
+        <p className="text-sm text-muted">Yearly cost</p>
+        <p className={HEADLINE_AMOUNT_CLASS}>
+          {fmt.amount(list.totalYearlyCostMinor, { currency: BASE_CURRENCY })}
+        </p>
+        <p className="text-sm text-muted">
+          {plural(recurringPayments.length, 'Recurring payment')}
+        </p>
+      </section>
+      {recurringPayments.length > 0 && (
+        <ul aria-label="Recurring payments" className={`${CARD_CLASS} divide-y divide-rule`}>
+          <PaymentRows payments={recurringPayments} today={today} fmt={fmt} action="dismiss" />
+        </ul>
+      )}
+      {ended.length > 0 && <EndedSection ended={ended} today={today} fmt={fmt} />}
+      <DismissedSection payments={dismissed} today={today} fmt={fmt} />
+    </>
   );
 }
 
 /** A series has no stored id: its first charge names it. */
 const paymentKey = (payment: RecurringPayment): string => chargeKey(payment.charges[0]!);
 
-/** The Ended series, collapsed: a native disclosure, no client script. */
-function EndedSection({
-  ended,
-  today,
-  fmt,
-}: {
+interface PaymentRowsProps extends RowContext {
+  payments: RecurringPayment[];
+  /** The button each row has: Dismiss, or Restore for a dismissed series. */
+  action: 'dismiss' | 'restore';
+}
+
+function PaymentRows({ payments, action, today, fmt }: PaymentRowsProps) {
+  return payments.map((payment) => (
+    <PaymentRow
+      key={paymentKey(payment)}
+      payment={payment}
+      today={today}
+      fmt={fmt}
+      action={
+        action === 'dismiss' ? (
+          <DismissButton payment={payment} />
+        ) : (
+          <RestoreButton payment={payment} />
+        )
+      }
+    />
+  ));
+}
+
+interface EndedSectionProps extends RowContext {
   ended: RecurringPayment[];
-  today: string;
-  fmt: Formatter;
-}) {
+}
+
+/** The Ended series, collapsed: a native disclosure, no client script. */
+function EndedSection({ ended, today, fmt }: EndedSectionProps) {
   return (
     <section aria-label="Ended" className={`${CARD_CLASS} text-sm`}>
       <details>
@@ -121,55 +143,46 @@ function EndedSection({
           aria-label="Ended Recurring payments"
           className="divide-y divide-rule border-t border-rule"
         >
-          {ended.map((payment) => (
-            <PaymentRow
-              key={paymentKey(payment)}
-              payment={payment}
-              today={today}
-              fmt={fmt}
-              action={<DismissButton payment={payment} />}
-            />
-          ))}
+          <PaymentRows payments={ended} today={today} fmt={fmt} action="dismiss" />
         </ul>
       </details>
     </section>
   );
 }
 
-interface PaymentRowProps {
+interface DismissedSectionProps extends RowContext {
+  payments: RecurringPayment[];
+}
+
+/** The dismissed series, collapsed: out of the total, each with a Restore button. */
+function DismissedSection({ payments, today, fmt }: DismissedSectionProps) {
+  if (payments.length === 0) return null;
+  return (
+    <section aria-label="Dismissed" className={`${CARD_CLASS} py-2.5 text-sm`}>
+      <details>
+        <summary className="cursor-pointer px-4 text-muted">Dismissed ({payments.length})</summary>
+        <ul aria-label="Dismissed Recurring payments" className="mt-2 divide-y divide-rule">
+          <PaymentRows payments={payments} today={today} fmt={fmt} action="restore" />
+        </ul>
+      </details>
+    </section>
+  );
+}
+
+interface PaymentProps {
   payment: RecurringPayment;
-  today: string;
   fmt: Formatter;
+}
+
+interface PaymentRowProps extends PaymentProps, RowContext {
   /** The row's Dismiss or Restore button. */
   action: ReactNode;
 }
 
 function PaymentRow({ payment, today, fmt, action }: PaymentRowProps) {
-  const badges = payment.state === 'ended' ? [] : badgesOf(payment, fmt);
   return (
     <li className="grid gap-x-6 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-baseline">
-      <div className="min-w-0">
-        <p className="truncate font-medium">
-          <Link href={drillHref(payment)} className="hover:underline">
-            {payment.payee.name}
-          </Link>
-        </p>
-        <p className="text-sm text-muted">
-          {cadenceLabel(payment.cadence)} · last{' '}
-          <span className="tabular-nums">
-            {fmt.amount(payment.lastAmountMinor, { currency: payment.currency })}
-          </span>
-        </p>
-        {badges.length > 0 && (
-          <ul aria-label="Flags" className="mt-1 flex flex-wrap gap-1.5">
-            {badges.map((badge) => (
-              <li key={badge.label} className={BADGE_CLASS[badge.tone]}>
-                {badge.label}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <PaymentSummary payment={payment} fmt={fmt} />
       <p className="text-sm text-muted sm:text-right">
         {payment.state === 'ended' ? (
           <>Last charged {fmt.date(payment.lastChargeDate)}</>
@@ -177,23 +190,63 @@ function PaymentRow({ payment, today, fmt, action }: PaymentRowProps) {
           <>Next {aroundDate(payment.nextExpectedDate, today)}</>
         )}
       </p>
-      <div className="sm:text-right">
-        {payment.yearlyCost ? (
-          <p className="font-medium tabular-nums">
-            {fmt.amount(payment.yearlyCost.amountMinor, { currency: 'CHF' })}
-            <span className="text-sm font-normal text-muted"> a year</span>
-          </p>
-        ) : (
-          <p className="text-sm text-muted">No FX rate yet</p>
-        )}
-        <p className="text-xs text-muted tabular-nums">{yearlyCostWorking(payment, fmt)}</p>
-      </div>
+      <YearlyCost payment={payment} fmt={fmt} />
       <div className="sm:text-right">{action}</div>
     </li>
   );
 }
 
-function DismissButton({ payment }: { payment: RecurringPayment }) {
+/** The Payee, linking to the Drill-down, its cadence and last amount, and its badges. */
+function PaymentSummary({ payment, fmt }: PaymentProps) {
+  const badges = payment.state === 'ended' ? [] : badgesOf(payment, fmt);
+  return (
+    <div className="min-w-0">
+      <p className="truncate font-medium">
+        <Link href={drillHref(payment)} className="hover:underline">
+          {payment.payee.name}
+        </Link>
+      </p>
+      <p className="text-sm text-muted">
+        {cadenceLabel(payment.cadence)} · last{' '}
+        <span className="tabular-nums">
+          {fmt.amount(payment.lastAmountMinor, { currency: payment.currency })}
+        </span>
+      </p>
+      {badges.length > 0 && (
+        <ul aria-label="Flags" className="mt-1 flex flex-wrap gap-1.5">
+          {badges.map((badge) => (
+            <li key={badge.label} className={BADGE_CLASS[badge.tone]}>
+              {badge.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** The yearly cost in CHF, or "No FX rate yet", with how it was worked out. */
+function YearlyCost({ payment, fmt }: PaymentProps) {
+  return (
+    <div className="sm:text-right">
+      {payment.yearlyCost ? (
+        <p className="font-medium tabular-nums">
+          {fmt.amount(payment.yearlyCost.amountMinor, { currency: BASE_CURRENCY })}
+          <span className="text-sm font-normal text-muted"> a year</span>
+        </p>
+      ) : (
+        <p className="text-sm text-muted">No FX rate yet</p>
+      )}
+      <p className="text-xs text-muted tabular-nums">{yearlyCostWorking(payment, fmt)}</p>
+    </div>
+  );
+}
+
+interface PaymentButtonProps {
+  payment: RecurringPayment;
+}
+
+function DismissButton({ payment }: PaymentButtonProps) {
   const charges = payment.charges.map(({ kind, id }) => ({ kind, id }));
   return (
     <ActionForm
@@ -207,7 +260,7 @@ function DismissButton({ payment }: { payment: RecurringPayment }) {
   );
 }
 
-function RestoreButton({ payment }: { payment: RecurringPayment }) {
+function RestoreButton({ payment }: PaymentButtonProps) {
   return (
     <ActionForm
       action={restoreRecurringPaymentAction.bind(null, payment.dismissalId!)}
@@ -217,35 +270,6 @@ function RestoreButton({ payment }: { payment: RecurringPayment }) {
         Restore
       </button>
     </ActionForm>
-  );
-}
-
-interface DismissedSectionProps {
-  payments: RecurringPayment[];
-  today: string;
-  fmt: Formatter;
-}
-
-/** The dismissed series, collapsed: out of the total, each with a Restore button. */
-function DismissedSection({ payments, today, fmt }: DismissedSectionProps) {
-  if (payments.length === 0) return null;
-  return (
-    <section aria-label="Dismissed" className={`${CARD_CLASS} py-2.5 text-sm`}>
-      <details>
-        <summary className="cursor-pointer px-4 text-muted">Dismissed ({payments.length})</summary>
-        <ul aria-label="Dismissed Recurring payments" className="mt-2 divide-y divide-rule">
-          {payments.map((payment) => (
-            <PaymentRow
-              key={paymentKey(payment)}
-              payment={payment}
-              today={today}
-              fmt={fmt}
-              action={<RestoreButton payment={payment} />}
-            />
-          ))}
-        </ul>
-      </details>
-    </section>
   );
 }
 

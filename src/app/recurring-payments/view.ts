@@ -135,3 +135,24 @@ export function badgesOf(
   const state = STATE_BADGES[payment.state];
   return [...(state ? [state] : []), ...payment.flags.map((flag) => flagBadge(flag, payment, fmt))];
 }
+
+/** What the page lists in each section: the series not dismissed, by state, and the dismissed. */
+export interface PageSections<T> {
+  recurringPayments: T[];
+  ended: T[];
+  /** Ended or not, out of the total, each with a Restore button. */
+  dismissed: T[];
+}
+
+/** Splits the listed series between the page's sections: the one place dismissal is filtered. */
+export function sectionsOf<T extends Pick<RecurringPayment, 'dismissalId'>>(list: {
+  recurringPayments: readonly T[];
+  ended: readonly T[];
+}): PageSections<T> {
+  const isKept = (payment: T) => payment.dismissalId === null;
+  return {
+    recurringPayments: list.recurringPayments.filter(isKept),
+    ended: list.ended.filter(isKept),
+    dismissed: [...list.recurringPayments, ...list.ended].filter((payment) => !isKept(payment)),
+  };
+}

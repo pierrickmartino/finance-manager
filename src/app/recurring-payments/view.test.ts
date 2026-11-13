@@ -8,6 +8,7 @@ import {
   chargeFromParams,
   drillHref,
   minimumChargesText,
+  sectionsOf,
   yearlyCostWorking,
 } from './view';
 
@@ -164,5 +165,22 @@ describe('badgesOf', () => {
     expect(badgesOf({ ...payment, state: 'not_yet_imported' }, fmt)).toEqual([
       { label: 'Not yet imported', tone: 'info' },
     ]);
+  });
+});
+
+describe('sectionsOf', () => {
+  const series = (name: string, dismissalId: string | null) => ({ name, dismissalId });
+
+  it('keeps the listed and Ended series that are not dismissed, and gathers the dismissed ones', () => {
+    const list = {
+      recurringPayments: [series('Netflix', null), series('Gym', 'd1')],
+      ended: [series('Spotify', null), series('Magazine', 'd2')],
+    };
+
+    expect(sectionsOf(list)).toEqual({
+      recurringPayments: [series('Netflix', null)],
+      ended: [series('Spotify', null)],
+      dismissed: [series('Gym', 'd1'), series('Magazine', 'd2')],
+    });
   });
 });
