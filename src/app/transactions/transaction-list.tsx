@@ -4,6 +4,7 @@ import type { Formatter } from '@/lib/format';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { transactionsHref, type SearchValues } from './search';
 import { amountClass, CategoryLabel, transactionName } from './transaction-display';
+import { TransactionMorph } from './transaction-morph';
 
 const CELL = 'px-3 py-2 align-top';
 
@@ -63,49 +64,51 @@ interface RowProps {
 function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
   const name = transactionName(transaction);
   return (
-    <tr className={isSelected ? 'xl:bg-sunken' : 'hover:bg-paper'}>
-      <td className={`${CELL} whitespace-nowrap text-muted tabular-nums`}>
-        {fmt.date(transaction.bookingDate)}
-      </td>
-      <td className={`${CELL} max-w-0 w-full`}>
-        <Link
-          href={previewHref}
-          scroll={false}
-          aria-current={isSelected ? 'true' : undefined}
-          className="hidden truncate font-medium hover:underline xl:block"
-        >
-          {name}
-        </Link>
-        <Link
-          href={`/transactions/${transaction.id}`}
-          className="block truncate font-medium hover:underline xl:hidden"
-        >
-          {name}
-        </Link>
-        <div className="truncate text-xs text-muted">
-          <CategoryLabel transaction={transaction} />
-          {' · '}
-          {transaction.accountName}
-          {transaction.isManual && ' · Manual'}
-          {transaction.tags.map((tag) => (
-            <span key={tag.id} className="ml-1.5">
-              #{tag.name}
-            </span>
-          ))}
-        </div>
-      </td>
-      <td
-        className={`${CELL} text-right font-medium whitespace-nowrap tabular-nums ${amountClass(transaction.amountMinor)}`}
-      >
-        {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
-        {transaction.matchingSplitAmountMinor !== null && (
-          <div className="text-xs font-normal text-muted">
-            of which{' '}
-            {fmt.amount(transaction.matchingSplitAmountMinor, { currency: transaction.currency })}{' '}
-            matches the filter
+    <TransactionMorph transactionId={transaction.id} part="row">
+      <tr className={isSelected ? 'xl:bg-sunken' : 'hover:bg-paper'}>
+        <td className={`${CELL} whitespace-nowrap text-muted tabular-nums`}>
+          {fmt.date(transaction.bookingDate)}
+        </td>
+        <td className={`${CELL} max-w-0 w-full`}>
+          <Link
+            href={previewHref}
+            scroll={false}
+            aria-current={isSelected ? 'true' : undefined}
+            className="hidden truncate font-medium hover:underline xl:block"
+          >
+            {name}
+          </Link>
+          <Link
+            href={`/transactions/${transaction.id}`}
+            className="block truncate font-medium hover:underline xl:hidden"
+          >
+            {name}
+          </Link>
+          <div className="truncate text-xs text-muted">
+            <CategoryLabel transaction={transaction} />
+            {' · '}
+            {transaction.accountName}
+            {transaction.isManual && ' · Manual'}
+            {transaction.tags.map((tag) => (
+              <span key={tag.id} className="ml-1.5">
+                #{tag.name}
+              </span>
+            ))}
           </div>
-        )}
-      </td>
-    </tr>
+        </td>
+        <td
+          className={`${CELL} text-right font-medium whitespace-nowrap tabular-nums ${amountClass(transaction.amountMinor)}`}
+        >
+          {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
+          {transaction.matchingSplitAmountMinor !== null && (
+            <div className="text-xs font-normal text-muted">
+              of which{' '}
+              {fmt.amount(transaction.matchingSplitAmountMinor, { currency: transaction.currency })}{' '}
+              matches the filter
+            </div>
+          )}
+        </td>
+      </tr>
+    </TransactionMorph>
   );
 }

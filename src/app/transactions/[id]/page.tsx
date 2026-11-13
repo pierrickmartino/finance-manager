@@ -32,6 +32,7 @@ import {
   editClassificationAction,
   unlockFieldAction,
 } from './actions';
+import { BackToTransactions } from '../back-to-list';
 import { BankDetails } from './bank-details';
 import { ClassificationForm } from './classification-form';
 import { SplitSection, type LineTransfers } from './split-section';
@@ -106,9 +107,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
 
   return (
     <section className="flex flex-col gap-5">
-      <Link href="/transactions" className="text-sm text-muted hover:underline">
-        ← Transactions
-      </Link>
+      <BackToTransactions />
       <TransactionHeader
         transaction={transaction}
         badges={transactionBadges(transaction, classification)}

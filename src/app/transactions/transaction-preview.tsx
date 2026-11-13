@@ -4,6 +4,7 @@ import { CARD_CLASS, HEADLINE_AMOUNT_CLASS, PRIMARY_BUTTON_CLASS } from '@/compo
 import type { Formatter } from '@/lib/format';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { amountClass, CategoryLabel, transactionName } from './transaction-display';
+import { TransactionMorph } from './transaction-morph';
 
 interface TransactionPreviewProps {
   fmt: Formatter;
@@ -17,15 +18,17 @@ export function TransactionPreview({ fmt, transaction }: TransactionPreviewProps
       aria-label="Transaction preview"
       className={`${CARD_CLASS} hidden h-fit flex-col gap-4 p-4 xl:sticky xl:top-4 xl:flex`}
     >
-      <div>
-        <p className="text-xs text-muted">
-          {fmt.date(transaction.bookingDate)} · {transaction.accountName}
-        </p>
-        <p className={`mt-1 ${HEADLINE_AMOUNT_CLASS} ${amountClass(transaction.amountMinor)}`}>
-          {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
-        </p>
-        <p className="mt-1 font-medium break-words">{transactionName(transaction)}</p>
-      </div>
+      <TransactionMorph transactionId={transaction.id} part="preview">
+        <div>
+          <p className="text-xs text-muted">
+            {fmt.date(transaction.bookingDate)} · {transaction.accountName}
+          </p>
+          <p className={`mt-1 ${HEADLINE_AMOUNT_CLASS} ${amountClass(transaction.amountMinor)}`}>
+            {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
+          </p>
+          <p className="mt-1 font-medium break-words">{transactionName(transaction)}</p>
+        </div>
+      </TransactionMorph>
       <dl className="divide-y divide-rule text-sm">
         <Field label="Category" value={<CategoryLabel transaction={transaction} />} />
         <Field label="Payee" value={transaction.payee?.name} />

@@ -4,6 +4,7 @@ import { CARD_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { TransactionDetail } from '@/server/services/transactions';
 import { amountClass, transactionName } from '../transaction-display';
+import { TransactionMorph } from '../transaction-morph';
 import type { BadgeTone, StatusBadge } from './transaction-badges';
 
 const TONE_CLASS: Record<BadgeTone, string> = {
@@ -28,45 +29,47 @@ interface TransactionHeaderProps {
 export function TransactionHeader({ transaction, badges, fmt, actions }: TransactionHeaderProps) {
   const name = transactionName(transaction);
   return (
-    <header
-      aria-label="Transaction"
-      className={`${CARD_CLASS} flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4`}
-    >
-      <span
-        aria-hidden="true"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-sunken text-lg font-semibold text-ink-soft"
+    <TransactionMorph transactionId={transaction.id} part="detail">
+      <header
+        aria-label="Transaction"
+        className={`${CARD_CLASS} flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4`}
       >
-        {name.slice(0, 1).toUpperCase()}
-      </span>
-      <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
-        <h1 className="line-clamp-2 text-lg font-semibold break-words" title={name}>
-          {name}
-        </h1>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
-          <span>
-            {fmt.date(transaction.bookingDate)} ·{' '}
-            <Link href={`/accounts/${transaction.accountId}`} className="underline">
-              {transaction.accountName}
-            </Link>
-          </span>
-          <ul aria-label="Status" className="flex flex-wrap gap-1.5">
-            {badges.map((badge) => (
-              <li
-                key={badge.label}
-                className={`rounded-md px-2.5 py-0.5 text-xs font-medium ${TONE_CLASS[badge.tone]}`}
-              >
-                {badge.label}
-              </li>
-            ))}
-          </ul>
+        <span
+          aria-hidden="true"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-sunken text-lg font-semibold text-ink-soft"
+        >
+          {name.slice(0, 1).toUpperCase()}
+        </span>
+        <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
+          <h1 className="line-clamp-2 text-lg font-semibold break-words" title={name}>
+            {name}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
+            <span>
+              {fmt.date(transaction.bookingDate)} ·{' '}
+              <Link href={`/accounts/${transaction.accountId}`} className="underline">
+                {transaction.accountName}
+              </Link>
+            </span>
+            <ul aria-label="Status" className="flex flex-wrap gap-1.5">
+              {badges.map((badge) => (
+                <li
+                  key={badge.label}
+                  className={`rounded-md px-2.5 py-0.5 text-xs font-medium ${TONE_CLASS[badge.tone]}`}
+                >
+                  {badge.label}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </div>
-      <p
-        className={`font-display text-3xl tracking-tight whitespace-nowrap tabular-nums ${amountClass(transaction.amountMinor)}`}
-      >
-        {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
-      </p>
-      <div className="flex items-center gap-3">{actions}</div>
-    </header>
+        <p
+          className={`font-display text-3xl tracking-tight whitespace-nowrap tabular-nums ${amountClass(transaction.amountMinor)}`}
+        >
+          {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
+        </p>
+        <div className="flex items-center gap-3">{actions}</div>
+      </header>
+    </TransactionMorph>
   );
 }
