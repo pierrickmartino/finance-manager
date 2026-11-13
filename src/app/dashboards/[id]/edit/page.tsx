@@ -7,7 +7,7 @@ import { listDashboards } from '@/server/services/dashboards';
 import { listWidgets } from '@/server/services/reporting';
 import { editWidgetHref, findDashboard, loadRecentActivity, loadStoryChapter } from '../../load';
 import { DashboardTabs } from '../../tabs';
-import { DashboardOverview } from '../overview/dashboard-overview';
+import { DashboardOverview, OverviewCards } from '../overview/dashboard-overview';
 import { AddWidgetMenu, EmptyBoard } from './add-widget';
 import { EditBoard } from './edit-board';
 
@@ -51,8 +51,8 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
             </Link>
           </>
         }
-        chapters={chapters}
-        recent={recent}
+        isEmpty={chapters.length === 0}
+        overview={<OverviewCards chapters={chapters} recent={recent} />}
         board={
           <EditBoard
             // A new set of Widgets (added, duplicated, removed) starts again from the server's board.

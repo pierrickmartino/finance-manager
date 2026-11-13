@@ -493,3 +493,58 @@ test("a Donut Widget's card is a ring with the total inside; pointing at a part 
   await rentRow.click();
   await expect(page).toHaveURL(/\/widgets\/drill/);
 });
+
+/** The cards and parts of the Story still waiting on their query. */
+function placeholders(page: Page) {
+  return page.locator('[aria-busy="true"]');
+}
+
+test('the Story streams its parts in: once loaded, every Widget has its card and no placeholder is left', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: 'Recent activity', level: 2 })).toBeVisible();
+  for (const name of ['Income vs. expense', 'Net cash flow', 'Spending by Category']) {
+    await expect(widgetCard(page, name)).toBeVisible();
+  }
+  await expect(placeholders(page)).toHaveCount(0);
+
+  // Edit mode and back: the route skeletons give way to the pages.
+  await page.getByRole('link', { name: 'Edit Dashboard' }).click();
+  await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Done' }).click();
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  await expect(placeholders(page)).toHaveCount(0);
+});
+
+test('a Widget whose query reports a problem says so in its own card; the others still draw', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const dashboard = await createDashboardRecord(ctx, { name: `Streams ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Still fine',
+      visualisation: 'number',
+      query: { dateRange: { kind: 'last', count: 3, unit: 'month' }, rows: null, columns: null },
+    });
+    const broken = await addWidget(ctx, dashboard.id, {
+      name: 'Gone wrong',
+      visualisation: 'line',
+      query: { dateRange: { kind: 'last', count: 3, unit: 'month' }, rows: null, columns: 'month' },
+    });
+    // A stored query that no longer passes validation: its run reports the problem.
+    await ctx.db.query(
+      `UPDATE widget SET query = jsonb_set(query, '{dateRange}', $2::jsonb) WHERE id = $1`,
+      [broken.id, JSON.stringify({ kind: 'fixed', from: '2026-02-01', to: '2026-01-01' })],
+    );
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+
+  await expect(widgetCard(page, 'Gone wrong')).toContainText('From must not be after To');
+  await expect(chapterTitles(page)).toHaveText(['Still fine', 'Gone wrong']);
+  await expect(placeholders(page)).toHaveCount(0);
+});

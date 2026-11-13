@@ -12,6 +12,8 @@ import ReactGridLayout, { useContainerWidth, type Compactor, type Layout } from 
 import 'react-grid-layout/css/styles.css';
 import { FieldError } from '@/components/form';
 import {
+  BOARD_GAP_PX,
+  BOARD_ROW_HEIGHT_PX,
   boardCells,
   GRID_COLUMNS,
   MAX_WIDGET_HEIGHT,
@@ -23,12 +25,7 @@ import {
   type VerticalDirection,
 } from '@/lib/reporting/board';
 import { keyboardStep } from '@/lib/reporting/board-keys';
-import {
-  BOARD_GAP_PX,
-  BOARD_ROW_HEIGHT_PX,
-  WidgetBoard,
-  type BoardChapter,
-} from '../overview/widget-board';
+import { WidgetBoard, type BoardChapter } from '../overview/widget-board';
 import { WidgetCard } from '../overview/widget-card';
 import { CardToolbar, DRAG_HANDLE_CLASS } from './card-toolbar';
 import { createPushDownCompactor, layoutCells } from './push-down-compactor';
