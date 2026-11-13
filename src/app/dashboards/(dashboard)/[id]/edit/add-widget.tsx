@@ -6,7 +6,7 @@ import { ActionForm } from '@/components/action-form';
 import { INPUT_CLASS } from '@/components/named-list';
 import { CARD_CLASS, PILL_BUTTON_CLASS, SMALL_BUTTON_CLASS } from '@/components/surface';
 import type { WidgetPickerOption } from '@/lib/reporting/widget-picker';
-import { addBalancesWidgetAction, copyWidgetToDashboardAction } from '../../actions';
+import { addBalancesWidgetAction, copyWidgetToDashboardAction } from '../../../actions';
 
 interface AddWidgetProps {
   dashboardId: string;

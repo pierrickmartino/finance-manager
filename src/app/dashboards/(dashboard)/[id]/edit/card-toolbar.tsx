@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { ActionForm } from '@/components/action-form';
 import { DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
 import type { VerticalDirection } from '@/lib/reporting/board';
-import { deleteDashboardWidgetAction, duplicateWidgetAction } from '../../actions';
+import { deleteDashboardWidgetAction, duplicateWidgetAction } from '../../../actions';
 
 const TOOLBAR_BUTTON = `${GHOST_BUTTON_CLASS} text-xs`;
 /** Remove, sized and padded like the toolbar's other actions. */

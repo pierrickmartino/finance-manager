@@ -5,9 +5,9 @@ import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { homeDashboard, listDashboards } from '@/server/services/dashboards';
 import { swissToday } from '@/server/services/fx/dates';
-import { findDashboard, loadRecentActivity, loadStoryChapter } from '../load';
-import { DashboardTabs } from '../tabs';
-import { DashboardOverview } from './overview/dashboard-overview';
+import { findDashboard, loadRecentActivity, loadStoryChapter } from '../../load';
+import { DashboardTabs } from '../../tabs';
+import { DashboardChrome, DashboardOverview } from './overview/dashboard-overview';
 import { StreamedBoard, StreamedCompleteness, StreamedOverview } from './streamed';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
@@ -37,7 +37,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
 
   return (
     <section className="flex flex-col gap-4">
-      <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
+      <DashboardChrome name="dashboard-tabs">
+        <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
+      </DashboardChrome>
       <DashboardOverview
         dashboardName={dashboard.name}
         subtitle={<p>Where you stand, where it went, and what changed this month.</p>}
