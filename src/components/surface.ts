@@ -26,6 +26,12 @@ export const WARNING_NOTICE_CLASS =
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 
+/**
+ * A quiet block standing in for content still loading (a card's chart, a line of text): a
+ * sunken fill that pulses gently, still under reduced motion. Decorative: mark its container busy.
+ */
+export const PLACEHOLDER_CLASS = 'rounded-md bg-sunken motion-safe:animate-pulse';
+
 const BADGE_BASE = 'rounded-md px-2 py-0.5 text-xs font-medium';
 /**
  * A short label beside a row's name (Missed, New), by tone: `warning` asks for attention,

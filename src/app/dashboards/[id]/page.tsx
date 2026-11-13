@@ -3,14 +3,12 @@ import Link from 'next/link';
 import { PILL_BUTTON_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
-import { checkCompleteness, type CompletenessEntry } from '@/server/services/completeness';
 import { homeDashboard, listDashboards } from '@/server/services/dashboards';
 import { swissToday } from '@/server/services/fx/dates';
 import { findDashboard, loadRecentActivity, loadStoryChapter } from '../load';
 import { DashboardTabs } from '../tabs';
-import { CompletenessNotice } from './completeness-notice';
 import { DashboardOverview } from './overview/dashboard-overview';
-import { WidgetBoard } from './overview/widget-board';
+import { StreamedBoard, StreamedCompleteness, StreamedOverview } from './streamed';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 
@@ -19,19 +17,21 @@ export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
  * its place and size (GLOSSARY: Dashboard Story, ADR-0009, ADR-0010). Values in CHF. Changing the Widgets
  * happens in Edit mode (./edit). The home Dashboard (the one the home page opens) also shows the
  * Completeness check (ADR-0008).
+ *
+ * The page shell (tabs, name, actions) renders as soon as the Dashboard is found; each part that
+ * waits on a query streams in behind its own placeholder (./streamed).
  */
 export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
-  const [dashboards, chapters, recent, fmt] = await Promise.all([
-    listDashboards(ctx),
-    Promise.all(dashboard.widgets.map((widget) => loadStoryChapter(ctx, widget))),
-    loadRecentActivity(ctx),
-    getFormatter(),
-  ]);
-  const today = swissToday();
-  const completeness: CompletenessEntry[] | null =
-    homeDashboard(dashboards)?.id === dashboard.id ? await checkCompleteness(ctx, { today }) : null;
+  // Started now, awaited by the parts that show them: each Widget's query runs once.
+  const cards = dashboard.widgets.map((widget) => ({
+    widget,
+    chapter: loadStoryChapter(ctx, widget),
+  }));
+  const recent = loadRecentActivity(ctx);
+  const [dashboards, fmt] = await Promise.all([listDashboards(ctx), getFormatter()]);
+  const isHome = homeDashboard(dashboards)?.id === dashboard.id;
 
   const editHref = `/dashboards/${dashboard.id}/edit`;
 
@@ -46,12 +46,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
             Edit Dashboard
           </Link>
         }
-        chapters={chapters}
-        recent={recent}
-        notice={
-          completeness && <CompletenessNotice entries={completeness} fmt={fmt} today={today} />
-        }
-        board={<WidgetBoard chapters={chapters} />}
+        isEmpty={dashboard.widgets.length === 0}
+        notice={isHome && <StreamedCompleteness ctx={ctx} fmt={fmt} today={swissToday()} />}
+        overview={<StreamedOverview chapters={cards.map((card) => card.chapter)} recent={recent} />}
+        board={<StreamedBoard cards={cards} />}
         empty={
           <p className="py-16 text-lg text-muted">
             No Widgets yet.{' '}

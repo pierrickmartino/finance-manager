@@ -9,6 +9,10 @@ export const GRID_COLUMNS = 12;
 export const MAX_WIDGET_HEIGHT = 40;
 /** How many rows the board has: every card ends on or above its last row. */
 export const MAX_BOARD_ROWS = 10_000;
+/** The height of one board row, in px; a card `h` rows tall also spans the `h - 1` gaps. */
+export const BOARD_ROW_HEIGHT_PX = 40;
+/** The gap between cards and between rows, in px (Tailwind `gap-5`). */
+export const BOARD_GAP_PX = 20;
 
 export interface Size {
   w: number;

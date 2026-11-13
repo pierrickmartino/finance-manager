@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
-import type { BoardChapter } from './widget-board';
+import type { StoryChapter } from '../story/chapter';
 
 interface DashboardOverviewProps {
   dashboardName: string;
@@ -8,15 +8,16 @@ interface DashboardOverviewProps {
   subtitle: ReactNode;
   /** Beside the name: Edit Dashboard, or Edit mode's Add Widget and Done. */
   actions: ReactNode;
-  /** In reading order. */
-  chapters: BoardChapter[];
-  recent: RecentActivity[];
+  /** Whether the Dashboard has no Widgets: known from the Dashboard itself, before any query. */
+  isEmpty: boolean;
   /**
    * Shown between the title and the grid, outside the Story itself: the home Dashboard's
    * Completeness check (ADR-0008). A server component, so it stays server-rendered.
    */
   notice?: ReactNode;
-  /** The Widgets' board: drawn as it is, or Edit mode's (ADR-0010). */
+  /** The overview row's cards: drawn as they are (`OverviewCards`), or streamed in by the Story. */
+  overview: ReactNode;
+  /** The Widgets' board: drawn as it is, streamed in card by card, or Edit mode's (ADR-0010). */
   board: ReactNode;
   /** What a Dashboard without Widgets shows instead of the overview row and the board. */
   empty: ReactNode;
@@ -32,9 +33,9 @@ export function DashboardOverview({
   dashboardName,
   subtitle,
   actions,
-  chapters,
-  recent,
+  isEmpty,
   notice,
+  overview,
   board,
   empty,
 }: DashboardOverviewProps) {
@@ -48,18 +49,37 @@ export function DashboardOverview({
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
       </header>
       {notice}
-      {chapters.length === 0 ? (
+      {isEmpty ? (
         empty
       ) : (
         <>
-          <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
-            <NetWorthCard chapters={chapters} />
-            <InsightCard chapters={chapters} />
-            <RecentActivityCard recent={recent} />
-          </div>
+          <OverviewRow>{overview}</OverviewRow>
           {board}
         </>
       )}
     </div>
+  );
+}
+
+/** The overview row's band: its cards side by side from `md` up. */
+export function OverviewRow({ children }: { children: ReactNode }) {
+  return <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">{children}</div>;
+}
+
+/** The overview row's cards, every chapter already loaded: net worth, insight, recent activity. */
+export function OverviewCards({
+  chapters,
+  recent,
+}: {
+  /** In reading order. */
+  chapters: StoryChapter[];
+  recent: RecentActivity[];
+}) {
+  return (
+    <>
+      <NetWorthCard chapters={chapters} />
+      <InsightCard chapters={chapters} />
+      <RecentActivityCard recent={recent} />
+    </>
   );
 }
