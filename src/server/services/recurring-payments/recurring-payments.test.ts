@@ -867,10 +867,10 @@ describe('the Missed state and "Not yet imported"', () => {
     expect(recurringPayments).toMatchObject([{ state: 'active' }]);
   });
 
-  it('is Missed the day after, when its Account has data through the grace, and stays in the total', async () => {
+  it('is Missed the day after, when its Account has data past the grace, and stays in the total', async () => {
     const card = await account();
     await charges(card, 'Gym', monthly(DATES, -5000));
-    await imported(card, ['2025-03-06', '2025-04-13']);
+    await imported(card, ['2025-03-06', '2025-04-14']);
 
     const result = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
 
@@ -888,10 +888,10 @@ describe('the Missed state and "Not yet imported"', () => {
     expect(recurringPayments).toMatchObject([{ state: 'missed' }]);
   });
 
-  it('is "Not yet imported" when its Account\'s data ends the day before the grace does', async () => {
+  it('is "Not yet imported" when its Account\'s data ends on the last day of the grace', async () => {
     const card = await account();
     await charges(card, 'Gym', monthly(DATES, -5000));
-    await imported(card, ['2025-03-06', '2025-04-12']);
+    await imported(card, ['2025-03-06', '2025-04-13']);
 
     const result = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
 

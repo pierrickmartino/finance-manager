@@ -55,16 +55,16 @@ interface StateInput {
 
 /**
  * Where a series stands on `today`. Once the grace after its next expected date has passed with
- * no charge it is Missed, unless the last charge's Account's data doesn't cover every day from
- * that charge to the grace's end (the Account is Stale, its data ends sooner, or a Gap falls in
- * between): then it is "Not yet imported". After `ENDED_AFTER_CADENCES` cadences it is Ended.
+ * no charge it is Missed, unless the last charge's Account's data doesn't reach beyond the grace's
+ * last day, covering every day from that charge on (the Account is Stale, its data ends on the
+ * grace's last day or sooner, or a Gap falls in between): then it is "Not yet imported". After `ENDED_AFTER_CADENCES` cadences it is Ended.
  */
 export function stateOf(series: StateInput): RecurringPaymentState {
   const { rule, lastChargeDate, today } = series;
   if (isEndedOn(rule, lastChargeDate, today)) return 'ended';
   const graceEnd = addDays(series.nextExpectedDate, graceDays(rule));
   if (today <= graceEnd) return 'active';
-  return coversThrough(series.accountData, lastChargeDate, graceEnd, today)
+  return coversThrough(series.accountData, lastChargeDate, addDays(graceEnd, 1), today)
     ? 'missed'
     : 'not_yet_imported';
 }
