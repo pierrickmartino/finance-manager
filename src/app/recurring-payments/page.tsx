@@ -15,29 +15,41 @@ import { swissToday } from '@/server/services/fx/dates';
 import {
   AMOUNT_TOLERANCE,
   CADENCES,
+  ENDED_AFTER_CADENCES,
   listRecurringPayments,
   WINDOW_MONTHS,
   type RecurringPayment,
 } from '@/server/services/recurring-payments';
 import { dismissRecurringPaymentAction, restoreRecurringPaymentAction } from './actions';
-import { aroundDate, cadenceLabel, drillHref, minimumChargesText, yearlyCostWorking } from './view';
+import {
+  aroundDate,
+  badgesOf,
+  cadenceLabel,
+  drillHref,
+  minimumChargesText,
+  yearlyCostWorking,
+  type Badge,
+} from './view';
 
 export const metadata: Metadata = { title: 'Recurring payments · Finance Manager' };
 
 /**
  * The Recurring payments page (spec: Recurring payments; ADR-0011): the series recognised from
- * recorded Transactions as of today, with the total of their yearly costs, highest first.
- * Dismissed ones sit in a collapsed section below, out of the total, where they can be restored.
+ * recorded Transactions as of today, highest yearly cost first, with the total of the active,
+ * Missed and Not yet imported ones. Below, collapsed and out of the total: the Ended ones, and the
+ * dismissed ones (Ended or not), where they can be restored.
  */
 export default async function RecurringPaymentsPage() {
   const ctx = await getServiceContext();
   const today = swissToday();
   const [list, fmt] = await Promise.all([listRecurringPayments(ctx, { today }), getFormatter()]);
   const { totalYearlyCostMinor } = list;
-  const recurringPayments = list.recurringPayments.filter(
-    (payment) => payment.dismissalId === null,
+  const isKept = (payment: RecurringPayment) => payment.dismissalId === null;
+  const recurringPayments = list.recurringPayments.filter(isKept);
+  const ended = list.ended.filter(isKept);
+  const dismissed = [...list.recurringPayments, ...list.ended].filter(
+    (payment) => !isKept(payment),
   );
-  const dismissed = list.recurringPayments.filter((payment) => payment.dismissalId !== null);
 
   return (
     <section className="flex flex-col gap-6">
@@ -48,7 +60,7 @@ export default async function RecurringPaymentsPage() {
         </p>
       </header>
 
-      {list.recurringPayments.length === 0 ? (
+      {list.recurringPayments.length === 0 && list.ended.length === 0 ? (
         <EmptyState />
       ) : (
         <>
@@ -62,17 +74,20 @@ export default async function RecurringPaymentsPage() {
               {recurringPayments.length === 1 ? '' : 's'}
             </p>
           </section>
-          <ul aria-label="Recurring payments" className={`${CARD_CLASS} divide-y divide-rule`}>
-            {recurringPayments.map((payment) => (
-              <PaymentRow
-                key={paymentKey(payment)}
-                payment={payment}
-                today={today}
-                fmt={fmt}
-                action={<DismissButton payment={payment} />}
-              />
-            ))}
-          </ul>
+          {recurringPayments.length > 0 && (
+            <ul aria-label="Recurring payments" className={`${CARD_CLASS} divide-y divide-rule`}>
+              {recurringPayments.map((payment) => (
+                <PaymentRow
+                  key={paymentKey(payment)}
+                  payment={payment}
+                  today={today}
+                  fmt={fmt}
+                  action={<DismissButton payment={payment} />}
+                />
+              ))}
+            </ul>
+          )}
+          {ended.length > 0 && <EndedSection ended={ended} today={today} fmt={fmt} />}
           <DismissedSection payments={dismissed} today={today} fmt={fmt} />
         </>
       )}
@@ -84,6 +99,49 @@ export default async function RecurringPaymentsPage() {
 const paymentKey = (payment: RecurringPayment): string =>
   `${payment.charges[0]!.kind}:${payment.charges[0]!.id}`;
 
+/** The Ended series, collapsed: a native disclosure, no client script. */
+function EndedSection({
+  ended,
+  today,
+  fmt,
+}: {
+  ended: RecurringPayment[];
+  today: string;
+  fmt: Formatter;
+}) {
+  return (
+    <section aria-label="Ended" className={`${CARD_CLASS} text-sm`}>
+      <details>
+        <summary className="cursor-pointer px-4 py-3 font-medium">Ended ({ended.length})</summary>
+        <p className="px-4 pb-3 text-muted">
+          No charge for {ENDED_AFTER_CADENCES} full cadences. Left out of the yearly cost; a new
+          charge makes one active again.
+        </p>
+        <ul
+          aria-label="Ended Recurring payments"
+          className="divide-y divide-rule border-t border-rule"
+        >
+          {ended.map((payment) => (
+            <PaymentRow
+              key={paymentKey(payment)}
+              payment={payment}
+              today={today}
+              fmt={fmt}
+              action={<DismissButton payment={payment} />}
+            />
+          ))}
+        </ul>
+      </details>
+    </section>
+  );
+}
+
+const BADGE_CLASS = {
+  warning:
+    'rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset',
+  info: 'rounded-md bg-info-tint px-2 py-0.5 text-xs text-info',
+} as const satisfies Record<Badge['tone'], string>;
+
 interface PaymentRowProps {
   payment: RecurringPayment;
   today: string;
@@ -93,6 +151,7 @@ interface PaymentRowProps {
 }
 
 function PaymentRow({ payment, today, fmt, action }: PaymentRowProps) {
+  const badges = payment.state === 'ended' ? [] : badgesOf(payment, fmt);
   return (
     <li className="grid gap-x-6 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-baseline">
       <div className="min-w-0">
@@ -107,9 +166,22 @@ function PaymentRow({ payment, today, fmt, action }: PaymentRowProps) {
             {fmt.amount(payment.lastAmountMinor, { currency: payment.currency })}
           </span>
         </p>
+        {badges.length > 0 && (
+          <ul aria-label="Flags" className="mt-1 flex flex-wrap gap-1.5">
+            {badges.map((badge) => (
+              <li key={badge.label} className={BADGE_CLASS[badge.tone]}>
+                {badge.label}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <p className="text-sm text-muted sm:text-right">
-        Next {aroundDate(payment.nextExpectedDate, today)}
+        {payment.state === 'ended' ? (
+          <>Last charged {fmt.date(payment.lastChargeDate)}</>
+        ) : (
+          <>Next {aroundDate(payment.nextExpectedDate, today)}</>
+        )}
       </p>
       <div className="sm:text-right">
         {payment.yearlyCost ? (

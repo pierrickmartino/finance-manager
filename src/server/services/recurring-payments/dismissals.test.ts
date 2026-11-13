@@ -19,7 +19,8 @@ import {
 const t = setupTestDatabase();
 
 let accountCount = 0;
-async function account(): Promise<Account> {
+/** An Account, imported by default; with `importFormat` null its Transactions are entered by hand. */
+async function account(importFormat: 'ubs_csv' | null = 'ubs_csv'): Promise<Account> {
   accountCount += 1;
   const bank = await createBank(t.ctx, { name: `Bank ${accountCount}` });
   return createAccount(t.ctx, {
@@ -28,7 +29,7 @@ async function account(): Promise<Account> {
     currency: 'CHF',
     iban: null,
     kind: 'current',
-    importFormat: 'ubs_csv',
+    importFormat,
     openingBalanceMinor: 0,
   });
 }
@@ -142,6 +143,58 @@ describe('dismissing a Recurring payment', () => {
   });
 });
 
+describe('a dismissed series that is Missed or Ended', () => {
+  // Next expected on 5 April: Missed after the 8-day grace (14 April), Ended from 6 May.
+  const DATES = ['2025-01-05', '2025-02-05', '2025-03-05'];
+
+  it('stays dismissed and out of the total once Missed, and opens its Drill-down', async () => {
+    const byHand = await account(null);
+    const ids = await monthly(byHand, 'Gym', DATES, -5000);
+    await monthly(byHand, 'Netflix', ['2025-02-12', '2025-03-12', '2025-04-12'], -2190);
+    const before = await listRecurringPayments(t.ctx, { today: '2025-04-01' });
+    const dismissal = await dismissRecurringPayment(t.ctx, {
+      charges: named(before.recurringPayments, 'Gym').charges,
+    });
+
+    const after = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
+    const drill = await listRecurringPaymentCharges(t.ctx, {
+      today: '2025-04-14',
+      charge: { kind: 'transaction', id: ids[2]! },
+    });
+
+    expect(named(after.recurringPayments, 'Gym')).toMatchObject({
+      state: 'missed',
+      dismissalId: dismissal.id,
+    });
+    expect(after.totalYearlyCostMinor).toBe(26280);
+    expect(drill.recurringPayment.dismissalId).toBe(dismissal.id);
+  });
+
+  it('is listed as Ended and dismissed, out of the total, and opens its Drill-down', async () => {
+    const card = await account();
+    const ids = await monthly(card, 'Gym', DATES, -5000);
+    await monthly(card, 'Netflix', ['2025-03-01', '2025-04-01', '2025-05-01'], -2190);
+    const before = await listRecurringPayments(t.ctx, { today: '2025-04-01' });
+    const dismissal = await dismissRecurringPayment(t.ctx, {
+      charges: named(before.recurringPayments, 'Gym').charges,
+    });
+
+    const after = await listRecurringPayments(t.ctx, { today: '2025-05-06' });
+    const drill = await listRecurringPaymentCharges(t.ctx, {
+      today: '2025-05-06',
+      charge: { kind: 'transaction', id: ids[2]! },
+    });
+
+    expect(after.recurringPayments.map((payment) => payment.payee.name)).toEqual(['Netflix']);
+    expect(after.ended).toMatchObject([
+      { payee: { name: 'Gym' }, state: 'ended', dismissalId: dismissal.id },
+    ]);
+    expect(after.totalYearlyCostMinor).toBe(26280);
+    expect(drill.recurringPayment).toMatchObject({ state: 'ended', dismissalId: dismissal.id });
+    expect(drill.transactions.map((transaction) => transaction.id)).toEqual(ids.toReversed());
+  });
+});
+
 describe('restoring a dismissed Recurring payment', () => {
   it('lists it again, counts it in the total and records the restore in History', async () => {
     await monthly(await account(), 'Spotify', ['2025-01-10', '2025-02-10', '2025-03-10'], -1290);
@@ -216,10 +269,11 @@ describe('a dismissal surviving changes', () => {
 describe('dropping references to charges that are gone', () => {
   it('deletes the dismissal once every referenced Transaction is deleted', async () => {
     const card = await account();
+    // Ended by TODAY: a dismissal anchors on an Ended series' charges too.
     const ids = await monthly(card, 'Spotify', ['2024-10-10', '2024-11-10', '2024-12-10'], -1290);
     const before = await listRecurringPayments(t.ctx, { today: TODAY });
     const dismissal = await dismissRecurringPayment(t.ctx, {
-      charges: before.recurringPayments[0]!.charges,
+      charges: before.ended[0]!.charges,
     });
 
     for (const id of ids) await deleteImportedTransaction(t.ctx, id);

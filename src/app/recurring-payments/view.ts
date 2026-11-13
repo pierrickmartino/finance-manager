@@ -7,6 +7,8 @@ import type {
   CadenceRule,
   ChargeRef,
   RecurringPayment,
+  RecurringPaymentFlag,
+  RecurringPaymentState,
 } from '@/server/services/recurring-payments';
 
 const MONTHS = [
@@ -99,4 +101,40 @@ export function minimumChargesText(rules: readonly CadenceRule[]): string {
     return `${count}${index === 0 ? ' charges' : ''} for ${cadences}`;
   });
   return `at least ${parts.join(', ')}`;
+}
+
+/** A short label beside a Recurring payment, in a meaning token: attention or neutral status. */
+export interface Badge {
+  label: string;
+  tone: 'warning' | 'info';
+}
+
+const STATE_BADGES = {
+  active: null,
+  missed: { label: 'Missed', tone: 'warning' },
+  not_yet_imported: { label: 'Not yet imported', tone: 'info' },
+  ended: null,
+} as const satisfies Record<RecurringPaymentState, Badge | null>;
+
+function flagBadge(
+  flag: RecurringPaymentFlag,
+  payment: Pick<RecurringPayment, 'currency' | 'lastAmountMinor' | 'previousAmountMinor'>,
+  fmt: Formatter,
+): Badge {
+  if (flag === 'new') return { label: 'New', tone: 'info' };
+  const from = fmt.amount(payment.previousAmountMinor, { currency: payment.currency });
+  const to = fmt.amount(payment.lastAmountMinor, { currency: payment.currency });
+  return { label: `Up from ${from} to ${to}`, tone: 'warning' };
+}
+
+/** The badges of a Recurring payment: its state (Missed, "Not yet imported") first, then its flags. */
+export function badgesOf(
+  payment: Pick<
+    RecurringPayment,
+    'currency' | 'lastAmountMinor' | 'previousAmountMinor' | 'state' | 'flags'
+  >,
+  fmt: Formatter,
+): Badge[] {
+  const state = STATE_BADGES[payment.state];
+  return [...(state ? [state] : []), ...payment.flags.map((flag) => flagBadge(flag, payment, fmt))];
 }

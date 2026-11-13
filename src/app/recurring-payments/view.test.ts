@@ -3,6 +3,7 @@ import { createFormatter, DEFAULT_DISPLAY_SETTINGS } from '@/lib/format';
 import { CADENCES } from '@/server/services/recurring-payments';
 import {
   aroundDate,
+  badgesOf,
   cadenceLabel,
   chargeFromParams,
   drillHref,
@@ -126,5 +127,36 @@ describe('minimumChargesText', () => {
     expect(minimumChargesText(CADENCES)).toBe(
       'at least 3 charges for monthly and quarterly, 2 for half-yearly and yearly',
     );
+  });
+});
+
+describe('badgesOf', () => {
+  const payment: Parameters<typeof badgesOf>[0] = {
+    currency: 'CHF',
+    lastAmountMinor: 1100,
+    previousAmountMinor: 1000,
+    state: 'active',
+    flags: [],
+  };
+
+  it('has no badge for an active series with no flag', () => {
+    expect(badgesOf(payment, fmt)).toEqual([]);
+  });
+
+  it('shows a price increase with both amounts, and New', () => {
+    expect(badgesOf({ ...payment, flags: ['price_increase', 'new'] }, fmt)).toEqual([
+      { label: 'Up from CHF 10.00 to CHF 11.00', tone: 'warning' },
+      { label: 'New', tone: 'info' },
+    ]);
+  });
+
+  it('shows Missed as a warning and "Not yet imported" as neutral status, before the flags', () => {
+    expect(badgesOf({ ...payment, state: 'missed', flags: ['new'] }, fmt)).toEqual([
+      { label: 'Missed', tone: 'warning' },
+      { label: 'New', tone: 'info' },
+    ]);
+    expect(badgesOf({ ...payment, state: 'not_yet_imported' }, fmt)).toEqual([
+      { label: 'Not yet imported', tone: 'info' },
+    ]);
   });
 });

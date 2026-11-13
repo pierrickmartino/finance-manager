@@ -33,16 +33,17 @@ function transactionIdsOf(charges: readonly Charge[]): string[] {
 
 /**
  * The Drill-down of the Recurring payment recognised as of `today` that `charge` is one of
- * (spec: Recurring payments): its charges' Transactions, through the list-by-id read. Not found
- * when no Recurring payment has that charge, e.g. once it is no longer recognised.
+ * (spec: Recurring payments), whatever its state (Ended ones too): its charges' Transactions,
+ * through the list-by-id read. Not found when no Recurring payment has that charge, e.g. once it
+ * is no longer recognised.
  */
 export async function listRecurringPaymentCharges(
   ctx: ServiceContext,
   input: { today: string; charge: ChargeRef },
 ): Promise<RecurringPaymentDrill> {
   const { today, charge } = parseInput(drillInput, input);
-  const { recurringPayments } = await listRecurringPayments(ctx, { today });
-  const recurringPayment = recurringPayments.find((payment) =>
+  const { recurringPayments, ended } = await listRecurringPayments(ctx, { today });
+  const recurringPayment = [...recurringPayments, ...ended].find((payment) =>
     payment.charges.some((one) => one.kind === charge.kind && one.id === charge.id),
   );
   if (!recurringPayment) throw new NotFoundError('Recurring payment not found');
