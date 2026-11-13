@@ -1,14 +1,9 @@
 import type { Queryable } from '@/server/db/client';
 import { REPORTED_PAYEE_ID } from '../transactions/line-payee';
-
-/** What a charge is: a whole unsplit Transaction, or one Split line (ADR-0011). */
-export type ChargeKind = 'transaction' | 'splitLine';
+import type { ChargeRef } from './charge-ref';
 
 /** One charge of a Recurring payment, as the series references it. */
-export interface Charge {
-  kind: ChargeKind;
-  /** The Transaction's id, or the Split line's for a line. */
-  id: string;
+export interface Charge extends ChargeRef {
   /** The Transaction it is, or belongs to. */
   transactionId: string;
   accountId: string;

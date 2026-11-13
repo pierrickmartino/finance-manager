@@ -103,8 +103,14 @@ describe('the Drill-down link', () => {
     expect(chargeFromParams(params)).toEqual({ kind: 'transaction', id: LAST });
   });
 
-  it('reads nothing back from a missing or malformed charge', () => {
-    for (const params of [{}, { charge: LAST }, { charge: 'transaction:' }, { charge: ':x' }]) {
+  it('reads nothing back from a missing or malformed charge, or one of an unknown kind', () => {
+    for (const params of [
+      {},
+      { charge: LAST },
+      { charge: 'transaction:' },
+      { charge: ':x' },
+      { charge: `payee:${LAST}` },
+    ]) {
       expect(chargeFromParams(params)).toBeNull();
     }
   });

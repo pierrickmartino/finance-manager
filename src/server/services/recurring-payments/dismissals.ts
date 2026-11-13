@@ -4,14 +4,7 @@ import { mutate, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import type { HistorySnapshot } from '../history/recorder';
 import { REPORTED_PAYEE_ID } from '../transactions/line-payee';
-import type { ChargeKind } from './charges';
-import type { ChargeRef } from './drill';
-
-/** Names one charge a dismissal is anchored on: a whole Transaction or a Split line. */
-interface KnownChargeRef {
-  kind: ChargeKind;
-  id: string;
-}
+import { chargeKey, chargeRefSchema, type ChargeKind, type ChargeRef } from './charge-ref';
 
 /** A stored dismissal (ADR-0011): only its id, the charges it is anchored on are internal. */
 export interface RecurringPaymentDismissal {
@@ -23,37 +16,31 @@ const HISTORY_TYPE = 'recurring_payment_dismissal';
 /** More charges than 36 months of weekly payments: a bound on untrusted input, not a rule. */
 const MAX_CHARGES = 500;
 
-const chargeRef = z.object({
-  kind: z.enum(['transaction', 'splitLine'], { error: 'Unknown charge kind' }),
-  id: z.uuid({ error: 'A charge must be a Transaction or Split line id' }),
-});
-
 const dismissInput = z.object({
   charges: z
-    .array(chargeRef)
+    .array(chargeRefSchema)
     .min(1, { error: 'A Recurring payment to dismiss needs its charges' })
     .max(MAX_CHARGES, { error: 'Too many charges' }),
 });
 
 const dismissalId = z.uuid();
 
-const refKey = (ref: ChargeRef): string => `${ref.kind}:${ref.id}`;
-
-function uniqueRefs(refs: readonly KnownChargeRef[]): KnownChargeRef[] {
-  const byKey = new Map(refs.map((ref) => [refKey(ref), { kind: ref.kind, id: ref.id }]));
+function uniqueRefs(refs: readonly ChargeRef[]): ChargeRef[] {
+  const byKey = new Map(refs.map((ref) => [chargeKey(ref), { kind: ref.kind, id: ref.id }]));
   return [...byKey.values()];
 }
 
-interface ExistingCharge extends KnownChargeRef {
+/** The ids of the `refs` of one kind. */
+function idsOf(refs: readonly ChargeRef[], kind: ChargeKind): string[] {
+  return refs.filter((ref) => ref.kind === kind).map((ref) => ref.id);
+}
+
+interface ExistingCharge extends ChargeRef {
   payeeName: string | null;
 }
 
 /** The given charges that exist, with their reported Payee's name. */
-async function findCharges(
-  db: Queryable,
-  refs: readonly KnownChargeRef[],
-): Promise<ExistingCharge[]> {
-  const ids = (kind: ChargeKind) => refs.filter((ref) => ref.kind === kind).map((ref) => ref.id);
+async function findCharges(db: Queryable, refs: readonly ChargeRef[]): Promise<ExistingCharge[]> {
   const result = await db.query<ExistingCharge>(
     `SELECT 'transaction' AS kind, t.id, p.name AS "payeeName"
      FROM "transaction" t LEFT JOIN payee p ON p.id = t.payee_id
@@ -63,7 +50,7 @@ async function findCharges(
      FROM split_line sl JOIN "transaction" t ON t.id = sl.transaction_id
      LEFT JOIN payee p ON p.id = ${REPORTED_PAYEE_ID}
      WHERE sl.id = ANY($2::uuid[])`,
-    [ids('transaction'), ids('splitLine')],
+    [idsOf(refs, 'transaction'), idsOf(refs, 'splitLine')],
   );
   return result.rows;
 }
@@ -73,7 +60,7 @@ function snapshot(charges: readonly ExistingCharge[]): HistorySnapshot {
   const payees = [...new Set(charges.map((charge) => charge.payeeName).filter(Boolean))];
   return {
     payee: payees.toSorted().join(', ') || null,
-    charges: charges.map(refKey).toSorted(),
+    charges: charges.map(chargeKey).toSorted(),
   };
 }
 
@@ -84,7 +71,7 @@ async function loadDismissalCharges(db: Queryable, id: string): Promise<Existing
     [id],
   );
   if (found.rowCount === 0) return null;
-  const refs = await db.query<KnownChargeRef>(
+  const refs = await db.query<ChargeRef>(
     `SELECT CASE WHEN transaction_id IS NULL THEN 'splitLine' ELSE 'transaction' END AS kind,
        coalesce(transaction_id, split_line_id) AS id
      FROM recurring_payment_dismissal_charge WHERE dismissal_id = $1`,
@@ -112,14 +99,12 @@ export async function dismissRecurringPayment(
       'INSERT INTO recurring_payment_dismissal DEFAULT VALUES RETURNING id',
     );
     const id = created.rows[0]!.id;
-    const ids = (kind: ChargeKind) =>
-      charges.filter((one) => one.kind === kind).map((one) => one.id);
     await tx.query(
       `INSERT INTO recurring_payment_dismissal_charge (dismissal_id, transaction_id, split_line_id)
        SELECT $1::uuid, unnest($2::uuid[]), NULL::uuid
        UNION ALL
        SELECT $1::uuid, NULL::uuid, unnest($3::uuid[])`,
-      [id, ids('transaction'), ids('splitLine')],
+      [id, idsOf(charges, 'transaction'), idsOf(charges, 'splitLine')],
     );
     await history.record(HISTORY_TYPE, id, null, snapshot(charges));
     return { id };
@@ -137,16 +122,15 @@ export async function restoreRecurringPayment(ctx: ServiceContext, id: string): 
   });
 }
 
-/** Every stored dismissal's charges, keyed `kind:id`, to the dismissal holding them. */
+/** Every stored dismissal's charges, keyed by `chargeKey`, to the dismissal holding them. */
 export async function loadDismissedCharges(db: Queryable): Promise<Map<string, string>> {
-  const result = await db.query<{ key: string; dismissalId: string }>(
-    `SELECT CASE WHEN transaction_id IS NULL THEN 'splitLine:' || split_line_id
-                 ELSE 'transaction:' || transaction_id END AS key,
-       dismissal_id AS "dismissalId"
+  const result = await db.query<ChargeRef & { dismissalId: string }>(
+    `SELECT CASE WHEN transaction_id IS NULL THEN 'splitLine' ELSE 'transaction' END AS kind,
+       coalesce(transaction_id, split_line_id) AS id, dismissal_id AS "dismissalId"
      FROM recurring_payment_dismissal_charge
      ORDER BY dismissal_id`,
   );
-  return new Map(result.rows.map((row) => [row.key, row.dismissalId]));
+  return new Map(result.rows.map((row) => [chargeKey(row), row.dismissalId]));
 }
 
 /** The dismissal holding any of `charges`, or null. */
@@ -155,7 +139,7 @@ export function dismissalOf(
   charges: readonly ChargeRef[],
 ): string | null {
   for (const charge of charges) {
-    const id = dismissed.get(refKey(charge));
+    const id = dismissed.get(chargeKey(charge));
     if (id) return id;
   }
   return null;

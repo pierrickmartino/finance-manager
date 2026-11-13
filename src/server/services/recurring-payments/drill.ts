@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ServiceContext } from '../context';
 import { NotFoundError, parseInput } from '../errors';
 import { listTransactionsByIds, type TransactionListItem } from '../transactions';
+import { chargeRefSchema, type ChargeRef } from './charge-ref';
 import type { Charge } from './charges';
 import { listRecurringPayments, type RecurringPayment } from './list';
 
@@ -12,18 +13,9 @@ export interface RecurringPaymentDrill {
   transactions: TransactionListItem[];
 }
 
-/**
- * One of a series' charges: series are not stored, so a charge is how a series is named. The
- * kind is a plain string, as it comes from a URL; it only ever matches a real charge's.
- */
-export interface ChargeRef {
-  kind: string;
-  id: string;
-}
-
 const drillInput = z.object({
   today: z.iso.date(),
-  charge: z.object({ kind: z.string().min(1).max(32), id: z.uuid() }),
+  charge: chargeRefSchema,
 });
 
 /** The Transactions of `charges` (oldest first), newest first and each once. */

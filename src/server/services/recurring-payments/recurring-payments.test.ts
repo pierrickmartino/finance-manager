@@ -985,7 +985,7 @@ describe("a Recurring payment's Drill-down", () => {
       'Gym',
       monthly(['2025-01-05', '2025-02-05', '2025-03-05'], -5000),
     );
-    const charge = { kind: 'transaction', id: ids[2]! };
+    const charge = { kind: 'transaction', id: ids[2]! } as const;
 
     const missed = await listRecurringPaymentCharges(t.ctx, { today: '2025-04-14', charge });
     const ended = await listRecurringPaymentCharges(t.ctx, { today: '2025-05-06', charge });

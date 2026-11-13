@@ -1,14 +1,15 @@
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { NUMBER_FORMATS, type Formatter } from '@/lib/format';
-import { z } from 'zod';
 import type { UrlParams } from '@/lib/reporting/widget-params';
-import type {
-  Cadence,
-  CadenceRule,
-  ChargeRef,
-  RecurringPayment,
-  RecurringPaymentFlag,
-  RecurringPaymentState,
+import {
+  chargeKey,
+  parseChargeKey,
+  type Cadence,
+  type CadenceRule,
+  type ChargeRef,
+  type RecurringPayment,
+  type RecurringPaymentFlag,
+  type RecurringPaymentState,
 } from '@/server/services/recurring-payments';
 
 const MONTHS = [
@@ -59,19 +60,14 @@ export function yearlyCostWorking(
  */
 export function drillHref(payment: { charges: readonly ChargeRef[] }): string {
   const latest = payment.charges.at(-1)!;
-  const params = new URLSearchParams({ charge: `${latest.kind}:${latest.id}` });
+  const params = new URLSearchParams({ charge: chargeKey(latest) });
   return `/recurring-payments/drill?${params}`;
 }
-
-const CHARGE_PARAM = /^([a-zA-Z]+):(.+)$/;
-const CHARGE_ID = z.uuid();
 
 /** The charge a Drill-down link names; null when it names none. */
 export function chargeFromParams(params: UrlParams): ChargeRef | null {
   const raw = Array.isArray(params.charge) ? params.charge[0] : params.charge;
-  const match = CHARGE_PARAM.exec(raw?.trim() ?? '');
-  if (!match || !CHARGE_ID.safeParse(match[2]).success) return null;
-  return { kind: match[1]!, id: match[2]! };
+  return parseChargeKey(raw?.trim() ?? '');
 }
 
 const CADENCE_LABELS = {

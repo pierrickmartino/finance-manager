@@ -15,6 +15,7 @@ import { swissToday } from '@/server/services/fx/dates';
 import {
   AMOUNT_TOLERANCE,
   CADENCES,
+  chargeKey,
   ENDED_AFTER_CADENCES,
   listRecurringPayments,
   WINDOW_MONTHS,
@@ -96,8 +97,7 @@ export default async function RecurringPaymentsPage() {
 }
 
 /** A series has no stored id: its first charge names it. */
-const paymentKey = (payment: RecurringPayment): string =>
-  `${payment.charges[0]!.kind}:${payment.charges[0]!.id}`;
+const paymentKey = (payment: RecurringPayment): string => chargeKey(payment.charges[0]!);
 
 /** The Ended series, collapsed: a native disclosure, no client script. */
 function EndedSection({
