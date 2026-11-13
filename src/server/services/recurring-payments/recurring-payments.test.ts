@@ -14,7 +14,8 @@ import {
 } from '../transactions';
 import { addDays } from '../fx/dates';
 import { linkTransfer } from '../transfers';
-import { listRecurringPayments } from '.';
+import { NotFoundError } from '../errors';
+import { listRecurringPaymentCharges, listRecurringPayments } from '.';
 
 const t = setupTestDatabase();
 
@@ -537,6 +538,23 @@ describe('Split lines as charges', () => {
     expect(totalYearlyCostMinor).toBe(120000);
   });
 
+  it('drills down from a series of Split lines to their Transactions, once each', async () => {
+    const split = await splitCharges(await account(), 'Swisscom', -10000, [
+      { amountMinor: -6000, categoryId: subscriptions.id },
+      { amountMinor: -4000, categoryId: subscriptions.id },
+    ]);
+
+    const drill = await listRecurringPaymentCharges(t.ctx, {
+      today: TODAY,
+      charge: { kind: 'splitLine', id: split[0]!.lineIds[1]! },
+    });
+
+    expect(drill.recurringPayment).toMatchObject({ lastAmountMinor: 4000 });
+    expect(drill.transactions.map((item) => [item.id, item.amountMinor])).toEqual(
+      split.toReversed().map(({ transactionId }) => [transactionId, -10000]),
+    );
+  });
+
   it('puts a Split line with its own Payee under that Payee', async () => {
     const netflix = await createPayee(t.ctx, 'Netflix');
     await splitCharges(await account(), 'Manor', -7190, [
@@ -919,5 +937,73 @@ describe('the Missed state and "Not yet imported"', () => {
     const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
 
     expect(recurringPayments).toMatchObject([{ state: 'not_yet_imported' }]);
+  });
+});
+
+describe("a Recurring payment's Drill-down", () => {
+  const TODAY = '2025-03-20';
+
+  /** Swisscom's two series: 49.00 on the 15th and 79.00 on the 16th, ids in each oldest first. */
+  async function twoSeries(): Promise<{ mobile: string[]; internet: string[] }> {
+    const ids = await charges(await account(), 'Swisscom', [
+      { date: '2025-01-15', amount: -4900 },
+      { date: '2025-01-16', amount: -7900 },
+      { date: '2025-02-15', amount: -4900 },
+      { date: '2025-02-16', amount: -7900 },
+      { date: '2025-03-15', amount: -4900 },
+      { date: '2025-03-16', amount: -7900 },
+    ]);
+    return {
+      mobile: ids.filter((_, index) => index % 2 === 0),
+      internet: ids.filter((_, index) => index % 2 === 1),
+    };
+  }
+
+  it("lists exactly the series' charges, newest first, from any one of them", async () => {
+    const { mobile } = await twoSeries();
+
+    const drill = await listRecurringPaymentCharges(t.ctx, {
+      today: TODAY,
+      charge: { kind: 'transaction', id: mobile[1]! },
+    });
+
+    expect(drill.recurringPayment).toMatchObject({
+      payee: { name: 'Swisscom' },
+      lastAmountMinor: 4900,
+    });
+    expect(drill.transactions.map((item) => [item.id, item.amountMinor])).toEqual([
+      [mobile[2], -4900],
+      [mobile[1], -4900],
+      [mobile[0], -4900],
+    ]);
+  });
+
+  it('opens a Missed or an Ended series too', async () => {
+    const card = await account('CHF', null);
+    const ids = await charges(
+      card,
+      'Gym',
+      monthly(['2025-01-05', '2025-02-05', '2025-03-05'], -5000),
+    );
+    const charge = { kind: 'transaction', id: ids[2]! };
+
+    const missed = await listRecurringPaymentCharges(t.ctx, { today: '2025-04-14', charge });
+    const ended = await listRecurringPaymentCharges(t.ctx, { today: '2025-05-06', charge });
+
+    expect(missed.recurringPayment.state).toBe('missed');
+    expect(ended.recurringPayment.state).toBe('ended');
+    expect(ended.transactions.map((item) => item.id)).toEqual(ids.toReversed());
+  });
+
+  it('is not found for a charge that is in no Recurring payment', async () => {
+    await twoSeries();
+    const [stray] = await charges(await account(), 'Kiosk', [{ date: '2025-03-01', amount: -500 }]);
+
+    await expect(
+      listRecurringPaymentCharges(t.ctx, {
+        today: TODAY,
+        charge: { kind: 'transaction', id: stray! },
+      }),
+    ).rejects.toThrow(NotFoundError);
   });
 });

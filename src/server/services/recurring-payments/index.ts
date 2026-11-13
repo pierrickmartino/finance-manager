@@ -18,6 +18,7 @@ export {
   type CadenceRule,
 } from './cadences';
 export type { Charge, ChargeKind } from './charges';
+export { listRecurringPaymentCharges, type ChargeRef, type RecurringPaymentDrill } from './drill';
 export {
   ENDED_AFTER_CADENCES,
   NEW_WITHIN_DAYS,

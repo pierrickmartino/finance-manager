@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { CARD_CLASS, HEADLINE_AMOUNT_CLASS, PAGE_TITLE_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import { getServiceContext } from '@/server/app-context';
@@ -16,6 +17,7 @@ import {
   aroundDate,
   badgesOf,
   cadenceLabel,
+  drillHref,
   minimumChargesText,
   yearlyCostWorking,
   type Badge,
@@ -123,7 +125,11 @@ function PaymentRow({ payment, today, fmt }: PaymentRowProps) {
   return (
     <li className="grid gap-x-6 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-baseline">
       <div className="min-w-0">
-        <p className="truncate font-medium">{payment.payee.name}</p>
+        <p className="truncate font-medium">
+          <Link href={drillHref(payment)} className="hover:underline">
+            {payment.payee.name}
+          </Link>
+        </p>
         <p className="text-sm text-muted">
           {cadenceLabel(payment.cadence)} · last{' '}
           <span className="tabular-nums">
