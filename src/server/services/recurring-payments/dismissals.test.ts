@@ -10,6 +10,7 @@ import { listPayees, mergePayees } from '../payees';
 import { editClassification, splitTransaction } from '../transactions';
 import {
   dismissRecurringPayment,
+  listRecurringPaymentCharges,
   listRecurringPayments,
   restoreRecurringPayment,
   type RecurringPayment,
@@ -80,6 +81,24 @@ describe('dismissing a Recurring payment', () => {
     expect(named(after.recurringPayments, 'Spotify').dismissalId).toBe(dismissal.id);
     expect(named(after.recurringPayments, 'Netflix').dismissalId).toBeNull();
     expect(after.totalYearlyCostMinor).toBe(26280);
+  });
+
+  it('still opens the Drill-down of a dismissed series', async () => {
+    const ids = await monthly(
+      await account(),
+      'Spotify',
+      ['2025-01-10', '2025-02-10', '2025-03-10'],
+      -1290,
+    );
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: TODAY });
+    await dismissRecurringPayment(t.ctx, { charges: recurringPayments[0]!.charges });
+
+    const drill = await listRecurringPaymentCharges(t.ctx, {
+      today: TODAY,
+      charge: { kind: 'transaction', id: ids[2]! },
+    });
+
+    expect(drill.transactions.map((transaction) => transaction.id)).toEqual(ids.toReversed());
   });
 
   it('records the dismissal in History with its Payee and charges', async () => {
