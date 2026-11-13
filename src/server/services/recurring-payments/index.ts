@@ -13,6 +13,7 @@ export {
   INTERVAL_TOLERANCE,
   WINDOW_MONTHS,
   type Cadence,
+  type CadenceRule,
 } from './cadences';
 export type { Charge, ChargeKind } from './charges';
 export { listRecurringPaymentCharges, type ChargeRef, type RecurringPaymentDrill } from './drill';

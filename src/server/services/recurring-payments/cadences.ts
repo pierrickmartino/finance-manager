@@ -4,7 +4,7 @@
  */
 
 /** A recognised cadence. Each one is a row of `CADENCES`. */
-export type Cadence = 'monthly';
+export type Cadence = 'monthly' | 'quarterly' | 'half-yearly' | 'yearly';
 
 export interface CadenceRule {
   cadence: Cadence;
@@ -14,8 +14,17 @@ export interface CadenceRule {
   minCharges: number;
 }
 
-/** The cadences recognised, tried in this order. */
-export const CADENCES: readonly CadenceRule[] = [{ cadence: 'monthly', months: 1, minCharges: 3 }];
+/**
+ * The cadences recognised, tried in this order. Their ±`INTERVAL_TOLERANCE` intervals don't
+ * overlap, so the order never changes a series' cadence. Nothing shorter than a month (weekly)
+ * is recognised.
+ */
+export const CADENCES: readonly CadenceRule[] = [
+  { cadence: 'monthly', months: 1, minCharges: 3 },
+  { cadence: 'quarterly', months: 3, minCharges: 3 },
+  { cadence: 'half-yearly', months: 6, minCharges: 2 },
+  { cadence: 'yearly', months: 12, minCharges: 2 },
+];
 
 /** A charge continues a series when its amount is within this share of the previous charge's. */
 export const AMOUNT_TOLERANCE = 0.2;
@@ -27,7 +36,7 @@ export const WINDOW_MONTHS = 36;
 /** The average length of a calendar month in days (Gregorian year / 12). */
 export const AVERAGE_MONTH_DAYS = 365.2425 / 12;
 
-/** How many charges a cadence makes in a year (12 for monthly). */
+/** How many charges a cadence makes in a year (12 monthly, 4 quarterly, 2 half-yearly, 1 yearly). */
 export function chargesPerYear(rule: CadenceRule): number {
   return 12 / rule.months;
 }
