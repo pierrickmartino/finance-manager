@@ -21,9 +21,7 @@ is **declared**, not that it renders right: the `audit/` journeys (`reflow.mjs` 
 - Faded text (`text-cyan/80`, `opacity-*`) → don't, unless the rendered result clears 4.6:1 on
   the worst surface in every Skin and Mode; `disabled:` is exempt (`faded-text-policy.ts`, ADR-0083).
 - Animation or transform transition → `motion-reduce:animate-none` / `motion-reduce:transition-none`
-  (or `motion-safe:`) in the same class string; colour and opacity transitions are exempt.
-  Navigation motion is a View Transition with the `--motion-*-nav` tokens, silenced under reduced
-  motion by the global rule in `src/app/globals.css` (`e2e/view-transitions.spec.ts`, ADR-0012).
+  in the same class string; colour and opacity transitions are exempt (`motion-policy.ts`, ADR-0082).
 - New Skin or retuned `--color-base` → update `SKIN_BASE_COLORS` in `lib/theme-color.ts` in the
   same change (`theme-color.test.ts`, ADR-0102).
 

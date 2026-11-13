@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 
 /** One animation the browser ran on a view-transition pseudo-element. */
 export interface ViewTransitionAnimation {
-  /** e.g. `::view-transition-group(root)`, `::view-transition-new(dashboard-header)`. */
+  /** e.g. `::view-transition-group(root)`, `::view-transition-new(dashboard-header-<id>)`. */
   pseudoElement: string;
   /** In milliseconds. */
   duration: number;
@@ -39,6 +39,20 @@ export async function viewTransitionAnimationsDuring(
   await page.evaluate(startRecording);
   await action();
   return page.evaluate(stopRecording);
+}
+
+/**
+ * The view-transition animations that moved something while `action` ran: those of
+ * `viewTransitionAnimationsDuring` that last longer than 0ms. React adds instant (0ms)
+ * housekeeping animations to the pseudo-elements of every view transition it starts, even
+ * under reduced motion; they move nothing, so a spec asserting on motion ignores them.
+ */
+export async function viewTransitionMotionDuring(
+  page: Page,
+  action: () => Promise<unknown>,
+): Promise<ViewTransitionAnimation[]> {
+  const animations = await viewTransitionAnimationsDuring(page, action);
+  return animations.filter((animation) => animation.duration > 0);
 }
 
 /*
