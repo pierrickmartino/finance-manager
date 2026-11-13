@@ -20,9 +20,9 @@ export type { Charge, ChargeKind } from './charges';
 export {
   dismissRecurringPayment,
   restoreRecurringPayment,
-  type ChargeRef,
   type RecurringPaymentDismissal,
 } from './dismissals';
+export { listRecurringPaymentCharges, type ChargeRef, type RecurringPaymentDrill } from './drill';
 
 /**
  * Where a Recurring payment stands. Only `active` for now; Missed, "Not yet imported", Ended

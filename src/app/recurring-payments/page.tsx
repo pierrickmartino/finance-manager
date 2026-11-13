@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ActionForm } from '@/components/action-form';
 import {
@@ -19,7 +20,7 @@ import {
   type RecurringPayment,
 } from '@/server/services/recurring-payments';
 import { dismissRecurringPaymentAction, restoreRecurringPaymentAction } from './actions';
-import { aroundDate, cadenceLabel, minimumChargesText, yearlyCostWorking } from './view';
+import { aroundDate, cadenceLabel, drillHref, minimumChargesText, yearlyCostWorking } from './view';
 
 export const metadata: Metadata = { title: 'Recurring payments · Finance Manager' };
 
@@ -95,7 +96,11 @@ function PaymentRow({ payment, today, fmt, action }: PaymentRowProps) {
   return (
     <li className="grid gap-x-6 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-baseline">
       <div className="min-w-0">
-        <p className="truncate font-medium">{payment.payee.name}</p>
+        <p className="truncate font-medium">
+          <Link href={drillHref(payment)} className="hover:underline">
+            {payment.payee.name}
+          </Link>
+        </p>
         <p className="text-sm text-muted">
           {cadenceLabel(payment.cadence)} · last{' '}
           <span className="tabular-nums">

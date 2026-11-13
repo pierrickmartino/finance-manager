@@ -6,11 +6,12 @@ const DASHBOARD = '0b6f4c1e-3a52-4d8e-9a7e-1f2d3c4b5a60';
 const WIDGET = '1c7a5d2f-4b63-4e9f-8b8f-2a3e4d5c6b71';
 
 describe('Drill-down origin', () => {
-  it('round-trips a Dashboard, a Widget and the editor through URL parameters', () => {
+  it('round-trips a Dashboard, a Widget, the editor and Recurring payments through URL parameters', () => {
     const origins: DrillOrigin[] = [
       { kind: 'dashboard', id: DASHBOARD },
       { kind: 'widget', id: WIDGET },
       { kind: 'editor' },
+      { kind: 'recurringPayment' },
     ];
 
     for (const origin of origins) {
@@ -61,5 +62,12 @@ describe('Drill-down origin', () => {
     expect(editor.href).toBe(
       '/widgets/new?range=last&count=12&unit=month&rows=month&columns=category&measure=sum&per=month',
     );
+  });
+
+  it('links back to the Recurring payments page', () => {
+    expect(backLink({ kind: 'recurringPayment' })).toEqual({
+      href: '/recurring-payments',
+      label: 'Back to Recurring payments',
+    });
   });
 });

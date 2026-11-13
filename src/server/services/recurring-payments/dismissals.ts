@@ -5,9 +5,10 @@ import { NotFoundError, parseInput, ValidationError } from '../errors';
 import type { HistorySnapshot } from '../history/recorder';
 import { REPORTED_PAYEE_ID } from '../transactions/line-payee';
 import type { ChargeKind } from './charges';
+import type { ChargeRef } from './drill';
 
 /** Names one charge a dismissal is anchored on: a whole Transaction or a Split line. */
-export interface ChargeRef {
+interface KnownChargeRef {
   kind: ChargeKind;
   id: string;
 }
@@ -38,17 +39,20 @@ const dismissalId = z.uuid();
 
 const refKey = (ref: ChargeRef): string => `${ref.kind}:${ref.id}`;
 
-function uniqueRefs(refs: readonly ChargeRef[]): ChargeRef[] {
+function uniqueRefs(refs: readonly KnownChargeRef[]): KnownChargeRef[] {
   const byKey = new Map(refs.map((ref) => [refKey(ref), { kind: ref.kind, id: ref.id }]));
   return [...byKey.values()];
 }
 
-interface ExistingCharge extends ChargeRef {
+interface ExistingCharge extends KnownChargeRef {
   payeeName: string | null;
 }
 
 /** The given charges that exist, with their reported Payee's name. */
-async function findCharges(db: Queryable, refs: readonly ChargeRef[]): Promise<ExistingCharge[]> {
+async function findCharges(
+  db: Queryable,
+  refs: readonly KnownChargeRef[],
+): Promise<ExistingCharge[]> {
   const ids = (kind: ChargeKind) => refs.filter((ref) => ref.kind === kind).map((ref) => ref.id);
   const result = await db.query<ExistingCharge>(
     `SELECT 'transaction' AS kind, t.id, p.name AS "payeeName"
@@ -80,7 +84,7 @@ async function loadDismissalCharges(db: Queryable, id: string): Promise<Existing
     [id],
   );
   if (found.rowCount === 0) return null;
-  const refs = await db.query<ChargeRef>(
+  const refs = await db.query<KnownChargeRef>(
     `SELECT CASE WHEN transaction_id IS NULL THEN 'splitLine' ELSE 'transaction' END AS kind,
        coalesce(transaction_id, split_line_id) AS id
      FROM recurring_payment_dismissal_charge WHERE dismissal_id = $1`,

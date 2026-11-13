@@ -1,6 +1,13 @@
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { NUMBER_FORMATS, type Formatter } from '@/lib/format';
-import type { Cadence, CadenceRule, RecurringPayment } from '@/server/services/recurring-payments';
+import { z } from 'zod';
+import type { UrlParams } from '@/lib/reporting/widget-params';
+import type {
+  Cadence,
+  CadenceRule,
+  ChargeRef,
+  RecurringPayment,
+} from '@/server/services/recurring-payments';
 
 const MONTHS = [
   'January',
@@ -41,6 +48,28 @@ export function yearlyCostWorking(
   const { decimal } = NUMBER_FORMATS[fmt.settings.numberFormat];
   const rateText = rate.rateToChf.replace('.', decimal);
   return `${working} at ${rateText} ${BASE_CURRENCY}/${payment.currency}`;
+}
+
+/**
+ * Where a Recurring payment's row leads: the Drill-down of its charges. Series are not stored,
+ * so the link names one by its latest charge (`charge=<kind>:<id>`), the one most likely to still
+ * be in the series when the link is followed.
+ */
+export function drillHref(payment: { charges: readonly ChargeRef[] }): string {
+  const latest = payment.charges.at(-1)!;
+  const params = new URLSearchParams({ charge: `${latest.kind}:${latest.id}` });
+  return `/recurring-payments/drill?${params}`;
+}
+
+const CHARGE_PARAM = /^([a-zA-Z]+):(.+)$/;
+const CHARGE_ID = z.uuid();
+
+/** The charge a Drill-down link names; null when it names none. */
+export function chargeFromParams(params: UrlParams): ChargeRef | null {
+  const raw = Array.isArray(params.charge) ? params.charge[0] : params.charge;
+  const match = CHARGE_PARAM.exec(raw?.trim() ?? '');
+  if (!match || !CHARGE_ID.safeParse(match[2]).success) return null;
+  return { kind: match[1]!, id: match[2]! };
 }
 
 const CADENCE_LABELS = {
