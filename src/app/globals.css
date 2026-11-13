@@ -66,6 +66,30 @@
 
 :root {
   color-scheme: light;
+
+  /*
+   * Navigation motion (ADR-0012): how long a route navigation's view transition takes, and
+   * its ease-out. Plain variables, not @theme: no utility is generated from them.
+   */
+  --motion-duration-nav: 250ms;
+  --motion-ease-nav: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Every view transition defaults to the navigation motion; a named element may override it. */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--motion-duration-nav);
+  animation-timing-function: var(--motion-ease-nav);
+}
+
+/* Reduced motion: the swap is instant, whatever an element's own transition says. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /* The hero's backdrop: deep navy at the top, lit from the top right, fading into the page. */
@@ -113,6 +137,17 @@ body {
 ::selection {
   background: var(--color-accent-tint);
   color: var(--color-ink);
+}
+
+/* A Dashboard's shared chrome (header, tabs, overview row) between its Story and Edit mode
+   (ADR-0012): the new look replaces the old at once, so only the board crossfades. */
+::view-transition-group(.dashboard-chrome),
+::view-transition-new(.dashboard-chrome) {
+  animation: none;
+}
+
+::view-transition-old(.dashboard-chrome) {
+  display: none;
 }
 
 /* Edit mode's grid (react-grid-layout, ADR-0010): where a dragged or resized card will land,

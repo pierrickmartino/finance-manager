@@ -15,8 +15,8 @@ import {
 import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
 import { drillLinks, toPivotData, type PivotLinks } from '../widgets/pivot-data';
-import type { RecentActivity } from './[id]/overview/overview-row';
-import type { BoardChapter } from './[id]/overview/widget-board';
+import type { RecentActivity } from './(dashboard)/[id]/overview/overview-row';
+import type { BoardChapter } from './(dashboard)/[id]/overview/widget-board';
 
 export interface WidgetView {
   data: ChartSource | null;

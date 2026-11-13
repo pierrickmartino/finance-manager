@@ -5,9 +5,9 @@ import { widgetPickerOptions } from '@/lib/reporting/widget-picker';
 import { getServiceContext } from '@/server/app-context';
 import { listDashboards } from '@/server/services/dashboards';
 import { listWidgets } from '@/server/services/reporting';
-import { editWidgetHref, findDashboard, loadRecentActivity, loadStoryChapter } from '../../load';
-import { DashboardTabs } from '../../tabs';
-import { DashboardOverview, OverviewCards } from '../overview/dashboard-overview';
+import { editWidgetHref, findDashboard, loadRecentActivity, loadStoryChapter } from '../../../load';
+import { DashboardTabs } from '../../../tabs';
+import { DashboardChrome, DashboardOverview, OverviewCards } from '../overview/dashboard-overview';
 import { AddWidgetMenu, EmptyBoard } from './add-widget';
 import { EditBoard } from './edit-board';
 
@@ -39,8 +39,11 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
 
   return (
     <section className="flex flex-col gap-4">
-      <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
+      <DashboardChrome part="dashboard-tabs" dashboardId={dashboard.id}>
+        <DashboardTabs dashboards={dashboards} currentId={dashboard.id} />
+      </DashboardChrome>
       <DashboardOverview
+        dashboardId={dashboard.id}
         dashboardName={dashboard.name}
         subtitle={<p>Editing</p>}
         actions={

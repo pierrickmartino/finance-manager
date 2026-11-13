@@ -30,7 +30,7 @@ pnpm dev                            # http://localhost:3000
 Both harnesses need a PostgreSQL server where user `postgres` can create databases. By default they use `postgresql://postgres:postgres@localhost:5432/postgres`; set `TEST_DATABASE_ADMIN_URL` to use another one. Each run creates its own uniquely named databases (`fm_test_*`, `fm_e2e_*`) and drops them when it ends, so several runs can share one server.
 
 - **Service tests** (`src/**/*.test.ts`): one migrated template database per run; each test file gets its own clone, truncated before every test.
-- **E2E tests** (`e2e/*.spec.ts`): the Playwright web server creates a database, migrates it, runs `next build` and `next start` on a random port. Set `E2E_SERVER=dev` to use `next dev` instead while debugging. For a first run, install the browser with `pnpm exec playwright install chromium` (or set `PLAYWRIGHT_CHROMIUM_PATH` to an existing Chromium).
+- **E2E tests** (`e2e/*.spec.ts`): the Playwright web server creates a database, migrates it, runs `next build` and `next start` on a random port. Set `E2E_SERVER=dev` (or run `pnpm test:e2e:dev`) to use `next dev` instead: for debugging, and for the checks that only a development build can make (React's duplicate `<ViewTransition>` name warning), which skip otherwise. For a first run, install the browser with `pnpm exec playwright install chromium` (or set `PLAYWRIGHT_CHROMIUM_PATH` to an existing Chromium).
 
 CI (`.github/workflows/ci.yml`) runs all of the above on every pull request and on pushes to `main`.
 

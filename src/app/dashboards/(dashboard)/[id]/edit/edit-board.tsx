@@ -24,6 +24,7 @@ import {
   type Cell,
   type VerticalDirection,
 } from '@/lib/reporting/board';
+import { minWidthQuery } from '@/lib/breakpoints';
 import { keyboardStep } from '@/lib/reporting/board-keys';
 import { WidgetBoard, type BoardChapter } from '../overview/widget-board';
 import { WidgetCard } from '../overview/widget-card';
@@ -37,7 +38,7 @@ export interface EditorChapter extends BoardChapter {
 }
 
 /** Tailwind's `lg`: the board is the 12-column grid from here up (ADR-0010). */
-const WIDE_QUERY = '(min-width: 64rem)';
+const WIDE_QUERY = minWidthQuery('lg');
 
 function subscribeWide(onChange: () => void): () => void {
   const query = window.matchMedia(WIDE_QUERY);

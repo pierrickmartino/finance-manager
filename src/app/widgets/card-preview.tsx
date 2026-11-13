@@ -1,7 +1,7 @@
 import { editedCardSize, GRID_COLUMNS } from '@/lib/reporting/board';
 import type { WidgetLayout } from '@/server/services/reporting';
-import type { StoryChapter } from '../dashboards/[id]/story/chapter';
-import { WidgetBoard } from '../dashboards/[id]/overview/widget-board';
+import type { StoryChapter } from '../dashboards/(dashboard)/[id]/story/chapter';
+import { WidgetBoard } from '../dashboards/(dashboard)/[id]/overview/widget-board';
 
 interface CardPreviewProps {
   chapter: StoryChapter;

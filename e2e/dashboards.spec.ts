@@ -17,6 +17,7 @@ import {
   widgetCard,
 } from './support/dashboards';
 import { withServices } from './support/services';
+import { viewTransitionMotionDuring } from './support/view-transitions';
 
 /** The chapter titles, in the order the page tells them. */
 function chapterTitles(page: Page) {
@@ -80,6 +81,99 @@ test('a Dashboard opens as its Story; Edit mode lists the same Widgets in order,
   await page.getByRole('link', { name: 'Done' }).click();
   await expect(page).toHaveURL(/\/dashboards\/[^/]+$/);
   await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+});
+
+/** How many view-transition animations moved something on each link (ADR-0012). */
+interface StoryEditMotion {
+  /** Story → Edit mode, on "Edit Dashboard". */
+  toEdit: number;
+  /** Edit mode → Story, on "Done". */
+  toStory: number;
+}
+
+/** On Edit mode's page, loaded. */
+async function editModeShown(page: Page): Promise<void> {
+  await expect(page).toHaveURL(/\/dashboards\/[^/]+\/edit$/);
+  await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Done' })).toBeVisible();
+}
+
+/** On a Dashboard's Story, loaded. */
+async function storyShown(page: Page): Promise<void> {
+  await expect(page).toHaveURL(/\/dashboards\/[^/]+$/);
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  await expect(chapterTitles(page).first()).toBeVisible();
+}
+
+/**
+ * Story → Edit mode → Done on the home Dashboard, returning the motion of each link. Then back
+ * and forward, checked only to land on the right page: React commits a history traversal at
+ * once, without a view transition, so they never animate, whatever the motion setting.
+ */
+async function switchStoryAndEditMode(page: Page): Promise<StoryEditMotion> {
+  await page.goto('/');
+  await storyShown(page);
+  const toEdit = await viewTransitionMotionDuring(page, async () => {
+    await page.getByRole('link', { name: 'Edit Dashboard' }).click();
+    await editModeShown(page);
+  });
+  const toStory = await viewTransitionMotionDuring(page, async () => {
+    await page.getByRole('link', { name: 'Done' }).click();
+    await storyShown(page);
+  });
+
+  await page.goBack();
+  await editModeShown(page);
+  await page.goForward();
+  await storyShown(page);
+
+  return { toEdit: toEdit.length, toStory: toStory.length };
+}
+
+test('Edit Dashboard and Done both crossfade the board; back and forward land on the right page', async ({
+  page,
+}) => {
+  const motion = await switchStoryAndEditMode(page);
+
+  expect(motion.toEdit).toBeGreaterThan(0);
+  expect(motion.toStory).toBeGreaterThan(0);
+});
+
+test('under reduced motion Edit Dashboard and Done swap with no animation', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  const motion = await switchStoryAndEditMode(page);
+
+  expect(motion).toEqual({ toEdit: 0, toStory: 0 });
+});
+
+test('switching to another Dashboard by its tab swaps with no animation', async ({ page }) => {
+  const name = `Tab switch ${Date.now()}`;
+  await withServices(async (ctx) => {
+    const dashboard = await createDashboardRecord(ctx, { name });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Tab switch figure',
+      visualisation: 'number',
+      query: { dateRange: { kind: 'last', count: 3, unit: 'month' }, rows: null, columns: null },
+    });
+  });
+  await page.goto('/');
+  await storyShown(page);
+  const tabs = page.getByRole('navigation', { name: 'Dashboards' });
+
+  const toOther = await viewTransitionMotionDuring(page, async () => {
+    await tabs.getByRole('link', { name }).click();
+    await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+    await expect(chapterTitles(page)).toHaveText(['Tab switch figure']);
+  });
+  const toHome = await viewTransitionMotionDuring(page, async () => {
+    await tabs.getByRole('link', { name: 'Overview' }).click();
+    await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
+    await expect(chapterTitles(page).first()).toBeVisible();
+  });
+
+  expect(toOther).toEqual([]);
+  expect(toHome).toEqual([]);
 });
 
 test('add a stacked bar Widget from the empty Dashboard; the editor previews its card', async ({
@@ -303,6 +397,10 @@ test('below lg Edit mode is one column with up/down moves that swap places on th
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.reload();
   await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  // Polled: right after the reload the grid may not have measured its width yet.
+  await expect
+    .poll(async () => Math.round((await cardBox(page, copy)).x))
+    .toBe(Math.round(wide.original.x));
   const swapped = { original: await cardBox(page, original), copy: await cardBox(page, copy) };
   expect(swapped.copy.x).toBeCloseTo(wide.original.x, 0);
   expect(swapped.original.x).toBeCloseTo(wide.copy.x, 0);

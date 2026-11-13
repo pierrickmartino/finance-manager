@@ -13,6 +13,7 @@ import {
   type TransactionPage,
   type TransactionQuery,
 } from '@/server/services/transactions';
+import { RememberTransactionsList } from './back-to-list';
 import { FilterRail } from './filter-rail';
 import { pickSelected, readTransactionSearch, transactionsHref, type SearchValues } from './search';
 import { TransactionList } from './transaction-list';
@@ -57,6 +58,9 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
 
   return (
     <section className="flex flex-col gap-6">
+      <RememberTransactionsList
+        href={transactionsHref(search.values, page?.page ?? 1, search.selected)}
+      />
       <h1 className={PAGE_TITLE_CLASS}>Transactions</h1>
       <div className="grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
         <FilterRail values={search.values} lists={{ accounts, groups, payees, tags }} />

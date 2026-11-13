@@ -32,7 +32,9 @@ import {
   editClassificationAction,
   unlockFieldAction,
 } from './actions';
+import { BackToTransactions } from '../back-to-list';
 import { BankDetails } from './bank-details';
+import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS } from './detail-layout';
 import { ClassificationForm } from './classification-form';
 import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
@@ -40,8 +42,6 @@ import { TransactionHeader } from './transaction-header';
 import { TransferSection } from './transfer-section';
 
 export const metadata: Metadata = { title: 'Transaction · Finance Manager' };
-
-const PANEL = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 
 /**
  * The narrow left column stays in view at the top of the screen while the wide
@@ -106,9 +106,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
 
   return (
     <section className="flex flex-col gap-5">
-      <Link href="/transactions" className="text-sm text-muted hover:underline">
-        ← Transactions
-      </Link>
+      <BackToTransactions />
       <TransactionHeader
         transaction={transaction}
         badges={transactionBadges(transaction, classification)}
@@ -121,11 +119,11 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         payees={payees}
         lineTransfers={lineTransfers}
         fmt={fmt}
-        className={`${PANEL} gap-4`}
+        className={`${DETAIL_PANEL_CLASS} gap-4`}
       />
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <div className={DETAIL_COLUMNS_CLASS}>
         <aside aria-label="Classify and link" className={EDITS_COLUMN}>
-          <section aria-labelledby="classification" className={PANEL}>
+          <section aria-labelledby="classification" className={DETAIL_PANEL_CLASS}>
             <h2 id="classification" className={SECTION_TITLE_CLASS}>
               Classification
             </h2>
@@ -146,7 +144,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
           </section>
           {/* A split Transaction is linked by its Split lines, not as a whole (ADR-0005). */}
           {isSplit ? (
-            <div className={PANEL}>
+            <div className={DETAIL_PANEL_CLASS}>
               <h2 className={SECTION_TITLE_CLASS}>Transfer</h2>
               <p className="text-sm text-muted">Linked line by line, in the Split.</p>
             </div>
@@ -158,12 +156,12 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
                 counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))
               }
               fmt={fmt}
-              className={PANEL}
+              className={DETAIL_PANEL_CLASS}
             />
           )}
         </aside>
         <div className="flex min-w-0 flex-col gap-5">
-          <BankDetails transaction={transaction} fmt={fmt} className={PANEL} />
+          <BankDetails transaction={transaction} fmt={fmt} className={DETAIL_PANEL_CLASS} />
           <details open className={`${CARD_CLASS} flex flex-col gap-3 px-5 py-4`}>
             <summary className="cursor-pointer text-sm font-semibold text-muted">
               History ({history.length})
