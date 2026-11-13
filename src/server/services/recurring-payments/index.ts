@@ -5,6 +5,7 @@ import { loadRateTable, toChfMinor, type ChfValue, type RateTable } from '../fx'
 import { chargesPerYear, WINDOW_MONTHS, type Cadence } from './cadences';
 import { loadCharges, type Charge } from './charges';
 import { addMonths } from './dates';
+import { dismissalOf, loadDismissedCharges } from './dismissals';
 import { recogniseSeries, type RecognisedSeries } from './recognise';
 
 export {
@@ -16,6 +17,12 @@ export {
   type CadenceRule,
 } from './cadences';
 export type { Charge, ChargeKind } from './charges';
+export {
+  dismissRecurringPayment,
+  restoreRecurringPayment,
+  type ChargeRef,
+  type RecurringPaymentDismissal,
+} from './dismissals';
 
 /**
  * Where a Recurring payment stands. Only `active` for now; Missed, "Not yet imported", Ended
@@ -43,6 +50,11 @@ export interface RecurringPayment {
    */
   yearlyCost: ChfValue | null;
   state: RecurringPaymentState;
+  /**
+   * The dismissal holding any of its charges (ADR-0011), or null. A dismissed series stays
+   * listed, for the Dismissed section, but is left out of the total.
+   */
+  dismissalId: string | null;
   /** The charges it was recognised from, oldest first. */
   charges: Charge[];
 }
@@ -50,7 +62,10 @@ export interface RecurringPayment {
 export interface RecurringPaymentList {
   /** Highest yearly cost first; a series with no FX rate yet comes last. */
   recurringPayments: RecurringPayment[];
-  /** The sum of the listed yearly costs, in CHF minor units (a series with no rate adds 0). */
+  /**
+   * The sum of the yearly costs of the series that are not dismissed, in CHF minor units (a series
+   * with no rate adds 0).
+   */
   totalYearlyCostMinor: number;
 }
 
@@ -68,7 +83,11 @@ function yearlyCostOf(
   return { amountMinor: toChfMinor(lastAmountMinor * perYear, currency, rate.rateToChf), rate };
 }
 
-function toRecurringPayment(series: RecognisedSeries, rates: RateTable): RecurringPayment {
+function toRecurringPayment(
+  series: RecognisedSeries,
+  rates: RateTable,
+  dismissed: ReadonlyMap<string, string>,
+): RecurringPayment {
   const last = series.charges.at(-1)!;
   const previous = series.charges.at(-2)!;
   const perYear = chargesPerYear(series.rule);
@@ -83,6 +102,7 @@ function toRecurringPayment(series: RecognisedSeries, rates: RateTable): Recurri
     nextExpectedDate: addMonths(last.bookingDate, series.rule.months),
     yearlyCost: yearlyCostOf(rates, series.currency, last.amountMinor, perYear, last.bookingDate),
     state: 'active',
+    dismissalId: dismissalOf(dismissed, series.charges),
     charges: series.charges.map(
       ({ kind, id, transactionId, accountId, bookingDate, amountMinor }) => ({
         kind,
@@ -115,17 +135,19 @@ export async function listRecurringPayments(
   const from = addMonths(today, -WINDOW_MONTHS);
   const charges = await loadCharges(ctx.db, { from, to: today });
   const series = recogniseSeries(charges);
-  const rates = await loadRateTable(ctx, {
-    currencies: [...new Set(series.map((one) => one.currency))],
-    from,
-    to: today,
-  });
+  const [rates, dismissed] = await Promise.all([
+    loadRateTable(ctx, {
+      currencies: [...new Set(series.map((one) => one.currency))],
+      from,
+      to: today,
+    }),
+    loadDismissedCharges(ctx.db),
+  ]);
   const recurringPayments = series
-    .map((one) => toRecurringPayment(one, rates))
+    .map((one) => toRecurringPayment(one, rates, dismissed))
     .toSorted(byYearlyCost);
-  const totalYearlyCostMinor = recurringPayments.reduce(
-    (sum, payment) => sum + (payment.yearlyCost?.amountMinor ?? 0),
-    0,
-  );
+  const totalYearlyCostMinor = recurringPayments
+    .filter((payment) => payment.dismissalId === null)
+    .reduce((sum, payment) => sum + (payment.yearlyCost?.amountMinor ?? 0), 0);
   return { recurringPayments, totalYearlyCostMinor };
 }

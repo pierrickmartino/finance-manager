@@ -21,6 +21,7 @@ export const HISTORY_ENTITY_TYPES = [
   'transfer',
   'widget',
   'dashboard',
+  'recurring_payment_dismissal',
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
