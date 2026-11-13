@@ -32,7 +32,7 @@ Type: `font-display` (Inter Tight) for page titles, section titles and headline 
 
 Corners: the radius scale itself is small (`rounded-md` 6px, `rounded-lg`/`xl`/`2xl` 8px, `rounded-3xl` 10px). Buttons, pills and avatars use `rounded-lg`, badges `rounded-md`. Keep `rounded-full` for things that are round by nature: dots, toggles, progress tracks.
 
-Motion: route navigations animate with View Transitions (ADR-0012). `--motion-duration-nav` (250ms) and `--motion-ease-nav` (`cubic-bezier(0.16, 1, 0.3, 1)`) are plain CSS variables on `:root` in `globals.css`, not utilities, and are the defaults of every `::view-transition-group/old/new(*)`. A page names the elements that move with React's `<ViewTransition>`; an override of the duration or easing uses these tokens. Under reduced motion every view transition is instant: one global rule sets `animation: none` on its pseudo-elements.
+Motion: route navigations animate with View Transitions (ADR-0012). `--motion-duration-nav` (250ms) and `--motion-ease-nav` (`cubic-bezier(0.16, 1, 0.3, 1)`) are plain CSS variables on `:root` in `globals.css`, not utilities, and are the defaults of every `::view-transition-group/old/new(*)`. A page names the elements that move with React's `<ViewTransition>`; an override of the duration or easing uses these tokens. Under reduced motion every view transition is instant: one global rule sets `animation: none` on its pseudo-elements (checked by `e2e/view-transitions.spec.ts`). Any other animation or transform transition carries `motion-safe:` or `motion-reduce:animate-none` / `motion-reduce:transition-none` in the same class string; colour and opacity transitions are exempt.
 
 ## Primitives (`surface.ts`)
 
