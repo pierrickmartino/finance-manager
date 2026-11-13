@@ -19,3 +19,4 @@ The spec asked to turn on `experimental.viewTransition` in `next.config.ts`. Nex
 - An element given its own view-transition animation inherits the tokens unless it overrides them, and is still silenced by the reduced-motion rule.
 - The E2E specs check motion with `viewTransitionAnimationsDuring` (`e2e/support/view-transitions.ts`), which lists the view-transition animations that ran during a step. Under reduced motion the browser still creates the pseudo-elements briefly, so specs assert on animations, not on the pseudo-elements.
 - Browsers without View Transitions navigate as before, with no animation.
+- The browser's back and forward buttons never animate: React renders a history traversal synchronously, outside a Transition. A page that should animate on the way back gives the user a link for it, as the Transaction detail's "← Transactions" returns to the list it was opened from.

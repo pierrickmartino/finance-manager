@@ -31,6 +31,14 @@ _Avoid_: Exchange rate, conversion rate
 One movement of money on one Account, dated and signed, in that Account's Currency.
 _Avoid_: Entry, posting, operation, line
 
+**Transaction detail**:
+The page of one Transaction, where it is classified, Split and linked as a Transfer, beside its bank fields and History.
+_Avoid_: Transaction page, detail view
+
+**Transaction preview**:
+The read-only summary of the selected Transaction beside the Transactions list, on wide screens only. Its "Open & classify" opens the Transaction detail.
+_Avoid_: Preview pane, side panel
+
 **Transfer**:
 A pair of linked sides moving money between two of the user's own Accounts, possibly in different Currencies. Each side is either a whole Transaction or one Split line of a Transaction. It is neither income nor expense.
 _Avoid_: Internal movement
