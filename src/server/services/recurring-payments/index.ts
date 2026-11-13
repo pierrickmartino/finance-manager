@@ -4,8 +4,10 @@ import { parseInput } from '../errors';
 import { loadRateTable, toChfMinor, type ChfValue, type RateTable } from '../fx';
 import { chargesPerYear, WINDOW_MONTHS, type Cadence } from './cadences';
 import { loadCharges, type Charge } from './charges';
+import { loadAccountData, type AccountData } from './account-data';
 import { addMonths } from './dates';
 import { recogniseSeries, type RecognisedSeries } from './recognise';
+import { flagsOf, stateOf, type RecurringPaymentFlag, type RecurringPaymentState } from './states';
 
 export {
   AMOUNT_TOLERANCE,
@@ -15,12 +17,12 @@ export {
   type Cadence,
 } from './cadences';
 export type { Charge, ChargeKind } from './charges';
-
-/**
- * Where a Recurring payment stands. Only `active` for now; Missed, "Not yet imported", Ended
- * (#130) and Dismissed (#132) join here.
- */
-export type RecurringPaymentState = 'active';
+export {
+  ENDED_AFTER_CADENCES,
+  NEW_WITHIN_DAYS,
+  type RecurringPaymentFlag,
+  type RecurringPaymentState,
+} from './states';
 
 /** A Recurring payment (GLOSSARY): one recognised series of a Payee's charges. */
 export interface RecurringPayment {
@@ -42,14 +44,21 @@ export interface RecurringPayment {
    */
   yearlyCost: ChfValue | null;
   state: RecurringPaymentState;
+  /** What changed: a price increase shows until the next charge; New while it started recently. */
+  flags: RecurringPaymentFlag[];
   /** The charges it was recognised from, oldest first. */
   charges: Charge[];
 }
 
 export interface RecurringPaymentList {
-  /** Highest yearly cost first; a series with no FX rate yet comes last. */
+  /** The series not Ended: highest yearly cost first; a series with no FX rate yet comes last. */
   recurringPayments: RecurringPayment[];
-  /** The sum of the listed yearly costs, in CHF minor units (a series with no rate adds 0). */
+  /** The Ended series, in the same order. */
+  ended: RecurringPayment[];
+  /**
+   * The sum of the yearly costs of `recurringPayments` (active and Missed), in CHF minor units;
+   * a series with no rate adds 0 and Ended series are left out.
+   */
   totalYearlyCostMinor: number;
 }
 
@@ -67,10 +76,21 @@ function yearlyCostOf(
   return { amountMinor: toChfMinor(lastAmountMinor * perYear, currency, rate.rateToChf), rate };
 }
 
-function toRecurringPayment(series: RecognisedSeries, rates: RateTable): RecurringPayment {
+/** What a series is judged against: FX rates, each imported Account's data, and today. */
+interface Context {
+  rates: RateTable;
+  accountData: ReadonlyMap<string, AccountData>;
+  today: string;
+}
+
+function toRecurringPayment(
+  series: RecognisedSeries,
+  { rates, accountData, today }: Context,
+): RecurringPayment {
   const last = series.charges.at(-1)!;
   const previous = series.charges.at(-2)!;
   const perYear = chargesPerYear(series.rule);
+  const nextExpectedDate = addMonths(last.bookingDate, series.rule.months);
   return {
     payee: series.payee,
     currency: series.currency,
@@ -79,9 +99,21 @@ function toRecurringPayment(series: RecognisedSeries, rates: RateTable): Recurri
     lastAmountMinor: last.amountMinor,
     previousAmountMinor: previous.amountMinor,
     lastChargeDate: last.bookingDate,
-    nextExpectedDate: addMonths(last.bookingDate, series.rule.months),
+    nextExpectedDate,
     yearlyCost: yearlyCostOf(rates, series.currency, last.amountMinor, perYear, last.bookingDate),
-    state: 'active',
+    state: stateOf({
+      rule: series.rule,
+      lastChargeDate: last.bookingDate,
+      nextExpectedDate,
+      accountData: accountData.get(last.accountId),
+      today,
+    }),
+    flags: flagsOf({
+      lastAmountMinor: last.amountMinor,
+      previousAmountMinor: previous.amountMinor,
+      firstChargeDate: series.charges[0]!.bookingDate,
+      today,
+    }),
     charges: series.charges.map(
       ({ kind, id, transactionId, accountId, bookingDate, amountMinor }) => ({
         kind,
@@ -114,17 +146,25 @@ export async function listRecurringPayments(
   const from = addMonths(today, -WINDOW_MONTHS);
   const charges = await loadCharges(ctx.db, { from, to: today });
   const series = recogniseSeries(charges);
-  const rates = await loadRateTable(ctx, {
-    currencies: [...new Set(series.map((one) => one.currency))],
-    from,
-    to: today,
-  });
-  const recurringPayments = series
-    .map((one) => toRecurringPayment(one, rates))
+  const [rates, accountData] = await Promise.all([
+    loadRateTable(ctx, {
+      currencies: [...new Set(series.map((one) => one.currency))],
+      from,
+      to: today,
+    }),
+    loadAccountData(ctx),
+  ]);
+  const all = series
+    .map((one) => toRecurringPayment(one, { rates, accountData, today }))
     .toSorted(byYearlyCost);
+  const recurringPayments = all.filter((payment) => payment.state !== 'ended');
   const totalYearlyCostMinor = recurringPayments.reduce(
     (sum, payment) => sum + (payment.yearlyCost?.amountMinor ?? 0),
     0,
   );
-  return { recurringPayments, totalYearlyCostMinor };
+  return {
+    recurringPayments,
+    ended: all.filter((payment) => payment.state === 'ended'),
+    totalYearlyCostMinor,
+  };
 }

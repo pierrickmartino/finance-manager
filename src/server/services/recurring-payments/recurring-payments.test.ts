@@ -12,7 +12,10 @@ import { listRecurringPayments } from '.';
 const t = setupTestDatabase();
 
 let accountCount = 0;
-async function account(currency = 'CHF'): Promise<Account> {
+async function account(
+  currency = 'CHF',
+  importFormat: 'ubs_csv' | null = 'ubs_csv',
+): Promise<Account> {
   accountCount += 1;
   const bank = await createBank(t.ctx, { name: `Bank ${accountCount}` });
   return createAccount(t.ctx, {
@@ -21,9 +24,21 @@ async function account(currency = 'CHF'): Promise<Account> {
     currency,
     iban: null,
     kind: 'current',
-    importFormat: 'ubs_csv',
+    importFormat,
     openingBalanceMinor: 0,
   });
+}
+
+/**
+ * Seeds one Import on `on` whose unclassified Transactions are booked on `dates`: it covers the
+ * days from the first to the last of them.
+ */
+async function imported(on: Account, dates: string[]): Promise<void> {
+  await seedTransactions(
+    t.ctx.db,
+    on,
+    dates.map((bookingDate) => ({ bookingDate, amountMinor: -100 })),
+  );
 }
 
 let subscriptions: Category;
@@ -339,11 +354,9 @@ describe('the 36-month window', () => {
       monthly(['2022-11-12', '2022-12-12', '2023-01-12'], -1500),
     );
 
-    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-11-12' });
+    const { ended } = await listRecurringPayments(t.ctx, { today: '2025-11-12' });
 
-    expect(recurringPayments).toMatchObject([
-      { payee: { name: 'Domain' }, charges: { length: 3 } },
-    ]);
+    expect(ended).toMatchObject([{ payee: { name: 'Domain' }, charges: { length: 3 } }]);
   });
 
   it('leaves out charges booked earlier than that', async () => {
@@ -353,9 +366,11 @@ describe('the 36-month window', () => {
       monthly(['2022-11-11', '2022-12-11', '2023-01-11'], -1500),
     );
 
-    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-11-12' });
+    const { recurringPayments, ended } = await listRecurringPayments(t.ctx, {
+      today: '2025-11-12',
+    });
 
-    expect(recurringPayments).toEqual([]);
+    expect([...recurringPayments, ...ended]).toEqual([]);
   });
 });
 
@@ -437,5 +452,238 @@ describe('yearly cost and next expected date', () => {
     const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-02-10' });
 
     expect(recurringPayments).toMatchObject([{ nextExpectedDate: '2025-02-28' }]);
+  });
+});
+
+describe('the price increase flag', () => {
+  it('flags a last charge higher than the one before, with both amounts', async () => {
+    await charges(await account(), 'Spotify', [
+      { date: '2024-12-10', amount: -1000 },
+      { date: '2025-01-10', amount: -1000 },
+      { date: '2025-02-10', amount: -1000 },
+      { date: '2025-03-10', amount: -1001 },
+    ]);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-03-20' });
+
+    expect(recurringPayments).toMatchObject([
+      { flags: ['price_increase'], previousAmountMinor: 1000, lastAmountMinor: 1001 },
+    ]);
+  });
+
+  it('does not flag an unchanged or lower last charge', async () => {
+    const card = await account();
+    await charges(card, 'Spotify', monthly(['2024-12-10', '2025-01-10', '2025-02-10'], -1000));
+    await charges(card, 'Cloud', [
+      { date: '2024-12-10', amount: -1000 },
+      { date: '2025-01-10', amount: -1000 },
+      { date: '2025-02-10', amount: -1200 },
+      { date: '2025-03-10', amount: -1100 },
+    ]);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-03-20' });
+
+    expect(recurringPayments).toMatchObject([
+      { payee: { name: 'Cloud' }, flags: [] },
+      { payee: { name: 'Spotify' }, flags: [] },
+    ]);
+  });
+
+  it('stops flagging once the next charge is at the same amount', async () => {
+    await charges(await account(), 'Spotify', [
+      { date: '2025-01-10', amount: -1000 },
+      { date: '2025-02-10', amount: -1000 },
+      { date: '2025-03-10', amount: -1100 },
+      { date: '2025-04-10', amount: -1100 },
+    ]);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-20' });
+
+    expect(recurringPayments).toMatchObject([{ flags: [] }]);
+  });
+});
+
+describe('the New flag', () => {
+  it('flags a series whose first charge is 90 days before today', async () => {
+    await charges(
+      await account(),
+      'Gym',
+      monthly(['2025-01-20', '2025-02-20', '2025-03-20'], -5000),
+    );
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-20' });
+
+    expect(recurringPayments).toMatchObject([{ flags: ['new'] }]);
+  });
+
+  it('does not flag a series whose first charge is 91 days before today', async () => {
+    await charges(
+      await account(),
+      'Gym',
+      monthly(['2025-01-19', '2025-02-19', '2025-03-19'], -5000),
+    );
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-20' });
+
+    expect(recurringPayments).toMatchObject([{ flags: [] }]);
+  });
+
+  it('flags a new series whose last charge went up as both', async () => {
+    await charges(await account(), 'Gym', [
+      { date: '2025-01-20', amount: -5000 },
+      { date: '2025-02-20', amount: -5000 },
+      { date: '2025-03-20', amount: -5500 },
+    ]);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-01' });
+
+    expect(recurringPayments).toMatchObject([{ flags: ['price_increase', 'new'] }]);
+  });
+});
+
+describe('the Ended state', () => {
+  const DATES = ['2025-01-05', '2025-02-05', '2025-03-05'];
+
+  it('is not Ended on the day two full cadences after its last charge', async () => {
+    await charges(await account('CHF', null), 'Gym', monthly(DATES, -5000));
+
+    const result = await listRecurringPayments(t.ctx, { today: '2025-05-05' });
+
+    expect(result.recurringPayments).toMatchObject([{ payee: { name: 'Gym' } }]);
+    expect(result.ended).toEqual([]);
+    expect(result.totalYearlyCostMinor).toBe(60000);
+  });
+
+  it('is Ended the day after, in its own list and out of the total', async () => {
+    await charges(await account('CHF', null), 'Gym', monthly(DATES, -5000));
+
+    const result = await listRecurringPayments(t.ctx, { today: '2025-05-06' });
+
+    expect(result.recurringPayments).toEqual([]);
+    expect(result.ended).toMatchObject([
+      { payee: { name: 'Gym' }, state: 'ended', yearlyCost: { amountMinor: 60000 } },
+    ]);
+    expect(result.totalYearlyCostMinor).toBe(0);
+  });
+
+  it('becomes active again, and is not New, when a charge continues it', async () => {
+    await charges(
+      await account(),
+      'Gym',
+      monthly(['2024-10-05', '2024-11-05', '2024-12-05', '2025-03-10'], -5000),
+    );
+
+    const result = await listRecurringPayments(t.ctx, { today: '2025-03-20' });
+
+    expect(result.ended).toEqual([]);
+    expect(result.recurringPayments).toMatchObject([
+      {
+        state: 'active',
+        flags: [],
+        lastChargeDate: '2025-03-10',
+        nextExpectedDate: '2025-04-10',
+        charges: { length: 4 },
+      },
+    ]);
+  });
+
+  it('is not recognised from a single charge after old one-off charges', async () => {
+    await charges(
+      await account(),
+      'Gym',
+      monthly(['2024-06-05', '2024-10-05', '2025-03-10'], -5000),
+    );
+
+    const result = await listRecurringPayments(t.ctx, { today: '2025-03-20' });
+
+    expect(result.recurringPayments).toEqual([]);
+    expect(result.ended).toEqual([]);
+  });
+});
+
+describe('the Missed state and "Not yet imported"', () => {
+  // Next expected on 5 April; the grace of a quarter of a month (8 days) runs to 13 April.
+  const DATES = ['2025-01-05', '2025-02-05', '2025-03-05'];
+
+  it('is still active on the last day of the grace', async () => {
+    const card = await account();
+    await charges(card, 'Gym', monthly(DATES, -5000));
+    await imported(card, ['2025-03-06', '2025-04-13']);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-13' });
+
+    expect(recurringPayments).toMatchObject([{ state: 'active' }]);
+  });
+
+  it('is Missed the day after, when its Account has data through the grace, and stays in the total', async () => {
+    const card = await account();
+    await charges(card, 'Gym', monthly(DATES, -5000));
+    await imported(card, ['2025-03-06', '2025-04-13']);
+
+    const result = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
+
+    expect(result.recurringPayments).toMatchObject([
+      { state: 'missed', nextExpectedDate: '2025-04-05' },
+    ]);
+    expect(result.totalYearlyCostMinor).toBe(60000);
+  });
+
+  it('is Missed on an Account with no Import format, whose data is all entered by hand', async () => {
+    await charges(await account('CHF', null), 'Gym', monthly(DATES, -5000));
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
+
+    expect(recurringPayments).toMatchObject([{ state: 'missed' }]);
+  });
+
+  it('is "Not yet imported" when its Account\'s data ends the day before the grace does', async () => {
+    const card = await account();
+    await charges(card, 'Gym', monthly(DATES, -5000));
+    await imported(card, ['2025-03-06', '2025-04-12']);
+
+    const result = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
+
+    expect(result.recurringPayments).toMatchObject([{ state: 'not_yet_imported' }]);
+    expect(result.totalYearlyCostMinor).toBe(60000);
+  });
+
+  it('is "Not yet imported" over a Stale Account', async () => {
+    await charges(await account(), 'Gym', monthly(DATES, -5000));
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-20' });
+
+    expect(recurringPayments).toMatchObject([{ state: 'not_yet_imported' }]);
+  });
+
+  it('is "Not yet imported" over a Gap after the last charge', async () => {
+    const card = await account();
+    await charges(card, 'Gym', monthly(DATES, -5000));
+    await imported(card, ['2025-03-20', '2025-04-20']);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-20' });
+
+    expect(recurringPayments).toMatchObject([{ state: 'not_yet_imported' }]);
+  });
+
+  it('is Missed despite a Gap before the last charge', async () => {
+    const card = await account();
+    await charges(card, 'Gym', monthly(DATES.slice(0, 2), -5000));
+    await charges(card, 'Gym', monthly(DATES.slice(2), -5000));
+    await imported(card, ['2025-03-06', '2025-04-14']);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
+
+    expect(recurringPayments).toMatchObject([{ state: 'missed' }]);
+  });
+
+  it("judges the last charge's Account, not an earlier one's", async () => {
+    const [current, stale] = [await account(), await account()];
+    await charges(current, 'Gym', monthly(DATES.slice(0, 2), -5000));
+    await imported(current, ['2025-02-06', '2025-04-14']);
+    await charges(stale, 'Gym', monthly(DATES.slice(2), -5000));
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: '2025-04-14' });
+
+    expect(recurringPayments).toMatchObject([{ state: 'not_yet_imported' }]);
   });
 });
