@@ -28,7 +28,7 @@ function camtFile(dates: string[], suffix: number): { fileName: string; content:
   return { fileName: 'recurring.xml', content: new TextEncoder().encode(xml) };
 }
 
-test('the Recurring payments page lists a monthly charge with its yearly cost', async ({
+test('the Recurring payments page lists a monthly charge with its yearly cost, which can be dismissed and restored', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -70,4 +70,20 @@ test('the Recurring payments page lists a monthly charge with its yearly cost', 
   await expect(row).toContainText('CHF 262.80');
   await expect(row).toContainText('CHF 21.90 × 12');
   await expect(row).toContainText(/Next around \d{1,2} [A-Z][a-z]+/);
+
+  await row.getByRole('button', { name: 'Dismiss' }).click();
+
+  await expect(row).toHaveCount(0);
+  const dismissedSection = page.getByRole('region', { name: 'Dismissed' });
+  await dismissedSection.getByText(/^Dismissed \(\d+\)$/).click();
+  const dismissedRow = dismissedSection
+    .getByRole('list', { name: 'Dismissed Recurring payments' })
+    .getByRole('listitem')
+    .filter({ hasText: payeeName });
+  await expect(dismissedRow).toContainText('CHF 262.80');
+
+  await dismissedRow.getByRole('button', { name: 'Restore' }).click();
+
+  await expect(dismissedRow).toHaveCount(0);
+  await expect(row).toContainText('CHF 262.80');
 });
