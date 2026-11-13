@@ -115,11 +115,29 @@ _Avoid_: Filter, automation
 One Payee's series of expenses of a similar amount at a regular cadence, recognised from Transactions and Split lines already recorded. A Payee may have several; a price change continues the same series. It is never scheduled or entered in advance. One the user has dismissed stays out of view until restored.
 _Avoid_: Subscription, standing order, regular charge
 
+**Charge**:
+One payment a Recurring payment is recognised from: an unsplit Transaction, or a Split line, classified under an Expense Category with a Payee, and money out. A refund is not a Charge.
+_Avoid_: Payment, debit, occurrence
+
 **Missed**:
-The state of a Recurring payment whose next expected date, plus a grace of a quarter of its cadence, has passed without a charge, while its Account's data reaches past that grace.
+The state of a Recurring payment whose next expected date, plus a grace of a quarter of its cadence, has passed without a Charge, while its Account's data reaches beyond the grace's last day.
+
+**Not yet imported**:
+The state of a Recurring payment that would be Missed, but whose Account's data doesn't reach beyond the grace: the Account is Stale, its data ends sooner, or a Gap falls after the last Charge. It still counts in the yearly cost.
+_Avoid_: Pending, unknown
 
 **Ended**:
-The state of a Recurring payment with no charge for two full cadences. A later matching charge makes it active again.
+The state of a Recurring payment with no Charge for two full cadences. A later matching Charge makes it active again.
+
+**Price increase**:
+The flag of a Recurring payment whose last Charge is higher than the one before. It shows until the next Charge.
+
+**New**:
+The flag of a Recurring payment whose first Charge is within the last 90 days. An Ended one charged again is not New.
+
+**Dismissal**:
+The user's record that a Recurring payment is a false positive, anchored on its Charges: any series containing one of them stays out of the list and the total until the Dismissal is restored.
+_Avoid_: Hide, ignore, exclusion
 
 ### History
 
