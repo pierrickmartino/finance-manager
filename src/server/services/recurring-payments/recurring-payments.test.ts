@@ -5,7 +5,13 @@ import { seedTransactions } from '@test/support/transactions';
 import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
-import { editClassification, type ClassificationChanges } from '../transactions';
+import { createPayee } from '../payees';
+import {
+  editClassification,
+  splitTransaction,
+  type ClassificationChanges,
+  type SplitLineInput,
+} from '../transactions';
 import { addDays } from '../fx/dates';
 import { linkTransfer } from '../transfers';
 import { listRecurringPayments } from '.';
@@ -450,6 +456,111 @@ describe('what counts as a charge', () => {
     }
 
     expect((await listRecurringPayments(t.ctx, { today: TODAY })).recurringPayments).toEqual([]);
+  });
+});
+
+describe('Split lines as charges', () => {
+  const DATES = ['2025-01-12', '2025-02-12', '2025-03-12'];
+  const TODAY = '2025-03-25';
+
+  /**
+   * Seeds a Transaction of `amount` at `payeeName` on each of `DATES` and splits it into
+   * `lines`. Returns, per date, the Transaction's id and its Split line ids in order.
+   */
+  async function splitCharges(
+    on: Account,
+    payeeName: string,
+    amount: number,
+    lines: SplitLineInput[],
+  ): Promise<{ transactionId: string; lineIds: string[] }[]> {
+    const ids = await charges(
+      on,
+      payeeName,
+      DATES.map((date) => ({ date, amount, classify: { payeeName } })),
+    );
+    const split = [];
+    for (const transactionId of ids) {
+      const result = await splitTransaction(t.ctx, transactionId, lines);
+      split.push({ transactionId, lineIds: result.splitLines.map((line) => line.id) });
+    }
+    return split;
+  }
+
+  it("recognises a series of Split lines under their Transaction's Payee, never the whole Transaction", async () => {
+    const telecom = await createCategoryGroup(t.ctx, { name: 'Telecom', type: 'expense' });
+    const mobile = await createCategory(t.ctx, { groupId: telecom.id, name: 'Mobile' });
+    const card = await account();
+    const split = await splitCharges(card, 'Swisscom', -10000, [
+      { amountMinor: -6000, categoryId: subscriptions.id },
+      { amountMinor: -4000, categoryId: mobile.id },
+    ]);
+
+    const { recurringPayments, totalYearlyCostMinor } = await listRecurringPayments(t.ctx, {
+      today: TODAY,
+    });
+
+    expect(recurringPayments).toMatchObject([
+      {
+        payee: { name: 'Swisscom' },
+        cadence: 'monthly',
+        lastAmountMinor: 6000,
+        charges: split.map(({ transactionId, lineIds }) => ({
+          kind: 'splitLine',
+          id: lineIds[0],
+          transactionId,
+          accountId: card.id,
+          amountMinor: 6000,
+        })),
+      },
+      {
+        payee: { name: 'Swisscom' },
+        lastAmountMinor: 4000,
+        charges: split.map(({ lineIds }) => ({ kind: 'splitLine', id: lineIds[1] })),
+      },
+    ]);
+    expect(totalYearlyCostMinor).toBe(120000);
+  });
+
+  it('puts a Split line with its own Payee under that Payee', async () => {
+    const netflix = await createPayee(t.ctx, 'Netflix');
+    await splitCharges(await account(), 'Manor', -7190, [
+      { amountMinor: -2190, categoryId: subscriptions.id, payeeId: netflix.id },
+      { amountMinor: -5000, categoryId: subscriptions.id },
+    ]);
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: TODAY });
+
+    expect(recurringPayments).toMatchObject([
+      { payee: { name: 'Manor' }, lastAmountMinor: 5000 },
+      { payee: { name: 'Netflix' }, lastAmountMinor: 2190 },
+    ]);
+  });
+
+  it('ignores Split lines that are Transfer sides', async () => {
+    const [current, savings] = [await account(), await account()];
+    const split = await splitCharges(current, 'Bank', -60000, [
+      { amountMinor: -50000, categoryId: subscriptions.id },
+      { amountMinor: -10000, categoryId: subscriptions.id },
+    ]);
+    const ins = await seedTransactions(
+      t.ctx.db,
+      savings,
+      DATES.map((date) => ({ bookingDate: date, amountMinor: 50000 })),
+    );
+    for (const [index, { lineIds }] of split.entries()) {
+      await linkTransfer(t.ctx, {
+        sides: [
+          { kind: 'splitLine', id: lineIds[0]! },
+          { kind: 'transaction', id: ins[index]! },
+        ],
+      });
+    }
+
+    const { recurringPayments } = await listRecurringPayments(t.ctx, { today: TODAY });
+
+    expect(recurringPayments).toMatchObject([
+      { payee: { name: 'Bank' }, lastAmountMinor: 10000, charges: { length: 3 } },
+    ]);
   });
 });
 

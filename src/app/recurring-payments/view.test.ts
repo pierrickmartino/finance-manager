@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFormatter, DEFAULT_DISPLAY_SETTINGS } from '@/lib/format';
-import { aroundDate, cadenceLabel, yearlyCostWorking } from './view';
+import { CADENCES } from '@/server/services/recurring-payments';
+import { aroundDate, cadenceLabel, minimumChargesText, yearlyCostWorking } from './view';
 
 const fmt = createFormatter(DEFAULT_DISPLAY_SETTINGS);
 
@@ -88,5 +89,13 @@ describe('cadenceLabel', () => {
     expect(cadenceLabel('quarterly')).toBe('Quarterly');
     expect(cadenceLabel('half-yearly')).toBe('Half-yearly');
     expect(cadenceLabel('yearly')).toBe('Yearly');
+  });
+});
+
+describe('minimumChargesText', () => {
+  it('names the fewest charges each cadence needs, grouped by count', () => {
+    expect(minimumChargesText(CADENCES)).toBe(
+      'at least 3 charges for monthly and quarterly, 2 for half-yearly and yearly',
+    );
   });
 });
