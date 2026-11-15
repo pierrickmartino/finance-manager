@@ -17,7 +17,10 @@ function readTags(text: string): string[] {
     .filter(Boolean);
 }
 
-/** The fields the user filled in; blank fields are left as they are on each Transaction. */
+/**
+ * The fields the user filled in; blank fields are left as they are on each Transaction. Tags are
+ * added: each Transaction keeps the Tags it has.
+ */
 function readChanges(formData: FormData): BulkChanges {
   const changes: BulkChanges = {};
   const payee = formText(formData, 'payee').trim();
@@ -25,7 +28,7 @@ function readChanges(formData: FormData): BulkChanges {
   const categoryId = formText(formData, 'categoryId');
   if (categoryId) changes.categoryId = categoryId;
   const tags = readTags(formText(formData, 'tags'));
-  if (tags.length > 0) changes.tagNames = tags;
+  if (tags.length > 0) changes.addTagNames = tags;
   return changes;
 }
 

@@ -32,8 +32,9 @@ interface BulkEditFormProps {
 }
 
 /**
- * Sets the Payee, Category or Tags of a whole Unclassified group, or of the ticked Transactions
- * (spec 62). Blank fields are left alone; filled ones are locked against the Rules (spec 64).
+ * Sets the Payee or Category, or adds Tags, on a whole Unclassified group or on the ticked
+ * Transactions (spec 62). Blank fields are left alone; filled ones are locked against the Rules
+ * (spec 64).
  */
 export function BulkEditForm({
   description,
@@ -104,7 +105,7 @@ export function BulkEditForm({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Tags
+          Add Tags
           <input
             name="tags"
             autoComplete="off"
@@ -114,7 +115,8 @@ export function BulkEditForm({
         </label>
       </div>
       <p className="text-xs text-muted">
-        Blank fields are left as they are. The fields you fill in are locked against Rules.
+        Blank fields are left as they are. Tags are added to the ones each Transaction has. The
+        fields you fill in are locked against Rules.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" name="scope" value="group" disabled={isPending} className={PRIMARY}>

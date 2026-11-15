@@ -43,7 +43,7 @@ describe('bulk edit', () => {
 
     const result = await bulkEditClassification(t.ctx, {
       groupKey: 'migros',
-      changes: { payeeName: 'Migros', categoryId: category.id, tagNames: ['Food'] },
+      changes: { payeeName: 'Migros', categoryId: category.id, addTagNames: ['Food'] },
     });
 
     expect(result.count).toBe(2);
@@ -67,7 +67,7 @@ describe('bulk edit', () => {
     expect(new Set(entries.map((entry) => entry.entityId))).toEqual(new Set([migros1, migros2]));
     expect(await getBatchSummaries(t.ctx, [result.batchId])).toEqual({
       [result.batchId]:
-        'Bulk edit of 2 Transactions: Payee Migros, Category Food › Groceries, Tags Food',
+        'Bulk edit of 2 Transactions: Payee Migros, Category Food › Groceries, Tags added Food',
     });
     expect((await listUnclassifiedGroups(t.ctx)).groups.map((group) => group.key)).toEqual([
       'coop',

@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import type { Queryable } from '@/server/db/client';
 import { categoryLabel } from '@/lib/classification';
 import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
-import { findOrCreateTags, findTag, tagName } from '../tags/model';
+import { findOrCreateTags, findTag, tagName, type Tag } from '../tags/model';
 import { CLASSIFICATION_FIELDS, recordClassificationChanges } from './classification';
 import { UNCLASSIFIED_CONDITION } from './query';
 import { IS_SPLIT, refuseSplitCategoryChange } from './split-guard';
@@ -13,9 +14,9 @@ import { anyInTransfer } from './transfer-guard';
 /**
  * Bulk edit (spec 62, 64): sets the Payee, Category or Tags of many Transactions at once, as one
  * user action. The given fields are written and locked on every selected Transaction, as a
- * manual edit (`applyClassification` with `by: 'manual'`) would, and the given Tags replace the
- * current ones. The whole edit is one History Batch with a summary, with one entry per changed
- * field of each Transaction.
+ * manual edit (`applyClassification` with `by: 'manual'`) would. Tags are never replaced: the
+ * given ones are added or removed, and the others stay. The whole edit is one History Batch with
+ * a summary, with one entry per changed field of each Transaction.
  *
  * The writes are set-based (one UPDATE for all Transactions) rather than one
  * `applyClassification` per Transaction: that is ~20 round trips per Transaction, and 2 000
@@ -32,15 +33,22 @@ const bulkChanges = z
     payeeId: optionalId,
     payeeName: payeeName.nullable().optional(),
     categoryId: optionalId,
-    tagIds: z.array(z.uuid({ error: 'Unknown Tag' })).optional(),
-    tagNames: z.array(tagName).optional(),
+    addTagIds: z
+      .array(z.uuid({ error: 'Unknown Tag' }))
+      .min(1, 'Choose a Tag to add')
+      .optional(),
+    addTagNames: z.array(tagName).min(1, 'Choose a Tag to add').optional(),
+    removeTagIds: z
+      .array(z.uuid({ error: 'Unknown Tag' }))
+      .min(1, 'Choose a Tag to remove')
+      .optional(),
   })
   .strict()
   .refine((input) => input.payeeId === undefined || input.payeeName === undefined, {
     message: 'Give the Payee by id or by name, not both',
   })
-  .refine((input) => input.tagIds === undefined || input.tagNames === undefined, {
-    message: 'Give the Tags by id or by name, not both',
+  .refine((input) => input.addTagIds === undefined || input.addTagNames === undefined, {
+    message: 'Give the Tags to add by id or by name, not both',
   })
   .refine((input) => Object.values(input).some((value) => value !== undefined), {
     message: 'Choose a Payee, Category or Tags to set',
@@ -96,13 +104,28 @@ async function resolveSelectedIds(
 interface BulkValues {
   payeeId?: string | null;
   categoryId?: string | null;
-  tagIds?: string[];
+  /** Tags added where missing; the Transaction's other Tags stay. */
+  addTagIds?: string[];
+  /** Tags deleted; the Transaction's other Tags stay. */
+  removeTagIds?: string[];
 }
 
 interface ResolvedChanges {
   changes: BulkValues;
   /** Readable parts of the Batch summary, e.g. "Payee Migros". */
   summary: string[];
+}
+
+/** Tags by name (creating missing ones) or by id, without repeats. */
+async function resolveTags(
+  scope: MutationScope,
+  ids: readonly string[] | undefined,
+  names: readonly string[] | undefined,
+): Promise<Tag[]> {
+  const tags = names
+    ? await findOrCreateTags(scope, names)
+    : await Promise.all((ids ?? []).map((id) => findTag(scope.tx, id)));
+  return [...new Map(tags.map((tag) => [tag.id, tag])).values()];
 }
 
 /**
@@ -130,13 +153,15 @@ async function resolveChanges(
     changes.categoryId = category?.id ?? null;
     summary.push(`Category ${category ? categoryLabel(category) : 'cleared'}`);
   }
-  if (input.tagNames !== undefined || input.tagIds !== undefined) {
-    const tags = input.tagNames
-      ? await findOrCreateTags(scope, input.tagNames)
-      : await Promise.all((input.tagIds ?? []).map((id) => findTag(scope.tx, id)));
-    const unique = [...new Map(tags.map((tag) => [tag.id, tag])).values()];
-    changes.tagIds = unique.map((tag) => tag.id);
-    summary.push(`Tags ${unique.map((tag) => tag.name).join(', ') || 'cleared'}`);
+  if (input.addTagNames !== undefined || input.addTagIds !== undefined) {
+    const tags = await resolveTags(scope, input.addTagIds, input.addTagNames);
+    changes.addTagIds = tags.map((tag) => tag.id);
+    summary.push(`Tags added ${tags.map((tag) => tag.name).join(', ')}`);
+  }
+  if (input.removeTagIds !== undefined) {
+    const tags = await resolveTags(scope, input.removeTagIds, undefined);
+    changes.removeTagIds = tags.map((tag) => tag.id);
+    summary.push(`Tags removed ${tags.map((tag) => tag.name).join(', ')}`);
   }
   return { changes, summary };
 }
@@ -155,7 +180,7 @@ function editedFields(values: BulkValues): string[] {
   const touched: Record<string, boolean> = {
     payee: values.payeeId !== undefined,
     category: values.categoryId !== undefined,
-    tags: values.tagIds !== undefined,
+    tags: values.addTagIds !== undefined || values.removeTagIds !== undefined,
   };
   return CLASSIFICATION_FIELDS.filter((field) => touched[field]);
 }
@@ -186,13 +211,27 @@ async function writeAll({ tx }: MutationScope, ids: string[], values: BulkValues
       editedFields(values),
     ],
   );
-  if (values.tagIds === undefined) return;
-  await tx.query('DELETE FROM transaction_tag WHERE transaction_id = ANY($1::uuid[])', [ids]);
+  await writeTags(tx, ids, values);
+}
+
+/**
+ * Removes the given Tags and adds the given ones where missing, as manual Tags, keeping every
+ * other Tag the Transactions have (from Rules too). Split-line Tags are never touched.
+ */
+async function writeTags(tx: Queryable, ids: string[], values: BulkValues): Promise<void> {
+  if (values.removeTagIds !== undefined) {
+    await tx.query(
+      'DELETE FROM transaction_tag WHERE transaction_id = ANY($1::uuid[]) AND tag_id = ANY($2::uuid[])',
+      [ids, values.removeTagIds],
+    );
+  }
+  if (values.addTagIds === undefined) return;
   await tx.query(
     `INSERT INTO transaction_tag (transaction_id, tag_id, source)
      SELECT transaction_id, tag_id, 'manual'
-     FROM unnest($1::uuid[]) AS transaction_id CROSS JOIN unnest($2::uuid[]) AS tag_id`,
-    [ids, values.tagIds],
+     FROM unnest($1::uuid[]) AS transaction_id CROSS JOIN unnest($2::uuid[]) AS tag_id
+     ON CONFLICT DO NOTHING`,
+    [ids, values.addTagIds],
   );
 }
 
