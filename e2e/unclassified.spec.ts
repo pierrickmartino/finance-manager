@@ -1,5 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createAccount } from '../src/server/services/accounts';
+import { createBank } from '../src/server/services/banks';
+import { createCategory, createCategoryGroup } from '../src/server/services/categories';
+import { createManualTransaction } from '../src/server/services/transactions/manual';
+import { splitTransaction } from '../src/server/services/transactions/split';
+import {
+  linkTransfer,
+  splitLineSide,
+  transactionSide,
+  unlinkTransfer,
+} from '../src/server/services/transfers';
 import { addExpenseCategory } from './support/categories';
+import { withServices } from './support/services';
 import { openTransaction } from './support/transactions';
 import { openAccountPage, openNewAccountForm } from './support/accounts';
 
@@ -89,4 +101,64 @@ test('classifies a whole group and a selected Transaction from the Unclassified 
   await expect(kiosk.getByRole('table').locator('tbody tr td').nth(3)).toHaveText(
     `Kiosk ${suffix}`,
   );
+});
+
+/**
+ * A group of two "Ordre <suffix>" debits, one of them split with a line that has neither a
+ * Category nor a Transfer (linked, then unlinked), so it is still Unclassified.
+ */
+async function seedGroupWithSplitMember(suffix: number) {
+  return withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Split bank ${suffix}` });
+    const newAccount = (name: string) =>
+      createAccount(ctx, {
+        bankId: bank.id,
+        kind: 'current',
+        importFormat: null,
+        name: `${name} ${suffix}`,
+        currency: 'CHF',
+        openingBalanceMinor: 0,
+        openingDate: '2021-01-01',
+      });
+    const current = await newAccount('Split current');
+    const savings = await newAccount('Split savings');
+    const group = await createCategoryGroup(ctx, { name: `Home ${suffix}`, type: 'expense' });
+    const rent = await createCategory(ctx, { groupId: group.id, name: `Rent ${suffix}` });
+    const add = (accountId: string, amountMinor: number, description: string) =>
+      createManualTransaction(ctx, {
+        accountId,
+        bookingDate: '2025-04-02',
+        amountMinor,
+        description,
+      });
+
+    const split = await add(current.id, -15_00, `Ordre ${suffix}`);
+    await add(current.id, -20_00, `Ordre ${suffix}`);
+    const credit = await add(savings.id, 10_00, `Credit ${suffix}`);
+    const { splitLines } = await splitTransaction(ctx, split.id, [
+      { amountMinor: -10_00, categoryId: rent.id },
+      { amountMinor: -5_00, categoryId: rent.id },
+    ]);
+    const line = splitLines[0]!.id;
+    await linkTransfer(ctx, { sides: [splitLineSide(line), transactionSide(credit.id)] });
+    await unlinkTransfer(ctx, splitLineSide(line));
+    return { rentName: rent.name };
+  });
+}
+
+test('a group Category edit leaves a split member out and says so', async ({ page }) => {
+  const suffix = Date.now();
+  const { rentName } = await seedGroupWithSplitMember(suffix);
+
+  await page.goto(`/unclassified?group=${encodeURIComponent(`ordre ${suffix}`)}`);
+  const ordre = page.getByRole('form', { name: `Classify Ordre ${suffix}` });
+  await expect(ordre.getByRole('table').locator('tbody tr')).toHaveCount(2);
+  await ordre.getByLabel('Category').selectOption({ label: rentName });
+  await ordre.getByRole('button', { name: 'Classify all 2' }).click();
+
+  await expect(ordre.getByRole('status')).toHaveText(
+    'Classified 1 Transaction · 1 split or Transfer left out.',
+  );
+  // The split member stays in the group: only its lines can take a Category.
+  await expect(ordre.getByRole('table').locator('tbody tr')).toHaveCount(1);
 });

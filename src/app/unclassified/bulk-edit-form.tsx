@@ -31,6 +31,12 @@ interface BulkEditFormProps {
   ) => Promise<ActionResult<BulkEditResult>>;
 }
 
+/** E.g. "Classified 28 Transactions · 2 split or Transfer left out." */
+function resultMessage({ count, leftOut }: BulkEditResult): string {
+  const classified = `Classified ${count} Transaction${count === 1 ? '' : 's'}`;
+  return leftOut > 0 ? `${classified} · ${leftOut} split or Transfer left out.` : `${classified}.`;
+}
+
 /**
  * Sets the Payee, Category or Tags of a whole Unclassified group, or of the ticked Transactions
  * (spec 62). Blank fields are left alone; filled ones are locked against the Rules (spec 64).
@@ -131,7 +137,7 @@ export function BulkEditForm({
         </button>
         {state?.ok && (
           <span role="status" className="text-sm text-muted">
-            Classified {state.data.count} Transaction{state.data.count === 1 ? '' : 's'}.
+            {resultMessage(state.data)}
           </span>
         )}
       </div>
