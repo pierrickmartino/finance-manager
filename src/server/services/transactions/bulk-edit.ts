@@ -246,10 +246,9 @@ export async function bulkEditClassification(
     const { changes, summary } = await resolveChanges(scope, values.changes);
     const leftOut =
       changes.categoryId === undefined ? new Set<string>() : await leftOutOfCategory(scope.tx, ids);
-    const categoryIds = changes.categoryId === undefined ? [] : ids.filter((id) => !leftOut.has(id));
-    await recordClassificationChanges(scope, ids, () =>
-      writeAll(scope, ids, categoryIds, changes),
-    );
+    const categoryIds =
+      changes.categoryId === undefined ? [] : ids.filter((id) => !leftOut.has(id));
+    await recordClassificationChanges(scope, ids, () => writeAll(scope, ids, categoryIds, changes));
     // A left-out Transaction is still changed when the edit sets anything besides the Category.
     const changesMore = editedFields(changes).some((field) => field !== 'category');
     const count = changesMore ? ids.length : categoryIds.length;

@@ -260,7 +260,7 @@ describe('a Transaction with an unlinked Split line is Unclassified', () => {
     expect((await unclassifiedState(debit)).listed).toBe(true);
   });
 
-  it("still gets the Payee of a group bulk edit that leaves it out of the Category", async () => {
+  it('still gets the Payee of a group bulk edit that leaves it out of the Category', async () => {
     const { bcge, debit, toSavings, rent } = await linkedAggregatedDebit();
     await unlinkTransfer(t.ctx, splitLineSide(toSavings));
     await seedOne(bcge, { amountMinor: -2000 });
