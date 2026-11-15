@@ -104,7 +104,7 @@ export function StreamedOverview({
         fallback={
           <>
             <TilePlaceholder label="Net worth" className="lg:row-span-2" />
-            <TilePlaceholder label="This month's insight" />
+            <TilePlaceholder label="This month's insight" className="lg:row-span-2" />
           </>
         }
       >

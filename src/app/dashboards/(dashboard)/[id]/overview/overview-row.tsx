@@ -4,10 +4,11 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useFormatter } from '@/components/formatter-provider';
 import { BADGE_CLASS, TILE_CLASS } from '@/components/surface';
-import { readCard, type CardFlow, type WidgetCardData } from '@/lib/reporting/card';
+import { readCard, type CardFlow, type MonthFlow, type WidgetCardData } from '@/lib/reporting/card';
 import {
   flowSummary,
   headlineAmount,
+  spendingBars,
   spendingInsight,
   type FlowSummary,
 } from '@/lib/reporting/overview';
@@ -164,9 +165,67 @@ export function NetWorthCard({ cards }: { cards: WidgetCardData[] }) {
   );
 }
 
-/** One sentence on how the latest full month compares, in the hero's navy. */
+/** A month label's first three letters, to fit under its bar ("Oct 2026" → "Oct"). */
+const barMonth = (label: string): string => shortMonth(label).slice(0, 3);
+
+/**
+ * Each full month's spending as a bar against the dashed average line, the latest lit. It fills
+ * the card's height from `lg` up; below, the card has no set height, so the bars get one.
+ */
+function SpendingChart({ months, money }: { months: MonthFlow[]; money: Money }) {
+  const chart = spendingBars(months);
+  if (!chart) return null;
+  const { bars, average, averageShare } = chart;
+  const label = `Spent per month: ${bars.map((bar) => `${bar.label} ${money(bar.expense)}`).join(', ')}. Average ${money(Math.round(average))}.`;
+  return (
+    <figure className="mt-6 flex min-h-40 flex-1 flex-col">
+      <figcaption className="flex items-baseline justify-between text-xs text-on-hero/70">
+        <span>Spent per month</span>
+        <span>
+          Average <span className="tabular-nums">{money(Math.round(average))}</span>
+        </span>
+      </figcaption>
+      <div
+        role="img"
+        aria-label={label}
+        className="relative mt-2 flex h-32 items-end gap-1.5 lg:h-auto lg:flex-1"
+      >
+        <div
+          aria-hidden
+          className="absolute inset-x-0 border-t border-dashed border-on-hero/50"
+          style={{ bottom: `${averageShare * 100}%` }}
+        />
+        {bars.map((bar) => (
+          <div
+            key={bar.label}
+            title={`${bar.label}: ${money(bar.expense)}`}
+            className={`flex-1 rounded-t-md ${bar.isLatest ? 'bg-on-hero' : 'bg-on-hero/25'}`}
+            style={{ height: `${Math.max(2, bar.share * 100)}%` }}
+          />
+        ))}
+      </div>
+      <div aria-hidden className="mt-1.5 flex gap-1.5 text-[10px] text-on-hero/60">
+        {bars.map((bar) => (
+          <span
+            key={bar.label}
+            className={`flex-1 truncate text-center ${bar.isLatest ? 'font-medium text-on-hero' : ''}`}
+          >
+            {barMonth(bar.label)}
+          </span>
+        ))}
+      </div>
+    </figure>
+  );
+}
+
+/**
+ * How the latest full month compares, in the hero's navy: one sentence, then each full month's
+ * spending against the average. As tall as Recent activity (both span the overview row's two
+ * rows from `lg` up).
+ */
 export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
   const fmt = useFormatter();
+  const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const flow = overviewFlow(cards, (minor) => fmt.amount(minor, { currency: 'CHF' }));
   const insight = flow ? spendingInsight(flow.months) : null;
   if (!flow || !insight) return null;
@@ -174,23 +233,22 @@ export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
   return (
     <section
       aria-labelledby="overview-insight"
-      className="flex min-h-56 flex-col justify-between rounded-3xl bg-insight p-6 text-on-hero shadow-lg"
+      className="flex flex-col rounded-3xl bg-insight p-6 text-on-hero shadow-lg lg:row-span-2 lg:self-stretch"
     >
-      <div>
-        <h2 id="overview-insight" className="font-display text-3xl leading-tight tracking-tight">
-          {insight.headline}
-        </h2>
-        <p className="mt-3 max-w-sm text-on-hero/80">
-          {before}
-          <FigureLink
-            href={flow.changeHref}
-            className={flow.changeHref ? 'underline underline-offset-4' : ''}
-          >
-            {change}
-          </FigureLink>
-          {after}
-        </p>
-      </div>
+      <h2 id="overview-insight" className="font-display text-3xl leading-tight tracking-tight">
+        {insight.headline}
+      </h2>
+      <p className="mt-3 max-w-sm text-on-hero/80">
+        {before}
+        <FigureLink
+          href={flow.changeHref}
+          className={flow.changeHref ? 'underline underline-offset-4' : ''}
+        >
+          {change}
+        </FigureLink>
+        {after}
+      </p>
+      <SpendingChart months={flow.months} money={money} />
       {flow.latestHref && (
         <Link
           href={flow.latestHref}
