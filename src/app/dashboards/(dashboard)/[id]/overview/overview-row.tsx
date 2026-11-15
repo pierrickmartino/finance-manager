@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
-import { TILE_CLASS } from '@/components/surface';
+import { BADGE_CLASS, TILE_CLASS } from '@/components/surface';
 import { findMonthFlows, spendingInsight } from '@/lib/reporting/overview';
+import { relativeDay, spotlight } from '@/lib/reporting/recent-activity';
 import { storyHero } from '@/lib/reporting/story';
 import { FigureLink } from '../figure-link';
 import type { StoryChapter } from '../story/chapter';
@@ -15,6 +16,8 @@ export interface RecentActivity {
   name: string;
   category: string;
   bookingDate: string;
+  /** Calendar days since the booking date, from the Swiss date: 0 is today. */
+  daysAgo: number;
   amountMinor: number;
   currency: string;
 }
@@ -103,18 +106,18 @@ export function InsightCard({ chapters }: { chapters: StoryChapter[] }) {
   );
 }
 
-/** Monogram tones, from the hero's navy and the ink: decoration, never meaning. */
-// Not `bg-hero`: that name is the hero's gradient utility (globals.css), not its flat colour.
-const MONOGRAM_TONES = ['bg-hero-deep', 'bg-hero-mid', 'bg-hero-glow', 'bg-ink-soft'];
-
-function monogramTone(name: string): string {
-  const hash = [...name].reduce((total, char) => total + char.charCodeAt(0), 0);
-  return MONOGRAM_TONES[hash % MONOGRAM_TONES.length]!;
-}
-
-/** The latest Transactions, newest first, each opening its page. */
+/**
+ * The latest Transactions, newest first: the largest of them in the spotlight, in the hero's
+ * navy, then the rest on a timeline with their Category and how long ago they were booked.
+ * Each opens its page.
+ */
 export function RecentActivityCard({ recent }: { recent: RecentActivity[] }) {
   const fmt = useFormatter();
+  const lit = spotlight(recent);
+  const signed = (transaction: RecentActivity) =>
+    `${transaction.amountMinor > 0 ? '+' : ''}${fmt.amount(transaction.amountMinor, { currency: transaction.currency })}`;
+  const when = (transaction: RecentActivity) =>
+    relativeDay(transaction.daysAgo) ?? fmt.date(transaction.bookingDate);
   return (
     <section aria-labelledby="overview-recent" className={`${TILE_CLASS} lg:row-span-2`}>
       <div className="flex items-center justify-between">
@@ -125,38 +128,58 @@ export function RecentActivityCard({ recent }: { recent: RecentActivity[] }) {
           View all
         </Link>
       </div>
-      {recent.length === 0 ? (
+      {!lit ? (
         <p className="mt-3 text-sm text-muted">No Transactions yet.</p>
       ) : (
-        <ul className="mt-3 flex flex-col gap-2">
-          {recent.map((transaction) => (
-            <li key={transaction.id}>
-              <Link
-                href={`/transactions/${transaction.id}`}
-                className="flex items-center gap-3 rounded-2xl bg-paper px-3 py-2.5 hover:bg-sunken"
-              >
-                <span
-                  aria-hidden
-                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-semibold text-on-hero ${monogramTone(transaction.name)}`}
-                >
-                  {transaction.name.charAt(0).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{transaction.name}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {transaction.category} · {fmt.date(transaction.bookingDate)}
-                  </span>
-                </span>
-                <span
-                  className={`text-sm font-medium whitespace-nowrap tabular-nums ${transaction.amountMinor > 0 ? 'text-positive' : 'text-negative'}`}
-                >
-                  {transaction.amountMinor > 0 ? '+' : ''}
-                  {fmt.amount(transaction.amountMinor, { currency: transaction.currency })}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <Link
+            href={`/transactions/${lit.spotlit.id}`}
+            className="mt-3 block rounded-2xl bg-hero-deep p-4 text-on-hero hover:bg-hero"
+          >
+            <span className="block text-xs text-on-hero/75">
+              Largest lately · {when(lit.spotlit)}
+            </span>
+            <span className="mt-1 block font-display text-3xl tracking-tight tabular-nums">
+              {signed(lit.spotlit)}
+            </span>
+            <span className="mt-1 block truncate text-sm text-on-hero/85">
+              {lit.spotlit.name} · {lit.spotlit.category}
+            </span>
+          </Link>
+          {lit.rest.length > 0 && (
+            <ol aria-label="Other recent Transactions" className="mt-4 ml-1.5 border-l border-rule">
+              {lit.rest.map((transaction) => (
+                <li key={transaction.id} className="relative pb-3 pl-4 last:pb-0">
+                  <span
+                    aria-hidden
+                    className="absolute top-2 -left-[5px] h-2.5 w-2.5 rounded-full border-2 border-surface bg-hero-mid"
+                  />
+                  <Link
+                    href={`/transactions/${transaction.id}`}
+                    className="-mx-2 block rounded-lg px-2 py-1 hover:bg-sunken"
+                  >
+                    <span className="flex items-baseline gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {transaction.name}
+                      </span>
+                      <span
+                        className={`text-sm whitespace-nowrap tabular-nums ${transaction.amountMinor > 0 ? 'text-positive' : 'text-negative'}`}
+                      >
+                        {signed(transaction)}
+                      </span>
+                    </span>
+                    <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted">
+                      <span className={`${BADGE_CLASS.neutral} truncate`}>
+                        {transaction.category}
+                      </span>
+                      <span className="whitespace-nowrap">{when(transaction)}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
       )}
     </section>
   );
