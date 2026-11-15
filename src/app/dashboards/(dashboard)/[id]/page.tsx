@@ -5,7 +5,7 @@ import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { homeDashboard, listDashboards } from '@/server/services/dashboards';
 import { swissToday } from '@/server/services/fx/dates';
-import { findDashboard, loadRecentActivity, loadStoryChapter } from '../../load';
+import { findDashboard, loadRecentActivity, loadWidgetCard } from '../../load';
 import { DashboardTabs } from '../../tabs';
 import { DashboardChrome, DashboardOverview } from './overview/dashboard-overview';
 import { StreamedBoard, StreamedCompleteness, StreamedOverview } from './streamed';
@@ -27,7 +27,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
   // Started now, awaited by the parts that show them: each Widget's query runs once.
   const cards = dashboard.widgets.map((widget) => ({
     widget,
-    chapter: loadStoryChapter(ctx, widget),
+    card: loadWidgetCard(ctx, widget),
   }));
   const recent = loadRecentActivity(ctx);
   const [dashboards, fmt] = await Promise.all([listDashboards(ctx), getFormatter()]);
@@ -51,7 +51,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
         }
         isEmpty={dashboard.widgets.length === 0}
         notice={isHome && <StreamedCompleteness ctx={ctx} fmt={fmt} today={swissToday()} />}
-        overview={<StreamedOverview chapters={cards.map((card) => card.chapter)} recent={recent} />}
+        overview={<StreamedOverview cards={cards.map(({ card }) => card)} recent={recent} />}
         board={<StreamedBoard cards={cards} />}
         empty={
           <p className="py-16 text-lg text-muted">

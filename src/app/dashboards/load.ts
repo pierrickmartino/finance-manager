@@ -17,7 +17,7 @@ import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
 import { drillLinks, toPivotData, type PivotLinks } from '../widgets/pivot-data';
 import type { RecentActivity } from './(dashboard)/[id]/overview/overview-row';
-import type { BoardChapter } from './(dashboard)/[id]/overview/widget-board';
+import type { BoardCard } from './(dashboard)/[id]/overview/widget-board';
 
 export interface WidgetView {
   data: ChartSource | null;
@@ -63,8 +63,8 @@ export async function loadWidgetView(ctx: ServiceContext, widget: Widget): Promi
   }
 }
 
-/** A Widget run into its Story chapter, with its card's place and size on the board. */
-export async function loadStoryChapter(ctx: ServiceContext, widget: Widget): Promise<BoardChapter> {
+/** A Widget run into its card's data, with the card's place and size on the board. */
+export async function loadWidgetCard(ctx: ServiceContext, widget: Widget): Promise<BoardCard> {
   const view = await loadWidgetView(ctx, widget);
   return {
     id: widget.id,

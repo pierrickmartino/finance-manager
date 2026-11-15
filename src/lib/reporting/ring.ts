@@ -1,5 +1,5 @@
 import { OTHER_LABEL, type ChartSource } from './chart-data';
-import { shareParts } from './story';
+import { shareParts } from './card';
 
 /**
  * The ring a Donut Widget's card draws (ADR-0009): its parts as slices, largest first and

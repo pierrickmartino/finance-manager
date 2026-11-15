@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Formatter } from '@/lib/format';
-import { cardPlaceholder } from '@/lib/reporting/placeholder';
+import { rowsHeight } from '@/lib/reporting/board';
+import { cardFrame } from '@/lib/reporting/card';
 import { checkCompleteness } from '@/server/services/completeness';
 import type { ServiceContext } from '@/server/services/context';
 import type { Widget } from '@/server/services/reporting';
@@ -16,30 +17,30 @@ import {
   RecentActivityCard,
   type RecentActivity,
 } from './overview/overview-row';
-import { BOARD_CARD_CLASS, BoardCell, BoardGrid, type BoardChapter } from './overview/widget-board';
+import { BOARD_CARD_CLASS, BoardCell, BoardGrid, type BoardCard } from './overview/widget-board';
 import { WidgetCard } from './overview/widget-card';
 import { CompletenessNotice } from './completeness-notice';
 
 /*
  * The Dashboard Story's parts that wait on a query, each streamed in behind its own Suspense
- * boundary so the page shell renders at once. Each Widget's chapter is a promise started once
+ * boundary so the page shell renders at once. Each Widget's card is a promise started once
  * by the page and shared: its card and the overview row read the same one, so no query runs twice.
  */
 
-/** The chapters that loaded; one that failed unexpectedly is left out (its own card says so). */
-async function loadedChapters(chapters: Promise<BoardChapter>[]): Promise<BoardChapter[]> {
-  const results = await Promise.allSettled(chapters);
+/** The cards that loaded; one that failed unexpectedly is left out (its own card says so). */
+async function loadedCards(cards: Promise<BoardCard>[]): Promise<BoardCard[]> {
+  const results = await Promise.allSettled(cards);
   return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
 }
 
-/** A Widget with its chapter still on its way: the Widget alone is enough for its placeholder. */
+/** A Widget with its card still on its way: the Widget alone is enough for its placeholder. */
 export interface StreamedWidget {
   widget: Widget;
-  chapter: Promise<BoardChapter>;
+  card: Promise<BoardCard>;
 }
 
-async function StreamedCard({ chapter }: { chapter: Promise<BoardChapter> }) {
-  return <WidgetCard chapter={await chapter} className={BOARD_CARD_CLASS} />;
+async function StreamedCard({ card }: { card: Promise<BoardCard> }) {
+  return <WidgetCard card={await card} className={BOARD_CARD_CLASS} />;
 }
 
 /**
@@ -49,8 +50,11 @@ async function StreamedCard({ chapter }: { chapter: Promise<BoardChapter> }) {
 export function StreamedBoard({ cards }: { cards: StreamedWidget[] }) {
   return (
     <BoardGrid>
-      {cards.map(({ widget, chapter }) => {
-        const { shape, height } = cardPlaceholder(widget);
+      {cards.map(({ widget, card }) => {
+        // Before the query has run there is no data: the card is framed from the Widget alone.
+        const frame = cardFrame({ ...widget, data: null });
+        const shape = frame.placeholder;
+        const height = rowsHeight(widget.layout?.h ?? frame.sizes.initial.h);
         return (
           <BoardCell key={widget.id} layout={widget.layout}>
             <CardErrorBoundary name={widget.name}>
@@ -59,7 +63,7 @@ export function StreamedBoard({ cards }: { cards: StreamedWidget[] }) {
                   <WidgetCardPlaceholder name={widget.name} shape={shape} height={height} />
                 }
               >
-                <StreamedCard chapter={chapter} />
+                <StreamedCard card={card} />
               </Suspense>
             </CardErrorBoundary>
           </BoardCell>
@@ -69,12 +73,12 @@ export function StreamedBoard({ cards }: { cards: StreamedWidget[] }) {
   );
 }
 
-async function StreamedNetWorthAndInsight({ chapters }: { chapters: Promise<BoardChapter>[] }) {
-  const loaded = await loadedChapters(chapters);
+async function StreamedNetWorthAndInsight({ cards }: { cards: Promise<BoardCard>[] }) {
+  const loaded = await loadedCards(cards);
   return (
     <>
-      <NetWorthCard chapters={loaded} />
-      <InsightCard chapters={loaded} />
+      <NetWorthCard cards={loaded} />
+      <InsightCard cards={loaded} />
     </>
   );
 }
@@ -84,14 +88,14 @@ async function StreamedRecent({ recent }: { recent: Promise<RecentActivity[]> })
 }
 
 /**
- * The overview row's cards. The net worth and insight cards are worked out from every chapter,
+ * The overview row's cards. The net worth and insight cards are worked out from every card,
  * so they wait for all of them; recent activity has a query of its own and arrives on its own.
  */
 export function StreamedOverview({
-  chapters,
+  cards,
   recent,
 }: {
-  chapters: Promise<BoardChapter>[];
+  cards: Promise<BoardCard>[];
   recent: Promise<RecentActivity[]>;
 }) {
   return (
@@ -104,7 +108,7 @@ export function StreamedOverview({
           </>
         }
       >
-        <StreamedNetWorthAndInsight chapters={chapters} />
+        <StreamedNetWorthAndInsight cards={cards} />
       </Suspense>
       <Suspense fallback={<TilePlaceholder label="Recent activity" className="lg:row-span-2" />}>
         <StreamedRecent recent={recent} />

@@ -160,7 +160,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
                 card={
                   <CardPreview
                     layout={widget?.layout ?? null}
-                    chapter={{
+                    card={{
                       id: widget?.id ?? 'preview',
                       name: title,
                       source: isBalances ? 'account_balances' : 'query',

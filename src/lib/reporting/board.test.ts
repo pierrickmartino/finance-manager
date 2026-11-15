@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Visualisation, WidgetSource } from '@/server/services/reporting';
 import {
   type Cell,
-  defaultSize,
   editedCardSize,
   findOverlaps,
   firstFreeSpot,
@@ -11,70 +9,39 @@ import {
   isInBounds,
   MAX_BOARD_ROWS,
   meetsMinimum,
-  minimumSize,
   moveCard,
   resizeCard,
   pushDown,
   readingOrder,
-  sizeKind,
+  rowsHeight,
   swapInReadingOrder,
   threeAcross,
-  WIDGET_SIZES,
 } from './board';
 
 const cell = (id: string, x: number, y: number, w: number, h: number): Cell => ({ id, x, y, w, h });
 
-const columns = (count: number) =>
-  Array.from({ length: count }, (_, i) => ({ key: `c${i}`, label: `C${i}`, isPartial: false }));
+/** A card's default and minimum size, as its frame gives them. */
+const sizes = { initial: { w: 8, h: 6 }, min: { w: 4, h: 4 } };
 
-/** Just what a Widget's chapter kind is read from. */
-const widget = (source: WidgetSource, visualisation: Visualisation, seriesCount = 1) => ({
-  source,
-  visualisation,
-  data: { columns: columns(seriesCount) } as never,
-});
-
-describe('Widget sizes', () => {
-  it('sizes a Widget by what its card shows', () => {
-    expect(sizeKind(widget('query', 'number'))).toBe('number');
-    expect(sizeKind(widget('account_balances', 'table'))).toBe('balances');
-    expect(sizeKind(widget('query', 'donut'))).toBe('list');
-    expect(sizeKind(widget('query', 'table', 6))).toBe('grid');
-    expect(sizeKind(widget('query', 'stacked_bar', 5))).toBe('list');
-    expect(sizeKind(widget('query', 'line'))).toBe('chart');
-    expect(sizeKind(widget('query', 'stacked_bar', 2))).toBe('chart');
-  });
-
-  it('gives each kind its default and minimum size', () => {
-    expect(defaultSize(widget('query', 'number'))).toEqual({ w: 4, h: 3 });
-    expect(defaultSize(widget('account_balances', 'table'))).toEqual({ w: 4, h: 6 });
-    expect(defaultSize(widget('query', 'donut'))).toEqual({ w: 4, h: 8 });
-    expect(defaultSize(widget('query', 'line'))).toEqual({ w: 8, h: 6 });
-    expect(minimumSize(widget('query', 'line'))).toEqual({ w: 4, h: 4 });
-    expect(defaultSize(widget('query', 'table', 6))).toEqual({ w: 8, h: 8 });
-    expect(minimumSize(widget('query', 'table', 6))).toEqual({ w: 4, h: 5 });
-  });
-
+describe('editedCardSize', () => {
   it('sizes a new Widget card at its default', () => {
-    expect(editedCardSize(null, widget('query', 'number'))).toEqual({ w: 4, h: 3 });
+    expect(editedCardSize(null, sizes)).toEqual({ w: 8, h: 6 });
   });
 
   it('keeps an edited card at its size when it still meets its minimum', () => {
-    const layout = { x: 2, y: 5, w: 6, h: 9 };
-    expect(editedCardSize(layout, widget('query', 'line'))).toEqual({ w: 6, h: 9 });
+    expect(editedCardSize({ w: 6, h: 9 }, sizes)).toEqual({ w: 6, h: 9 });
   });
 
   it('grows an edited card to its new minimum, never shrinking it', () => {
-    const layout = { x: 0, y: 0, w: 2, h: 7 };
-    expect(editedCardSize(layout, widget('query', 'line'))).toEqual({ w: 4, h: 7 });
+    expect(editedCardSize({ w: 2, h: 7 }, sizes)).toEqual({ w: 4, h: 7 });
   });
+});
 
-  it('keeps every minimum at or below its default, and within three across', () => {
-    for (const { initial, min } of Object.values(WIDGET_SIZES)) {
-      expect(min.w).toBeLessThanOrEqual(initial.w);
-      expect(min.h).toBeLessThanOrEqual(initial.h);
-      expect(min.w).toBeLessThanOrEqual(4);
-    }
+describe('rowsHeight', () => {
+  it('spans the rows and the gaps between them', () => {
+    // 6 rows of 40px and the 5 gaps of 20px between them.
+    expect(rowsHeight(6)).toBe(340);
+    expect(rowsHeight(1)).toBe(40);
   });
 });
 

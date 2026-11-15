@@ -6,11 +6,11 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { compactValue, HEAT_LEVELS, toHeatmap } from '@/lib/reporting/heatmap';
 import {
   latestFullIndex,
-  litTicks,
-  runningTotals,
   type MonthFlow,
   type PeriodValue,
-} from '@/lib/reporting/overview';
+  type TickItem,
+} from '@/lib/reporting/card';
+import { litTicks, runningTotals } from '@/lib/reporting/overview';
 
 /**
  * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the hero's navy,
@@ -159,15 +159,6 @@ export function MonthBars({ periods }: { periods: PeriodValue[] }) {
       ))}
     </div>
   );
-}
-
-export interface TickItem {
-  key: string;
-  title: string;
-  /** Under the title: the group, the amount. */
-  detail: string;
-  share: number;
-  href: string | null;
 }
 
 const TICKS = 12;

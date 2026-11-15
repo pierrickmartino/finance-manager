@@ -1,61 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import type { ReportHeader } from '@/server/services/reporting';
+import type { CardWidget, MonthFlow } from './card';
 import type { ChartSource } from './chart-data';
-import { cellFromParams, DEFAULT_WIDGET_QUERY } from './widget-params';
-import {
-  findMonthFlows,
-  latestFullIndex,
-  litTicks,
-  monthFlows,
-  periodValues,
-  runningTotals,
-  spendingInsight,
-  type MonthFlow,
-} from './overview';
-import type { StoryWidget } from './story';
+import { headlineAmount, litTicks, runningTotals, spendingInsight } from './overview';
 
-const header = (label: string, isPartial = false): ReportHeader => ({
-  key: label,
-  label,
-  isPartial,
-});
-
-/** A source from a grid of cells, totals computed; the last row partial when asked. */
-function source(
-  rows: string[],
-  columns: string[],
-  cells: (number | null)[][],
-  { lastIsPartial = false } = {},
-): ChartSource {
-  const sum = (values: (number | null)[]) => values.reduce<number>((a, v) => a + (v ?? 0), 0);
-  const rowTotals = cells.map(sum);
+/** A one-column source whose total opens `total`. */
+function totalled(rows: string[], values: number[]): ChartSource {
+  const total = values.reduce((a, v) => a + v, 0);
   return {
     measure: 'sum',
-    rows: rows.map((row, r) => header(row, lastIsPartial && r === rows.length - 1)),
-    columns: columns.map((column) => header(column)),
-    cells,
-    rowTotals,
-    columnTotals: columns.map((_, c) => sum(cells.map((row) => row[c] ?? null))),
-    total: sum(rowTotals),
+    rows: rows.map((label) => ({ key: label, label, isPartial: false })),
+    columns: [{ key: 'v', label: 'Value', isPartial: false }],
+    cells: values.map((value) => [value]),
+    rowTotals: values,
+    columnTotals: [total],
+    total,
     hrefs: {
-      cells: rows.map((r) => columns.map((c) => `cell:${r}/${c}`)),
+      cells: rows.map((r) => [`cell:${r}`]),
       rowTotals: rows.map((r) => `row:${r}`),
-      columnTotals: columns.map((c) => `column:${c}`),
+      columnTotals: ['column:v'],
       total: 'total',
     },
     drill: null,
   };
 }
 
-const flowSource = source(
-  ['Jan', 'Feb', 'Mar'],
-  ['Expense', 'Income'],
-  [
-    [-600_00, 1000_00],
-    [-900_00, 1000_00],
-    [-300_00, 1500_00],
-  ],
-);
+const widget = (overrides: Partial<CardWidget> & Pick<CardWidget, 'data'>): CardWidget => ({
+  id: 'w1',
+  name: 'Widget',
+  source: 'query',
+  visualisation: 'stacked_bar',
+  ...overrides,
+});
 
 const month = (label: string, income: number, expense: number, isPartial = false): MonthFlow => ({
   label,
@@ -65,113 +40,44 @@ const month = (label: string, income: number, expense: number, isPartial = false
   net: income - expense,
 });
 
-describe('monthFlows', () => {
-  it('reads what came in and went out per row, whichever column holds the income', () => {
-    expect(monthFlows(flowSource)).toEqual([
-      month('Jan', 1000_00, 600_00),
-      month('Feb', 1000_00, 900_00),
-      month('Mar', 1500_00, 300_00),
-    ]);
+describe('headlineAmount', () => {
+  const spending = widget({ name: 'Spending', data: totalled(['Jan', 'Feb'], [-500_00, -300_00]) });
+  const balances = widget({
+    name: 'Account balances in CHF',
+    source: 'account_balances',
+    visualisation: 'table',
+    data: totalled(['UBS · Savings', 'UBS · Current'], [6000_00, 4000_00]),
   });
 
-  it('is null unless the source has one income and one expense column', () => {
-    const spending = source(['Jan'], ['Rent', 'Food'], [[-2000_00, -500_00]]);
-    const single = source(['Jan'], ['Net'], [[400_00]]);
-
-    expect(monthFlows(spending)).toBeNull();
-    expect(monthFlows(single)).toBeNull();
-  });
-
-  it('counts an empty cell as nothing', () => {
-    const gaps = source(
-      ['Jan', 'Feb'],
-      ['Income', 'Expense'],
-      [
-        [1000_00, null],
-        [null, -200_00],
-      ],
-    );
-
-    expect(monthFlows(gaps)).toEqual([month('Jan', 1000_00, 0), month('Feb', 0, 200_00)]);
-  });
-});
-
-describe('findMonthFlows', () => {
-  const widget = (id: string, data: ChartSource | null): StoryWidget => ({
-    id,
-    name: id,
-    source: 'query',
-    visualisation: 'stacked_bar',
-    data,
-  });
-
-  it('takes the first Widget that holds income and expense', () => {
-    const spending = widget('spending', source(['Jan'], ['Rent', 'Food'], [[-1_00, -2_00]]));
-
-    const found = findMonthFlows([widget('empty', null), spending, widget('flow', flowSource)]);
-
-    expect(found?.widgetId).toBe('flow');
-    expect(found?.months).toHaveLength(3);
-  });
-
-  it('is null when no Widget holds income and expense', () => {
-    expect(findMonthFlows([widget('empty', null)])).toBeNull();
-  });
-
-  it('links what was kept to the grand total, and the latest full month to that month only', () => {
-    const partial = source(
-      ['2025-01', '2025-02', '2025-03'],
-      ['expense', 'income'],
-      [
-        [-600_00, 1000_00],
-        [-900_00, 1000_00],
-        [-30_00, 0],
-      ],
-      { lastIsPartial: true },
-    );
-
-    const found = findMonthFlows([widget('flow', partial)]);
-
-    expect(found).toMatchObject({ href: 'total', latestHref: 'row:2025-02' });
-  });
-
-  it("opens the insight's change on the expense of every full month, subtotalled", () => {
-    const drillable: ChartSource = {
-      ...source(
-        ['2025-01', '2025-02', '2025-03'],
-        ['expense', 'income'],
-        [
-          [-600_00, 1000_00],
-          [-900_00, 1000_00],
-          [-30_00, 0],
-        ],
-        { lastIsPartial: true },
-      ),
-      drill: {
-        query: { ...DEFAULT_WIDGET_QUERY, rows: 'month', columns: 'categoryGroupType' },
-        origin: { kind: 'dashboard', id: '0b6f4c1e-3a52-4d8e-9a7e-1f2d3c4b5a60' },
-      },
-    };
-
-    const { changeHref } = findMonthFlows([widget('flow', drillable)])!;
-
-    const params = new URL(changeHref!, 'http://localhost').searchParams;
-    expect(cellFromParams(Object.fromEntries(params))).toEqual({
-      row: { except: ['2025-03'] },
-      column: 'expense',
-      withPeriodSubtotals: true,
-      page: 1,
+  it('leads with net worth from the Account balances', () => {
+    expect(headlineAmount([spending, balances])).toEqual({
+      label: 'Your net worth today',
+      value: 10000_00,
+      href: 'total',
     });
-    expect(params.get('origin')).toBe('dashboard');
-    // Without Drill-downs there is nothing to open.
-    expect(findMonthFlows([widget('flow', flowSource)])?.changeHref).toBeNull();
+  });
+
+  it('falls back to the first Widget with a total', () => {
+    expect(headlineAmount([widget({ data: null }), spending])).toEqual({
+      label: 'Spending',
+      value: -800_00,
+      href: 'total',
+    });
+  });
+
+  it('is null when no Widget has a total', () => {
+    expect(headlineAmount([widget({ data: null })])).toBeNull();
   });
 });
 
 describe('spendingInsight', () => {
   it('says spending is easing when the latest full month spent less than the months before', () => {
     // Average of Jan and Feb: 750; Mar spent 300, 60% below. Kept: (3500 - 1800) / 3500.
-    const insight = spendingInsight(monthFlows(flowSource)!);
+    const insight = spendingInsight([
+      month('Jan', 1000_00, 600_00),
+      month('Feb', 1000_00, 900_00),
+      month('Mar', 1500_00, 300_00),
+    ]);
 
     expect(insight).toEqual({
       headline: 'Spending is easing.',
@@ -209,24 +115,6 @@ describe('spendingInsight', () => {
 describe('runningTotals', () => {
   it('adds each value to the ones before it', () => {
     expect(runningTotals([100, -40, 25])).toEqual([100, 60, 85]);
-  });
-});
-
-describe('latestFullIndex', () => {
-  it('is the last row that is not partial, or -1 when every row is', () => {
-    expect(latestFullIndex([header('Jan'), header('Feb'), header('Mar', true)])).toBe(1);
-    expect(latestFullIndex([header('Mar', true)])).toBe(-1);
-  });
-});
-
-describe('periodValues', () => {
-  it('gives each row its total, its link and whether it is still running', () => {
-    const data = source(['Jan', 'Feb'], ['Net'], [[400_00], [-100_00]], { lastIsPartial: true });
-
-    expect(periodValues(data)).toEqual([
-      { label: 'Jan', value: 400_00, href: 'row:Jan', isPartial: false },
-      { label: 'Feb', value: -100_00, href: 'row:Feb', isPartial: true },
-    ]);
   });
 });
 

@@ -1,11 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { BOARD_ROW_HEIGHT_PX } from '@/lib/reporting/board';
 import type { WidgetLayout } from '@/server/services/reporting';
-import type { StoryChapter } from '../story/chapter';
+import type { WidgetCardData } from '@/lib/reporting/card';
 import { WidgetCard } from './widget-card';
 
-/** A Widget's chapter with its card's place and size on the board. */
-export interface BoardChapter extends StoryChapter {
+/** A Widget's card data with the card's place and size on the board. */
+export interface BoardCard extends WidgetCardData {
   layout: WidgetLayout | null;
 }
 
@@ -56,20 +56,20 @@ export function BoardCell({
 /** The class a Widget's card takes in its cell: it fills the cell, and content that doesn't fit scrolls. */
 export const BOARD_CARD_CLASS = 'lg:h-full lg:overflow-auto';
 
-interface WidgetBoardProps<T extends BoardChapter> {
+interface WidgetBoardProps<T extends BoardCard> {
   /** In reading order. */
-  chapters: T[];
+  cards: T[];
   /** Edit mode's actions on each card. */
-  toolbar?: (chapter: T) => ReactNode;
+  toolbar?: (card: T) => ReactNode;
 }
 
-/** The board with every chapter already loaded, as Edit mode draws it. */
-export function WidgetBoard<T extends BoardChapter>({ chapters, toolbar }: WidgetBoardProps<T>) {
+/** The board with every card already loaded, as Edit mode draws it. */
+export function WidgetBoard<T extends BoardCard>({ cards, toolbar }: WidgetBoardProps<T>) {
   return (
     <BoardGrid>
-      {chapters.map((chapter) => (
-        <BoardCell key={chapter.id} layout={chapter.layout}>
-          <WidgetCard chapter={chapter} className={BOARD_CARD_CLASS} toolbar={toolbar?.(chapter)} />
+      {cards.map((card) => (
+        <BoardCell key={card.id} layout={card.layout}>
+          <WidgetCard card={card} className={BOARD_CARD_CLASS} toolbar={toolbar?.(card)} />
         </BoardCell>
       ))}
     </BoardGrid>

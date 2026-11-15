@@ -5,7 +5,7 @@ import { widgetPickerOptions } from '@/lib/reporting/widget-picker';
 import { getServiceContext } from '@/server/app-context';
 import { listDashboards } from '@/server/services/dashboards';
 import { listWidgets } from '@/server/services/reporting';
-import { editWidgetHref, findDashboard, loadRecentActivity, loadStoryChapter } from '../../../load';
+import { editWidgetHref, findDashboard, loadRecentActivity, loadWidgetCard } from '../../../load';
 import { DashboardTabs } from '../../../tabs';
 import { DashboardChrome, DashboardOverview, OverviewCards } from '../overview/dashboard-overview';
 import { AddWidgetMenu, EmptyBoard } from './add-widget';
@@ -21,11 +21,11 @@ export const metadata: Metadata = { title: 'Edit Dashboard · Finance Manager' }
 export default async function EditDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
-  const [dashboards, chapters, recent, savedWidgets] = await Promise.all([
+  const [dashboards, cards, recent, savedWidgets] = await Promise.all([
     listDashboards(ctx),
     Promise.all(
       dashboard.widgets.map(async (widget) => ({
-        ...(await loadStoryChapter(ctx, widget)),
+        ...(await loadWidgetCard(ctx, widget)),
         editHref: editWidgetHref(widget),
       })),
     ),
@@ -48,23 +48,23 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
         subtitle={<p>Editing</p>}
         actions={
           <>
-            {chapters.length > 0 && <AddWidgetMenu {...choices} />}
+            {cards.length > 0 && <AddWidgetMenu {...choices} />}
             <Link href={`/dashboards/${dashboard.id}`} className={ACCENT_BUTTON_CLASS}>
               Done
             </Link>
           </>
         }
-        isEmpty={chapters.length === 0}
-        overview={<OverviewCards chapters={chapters} recent={recent} />}
+        isEmpty={cards.length === 0}
+        overview={<OverviewCards cards={cards} recent={recent} />}
         board={
           <EditBoard
             // A new set of Widgets (added, duplicated, removed) starts again from the server's board.
-            key={chapters
-              .map((chapter) => chapter.id)
+            key={cards
+              .map((card) => card.id)
               .sort()
               .join()}
             dashboardId={dashboard.id}
-            chapters={chapters}
+            cards={cards}
           />
         }
         empty={<EmptyBoard {...choices} />}

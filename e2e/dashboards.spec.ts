@@ -19,9 +19,9 @@ import {
 import { withServices } from './support/services';
 import { viewTransitionMotionDuring } from './support/view-transitions';
 
-/** The chapter titles, in the order the page tells them. */
-function chapterTitles(page: Page) {
-  return page.locator('h2[id^="chapter-"]');
+/** The card titles, in the order the page tells them. */
+function cardTitles(page: Page) {
+  return page.locator('h2[id^="card-"]');
 }
 
 /** In Edit mode: adds the Account balances, from the empty Dashboard or from Add Widget. */
@@ -62,13 +62,13 @@ test('a Dashboard opens as its Story; Edit mode lists the same Widgets in order,
 }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
-  const storyOrder = await chapterTitles(page).allTextContents();
-  await expect(page.getByText('Add chapter')).toHaveCount(0);
+  const storyOrder = await cardTitles(page).allTextContents();
+  await expect(page.getByRole('button', { name: 'Add Widget' })).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Edit Dashboard' }).click();
   await expect(page).toHaveURL(/\/dashboards\/[^/]+\/edit$/);
   await expect(page.getByText('Editing', { exact: true })).toBeVisible();
-  await expect(chapterTitles(page)).toHaveText(storyOrder);
+  await expect(cardTitles(page)).toHaveText(storyOrder);
   // The same overview row above the board, then each card with its toolbar.
   await expect(page.getByRole('heading', { name: 'Recent activity', level: 2 })).toBeVisible();
   const toolbar = page.getByRole('toolbar', { name: 'Net cash flow actions' });
@@ -102,7 +102,7 @@ async function editModeShown(page: Page): Promise<void> {
 async function storyShown(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/dashboards\/[^/]+$/);
   await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
-  await expect(chapterTitles(page).first()).toBeVisible();
+  await expect(cardTitles(page).first()).toBeVisible();
 }
 
 /**
@@ -164,12 +164,12 @@ test('switching to another Dashboard by its tab swaps with no animation', async 
   const toOther = await viewTransitionMotionDuring(page, async () => {
     await tabs.getByRole('link', { name }).click();
     await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
-    await expect(chapterTitles(page)).toHaveText(['Tab switch figure']);
+    await expect(cardTitles(page)).toHaveText(['Tab switch figure']);
   });
   const toHome = await viewTransitionMotionDuring(page, async () => {
     await tabs.getByRole('link', { name: 'Overview' }).click();
     await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
-    await expect(chapterTitles(page).first()).toBeVisible();
+    await expect(cardTitles(page).first()).toBeVisible();
   });
 
   expect(toOther).toEqual([]);
@@ -196,7 +196,7 @@ test('add a stacked bar Widget from the empty Dashboard; the editor previews its
   await page.getByRole('button', { name: 'Save Widget' }).click();
 
   await expect(page.getByRole('heading', { name: dashboardName, level: 1 })).toBeVisible();
-  await expect(chapterTitles(page)).toHaveText([widgetName]);
+  await expect(cardTitles(page)).toHaveText([widgetName]);
 });
 
 test('drag a card by its handle and resize it from its corner; both views keep it after a reload', async ({
@@ -206,12 +206,12 @@ test('drag a card by its handle and resize it from its corner; both views keep i
   const copy = `${original} (copy)`;
   await createDashboard(page, `Grid ${Date.now()}`);
   await addBalances(page);
-  await expect(chapterTitles(page)).toHaveText([original]);
+  await expect(cardTitles(page)).toHaveText([original]);
   await page
     .getByRole('form', { name: `Duplicate ${original}` })
     .getByRole('button')
     .click();
-  await expect(chapterTitles(page)).toHaveText([original, copy]);
+  await expect(cardTitles(page)).toHaveText([original, copy]);
   // Balances start 4×6: the copy sits right of its original on the same row.
   const before = { original: await cardBox(page, original), copy: await cardBox(page, copy) };
   expect(before.copy.x).toBeGreaterThan(before.original.x + before.original.width);
@@ -263,7 +263,7 @@ test('move and resize a focused card from the keyboard; each step is announced a
     .getByRole('form', { name: `Duplicate ${original}` })
     .getByRole('button')
     .click();
-  await expect(chapterTitles(page)).toHaveText([original, copy]);
+  await expect(cardTitles(page)).toHaveText([original, copy]);
   const before = await cardBox(page, copy);
 
   // The copy starts 4×6 at column 5, row 1 (right of its original).
@@ -305,12 +305,12 @@ test('a Widget added from Add Widget goes in the first free spot; removing one l
   const balances = 'Account balances in CHF';
   const copy = `${balances} (copy)`;
   await addBalances(page);
-  await expect(chapterTitles(page)).toHaveText([balances]);
+  await expect(cardTitles(page)).toHaveText([balances]);
   await page
     .getByRole('form', { name: `Duplicate ${balances}` })
     .getByRole('button')
     .click();
-  await expect(chapterTitles(page)).toHaveText([balances, copy]);
+  await expect(cardTitles(page)).toHaveText([balances, copy]);
 
   await page.getByText('Add Widget', { exact: true }).click();
   await page.getByRole('link', { name: 'New Widget' }).click();
@@ -319,7 +319,7 @@ test('a Widget added from Add Widget goes in the first free spot; removing one l
   await expect(page).toHaveURL(/[?&]vis=donut/);
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
-  await expect(chapterTitles(page)).toHaveText([balances, copy, widgetName]);
+  await expect(cardTitles(page)).toHaveText([balances, copy, widgetName]);
 
   // At lg the board is the grid: the duplicate sits right of its original, the new Widget next
   // to it, all on one row (4 columns each), the shorter cards not stretched to the taller one.
@@ -350,7 +350,7 @@ test('a Widget added from Add Widget goes in the first free spot; removing one l
     .getByRole('form', { name: `Remove ${copy}` })
     .getByRole('button')
     .click();
-  await expect(chapterTitles(page)).toHaveText([balances, widgetName]);
+  await expect(cardTitles(page)).toHaveText([balances, widgetName]);
   const addedAfter = await box(widgetName);
   expect(addedAfter.x).toBeCloseTo(addedBefore.x, 0);
   expect(addedAfter.y).toBeCloseTo(addedBefore.y, 0);
@@ -367,7 +367,7 @@ test('below lg Edit mode is one column with up/down moves that swap places on th
     .getByRole('form', { name: `Duplicate ${original}` })
     .getByRole('button')
     .click();
-  await expect(chapterTitles(page)).toHaveText([original, copy]);
+  await expect(cardTitles(page)).toHaveText([original, copy]);
   const wide = { original: await cardBox(page, original), copy: await cardBox(page, copy) };
   expect(wide.copy.x).toBeGreaterThan(wide.original.x + wide.original.width);
 
@@ -389,7 +389,7 @@ test('below lg Edit mode is one column with up/down moves that swap places on th
   const saved = nextAction(page);
   await moveButton(copy, 'up').click();
   expect((await saved).ok()).toBe(true);
-  await expect(chapterTitles(page)).toHaveText([copy, original]);
+  await expect(cardTitles(page)).toHaveText([copy, original]);
   await expect(moveButton(copy, 'up')).toBeFocused();
   await expect(moveButton(copy, 'up')).toBeDisabled();
 
@@ -416,12 +416,12 @@ test('changing a Widget to a chart that needs more room grows its card on the St
   await page.getByRole('group', { name: 'Visualisation' }).getByText('Single number').click();
   await page.getByLabel('Widget name').fill(widgetName);
   await page.getByRole('button', { name: 'Save Widget' }).click();
-  await expect(chapterTitles(page)).toHaveText([widgetName]);
+  await expect(cardTitles(page)).toHaveText([widgetName]);
 
-  // A Single number also heads the overview row; the card is its chapter.
+  // A Single number also heads the overview row; the Widget keeps its own card.
   const card = page
     .getByRole('region', { name: widgetName, exact: true })
-    .and(page.locator('[aria-labelledby^="chapter-"]'));
+    .and(page.locator('[aria-labelledby^="card-"]'));
   const cardHeight = async () => {
     const found = await card.boundingBox();
     if (!found) throw new Error(`No card for ${widgetName}`);
@@ -442,7 +442,7 @@ test('changing a Widget to a chart that needs more room grows its card on the St
   await expect(page).toHaveURL(/[?&]vis=line/);
   await expect(page.getByRole('radio', { name: /^Line/ })).toBeChecked();
   await page.getByRole('button', { name: 'Update Widget' }).click();
-  await expect(chapterTitles(page)).toHaveText([widgetName]);
+  await expect(cardTitles(page)).toHaveText([widgetName]);
   await page.getByRole('link', { name: 'Done' }).click();
   await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
 
@@ -465,7 +465,7 @@ test('add an existing Widget from the Widgets page to a Dashboard as a copy', as
     .selectOption({ label: `${widgetName} (No Dashboard)` });
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
-  await expect(chapterTitles(page)).toHaveText([widgetName]);
+  await expect(cardTitles(page)).toHaveText([widgetName]);
   await page.getByText('Add Widget', { exact: true }).click();
   await expect(
     page.getByRole('combobox', { name: 'Existing Widget' }).getByRole('option'),
@@ -575,7 +575,7 @@ test("a Donut Widget's card is a ring with the total inside; pointing at a part 
   // The card, not the overview's headline tile, which takes the first Widget's name too.
   const card = page
     .getByRole('region', { name: 'Spend by Account', exact: true })
-    .and(page.locator('[aria-labelledby^="chapter-"]'));
+    .and(page.locator('[aria-labelledby^="card-"]'));
   const hole = card.locator('figure > div').first();
   await expect(hole).toContainText('Total');
   await expect(hole).toContainText(/1.000/);
@@ -643,6 +643,6 @@ test('a Widget whose query reports a problem says so in its own card; the others
   await page.goto(`/dashboards/${dashboardId}`);
 
   await expect(widgetCard(page, 'Gone wrong')).toContainText('From must not be after To');
-  await expect(chapterTitles(page)).toHaveText(['Still fine', 'Gone wrong']);
+  await expect(cardTitles(page)).toHaveText(['Still fine', 'Gone wrong']);
   await expect(placeholders(page)).toHaveCount(0);
 });

@@ -4,8 +4,8 @@ import { seedTransactions } from '@test/support/transactions';
 import { toPivotData } from '@/app/widgets/pivot-data';
 import { toDonutSlices, toSeriesChart, type ChartSource } from '@/lib/reporting/chart-data';
 import { changeWorking } from '@/lib/reporting/drill-summary';
-import { findMonthFlows, spendingInsight } from '@/lib/reporting/overview';
-import { chapterStory, rankedTotals, type StoryWidget } from '@/lib/reporting/story';
+import { readCard, type CardWidget } from '@/lib/reporting/card';
+import { spendingInsight } from '@/lib/reporting/overview';
 import { cellFromParams, queryFromParams } from '@/lib/reporting/widget-params';
 import { createAccount } from '../accounts';
 import { createBank } from '../banks';
@@ -75,7 +75,7 @@ async function dataset(): Promise<void> {
 async function widget(
   query: WidgetQueryInput,
   visualisation: Visualisation,
-): Promise<StoryWidget & { data: ChartSource }> {
+): Promise<CardWidget & { data: ChartSource }> {
   const report = await runWidgetQuery(t.ctx, query);
   return { id: 'w', name: 'Widget', source: 'query', visualisation, data: toPivotData(report) };
 }
@@ -121,8 +121,17 @@ describe('"Other" drills down to what it folds', () => {
     for (const point of chart.points) {
       expect((await open(point.hrefs[other.key])).value).toBe(point.values[other.key]);
     }
-    const ranked = rankedTotals(data, 9).find((item) => item.name === 'Other')!;
-    expect((await open(ranked.href)).value).toBe(ranked.value);
+  });
+
+  it("adds up on a ranking card's parts, each the amount its Drill-down works out", async () => {
+    await dataset();
+    const { mark } = readCard(await widget(spendingQuery, 'stacked_bar'), money);
+    if (mark.type !== 'ticks') throw new Error(`expected ticks, got ${mark.type}`);
+
+    expect(mark.items.length).toBeGreaterThan(0);
+    for (const item of mark.items) {
+      expect(item.detail.split(' · ').at(-1)).toBe(money((await open(item.href)).value!));
+    }
   });
 
   it('adds up on a donut', async () => {
@@ -142,7 +151,7 @@ describe('each Story fact is what its Drill-down works out', () => {
   it('for spending: the leader, the heaviest and lightest months, and the monthly average', async () => {
     await dataset();
     const spending = await widget(spendingQuery, 'stacked_bar');
-    const story = chapterStory(spending, money);
+    const story = readCard(spending, money);
 
     expect(story.facts.map((fact) => fact.label)).toEqual([
       'Heaviest month: Mar 2025',
@@ -160,7 +169,7 @@ describe('each Story fact is what its Drill-down works out', () => {
   it('for income vs. expense: most in, most out and kept per month', async () => {
     await dataset();
     const flow = await widget(flowQuery, 'stacked_bar');
-    const story = chapterStory(flow, money);
+    const story = readCard(flow, money);
 
     expect(story.lead!.headline).toBe('Most came in: Mar 2025');
     expect(money((await open(story.lead!.href)).value!)).toBe(story.lead!.detail);
@@ -178,7 +187,7 @@ describe('each Story fact is what its Drill-down works out', () => {
 describe("the overview's figures are what their Drill-downs work out", () => {
   it('kept over the months is the grand total of income and expense', async () => {
     await dataset();
-    const found = findMonthFlows([await widget(flowQuery, 'stacked_bar')])!;
+    const found = readCard(await widget(flowQuery, 'stacked_bar'), money).flow!;
     const kept = found.months.reduce((total, month) => total + month.net, 0);
 
     expect((await open(found.href)).value).toBe(kept);
@@ -186,7 +195,7 @@ describe("the overview's figures are what their Drill-downs work out", () => {
 
   it('the insight opens the latest month only, and its change from the months subtotalled', async () => {
     await dataset();
-    const found = findMonthFlows([await widget(flowQuery, 'stacked_bar')])!;
+    const found = readCard(await widget(flowQuery, 'stacked_bar'), money).flow!;
     const latest = found.months.at(-1)!;
 
     const month = await open(found.latestHref);
