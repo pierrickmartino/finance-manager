@@ -170,7 +170,7 @@ export async function createWidget(ctx: ServiceContext, input: WidgetInput): Pro
 
 /**
  * Replaces a Widget's name, query and visualisation, with History. A Widget on a Dashboard
- * whose chapter kind changes grows to its new kind's minimum if its card is now smaller,
+ * whose card kind changes grows to its new kind's minimum if its card is now smaller,
  * pushing the cards in its way down (ADR-0010), in the same transaction and under the
  * Dashboard's lock. A card is never shrunk, and the layout change isn't History (spec 117).
  */
@@ -204,7 +204,7 @@ export async function updateWidget(
 }
 
 /**
- * The minimum a Widget's card must now have, or null when the edit kept its chapter kind. A
+ * The minimum a Widget's card must now have, or null when the edit kept its card kind. A
  * stacked bar's kind depends on its data, so its query runs (on the pool: it reads no row the
  * edit has locked).
  */
@@ -213,7 +213,7 @@ async function newMinimum(
   before: Widget,
   after: Widget,
 ): Promise<Size | null> {
-  const [was, now] = await Promise.all([chapterSourceOf(ctx, before), chapterSourceOf(ctx, after)]);
+  const [was, now] = await Promise.all([cardSourceOf(ctx, before), cardSourceOf(ctx, after)]);
   const [wasFrame, nowFrame] = [cardFrame(was), cardFrame(now)];
   return wasFrame.kind === nowFrame.kind ? null : nowFrame.sizes.min;
 }
@@ -270,11 +270,11 @@ export async function runSavedWidget(
 }
 
 /**
- * What decides a Widget's chapter kind, as the Dashboard Story reads it. Only a stacked bar
+ * What decides a Widget's card kind, as the Dashboard Story reads it. Only a stacked bar
  * depends on its data (how many series it has), so only a stacked bar's query is run; one that
  * fails to run counts as having no series.
  */
-export async function chapterSourceOf(
+export async function cardSourceOf(
   ctx: ServiceContext,
   widget: Pick<Widget, 'source' | 'query' | 'visualisation'>,
 ): Promise<CardSource> {

@@ -121,19 +121,19 @@ export function OverviewRow({ children }: { children: ReactNode }) {
   return <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">{children}</div>;
 }
 
-/** The overview row's cards, every chapter already loaded: net worth, insight, recent activity. */
+/** The overview row's cards, every card already loaded: net worth, insight, recent activity. */
 export function OverviewCards({
-  chapters,
+  cards,
   recent,
 }: {
   /** In reading order. */
-  chapters: WidgetCardData[];
+  cards: WidgetCardData[];
   recent: RecentActivity[];
 }) {
   return (
     <>
-      <NetWorthCard chapters={chapters} />
-      <InsightCard chapters={chapters} />
+      <NetWorthCard cards={cards} />
+      <InsightCard cards={cards} />
       <RecentActivityCard recent={recent} />
     </>
   );

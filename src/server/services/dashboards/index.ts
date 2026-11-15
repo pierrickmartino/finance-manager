@@ -5,7 +5,7 @@ import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import type { HistorySnapshot } from '../history';
 import {
-  chapterSourceOf,
+  cardSourceOf,
   findDashboardWidgets,
   findWidget,
   insertWidget,
@@ -175,7 +175,7 @@ export async function deleteDashboard(ctx: ServiceContext, id: string): Promise<
 }
 
 /**
- * Adds a Widget to a Dashboard at the default size for its chapter kind, in the first free spot
+ * Adds a Widget to a Dashboard at the default size for its card kind, in the first free spot
  * at the bottom of the board. A given `layout` is stored as it is (the starter Dashboard).
  */
 export async function addWidget(
@@ -186,7 +186,7 @@ export async function addWidget(
   const values = parseInput(widgetInput, input);
   const source = parseInput(z.enum(['query', 'account_balances']).default('query'), input.source);
   const given = input.layout ? parseInput(widgetLayoutInput, input.layout) : null;
-  const size = given ?? cardFrame(await chapterSourceOf(ctx, { ...values, source })).sizes.initial;
+  const size = given ?? cardFrame(await cardSourceOf(ctx, { ...values, source })).sizes.initial;
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
     const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
@@ -213,7 +213,7 @@ export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<
     const cells = boardCells(await findDashboardWidgets(scope.tx, widget.dashboardId));
     const layout = widget.layout
       ? freeLayout(cells, widget.layout, widget.id)
-      : freeLayout(cells, cardFrame(await chapterSourceOf(ctx, widget)).sizes.initial);
+      : freeLayout(cells, cardFrame(await cardSourceOf(ctx, widget)).sizes.initial);
     return insertWidget(scope, { ...copy, layout });
   });
 }
@@ -221,7 +221,7 @@ export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<
 /**
  * Places a copy of a Widget (a Standalone Widget or one from another Dashboard) in the first
  * free spot at the bottom of a Dashboard: at the original's size if it has one, else at the
- * default size for its chapter kind. The original is left as it is (GLOSSARY: Standalone Widget).
+ * default size for its card kind. The original is left as it is (GLOSSARY: Standalone Widget).
  */
 export async function copyWidgetToDashboard(
   ctx: ServiceContext,
@@ -229,7 +229,7 @@ export async function copyWidgetToDashboard(
   dashboardId: string,
 ): Promise<Widget> {
   const widget = await findWidget(ctx.db, widgetId);
-  const size = widget.layout ?? cardFrame(await chapterSourceOf(ctx, widget)).sizes.initial;
+  const size = widget.layout ?? cardFrame(await cardSourceOf(ctx, widget)).sizes.initial;
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
     const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
@@ -251,7 +251,7 @@ function assertEveryWidgetOnce(widgets: readonly Widget[], board: readonly Cell[
 }
 
 /**
- * Refuses the first card under its chapter kind's minimum. Only a stacked bar's kind needs its
+ * Refuses the first card under its card kind's minimum. Only a stacked bar's kind needs its
  * query run, so the kinds are worked out together rather than one after another.
  */
 async function assertMinimums(
@@ -261,7 +261,7 @@ async function assertMinimums(
 ): Promise<void> {
   const widgets = board.map((cell) => byId.get(cell.id)!);
   const minimums = await Promise.all(
-    widgets.map(async (widget) => cardFrame(await chapterSourceOf(ctx, widget)).sizes.min),
+    widgets.map(async (widget) => cardFrame(await cardSourceOf(ctx, widget)).sizes.min),
   );
   const index = board.findIndex((cell, i) => !meetsMinimum(cell, minimums[i]!));
   if (index < 0) return;
@@ -281,7 +281,7 @@ function assertNoOverlap(byId: ReadonlyMap<string, Widget>, board: readonly Cell
 
 /**
  * Saves a Dashboard's whole board as the editor last left it: every Widget listed once, each
- * inside the columns, at or above its chapter kind's minimum, with no two overlapping
+ * inside the columns, at or above its card kind's minimum, with no two overlapping
  * (ADR-0010). Writes every layout in one transaction; the last save wins. Layout isn't
  * History (spec 117).
  */

@@ -177,6 +177,10 @@ A named set of Widgets laid out on a board of 12 columns and fixed-height rows, 
 A Dashboard read as a grid of cards: an overview row (the headline amount, the latest month's insight, the most recent Transactions), then the board, with one card per Widget drawn at the Widget's place and size, each saying in words what its chart shows. On narrow screens the cards read as one column, top to bottom then left to right.
 _Avoid_: Report, overview page, presentation
 
+**Card**:
+How one Widget is drawn on the Dashboard Story: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per period) and the facts behind it, each linking to its Drill-down. A card's kind follows from its Widget's source, visualisation and data. A bars or line Widget whose two columns are its income and its expense is read as a flow.
+_Avoid_: Chapter, tile
+
 **Edit mode**:
 The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History. On narrow screens the board is one column in reading order, with no dragging or resizing: a card moves up or down instead, swapping places with its neighbour. From the keyboard, a focused card moves one cell with the arrow keys and resizes one cell with Shift+arrows.
 _Avoid_: Layout editor, design mode

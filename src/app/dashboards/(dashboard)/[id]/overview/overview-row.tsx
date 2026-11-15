@@ -24,9 +24,9 @@ export interface RecentActivity {
 type Money = (minor: number) => string;
 
 /** The income and expense of the first card whose Widget holds both (the cards' own reading). */
-function overviewFlow(chapters: WidgetCardData[], money: Money): CardFlow | null {
-  for (const chapter of chapters) {
-    const { flow } = readCard(chapter, money);
+function overviewFlow(cards: WidgetCardData[], money: Money): CardFlow | null {
+  for (const card of cards) {
+    const { flow } = readCard(card, money);
     if (flow) return flow;
   }
   return null;
@@ -36,12 +36,12 @@ function overviewFlow(chapters: WidgetCardData[], money: Money): CardFlow | null
  * The opening number (net worth, else the first Widget's total) and, from an income-vs-expense
  * Widget, what was kept over its periods, drawn as a running line.
  */
-export function NetWorthCard({ chapters }: { chapters: WidgetCardData[] }) {
+export function NetWorthCard({ cards }: { cards: WidgetCardData[] }) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const hero = headlineAmount(chapters);
+  const hero = headlineAmount(cards);
   if (!hero) return null;
-  const flow = overviewFlow(chapters, money);
+  const flow = overviewFlow(cards, money);
   const nets = flow?.months.map((month) => month.net) ?? [];
   const kept = nets.reduce((total, net) => total + net, 0);
   return (
@@ -79,9 +79,9 @@ export function NetWorthCard({ chapters }: { chapters: WidgetCardData[] }) {
 }
 
 /** One sentence on how the latest full month compares, in the hero's navy. */
-export function InsightCard({ chapters }: { chapters: WidgetCardData[] }) {
+export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
   const fmt = useFormatter();
-  const flow = overviewFlow(chapters, (minor) => fmt.amount(minor, { currency: 'CHF' }));
+  const flow = overviewFlow(cards, (minor) => fmt.amount(minor, { currency: 'CHF' }));
   const insight = flow ? spendingInsight(flow.months) : null;
   if (!flow || !insight) return null;
   const [before, change, after] = insight.detail;

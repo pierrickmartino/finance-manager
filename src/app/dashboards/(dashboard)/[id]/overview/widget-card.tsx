@@ -41,7 +41,7 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
 }
 
 interface WidgetCardProps {
-  chapter: WidgetCardData;
+  card: WidgetCardData;
   className?: string;
   /** Edit mode's actions on this Widget, at the top of its card. */
   toolbar?: ReactNode;
@@ -51,19 +51,19 @@ interface WidgetCardProps {
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps) {
+export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const reading = readCard(chapter, money);
+  const reading = readCard(card, money);
   return (
     <section
-      aria-labelledby={`chapter-${chapter.id}`}
+      aria-labelledby={`card-${card.id}`}
       className={`${TILE_CLASS} flex flex-col gap-4 ${className}`}
     >
       {toolbar}
       <div>
-        <h2 id={`chapter-${chapter.id}`} className="font-medium">
-          {chapter.name}
+        <h2 id={`card-${card.id}`} className="font-medium">
+          {card.name}
         </h2>
         {reading.lead && (
           <>
@@ -74,9 +74,9 @@ export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps
           </>
         )}
       </div>
-      {chapter.error && <FieldError message={chapter.error} />}
-      {chapter.unconvertedCount > 0 && (
-        <p className="text-sm text-warning">{chapter.unconvertedCount} left out: no FX rate yet.</p>
+      {card.error && <FieldError message={card.error} />}
+      {card.unconvertedCount > 0 && (
+        <p className="text-sm text-warning">{card.unconvertedCount} left out: no FX rate yet.</p>
       )}
       <CardBody mark={reading.mark} money={money} />
       {reading.facts.length > 0 && (

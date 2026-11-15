@@ -27,7 +27,7 @@ export interface Cell extends Size {
 /** Where a card sits and how big it is, without its id: a Widget's stored layout. */
 export type Place = Omit<Cell, 'id'>;
 
-/** The cards of things that may sit on the board (a Widget, a chapter); one without a layout has none. */
+/** The cards of things that may sit on the board (a Widget, its card's data); one without a layout has none. */
 export function boardCells(items: readonly { id: string; layout: Place | null }[]): Cell[] {
   return items.flatMap(({ id, layout }) =>
     layout ? [{ id, x: layout.x, y: layout.y, w: layout.w, h: layout.h }] : [],
