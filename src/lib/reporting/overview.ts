@@ -68,9 +68,37 @@ export function spendingInsight(
   };
 }
 
-/** Each value added to the ones before it (a running balance from period amounts). */
-export function runningTotals(values: number[]): number[] {
-  return values.map((_, index) => sum(values.slice(0, index + 1)));
+/** What the net worth card breaks down from an income-vs-expense Widget's months. */
+export interface FlowSummary {
+  /** Over every month shown, the running one included. */
+  income: number;
+  expense: number;
+  kept: number;
+  /** The share of income kept; null without income. */
+  savingsRate: number | null;
+  /** The average kept over the full months; null without one. */
+  keptPerMonth: number | null;
+  /** The full months that kept the most and the least; null with fewer than two to compare. */
+  best: MonthFlow | null;
+  leanest: MonthFlow | null;
+}
+
+export function flowSummary(months: MonthFlow[]): FlowSummary {
+  const income = sum(months.map((month) => month.income));
+  const expense = sum(months.map((month) => month.expense));
+  const kept = income - expense;
+  const full = months.filter((month) => !month.isPartial);
+  const byNet = [...full].sort((a, b) => b.net - a.net);
+  const hasPair = full.length >= 2;
+  return {
+    income,
+    expense,
+    kept,
+    savingsRate: income === 0 ? null : kept / income,
+    keptPerMonth: full.length === 0 ? null : sum(full.map((month) => month.net)) / full.length,
+    best: hasPair ? byNet[0]! : null,
+    leanest: hasPair ? byNet.at(-1)! : null,
+  };
 }
 
 /** How many of `ticks` a share lights: in proportion, at least one for any share above zero. */

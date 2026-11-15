@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CardWidget, MonthFlow } from './card';
 import type { ChartSource } from './chart-data';
-import { headlineAmount, litTicks, runningTotals, spendingInsight } from './overview';
+import { flowSummary, headlineAmount, litTicks, spendingInsight } from './overview';
 
 /** A one-column source whose total opens `total`. */
 function totalled(rows: string[], values: number[]): ChartSource {
@@ -112,9 +112,44 @@ describe('spendingInsight', () => {
   });
 });
 
-describe('runningTotals', () => {
-  it('adds each value to the ones before it', () => {
-    expect(runningTotals([100, -40, 25])).toEqual([100, 60, 85]);
+describe('flowSummary', () => {
+  it('totals what came in, went out and was kept over every month shown', () => {
+    const summary = flowSummary([
+      month('Jan', 1000_00, 600_00),
+      month('Feb', 1000_00, 1200_00),
+      month('Mar', 500_00, 100_00, true),
+    ]);
+
+    expect(summary).toMatchObject({ income: 2500_00, expense: 1900_00, kept: 600_00 });
+    expect(summary.savingsRate).toBeCloseTo(0.24);
+  });
+
+  it('averages, and picks the best and leanest month, over full months only', () => {
+    const summary = flowSummary([
+      month('Jan', 1000_00, 600_00),
+      month('Feb', 1000_00, 1200_00),
+      month('Mar', 900_00, 0, true),
+    ]);
+
+    expect(summary.keptPerMonth).toBe(100_00);
+    expect(summary.best?.label).toBe('Jan');
+    expect(summary.leanest?.label).toBe('Feb');
+  });
+
+  it('has no savings rate without income', () => {
+    expect(flowSummary([month('Jan', 0, 100_00), month('Feb', 0, 50_00)]).savingsRate).toBeNull();
+  });
+
+  it('has no best or leanest month with fewer than two full months', () => {
+    const summary = flowSummary([month('Jan', 1000_00, 600_00), month('Feb', 0, 10_00, true)]);
+
+    expect(summary.keptPerMonth).toBe(400_00);
+    expect(summary.best).toBeNull();
+    expect(summary.leanest).toBeNull();
+  });
+
+  it('has no monthly average without a full month', () => {
+    expect(flowSummary([month('Jan', 100_00, 10_00, true)]).keptPerMonth).toBeNull();
   });
 });
 

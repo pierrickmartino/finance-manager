@@ -1,13 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { useFormatter } from '@/components/formatter-provider';
 import { BADGE_CLASS, TILE_CLASS } from '@/components/surface';
 import { readCard, type CardFlow, type WidgetCardData } from '@/lib/reporting/card';
-import { headlineAmount, spendingInsight } from '@/lib/reporting/overview';
+import {
+  flowSummary,
+  headlineAmount,
+  spendingInsight,
+  type FlowSummary,
+} from '@/lib/reporting/overview';
 import { relativeDay, spotlight } from '@/lib/reporting/recent-activity';
 import { FigureLink } from '../figure-link';
-import { Sparkline } from './marks';
 
 /** A recent Transaction, as the Dashboard's activity card lists it. */
 export interface RecentActivity {
@@ -32,9 +37,93 @@ function overviewFlow(cards: WidgetCardData[], money: Money): CardFlow | null {
   return null;
 }
 
+interface StatProps {
+  label: string;
+  value: string;
+  /** The bar's length, as a share of the larger of income and expense. */
+  share: number;
+  tone: string;
+}
+
+/** One total with a bar drawn against the larger of what came in and what went out. */
+function Stat({ label, value, share, tone }: StatProps) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-sm">
+        <span className="text-muted">{label}</span>
+        <span className="font-medium tabular-nums">{value}</span>
+      </div>
+      <div className="mt-1.5 h-2 rounded-full bg-sunken" aria-hidden>
+        <div
+          className={`h-2 rounded-full ${tone}`}
+          style={{ width: `${Math.max(2, Math.min(1, share) * 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-paper p-3">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="mt-1 tabular-nums">{children}</dd>
+    </div>
+  );
+}
+
+const shortMonth = (label: string): string => label.split(' ')[0] ?? label;
+
+/** What came in, went out and was kept, then the monthly average, rate, best and leanest month. */
+function FlowBreakdown({ summary, money }: { summary: FlowSummary; money: Money }) {
+  const { income, expense, kept, savingsRate, keptPerMonth, best, leanest } = summary;
+  const top = Math.max(1, income, expense);
+  return (
+    <>
+      <div className="mt-6 flex flex-col gap-4">
+        <Stat label="Came in" value={money(income)} share={income / top} tone="bg-hero-deep" />
+        <Stat label="Went out" value={money(expense)} share={expense / top} tone="bg-hero-glow" />
+        <Stat
+          label="Kept"
+          value={money(kept)}
+          share={Math.abs(kept) / top}
+          tone={kept >= 0 ? 'bg-positive' : 'bg-negative'}
+        />
+      </div>
+      <dl className="mt-auto grid grid-cols-2 gap-3 pt-6 text-sm">
+        {keptPerMonth !== null && (
+          <Fact label="Kept per month">
+            <span className="font-display text-xl">{money(Math.round(keptPerMonth))}</span>
+          </Fact>
+        )}
+        {savingsRate !== null && (
+          <Fact label="Savings rate">
+            <span className="font-display text-xl">{Math.round(savingsRate * 100)}%</span>
+          </Fact>
+        )}
+        {best && (
+          <Fact label="Best month">
+            {shortMonth(best.label)} ·{' '}
+            <span className={best.net < 0 ? 'text-negative' : 'text-positive'}>
+              {money(best.net)}
+            </span>
+          </Fact>
+        )}
+        {leanest && (
+          <Fact label="Leanest month">
+            {shortMonth(leanest.label)} ·{' '}
+            <span className={leanest.net < 0 ? 'text-negative' : ''}>{money(leanest.net)}</span>
+          </Fact>
+        )}
+      </dl>
+    </>
+  );
+}
+
 /**
  * The opening number (net worth, else the first Widget's total) and, from an income-vs-expense
- * Widget, what was kept over its periods, drawn as a running line.
+ * Widget, what came in, went out and was kept over its periods. With that breakdown it stands as
+ * tall as Recent activity (both span the overview row's two rows from `lg` up).
  */
 export function NetWorthCard({ cards }: { cards: WidgetCardData[] }) {
   const fmt = useFormatter();
@@ -42,38 +131,35 @@ export function NetWorthCard({ cards }: { cards: WidgetCardData[] }) {
   const hero = headlineAmount(cards);
   if (!hero) return null;
   const flow = overviewFlow(cards, money);
-  const nets = flow?.months.map((month) => month.net) ?? [];
-  const kept = nets.reduce((total, net) => total + net, 0);
+  const summary = flow ? flowSummary(flow.months) : null;
   return (
     <section
       aria-labelledby="overview-headline"
-      className={`${TILE_CLASS} bg-gradient-to-br from-hero-mist/30 to-surface`}
+      className={`${TILE_CLASS} flex flex-col bg-gradient-to-br from-hero-mist/30 to-surface ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
     >
       <h2 id="overview-headline" className="font-medium">
         {hero.label}
       </h2>
-      <div className="mt-4 grid grid-cols-[auto_1fr] items-end gap-4">
-        <div>
-          <Link
-            href={hero.href}
-            className="font-display text-4xl tracking-tight tabular-nums hover:underline"
-          >
-            {money(hero.value)}
-          </Link>
-          {flow && (
-            <p className="mt-2 text-sm text-muted">
-              <FigureLink
-                href={flow.href}
-                className={kept >= 0 ? 'text-positive' : 'text-negative'}
-              >
-                <span aria-hidden>{kept >= 0 ? '↗' : '↘'}</span> {money(kept)}
-              </FigureLink>{' '}
-              kept over {nets.length} months
-            </p>
-          )}
-        </div>
-        <Sparkline values={nets} />
-      </div>
+      <Link
+        href={hero.href}
+        className="mt-4 self-start font-display text-4xl tracking-tight tabular-nums hover:underline"
+      >
+        {money(hero.value)}
+      </Link>
+      {flow && summary && (
+        <>
+          <p className="mt-2 text-sm text-muted">
+            <FigureLink
+              href={flow.href}
+              className={summary.kept >= 0 ? 'text-positive' : 'text-negative'}
+            >
+              <span aria-hidden>{summary.kept >= 0 ? '↗' : '↘'}</span> {money(summary.kept)}
+            </FigureLink>{' '}
+            kept over {flow.months.length} months
+          </p>
+          <FlowBreakdown summary={summary} money={money} />
+        </>
+      )}
     </section>
   );
 }
