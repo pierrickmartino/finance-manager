@@ -13,9 +13,9 @@ import {
 import {
   InsightCard,
   NetWorthCard,
+  RecentActivityCard,
   type RecentActivity,
 } from './overview/overview-row';
-import { RecentActivityPrototype } from './overview/recent-activity.prototype';
 import { BOARD_CARD_CLASS, BoardCell, BoardGrid, type BoardChapter } from './overview/widget-board';
 import { WidgetCard } from './overview/widget-card';
 import { CompletenessNotice } from './completeness-notice';
@@ -80,8 +80,7 @@ async function StreamedNetWorthAndInsight({ chapters }: { chapters: Promise<Boar
 }
 
 async function StreamedRecent({ recent }: { recent: Promise<RecentActivity[]> }) {
-  // PROTOTYPE: was <RecentActivityCard />; revert when a variant wins.
-  return <RecentActivityPrototype recent={await recent} />;
+  return <RecentActivityCard recent={await recent} />;
 }
 
 /**

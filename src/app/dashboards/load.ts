@@ -12,6 +12,7 @@ import {
   type ReportTable,
   type Widget,
 } from '@/server/services/reporting';
+import { daysBetween, swissToday } from '@/server/services/fx/dates';
 import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
 import { drillLinks, toPivotData, type PivotLinks } from '../widgets/pivot-data';
@@ -99,14 +100,22 @@ export async function findDashboard(
 /** How many Transactions the Dashboard's recent activity lists. */
 const RECENT_ACTIVITY_COUNT = 6;
 
-/** The latest Transactions, newest first, as the Dashboard's recent activity card lists them. */
-export async function loadRecentActivity(ctx: ServiceContext): Promise<RecentActivity[]> {
+/**
+ * The latest Transactions, newest first, as the Dashboard's recent activity card lists them.
+ * How long ago each was booked is counted here, from the Swiss date, so the page reads the same
+ * on the server and in the browser.
+ */
+export async function loadRecentActivity(
+  ctx: ServiceContext,
+  today: string = swissToday(),
+): Promise<RecentActivity[]> {
   const page = await listTransactions(ctx, { pageSize: RECENT_ACTIVITY_COUNT });
   return page.transactions.map((transaction) => ({
     id: transaction.id,
     name: transactionName(transaction),
     category: categoryText(transaction),
     bookingDate: transaction.bookingDate,
+    daysAgo: daysBetween(transaction.bookingDate, today),
     amountMinor: transaction.amountMinor,
     currency: transaction.currency,
   }));
