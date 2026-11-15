@@ -7,7 +7,7 @@ import { findMonthFlows, spendingInsight } from '@/lib/reporting/overview';
 import { relativeDay, spotlight } from '@/lib/reporting/recent-activity';
 import { storyHero } from '@/lib/reporting/story';
 import { FigureLink } from '../figure-link';
-import type { StoryChapter } from '../story/chapter';
+import type { StoryChapter } from '@/lib/reporting/story';
 import { Sparkline } from './marks';
 
 /** A recent Transaction, as the Dashboard's activity card lists it. */

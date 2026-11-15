@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { BOARD_ROW_HEIGHT_PX } from '@/lib/reporting/board';
 import type { WidgetLayout } from '@/server/services/reporting';
-import type { StoryChapter } from '../story/chapter';
+import type { StoryChapter } from '@/lib/reporting/story';
 import { WidgetCard } from './widget-card';
 
 /** A Widget's chapter with its card's place and size on the board. */

@@ -1,6 +1,6 @@
 import { ViewTransition, type ReactElement, type ReactNode } from 'react';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
-import type { StoryChapter } from '../story/chapter';
+import type { StoryChapter } from '@/lib/reporting/story';
 
 interface DashboardOverviewProps {
   dashboardId: string;

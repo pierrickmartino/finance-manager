@@ -17,6 +17,13 @@ export interface StoryWidget {
   data: ChartSource | null;
 }
 
+/** A Widget as its card draws it: its data, and how its query went. */
+export interface StoryChapter extends StoryWidget {
+  error: string | null;
+  /** Transactions (or Accounts) left out for want of an FX rate. */
+  unconvertedCount: number;
+}
+
 /** How a chapter shows its Widget. */
 export type ChapterKind = 'trend' | 'bars' | 'ranking' | 'share' | 'grid' | 'ring' | 'number';
 

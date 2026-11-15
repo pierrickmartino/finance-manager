@@ -9,7 +9,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { monthFlows, periodValues } from '@/lib/reporting/overview';
 import { chapterKind, chapterStory, rankedTotals, shareParts } from '@/lib/reporting/story';
 import { FigureLink } from '../figure-link';
-import type { StoryChapter } from '../story/chapter';
+import type { StoryChapter } from '@/lib/reporting/story';
 import { DotMatrix, HeatmapGrid, MonthBars, TickList, type TickItem } from './marks';
 import { DonutRing } from './ring';
 
