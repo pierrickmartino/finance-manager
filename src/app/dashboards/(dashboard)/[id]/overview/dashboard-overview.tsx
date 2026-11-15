@@ -1,5 +1,6 @@
 import { ViewTransition, type ReactElement, type ReactNode } from 'react';
-import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
+import { NetWorthCardPrototype } from './net-worth-card.prototype';
+import { InsightCard, RecentActivityCard, type RecentActivity } from './overview-row';
 import type { WidgetCardData } from '@/lib/reporting/card';
 
 interface DashboardOverviewProps {
@@ -132,7 +133,8 @@ export function OverviewCards({
 }) {
   return (
     <>
-      <NetWorthCard cards={cards} />
+      {/* PROTOTYPE: was <NetWorthCard cards={cards} /> */}
+      <NetWorthCardPrototype cards={cards} />
       <InsightCard cards={cards} />
       <RecentActivityCard recent={recent} />
     </>

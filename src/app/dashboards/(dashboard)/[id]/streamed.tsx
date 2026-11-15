@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { NetWorthCardPrototype } from './overview/net-worth-card.prototype';
 import type { Formatter } from '@/lib/format';
 import { rowsHeight } from '@/lib/reporting/board';
 import { cardFrame } from '@/lib/reporting/card';
@@ -11,12 +12,7 @@ import {
   TilePlaceholder,
   WidgetCardPlaceholder,
 } from './overview/card-placeholder';
-import {
-  InsightCard,
-  NetWorthCard,
-  RecentActivityCard,
-  type RecentActivity,
-} from './overview/overview-row';
+import { InsightCard, RecentActivityCard, type RecentActivity } from './overview/overview-row';
 import { BOARD_CARD_CLASS, BoardCell, BoardGrid, type BoardCard } from './overview/widget-board';
 import { WidgetCard } from './overview/widget-card';
 import { CompletenessNotice } from './completeness-notice';
@@ -77,7 +73,8 @@ async function StreamedNetWorthAndInsight({ cards }: { cards: Promise<BoardCard>
   const loaded = await loadedCards(cards);
   return (
     <>
-      <NetWorthCard cards={loaded} />
+      {/* PROTOTYPE: was <NetWorthCard cards={loaded} /> */}
+      <NetWorthCardPrototype cards={loaded} />
       <InsightCard cards={loaded} />
     </>
   );
