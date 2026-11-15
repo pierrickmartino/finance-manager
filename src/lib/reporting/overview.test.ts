@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CardWidget, MonthFlow } from './card';
 import type { ChartSource } from './chart-data';
-import { flowSummary, headlineAmount, litTicks, spendingInsight } from './overview';
+import { flowSummary, headlineAmount, litTicks, spendingBars, spendingInsight } from './overview';
 
 /** A one-column source whose total opens `total`. */
 function totalled(rows: string[], values: number[]): ChartSource {
@@ -163,5 +163,35 @@ describe('litTicks', () => {
   it('lights none for nothing and never more than all', () => {
     expect(litTicks(0, 12)).toBe(0);
     expect(litTicks(1.4, 12)).toBe(12);
+  });
+});
+
+describe('spendingBars', () => {
+  it('draws each full month against the average of the ones before the latest', () => {
+    const bars = spendingBars([
+      month('Aug 2026', 5000, 2000),
+      month('Sep 2026', 5000, 4000),
+      month('Oct 2026', 5000, 1000),
+      month('Nov 2026', 5000, 9000, true),
+    ]);
+    expect(bars).toEqual({
+      bars: [
+        { label: 'Aug 2026', expense: 2000, share: 0.5, isLatest: false },
+        { label: 'Sep 2026', expense: 4000, share: 1, isLatest: false },
+        { label: 'Oct 2026', expense: 1000, share: 0.25, isLatest: true },
+      ],
+      average: 3000,
+      averageShare: 0.75,
+    });
+  });
+
+  it('is null without two full months to compare', () => {
+    expect(spendingBars([month('Oct 2026', 5000, 1000), month('Nov 2026', 0, 0, true)])).toBe(null);
+  });
+
+  it('draws nothing tall when nothing was spent', () => {
+    const bars = spendingBars([month('Sep 2026', 5000, 0), month('Oct 2026', 5000, 0)]);
+    expect(bars?.bars.map((bar) => bar.share)).toEqual([0, 0]);
+    expect(bars?.averageShare).toBe(0);
   });
 });

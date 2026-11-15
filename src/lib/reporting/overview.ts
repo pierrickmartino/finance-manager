@@ -68,6 +68,41 @@ export function spendingInsight(
   };
 }
 
+/** One full month's spending as the insight card draws it. */
+export interface SpendingBar {
+  label: string;
+  expense: number;
+  /** The bar's height, as a share of the tallest bar or the average line, whichever is higher. */
+  share: number;
+  /** The latest full month: the one the insight speaks of. */
+  isLatest: boolean;
+}
+
+/**
+ * The insight card's chart: each full month's spending, and the average line the latest is set
+ * against (the full months before it, as in `spendingInsight`). Null without two full months.
+ */
+export function spendingBars(
+  months: MonthFlow[],
+): { bars: SpendingBar[]; average: number; averageShare: number } | null {
+  const full = months.filter((month) => !month.isPartial);
+  if (full.length < 2) return null;
+  const before = full.slice(0, -1);
+  const average = sum(before.map((month) => month.expense)) / before.length;
+  const top = Math.max(average, ...full.map((month) => month.expense));
+  const shareOf = (value: number): number => (top === 0 ? 0 : value / top);
+  return {
+    bars: full.map((month, index) => ({
+      label: month.label,
+      expense: month.expense,
+      share: shareOf(month.expense),
+      isLatest: index === full.length - 1,
+    })),
+    average,
+    averageShare: shareOf(average),
+  };
+}
+
 /** What the net worth card breaks down from an income-vs-expense Widget's months. */
 export interface FlowSummary {
   /** Over every month shown, the running one included. */

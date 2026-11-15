@@ -11,8 +11,12 @@ import {
   TilePlaceholder,
   WidgetCardPlaceholder,
 } from './overview/card-placeholder';
-import { InsightCardPrototype } from './overview/insight-card.prototype';
-import { NetWorthCard, RecentActivityCard, type RecentActivity } from './overview/overview-row';
+import {
+  InsightCard,
+  NetWorthCard,
+  RecentActivityCard,
+  type RecentActivity,
+} from './overview/overview-row';
 import { BOARD_CARD_CLASS, BoardCell, BoardGrid, type BoardCard } from './overview/widget-board';
 import { WidgetCard } from './overview/widget-card';
 import { CompletenessNotice } from './completeness-notice';
@@ -74,8 +78,7 @@ async function StreamedNetWorthAndInsight({ cards }: { cards: Promise<BoardCard>
   return (
     <>
       <NetWorthCard cards={loaded} />
-      {/* PROTOTYPE: was <InsightCard cards={loaded} /> */}
-      <InsightCardPrototype cards={loaded} />
+      <InsightCard cards={loaded} />
     </>
   );
 }
