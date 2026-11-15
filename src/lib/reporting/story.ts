@@ -58,15 +58,33 @@ function splitPath(label: string): [group: string, name: string] {
   return rest.length > 0 ? [group!, rest.join(' › ')] : [label, label];
 }
 
+/** Which column holds the income and which the expense: the larger total is the income. */
+interface FlowSlots {
+  incomeSlot: number;
+  expenseSlot: number;
+}
+
+/** The income and expense columns, when the source has one positive and one negative column. */
+function flowSlotsOf(data: ChartSource): FlowSlots | null {
+  if (data.columns.length !== 2) return null;
+  const [first, second] = data.columnTotals;
+  if (first == null || second == null) return null;
+  const incomeSlot = first >= second ? 0 : 1;
+  const expenseSlot = 1 - incomeSlot;
+  if ((data.columnTotals[incomeSlot] ?? 0) <= 0 || (data.columnTotals[expenseSlot] ?? 0) >= 0) {
+    return null;
+  }
+  return { incomeSlot, expenseSlot };
+}
+
 /** Income and expense totals, when the source has one positive and one negative column. */
 function incomeAndExpense(data: ChartSource): { income: number; expense: number } | null {
-  if (data.columns.length !== 2) return null;
-  const [a, b] = data.columnTotals;
-  if (a == null || b == null) return null;
-  const income = Math.max(a, b);
-  const expense = Math.min(a, b);
-  if (income <= 0 || expense >= 0) return null;
-  return { income, expense: -expense };
+  const slots = flowSlotsOf(data);
+  if (!slots) return null;
+  return {
+    income: data.columnTotals[slots.incomeSlot]!,
+    expense: -data.columnTotals[slots.expenseSlot]!,
+  };
 }
 
 /** The share of income kept (income minus expense, over income), or null. */
@@ -205,14 +223,13 @@ function periodWords(data: ChartSource): PeriodWords {
 }
 
 /** Income vs. expense: the biggest period in, the biggest period out, and what stayed. */
-function flowStory(data: ChartSource, money: Money): ChapterStory {
+function flowStory(
+  data: ChartSource,
+  { incomeSlot, expenseSlot }: FlowSlots,
+  money: Money,
+): ChapterStory {
   const { noun } = periodWords(data);
   const chart = toSeriesChart(data);
-  const slotOf = (sign: 1 | -1) =>
-    chart.series.find((series) =>
-      chart.points.some((point) => sign * (point.values[series.key] ?? 0) > 0),
-    )!.slot;
-  const [incomeSlot, expenseSlot] = [slotOf(1), slotOf(-1)];
   const income = data.rows.map((_, r) => data.cells[r]?.[incomeSlot] ?? 0);
   const expense = data.rows.map((_, r) => -(data.cells[r]?.[expenseSlot] ?? 0));
   const most = (values: number[]) => values.indexOf(Math.max(...values));
@@ -284,7 +301,8 @@ export function chapterStory(widget: StoryWidget, money: Money): ChapterStory {
   if (kind === 'number') return { lead: null, facts: [] };
   // A grid's headline is its largest row, as a share's: the heatmap shows the rest.
   if (kind === 'share' || kind === 'grid' || kind === 'ring') return shareStory(data, money);
-  if (kind === 'bars' && incomeAndExpense(data)) return flowStory(data, money);
+  const slots = kind === 'bars' || kind === 'trend' ? flowSlotsOf(data) : null;
+  if (slots) return flowStory(data, slots, money);
   return periodStory(widget, data, money);
 }
 

@@ -248,6 +248,41 @@ describe('chapterStory', () => {
     ]);
   });
 
+  it('reads the income from the column with the larger total, even after a refund month', () => {
+    // The expense column comes first and one refund turns a month of it positive.
+    const refunded = widget({
+      visualisation: 'stacked_bar',
+      data: source(
+        ['Jan', 'Feb', 'Mar'],
+        ['Expense', 'Income'],
+        [
+          [-600_00, 1000_00],
+          [50_00, 1000_00],
+          [-700_00, 1500_00],
+        ],
+      ),
+    });
+
+    const story = chapterStory(refunded, money);
+
+    expect(story.lead).toEqual({
+      headline: 'Most came in: Mar',
+      detail: 'CHF 1500',
+      href: 'cell:Mar/Income',
+    });
+    expect(story.facts[0]).toEqual({
+      label: 'Most went out: Mar',
+      value: 'CHF 700',
+      href: 'cell:Mar/Expense',
+    });
+  });
+
+  it('tells a line of income vs. expense as a flow, as it does bars', () => {
+    const line = widget({ visualisation: 'line', data: incomeVsExpense.data });
+
+    expect(chapterStory(line, money)).toEqual(chapterStory(incomeVsExpense, money));
+  });
+
   it('opens what was kept per month on income and expense together, averaged per month', () => {
     const flow = drillable(
       source(
