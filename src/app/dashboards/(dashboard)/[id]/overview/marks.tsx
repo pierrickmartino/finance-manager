@@ -10,7 +10,7 @@ import {
   type PeriodValue,
   type TickItem,
 } from '@/lib/reporting/card';
-import { litTicks, runningTotals } from '@/lib/reporting/overview';
+import { litTicks } from '@/lib/reporting/overview';
 
 /**
  * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the hero's navy,
@@ -24,45 +24,6 @@ function useMoney(): (minor: number) => string {
 
 /** "Oct 2026" → "Oct": axis labels keep only the month. */
 const shortLabel = (label: string): string => label.split(' ')[0] ?? label;
-
-const SPARK_WIDTH = 220;
-const SPARK_HEIGHT = 96;
-
-/** A running balance as a line that ends in a dot, over one faint rule per period. */
-export function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const points = runningTotals(values);
-  const min = Math.min(0, ...points);
-  const range = Math.max(...points) - min || 1;
-  const x = (i: number) => (i / (points.length - 1)) * (SPARK_WIDTH - 12) + 4;
-  const y = (v: number) => SPARK_HEIGHT - 8 - ((v - min) / range) * (SPARK_HEIGHT - 20);
-  const path = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(v)}`).join(' ');
-  const end = { cx: x(points.length - 1), cy: y(points.at(-1)!) };
-  return (
-    <svg viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`} className="h-24 w-full" aria-hidden>
-      {points.map((_, i) => (
-        <line
-          key={i}
-          x1={x(i)}
-          x2={x(i)}
-          y1={4}
-          y2={SPARK_HEIGHT - 4}
-          className="stroke-rule"
-          strokeWidth={1}
-        />
-      ))}
-      <path
-        d={path}
-        fill="none"
-        className="stroke-hero-mid"
-        strokeWidth={3}
-        strokeLinecap="round"
-      />
-      <circle {...end} r={9} className="fill-hero-mist" opacity={0.6} />
-      <circle {...end} r={5} className="fill-hero-deep" />
-    </svg>
-  );
-}
 
 const DOT_LEVELS = 9;
 

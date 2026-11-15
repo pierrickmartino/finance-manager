@@ -103,7 +103,7 @@ export function StreamedOverview({
       <Suspense
         fallback={
           <>
-            <TilePlaceholder label="Net worth" />
+            <TilePlaceholder label="Net worth" className="lg:row-span-2" />
             <TilePlaceholder label="This month's insight" />
           </>
         }
