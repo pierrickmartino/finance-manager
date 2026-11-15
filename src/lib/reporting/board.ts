@@ -1,5 +1,3 @@
-import { chapterKind, type ChapterSource } from './story';
-
 /**
  * The Dashboard's board (ADR-0010): Widget cards placed and sized in whole cells on a
  * 12-column grid of fixed-height rows. Pure geometry over `{ id, x, y, w, h }`, shared by the
@@ -55,41 +53,20 @@ export function boardKey(cells: readonly Cell[]): string {
   );
 }
 
-/** What a card's size is chosen by: what it shows, coarser than its chapter kind. */
-export type SizeKind = 'number' | 'balances' | 'list' | 'grid' | 'chart';
-
-/** The size a new Widget starts at, and the smallest its card can be read at, per kind. */
-export const WIDGET_SIZES: Record<SizeKind, { initial: Size; min: Size }> = {
-  number: { initial: { w: 4, h: 3 }, min: { w: 2, h: 2 } },
-  balances: { initial: { w: 4, h: 6 }, min: { w: 3, h: 4 } },
-  list: { initial: { w: 4, h: 8 }, min: { w: 3, h: 5 } },
-  grid: { initial: { w: 8, h: 8 }, min: { w: 4, h: 5 } },
-  chart: { initial: { w: 8, h: 6 }, min: { w: 4, h: 4 } },
-};
-
-export function sizeKind(widget: ChapterSource): SizeKind {
-  const kind = chapterKind(widget);
-  if (kind === 'number') return 'number';
-  if (widget.source === 'account_balances') return 'balances';
-  if (kind === 'grid') return 'grid';
-  return kind === 'ranking' || kind === 'share' || kind === 'ring' ? 'list' : 'chart';
-}
-
-export function defaultSize(widget: ChapterSource): Size {
-  return { ...WIDGET_SIZES[sizeKind(widget)].initial };
-}
-
-export function minimumSize(widget: ChapterSource): Size {
-  return { ...WIDGET_SIZES[sizeKind(widget)].min };
+/** How tall `rows` board rows are, with the gaps between them, in px. */
+export function rowsHeight(rows: number): number {
+  return rows * BOARD_ROW_HEIGHT_PX + (rows - 1) * BOARD_GAP_PX;
 }
 
 /**
  * The size a Widget's card has once the editor saves it: a new Widget's default size, or the
  * card it already has, grown to the chart's minimum but never shrunk (as `growToMinimum`).
  */
-export function editedCardSize(layout: Size | null, widget: ChapterSource): Size {
-  if (!layout) return defaultSize(widget);
-  const min = minimumSize(widget);
+export function editedCardSize(
+  layout: Size | null,
+  { initial, min }: { initial: Size; min: Size },
+): Size {
+  if (!layout) return { ...initial };
   return {
     w: clamp(Math.max(layout.w, min.w), 1, GRID_COLUMNS),
     h: clamp(Math.max(layout.h, min.h), 1, MAX_WIDGET_HEIGHT),

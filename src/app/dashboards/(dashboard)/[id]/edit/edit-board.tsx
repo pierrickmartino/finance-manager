@@ -17,13 +17,13 @@ import {
   boardCells,
   GRID_COLUMNS,
   MAX_WIDGET_HEIGHT,
-  minimumSize,
   placeOf,
   readingOrder,
   swapInReadingOrder,
   type Cell,
   type VerticalDirection,
 } from '@/lib/reporting/board';
+import { cardFrame } from '@/lib/reporting/card';
 import { minWidthQuery } from '@/lib/breakpoints';
 import { keyboardStep } from '@/lib/reporting/board-keys';
 import { WidgetBoard, type BoardChapter } from '../overview/widget-board';
@@ -68,7 +68,7 @@ function placedChapters(chapters: readonly EditorChapter[], cells: readonly Cell
 function gridLayout(placed: readonly EditorChapter[]): Layout {
   return placed.flatMap(({ id, layout, ...chapter }) => {
     if (!layout) return [];
-    const min = minimumSize(chapter);
+    const { min } = cardFrame(chapter).sizes;
     return [{ i: id, ...placeOf(layout), minW: min.w, minH: min.h, maxH: MAX_WIDGET_HEIGHT }];
   });
 }
@@ -103,7 +103,7 @@ function useKeyboardStep({ cells, onChange, onAnnounce }: BoardChange): KeyStep 
   const refocus = useRefocus();
   return (chapter, event) => {
     if (event.target !== event.currentTarget) return;
-    const result = keyboardStep(cells, chapter.id, event, minimumSize(chapter));
+    const result = keyboardStep(cells, chapter.id, event, cardFrame(chapter).sizes.min);
     if (!result) return;
     event.preventDefault();
     onChange(result.cells);

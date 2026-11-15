@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
 import { BADGE_CLASS, TILE_CLASS } from '@/components/surface';
-import { findMonthFlows, spendingInsight } from '@/lib/reporting/overview';
+import { readCard, type CardFlow, type WidgetCardData } from '@/lib/reporting/card';
+import { headlineAmount, spendingInsight } from '@/lib/reporting/overview';
 import { relativeDay, spotlight } from '@/lib/reporting/recent-activity';
-import { storyHero } from '@/lib/reporting/story';
 import { FigureLink } from '../figure-link';
-import type { StoryChapter } from '@/lib/reporting/story';
 import { Sparkline } from './marks';
 
 /** A recent Transaction, as the Dashboard's activity card lists it. */
@@ -22,16 +21,27 @@ export interface RecentActivity {
   currency: string;
 }
 
+type Money = (minor: number) => string;
+
+/** The income and expense of the first card whose Widget holds both (the cards' own reading). */
+function overviewFlow(chapters: WidgetCardData[], money: Money): CardFlow | null {
+  for (const chapter of chapters) {
+    const { flow } = readCard(chapter, money);
+    if (flow) return flow;
+  }
+  return null;
+}
+
 /**
  * The opening number (net worth, else the first Widget's total) and, from an income-vs-expense
  * Widget, what was kept over its periods, drawn as a running line.
  */
-export function NetWorthCard({ chapters }: { chapters: StoryChapter[] }) {
+export function NetWorthCard({ chapters }: { chapters: WidgetCardData[] }) {
   const fmt = useFormatter();
-  const money = (minor: number) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const hero = storyHero(chapters);
+  const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
+  const hero = headlineAmount(chapters);
   if (!hero) return null;
-  const flow = findMonthFlows(chapters);
+  const flow = overviewFlow(chapters, money);
   const nets = flow?.months.map((month) => month.net) ?? [];
   const kept = nets.reduce((total, net) => total + net, 0);
   return (
@@ -69,8 +79,9 @@ export function NetWorthCard({ chapters }: { chapters: StoryChapter[] }) {
 }
 
 /** One sentence on how the latest full month compares, in the hero's navy. */
-export function InsightCard({ chapters }: { chapters: StoryChapter[] }) {
-  const flow = findMonthFlows(chapters);
+export function InsightCard({ chapters }: { chapters: WidgetCardData[] }) {
+  const fmt = useFormatter();
+  const flow = overviewFlow(chapters, (minor) => fmt.amount(minor, { currency: 'CHF' }));
   const insight = flow ? spendingInsight(flow.months) : null;
   if (!flow || !insight) return null;
   const [before, change, after] = insight.detail;

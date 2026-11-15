@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { CARD_CLASS, PLACEHOLDER_CLASS, TILE_CLASS } from '@/components/surface';
-import type { PlaceholderShape } from '@/lib/reporting/placeholder';
+import type { PlaceholderShape } from '@/lib/reporting/card';
 
 /** The quiet mark standing in for a card's chart, shaped like the one it will draw. */
 function ShapeMark({ shape }: { shape: PlaceholderShape }) {

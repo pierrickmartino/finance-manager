@@ -1,10 +1,11 @@
 import { editedCardSize, GRID_COLUMNS } from '@/lib/reporting/board';
+import { cardFrame } from '@/lib/reporting/card';
 import type { WidgetLayout } from '@/server/services/reporting';
-import type { StoryChapter } from '@/lib/reporting/story';
+import type { WidgetCardData } from '@/lib/reporting/card';
 import { WidgetBoard } from '../dashboards/(dashboard)/[id]/overview/widget-board';
 
 interface CardPreviewProps {
-  chapter: StoryChapter;
+  chapter: WidgetCardData;
   /** The Widget's card on its Dashboard; null for a new or Standalone Widget. */
   layout: WidgetLayout | null;
 }
@@ -15,7 +16,7 @@ interface CardPreviewProps {
  * cell is narrower than on the Dashboard; the rows are the same height.
  */
 export function CardPreview({ chapter, layout }: CardPreviewProps) {
-  const { w, h } = editedCardSize(layout, chapter);
+  const { w, h } = editedCardSize(layout, cardFrame(chapter).sizes);
   return (
     <div>
       <WidgetBoard chapters={[{ ...chapter, layout: { x: 0, y: 0, w, h } }]} />

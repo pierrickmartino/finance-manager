@@ -1,6 +1,6 @@
 import { ViewTransition, type ReactElement, type ReactNode } from 'react';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
-import type { StoryChapter } from '@/lib/reporting/story';
+import type { WidgetCardData } from '@/lib/reporting/card';
 
 interface DashboardOverviewProps {
   dashboardId: string;
@@ -127,7 +127,7 @@ export function OverviewCards({
   recent,
 }: {
   /** In reading order. */
-  chapters: StoryChapter[];
+  chapters: WidgetCardData[];
   recent: RecentActivity[];
 }) {
   return (

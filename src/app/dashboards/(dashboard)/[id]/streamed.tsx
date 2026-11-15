@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { Formatter } from '@/lib/format';
-import { cardPlaceholder } from '@/lib/reporting/placeholder';
+import { rowsHeight } from '@/lib/reporting/board';
+import { cardFrame } from '@/lib/reporting/card';
 import { checkCompleteness } from '@/server/services/completeness';
 import type { ServiceContext } from '@/server/services/context';
 import type { Widget } from '@/server/services/reporting';
@@ -50,7 +51,10 @@ export function StreamedBoard({ cards }: { cards: StreamedWidget[] }) {
   return (
     <BoardGrid>
       {cards.map(({ widget, chapter }) => {
-        const { shape, height } = cardPlaceholder(widget);
+        // Before the query has run there is no data: the card is framed from the Widget alone.
+        const frame = cardFrame({ ...widget, data: null });
+        const shape = frame.placeholder;
+        const height = rowsHeight(widget.layout?.h ?? frame.sizes.initial.h);
         return (
           <BoardCell key={widget.id} layout={widget.layout}>
             <CardErrorBoundary name={widget.name}>

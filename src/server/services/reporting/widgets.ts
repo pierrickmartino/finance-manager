@@ -3,12 +3,11 @@ import {
   boardCells,
   growToMinimum,
   isSamePlace,
-  minimumSize,
   placeOf,
   type Cell,
   type Size,
 } from '@/lib/reporting/board';
-import { chapterKind, type ChapterSource } from '@/lib/reporting/story';
+import { cardFrame, type CardSource } from '@/lib/reporting/card';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ServiceError } from '../errors';
@@ -215,7 +214,8 @@ async function newMinimum(
   after: Widget,
 ): Promise<Size | null> {
   const [was, now] = await Promise.all([chapterSourceOf(ctx, before), chapterSourceOf(ctx, after)]);
-  return chapterKind(was) === chapterKind(now) ? null : minimumSize(now);
+  const [wasFrame, nowFrame] = [cardFrame(was), cardFrame(now)];
+  return wasFrame.kind === nowFrame.kind ? null : nowFrame.sizes.min;
 }
 
 /** Grows a Widget's card to `minimum` on its Dashboard's board and stores every card that moved. */
@@ -277,7 +277,7 @@ export async function runSavedWidget(
 export async function chapterSourceOf(
   ctx: ServiceContext,
   widget: Pick<Widget, 'source' | 'query' | 'visualisation'>,
-): Promise<ChapterSource> {
+): Promise<CardSource> {
   const { source, visualisation } = widget;
   if (source !== 'query' || visualisation !== 'stacked_bar') {
     return { source, visualisation, data: null };

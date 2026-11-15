@@ -5,76 +5,43 @@ import type { ReactNode } from 'react';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { TILE_CLASS } from '@/components/surface';
-import type { ChartSource } from '@/lib/reporting/chart-data';
-import { monthFlows, periodValues } from '@/lib/reporting/overview';
-import { chapterKind, chapterStory, rankedTotals, shareParts } from '@/lib/reporting/story';
+import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
-import type { StoryChapter } from '@/lib/reporting/story';
-import { DotMatrix, HeatmapGrid, MonthBars, TickList, type TickItem } from './marks';
+import { DotMatrix, HeatmapGrid, MonthBars, TickList } from './marks';
 import { DonutRing } from './ring';
-
-/** How many parts a ranking card lists. */
-const RANKING_LIMIT = 6;
 
 type Money = (minor: number) => string;
 
-function rankingItems(data: ChartSource, money: Money): TickItem[] {
-  const parts = rankedTotals(data, RANKING_LIMIT);
-  const whole = Math.abs(data.total ?? 0) || parts.reduce((t, p) => t + Math.abs(p.value), 0);
-  return parts.map((part) => ({
-    key: `${part.group}/${part.name}`,
-    title: part.name,
-    detail: part.group === part.name ? money(part.value) : `${part.group} · ${money(part.value)}`,
-    share: whole === 0 ? 0 : Math.abs(part.value) / whole,
-    href: part.href,
-  }));
-}
-
-function shareItems(data: ChartSource, money: Money): TickItem[] {
-  return shareParts(data).map((part) => ({
-    key: part.label,
-    title: part.label,
-    detail: money(part.value),
-    share: part.share,
-    href: part.href,
-  }));
-}
-
-/** The mark that suits the Widget: dots for in and out, bars per period, ticks for parts. */
-function CardBody({ chapter, money }: { chapter: StoryChapter; money: Money }) {
-  const { data } = chapter;
-  if (!data) return null;
-  if (data.rows.length === 0) return <p className="text-muted">No data in this date range yet.</p>;
-  switch (chapterKind(chapter)) {
+/** The card's mark, as its reading chose it: dots for in and out, bars per period, ticks for parts. */
+function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
+  switch (mark.type) {
+    case 'none':
+      return null;
+    case 'empty':
+      return <p className="text-muted">No data in this date range yet.</p>;
     case 'number':
-      return data.total === null ? (
+      return mark.total === null ? (
         <p className="font-display text-5xl text-muted">—</p>
       ) : (
-        <Link
-          href={data.hrefs.total}
-          className="font-display text-5xl tabular-nums hover:underline"
-        >
-          {money(data.total)}
+        <Link href={mark.href} className="font-display text-5xl tabular-nums hover:underline">
+          {money(mark.total)}
         </Link>
       );
-    case 'share':
-      return <TickList items={shareItems(data, money)} />;
+    case 'ticks':
+      return <TickList items={mark.items} />;
     case 'ring':
-      return <DonutRing data={data} money={money} />;
-    case 'ranking':
-      return <TickList items={rankingItems(data, money)} />;
+      return <DonutRing data={mark.data} money={money} />;
     case 'grid':
-      return <HeatmapGrid data={data} />;
-    case 'trend':
-    case 'bars': {
-      const months = monthFlows(data);
-      return months ? <DotMatrix months={months} /> : <MonthBars periods={periodValues(data)} />;
-    }
+      return <HeatmapGrid data={mark.data} />;
+    case 'dots':
+      return <DotMatrix months={mark.months} />;
+    case 'bars':
+      return <MonthBars periods={mark.periods} />;
   }
 }
 
 interface WidgetCardProps {
-  chapter: StoryChapter;
+  chapter: WidgetCardData;
   className?: string;
   /** Edit mode's actions on this Widget, at the top of its card. */
   toolbar?: ReactNode;
@@ -87,7 +54,7 @@ interface WidgetCardProps {
 export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const story = chapterStory(chapter, money);
+  const reading = readCard(chapter, money);
   return (
     <section
       aria-labelledby={`chapter-${chapter.id}`}
@@ -98,11 +65,11 @@ export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps
         <h2 id={`chapter-${chapter.id}`} className="font-medium">
           {chapter.name}
         </h2>
-        {story.lead && (
+        {reading.lead && (
           <>
-            <p className="mt-1 text-sm text-muted">{story.lead.headline}</p>
+            <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>
             <p className="font-display text-3xl tracking-tight tabular-nums">
-              <FigureLink href={story.lead.href}>{story.lead.detail}</FigureLink>
+              <FigureLink href={reading.lead.href}>{reading.lead.detail}</FigureLink>
             </p>
           </>
         )}
@@ -111,10 +78,10 @@ export function WidgetCard({ chapter, className = '', toolbar }: WidgetCardProps
       {chapter.unconvertedCount > 0 && (
         <p className="text-sm text-warning">{chapter.unconvertedCount} left out: no FX rate yet.</p>
       )}
-      <CardBody chapter={chapter} money={money} />
-      {story.facts.length > 0 && (
+      <CardBody mark={reading.mark} money={money} />
+      {reading.facts.length > 0 && (
         <dl className="grid grid-cols-2 gap-3 border-t border-rule pt-3">
-          {story.facts.map((fact) => (
+          {reading.facts.map((fact) => (
             <div key={fact.label}>
               <dt className="text-xs text-muted">{fact.label}</dt>
               <dd className="text-sm tabular-nums">

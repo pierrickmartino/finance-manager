@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { STORY_SHOWN_AS } from '@/lib/reporting/story';
+import { STORY_SHOWN_AS } from '@/lib/reporting/card';
 import {
   VISUALISATION_LABELS,
   VISUALISATIONS,

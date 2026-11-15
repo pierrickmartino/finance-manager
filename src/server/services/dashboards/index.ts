@@ -16,14 +16,8 @@ import {
   type WidgetInput,
   type WidgetLayout,
 } from '../reporting/widgets';
-import {
-  boardCells,
-  defaultSize,
-  findOverlaps,
-  meetsMinimum,
-  minimumSize,
-  type Cell,
-} from '@/lib/reporting/board';
+import { boardCells, findOverlaps, meetsMinimum, type Cell } from '@/lib/reporting/board';
+import { cardFrame } from '@/lib/reporting/card';
 import { boardInput, freeLayout, widgetLayoutInput, type CellInput } from './layout';
 
 export type { CellInput } from './layout';
@@ -192,7 +186,7 @@ export async function addWidget(
   const values = parseInput(widgetInput, input);
   const source = parseInput(z.enum(['query', 'account_balances']).default('query'), input.source);
   const given = input.layout ? parseInput(widgetLayoutInput, input.layout) : null;
-  const size = given ?? defaultSize(await chapterSourceOf(ctx, { ...values, source }));
+  const size = given ?? cardFrame(await chapterSourceOf(ctx, { ...values, source })).sizes.initial;
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
     const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
@@ -219,7 +213,7 @@ export async function duplicateWidget(ctx: ServiceContext, id: string): Promise<
     const cells = boardCells(await findDashboardWidgets(scope.tx, widget.dashboardId));
     const layout = widget.layout
       ? freeLayout(cells, widget.layout, widget.id)
-      : freeLayout(cells, defaultSize(await chapterSourceOf(ctx, widget)));
+      : freeLayout(cells, cardFrame(await chapterSourceOf(ctx, widget)).sizes.initial);
     return insertWidget(scope, { ...copy, layout });
   });
 }
@@ -235,7 +229,7 @@ export async function copyWidgetToDashboard(
   dashboardId: string,
 ): Promise<Widget> {
   const widget = await findWidget(ctx.db, widgetId);
-  const size = widget.layout ?? defaultSize(await chapterSourceOf(ctx, widget));
+  const size = widget.layout ?? cardFrame(await chapterSourceOf(ctx, widget)).sizes.initial;
   return mutate(ctx, async (scope) => {
     await findDashboard(scope.tx, dashboardId, true);
     const cells = boardCells(await findDashboardWidgets(scope.tx, dashboardId));
@@ -267,7 +261,7 @@ async function assertMinimums(
 ): Promise<void> {
   const widgets = board.map((cell) => byId.get(cell.id)!);
   const minimums = await Promise.all(
-    widgets.map(async (widget) => minimumSize(await chapterSourceOf(ctx, widget))),
+    widgets.map(async (widget) => cardFrame(await chapterSourceOf(ctx, widget)).sizes.min),
   );
   const index = board.findIndex((cell, i) => !meetsMinimum(cell, minimums[i]!));
   if (index < 0) return;
