@@ -32,8 +32,12 @@ One movement of money on one Account, dated and signed, in that Account's Curren
 _Avoid_: Entry, posting, operation, line
 
 **Transaction detail**:
-The page of one Transaction, where it is classified, Split and linked as a Transfer, beside its bank fields and History.
+The page of one Transaction, where it is classified, Split and linked as a Transfer, beside its bank fields and History. Opened from the Transactions list, it steps to the previous or next Transaction of that list.
 _Avoid_: Transaction page, detail view
+
+**Transactions list**:
+The Transactions matching the current filters, newest first, paged.
+_Avoid_: Filtered list, transactions page
 
 **Transaction preview**:
 The read-only summary of the selected Transaction beside the Transactions list, on wide screens only. Its "Open & classify" opens the Transaction detail.
