@@ -26,7 +26,7 @@ Style with tokens and primitives, so a change to the look is a one-place edit. W
 | `accent-tint` | Selected navigation, highlighted rows. |
 | `hero-deep`, `hero`, `hero-mid`, `hero-glow`, `hero-mist` | The app shell's hero: the navy band at the top of every signed-in page, drawn by the `bg-hero` utility. `hero` is also the text of a white button on it. Also the marks of the Dashboard's cards (see Rules), with `bg-insight` for its insight card and `bg-hatch` for the period a card points out. Use `bg-hero-*` for a flat navy fill: `bg-hero` is the gradient. |
 | `on-hero` | Text, outlines and translucent fills on the hero (`text-on-hero/75`, `ring-on-hero/25`). |
-| `positive`, `negative`, `warning`, `info` (+ `-tint`, `warning-rule`) | Meaning only: income and success, expense and errors, attention, neutral status. Never decoration. |
+| `positive`, `negative`, `warning`, `info` (+ `-tint`, `warning-rule`) | Meaning only: income and success, expense and errors, attention, neutral status. Never decoration. `warning` is terracotta, a red-orange kept well apart from the amber accent so attention never reads as a link or a selection. |
 
 Type: `font-display` (Inter Tight) for page titles, section titles and headline amounts; the default sans (Inter) for everything else. Amounts that line up use `tabular-nums`.
 

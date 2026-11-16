@@ -42,9 +42,11 @@
   --color-positive-tint: #ecfdf5;
   --color-negative: #be123c;
   --color-negative-tint: #fff1f2;
-  --color-warning: #b45309;
-  --color-warning-tint: #fffbeb;
-  --color-warning-rule: #fcd34d;
+  /* Warning is terracotta, a red-orange well apart from the amber accent, so attention never
+     reads as a link or a selection. AA on surface (5.2:1) and on its tint (4.8:1). */
+  --color-warning: #c2410c;
+  --color-warning-tint: #fff4ed;
+  --color-warning-rule: #fdba74;
   --color-info: #0369a1;
   --color-info-tint: #f0f9ff;
 
@@ -165,63 +167,4 @@ body {
 
 .dashboard-board .react-grid-item > .react-resizable-handle::after {
   border-color: var(--color-ink-soft);
-}
-
-/*
- * PROTOTYPE ONLY: warning colour variants (src/components/app-shell/warning-prototype.tsx).
- * A is today's tokens. Delete this block with the prototype.
- *
- * B Terracotta: the same tint-and-rule notice, moved from amber to red-orange so a warning
- *   no longer reads as the amber accent (accent-ink #9a5b00 vs warning #b45309 today).
- * C Edge bar: notices go quiet (surface, ink text) and carry the warning as a left bar;
- *   badges become an outline with a dot. Colour marks the problem, not the paragraph.
- * D Solid: notices and badges are a solid warning fill with white text: loudest, hard to miss.
- */
-html[data-warning='B'] {
-  --color-warning: #c2410c; /* 5.2:1 on surface, 4.8:1 on its tint */
-  --color-warning-tint: #fff4ed;
-  --color-warning-rule: #fdba74;
-}
-
-html[data-warning='C'] {
-  --color-warning: #b8380b; /* 5.8:1 on surface */
-  --color-warning-tint: #fff4ed;
-  --color-warning-rule: #fdba74;
-}
-html[data-warning='C'] .warning-notice {
-  background: var(--color-surface);
-  border-color: var(--color-rule);
-  border-left: 3px solid var(--color-warning);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  color: var(--color-ink);
-}
-html[data-warning='C'] .warning-badge {
-  background: var(--color-surface);
-  --tw-ring-color: var(--color-rule-strong);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-html[data-warning='C'] .warning-badge::before {
-  content: '';
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 9999px;
-  background: var(--color-warning);
-}
-
-html[data-warning='D'] {
-  --color-warning: #b8380b; /* white on it: 5.8:1 */
-  --color-warning-tint: #fff4ed;
-  --color-warning-rule: #fdba74;
-}
-html[data-warning='D'] .warning-notice,
-html[data-warning='D'] .warning-badge {
-  background: var(--color-warning);
-  border-color: var(--color-warning);
-  --tw-ring-color: var(--color-warning);
-  color: #ffffff;
-}
-html[data-warning='D'] .warning-notice :is(a, .text-warning, .text-muted, .text-ink-soft) {
-  color: inherit;
 }

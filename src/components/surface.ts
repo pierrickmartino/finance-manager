@@ -22,7 +22,7 @@ export const CARD_CLASS = 'rounded-xl border border-rule bg-surface shadow-sm';
  * on the warning tint, inside a warning rule. Give the element `role="alert"`.
  */
 export const WARNING_NOTICE_CLASS =
-  'warning-notice rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning'; // PROTOTYPE marker: warning-notice
+  'rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning';
 /**
  * A quiet notice about the view's own state, which asks for nothing (all N on this page are
  * selected): soft ink on a sunken fill. Not an alert: attention takes WARNING_NOTICE_CLASS.
@@ -56,7 +56,7 @@ const BADGE_BASE = 'rounded-md px-2 py-0.5 text-xs font-medium';
  * `info` is neutral status, `neutral` is a plain fact. Tones carry meaning, never decoration.
  */
 export const BADGE_CLASS = {
-  warning: `warning-badge ${BADGE_BASE} bg-warning-tint text-warning ring-1 ring-warning-rule ring-inset`,
+  warning: `${BADGE_BASE} bg-warning-tint text-warning ring-1 ring-warning-rule ring-inset`,
   info: `${BADGE_BASE} bg-info-tint text-info`,
   neutral: `${BADGE_BASE} bg-sunken text-ink-soft`,
 } as const;

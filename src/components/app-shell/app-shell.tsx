@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Suspense, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { logoutAction } from '@/app/login/actions';
 import { greetingFor } from './greeting';
 import {
@@ -17,7 +17,6 @@ import { Icon } from './icon';
 import { MobileDrawer } from './mobile-drawer';
 import { MoreMenu } from './more-menu';
 import { PRIMARY_LINKS, findCurrentPage, isActive } from './navigation';
-import { WarningPrototype } from './warning-prototype'; // PROTOTYPE
 
 const subscribeToNothing = () => () => {};
 
@@ -149,10 +148,6 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
       </div>
 
       {showNavigation && isMenuOpen && <MobileDrawer onClose={() => setIsMenuOpen(false)} />}
-      {/* PROTOTYPE: warning colour variants, ?warning=A…D */}
-      <Suspense fallback={null}>
-        <WarningPrototype />
-      </Suspense>
     </div>
   );
 }
