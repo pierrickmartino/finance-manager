@@ -28,6 +28,19 @@ export const WARNING_NOTICE_CLASS =
  * selected): soft ink on a sunken fill. Not an alert: attention takes WARNING_NOTICE_CLASS.
  */
 export const INFO_NOTICE_CLASS = 'rounded-lg bg-sunken px-3 py-2 text-sm text-ink-soft';
+/**
+ * A dark toolbar floating over the page's bottom edge while something is selected (the
+ * Transactions list's Bulk edit dock). Ink, so it reads as a tool above the page, not part of it.
+ */
+export const DOCK_CLASS = 'rounded-xl bg-ink p-1.5 text-sm text-paper shadow-2xl';
+/**
+ * An action on DOCK_CLASS: paper text, a translucent paper fill on hover or while its popover
+ * is open (`aria-expanded`), and the accent fill as its focus ring (accent-ink fails on ink).
+ */
+export const DOCK_BUTTON_CLASS =
+  'flex items-center gap-2 rounded-md px-3 py-1.5 font-medium hover:bg-paper/10 aria-expanded:bg-paper/15 focus-visible:outline-accent disabled:opacity-50';
+/** A popover over the page: a menu or picker opened from a toolbar or the dock. */
+export const POPOVER_CLASS = 'rounded-xl border border-rule bg-surface p-2 text-ink shadow-xl';
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 

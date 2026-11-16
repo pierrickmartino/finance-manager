@@ -10,7 +10,7 @@ import { withServices } from './support/services';
 
 /** Tailwind's `xl` and up: the Transaction preview shows beside the list. */
 const WIDE = { width: breakpointPx('xl'), height: 800 };
-/** A phone: one column, the action bar fixed to the bottom. */
+/** A phone: one column, the dock across the bottom of the screen. */
 const PHONE = { width: 390, height: 844 };
 
 /** One more than a page of the list (50 rows), so there is a second page. */
@@ -59,9 +59,7 @@ async function seedAccount(suffix: number) {
   });
 }
 
-test('selects Transactions on the list and bulk edits them from the action bar', async ({
-  page,
-}) => {
+test('selects Transactions on the list and bulk edits them from the dock', async ({ page }) => {
   // The E2E database is shared by the whole run: every name below is unique to this test.
   const suffix = Date.now();
   const { accountId, groceriesName } = await seedAccount(suffix);
@@ -90,10 +88,11 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await expect(header).toBeChecked({ indeterminate: true });
   expect(page.url()).toBe(listUrl);
 
-  // Set Category: the split row is left out, the others take the Category
-  await bar.getByRole('button', { name: 'Set Category' }).click();
-  await bar.getByLabel('Category').selectOption({ label: groceriesName });
-  await bar.getByRole('button', { name: 'Apply' }).click();
+  // Set Category: one click in the picker applies; the split row is left out
+  await bar.getByRole('button', { name: 'Category' }).click();
+  const categories = bar.getByRole('dialog', { name: 'Set Category' });
+  await categories.getByLabel('Find a Category').fill(groceriesName);
+  await categories.getByRole('button', { name: groceriesName }).click();
   await expect(page.getByRole('status')).toHaveText(
     `Set ${groceriesName}: 3 Transactions changed · 1 split or Transfer left out.`,
   );
@@ -103,12 +102,15 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await expect(checkbox(52)).not.toBeChecked();
   await expect(header).not.toBeChecked();
 
-  // Add Tag: a new Tag joins the ones each Transaction has
+  // Tags: a new Tag joins the ones each Transaction has
+  const tagPicker = bar.getByRole('dialog', { name: 'Add or remove Tags' });
+  const tagBox = (name: string) =>
+    tagPicker.getByRole('checkbox', { name: new RegExp(`#${name}`) });
   await checkbox(52).check();
   await checkbox(51).check();
-  await bar.getByRole('button', { name: 'Add Tag' }).click();
-  await bar.getByLabel('Tag', { exact: true }).fill(`Vacation ${suffix}`);
-  await bar.getByRole('button', { name: 'Apply' }).click();
+  await bar.getByRole('button', { name: 'Tags' }).click();
+  await tagPicker.getByLabel('Find or create a Tag').fill(`Vacation ${suffix}`);
+  await tagPicker.getByRole('button', { name: `Add new Tag #Vacation ${suffix}` }).click();
   await expect(page.getByRole('status')).toHaveText(
     `Added Vacation ${suffix}: 2 Transactions changed.`,
   );
@@ -116,26 +118,43 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await expect(row(51)).toContainText(`#Vacation ${suffix}`);
   await expect(row(52)).toContainText(`#Vacation ${suffix}`);
 
-  // Remove Tag offers the Tags on the selection and removes only the chosen one
+  // A Tag some of the selection carries is mixed, and can be removed from those
+  await checkbox(52).check();
   await checkbox(51).check();
-  await bar.getByRole('button', { name: 'Remove Tag' }).click();
-  const removable = bar.getByRole('combobox', { name: 'Tag', exact: true });
-  await expect(removable.getByRole('option')).toHaveText([`Trip ${suffix}`, `Vacation ${suffix}`]);
-  await removable.selectOption({ label: `Trip ${suffix}` });
-  await bar.getByRole('button', { name: 'Apply' }).click();
+  await page.keyboard.press('t');
+  await tagPicker.getByLabel('Find or create a Tag').fill(`${suffix}`);
+  await expect(tagBox(`Trip ${suffix}`)).toHaveAttribute('aria-checked', 'mixed');
+  await expect(tagBox(`Trip ${suffix}`)).toContainText('1 of 2');
+  await expect(tagBox(`Vacation ${suffix}`)).toBeChecked();
+  await tagPicker
+    .getByRole('button', { name: `Remove #Trip ${suffix} from the 1 that have it` })
+    .click();
   await expect(page.getByRole('status')).toHaveText(
     `Removed Trip ${suffix}: 1 Transaction changed.`,
   );
   await expect(row(51)).not.toContainText(`#Trip ${suffix}`);
   await expect(row(51)).toContainText(`#Vacation ${suffix}`);
 
-  // Set Payee by typing a new name, from the keyboard
+  // Unticking a Tag every selected Transaction carries removes it from them
+  await checkbox(52).check();
+  await bar.getByRole('button', { name: 'Tags' }).click();
+  await tagPicker.getByLabel('Find or create a Tag').fill(`Vacation ${suffix}`);
+  await tagBox(`Vacation ${suffix}`).click();
+  await expect(page.getByRole('status')).toHaveText(
+    `Removed Vacation ${suffix}: 1 Transaction changed.`,
+  );
+  await expect(row(52)).not.toContainText(`#Vacation ${suffix}`);
+  await expect(row(51)).toContainText(`#Vacation ${suffix}`);
+
+  // Set Payee by typing a new name, all from the keyboard
   await checkbox(48).focus();
   await page.keyboard.press('Space');
   await expect(bar).toContainText('1 selected');
-  await bar.getByRole('button', { name: 'Set Payee' }).click();
-  await bar.getByLabel('Payee').fill(`Corner shop ${suffix}`);
-  await bar.getByLabel('Payee').press('Enter');
+  await page.keyboard.press('p');
+  const payee = bar.getByRole('dialog', { name: 'Set Payee' }).getByLabel('Find or create a Payee');
+  await expect(payee).toBeFocused();
+  await page.keyboard.type(`Corner shop ${suffix}`);
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('status')).toHaveText(
     `Set Corner shop ${suffix}: 1 Transaction changed.`,
   );
@@ -155,6 +174,17 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await expect(bar).toContainText('50 selected');
   await bar.getByRole('button', { name: 'Clear selection' }).click();
   await expect(header).not.toBeChecked();
+  await expect(bar).toBeHidden();
+
+  // Escape closes an open picker first, then clears the selection
+  await checkbox(52).check();
+  await bar.getByRole('button', { name: 'Category' }).click();
+  await expect(categories).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(categories).toBeHidden();
+  await expect(bar).toContainText('1 selected');
+  await page.keyboard.press('Escape');
+  await expect(checkbox(52)).not.toBeChecked();
   await expect(bar).toBeHidden();
 
   // A page change clears the selection
@@ -216,9 +246,10 @@ test('selects every Transaction the filter matches, across pages, and bulk edits
   await expect(bar).toContainText(`${SEEDED} selected`);
 
   // Set Category edits every match, on every page; the split one is left out
-  await bar.getByRole('button', { name: 'Set Category' }).click();
-  await bar.getByLabel('Category').selectOption({ label: groceriesName });
-  await bar.getByRole('button', { name: 'Apply' }).click();
+  await bar.getByRole('button', { name: 'Category' }).click();
+  const categories = bar.getByRole('dialog', { name: 'Set Category' });
+  await categories.getByLabel('Find a Category').fill(groceriesName);
+  await categories.getByRole('button', { name: groceriesName }).click();
   await expect(page.getByRole('status')).toHaveText(
     `Set ${groceriesName}: ${SEEDED - 1} Transactions changed · 1 split or Transfer left out.`,
   );
@@ -240,7 +271,9 @@ test('selects every Transaction the filter matches, across pages, and bulk edits
   await expect(bar).toBeHidden();
 });
 
-test('on a phone the action bar is fixed to the bottom of the screen', async ({ page }) => {
+test('on a phone the dock floats at the bottom of the screen, within its width', async ({
+  page,
+}) => {
   const suffix = Date.now();
   const { accountId } = await seedAccount(suffix);
 
@@ -256,9 +289,14 @@ test('on a phone the action bar is fixed to the bottom of the screen', async ({ 
   await expectAtBottom(page, bar);
 });
 
+/** The dock's bottom gap: `bottom-4`. */
+const DOCK_GAP_PX = 16;
+
 async function expectAtBottom(page: Page, bar: Locator): Promise<void> {
   const box = await bar.boundingBox();
   const viewport = page.viewportSize();
   expect(box).not.toBeNull();
-  expect(Math.round(box!.y + box!.height)).toBe(viewport!.height);
+  expect(Math.round(box!.y + box!.height)).toBe(viewport!.height - DOCK_GAP_PX);
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width);
 }
