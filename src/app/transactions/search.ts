@@ -105,6 +105,22 @@ export function transactionsHref(values: SearchValues, page = 1, selected = ''):
 }
 
 /**
+ * "← Transactions" from the Transaction detail of `id` (ADR-0013): the list it was opened from
+ * (`values`, null for a bare detail), at the page holding the Transaction (`place`, from
+ * `locateTransaction`), with it selected. With a list but no known place (its filters don't
+ * read), the list's first page.
+ */
+export function transactionsBackHref(
+  values: SearchValues | null,
+  place: { page: number } | null,
+  id: string,
+): string {
+  if (!values) return '/transactions';
+  if (!place) return transactionsHref(values);
+  return transactionsHref(values, place.page, id);
+}
+
+/**
  * The marker of a Transaction detail URL built by a Transactions list link (ADR-0013): it
  * tells the unfiltered list from a bare link, which shows no Previous and Next.
  */

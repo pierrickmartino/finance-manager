@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { createAccount } from '../src/server/services/accounts';
+import { createBank } from '../src/server/services/banks';
+import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { openAccountPage, openNewAccountForm } from './support/accounts';
+import { withServices } from './support/services';
 import { openTransaction } from './support/transactions';
 import { breakpointPx } from '../src/lib/breakpoints';
 import { viewTransitionMotionDuring } from './support/view-transitions';
@@ -247,6 +251,89 @@ test.describe('opening a Transaction morphs it into its Transaction detail', () 
     expect(warnings).toEqual([]);
   });
 });
+
+test('"← Transactions" returns to the list page holding the Transaction, with it selected', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const accountId = await seedLongAccount(suffix);
+  const item = (n: number) => longItemName(n, suffix);
+  await page.setViewportSize(WIDE);
+  const preview = page.getByRole('complementary', { name: 'Transaction preview' });
+  const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
+
+  // Opened from page 1: its last Transaction is the 50th of 52, and Next steps past it
+  await page.goto(`/transactions?accountId=${accountId}`);
+  await expect(rows).toHaveCount(50);
+  await page.waitForLoadState('networkidle');
+  await rows
+    .filter({ hasText: item(3) })
+    .getByRole('link')
+    .click();
+  await expect(preview).toContainText(item(3));
+  await preview.getByRole('link', { name: 'Open & classify' }).click();
+  // A Manual transaction's detail has no bank fields: wait for its title instead
+  const title = page.getByRole('heading', { level: 1 });
+  await expect(title).toHaveText(item(3));
+  const stepper = listStepper(page);
+  await expect(stepper.getByText('50 of 52', { exact: true })).toBeVisible();
+  await stepper.getByRole('link', { name: 'Next Transaction' }).click();
+  await expect(stepper.getByText('51 of 52', { exact: true })).toBeVisible();
+
+  // The list is in the detail URL, so a reload keeps where "← Transactions" returns to
+  await page.reload();
+  await expect(stepper.getByText('51 of 52', { exact: true })).toBeVisible();
+  const detailPath = new URL(page.url()).pathname;
+
+  // Page 2 of the Account's list, the Transaction now open selected in the preview
+  await backToList(page);
+  await expect(page).toHaveURL(/\/transactions\?.*page=2/);
+  expect(new URL(page.url()).searchParams.get('accountId')).toBe(accountId);
+  await expect(rows).toHaveCount(2);
+  await expect(rows.filter({ hasText: item(2) }).getByRole('link')).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+  await expect(preview).toContainText(item(2));
+
+  // A bare detail URL knows no list: back to the bare Transactions list
+  await page.goto(detailPath);
+  await expect(title).toHaveText(item(2));
+  await expect(page.getByRole('link', { name: '← Transactions' })).toHaveAttribute(
+    'href',
+    '/transactions',
+  );
+});
+
+/** More than a page of the list (50 rows), so there is a second page. */
+const LONG_SEEDED = 52;
+
+const longItemName = (n: number, suffix: number) => `Long ${String(n).padStart(2, '0')} ${suffix}`;
+
+/** An Account with 52 manual Transactions, "Long 01" oldest to "Long 52" newest (one per day). */
+async function seedLongAccount(suffix: number): Promise<string> {
+  return withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Long bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Long account ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 0,
+      openingDate: '2024-01-01',
+    });
+    for (let n = 1; n <= LONG_SEEDED; n += 1) {
+      await createManualTransaction(ctx, {
+        accountId: account.id,
+        bookingDate: new Date(Date.UTC(2025, 0, n)).toISOString().slice(0, 10),
+        amountMinor: -n * 100,
+        description: longItemName(n, suffix),
+      });
+    }
+    return account.id;
+  });
+}
 
 /** Adds a Bank and an Account named after `label`, imports the UBS file into it, returns its name. */
 async function importUbsAccount(page: Page, label: string): Promise<string> {

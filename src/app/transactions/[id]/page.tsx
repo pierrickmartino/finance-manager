@@ -35,7 +35,7 @@ import {
   unlockFieldAction,
 } from './actions';
 import { BackToTransactions } from '../back-to-list';
-import { readDetailList, type TransactionSearch } from '../search';
+import { readDetailList, transactionsBackHref, type TransactionSearch } from '../search';
 import { BankDetails } from './bank-details';
 import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS, DETAIL_TOP_LINE_CLASS } from './detail-layout';
 import { ListStepper } from './list-stepper';
@@ -130,7 +130,9 @@ export default async function TransactionPage({ params, searchParams }: Transact
   return (
     <section className="flex flex-col gap-5">
       <div className={DETAIL_TOP_LINE_CLASS}>
-        <BackToTransactions />
+        <BackToTransactions
+          href={transactionsBackHref(list?.values ?? null, place, transaction.id)}
+        />
         {list && place && <ListStepper place={place} values={list.values} />}
       </div>
       <TransactionHeader
