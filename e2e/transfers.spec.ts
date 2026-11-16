@@ -73,6 +73,13 @@ test('confirms a Transfer candidate in the Import preview', async ({ page }) => 
   await expect(stepper.getByText('No longer matches this list')).toBeVisible();
   // Same booking date, entered before the UBS side: it sits just after it in the list's order
   await expect(stepper.getByRole('link', { name: 'Next Transaction' })).toHaveCount(0);
+  // "← Transactions" goes back to that list, not the counterpart's Account
+  await page.getByRole('link', { name: '← Transactions' }).click();
+  await expect(page).toHaveURL(new RegExp(`accountId=${ubsId}`));
+  await expect(page).toHaveURL(/transfer=only/);
+  await expect(rows).toHaveCount(1);
+  await page.goBack();
+  await expect(stepper.getByText('— of 1', { exact: true })).toBeVisible();
   await stepper.getByRole('link', { name: 'Previous Transaction' }).click();
   await expect(transfer).toContainText(`Transfer with ${bcge}`);
   await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
