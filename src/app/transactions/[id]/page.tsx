@@ -6,7 +6,7 @@ import { BUTTON_CLASS } from '@/components/named-list';
 import { CARD_CLASS, DANGER_BUTTON_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
-import { NotFoundError } from '@/server/services/errors';
+import { NotFoundError, ValidationError } from '@/server/services/errors';
 import { listCategoryGroups } from '@/server/services/categories';
 import { listHistory } from '@/server/services/history';
 import { listPayees } from '@/server/services/payees';
@@ -15,8 +15,10 @@ import {
   CLASSIFICATION_FIELD_LABELS,
   getClassification,
   getTransaction,
+  locateTransaction,
   type Classification,
   type TransactionDetail,
+  type TransactionPlace,
 } from '@/server/services/transactions';
 import type { ServiceContext } from '@/server/services/context';
 import {
@@ -33,8 +35,10 @@ import {
   unlockFieldAction,
 } from './actions';
 import { BackToTransactions } from '../back-to-list';
+import { readDetailList, type TransactionSearch } from '../search';
 import { BankDetails } from './bank-details';
-import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS } from './detail-layout';
+import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS, DETAIL_TOP_LINE_CLASS } from './detail-layout';
+import { ListStepper } from './list-stepper';
 import { ClassificationForm } from './classification-form';
 import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
@@ -53,6 +57,8 @@ const EDITS_COLUMN =
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
+  /** The Transactions list it was opened from, if any (ADR-0013). */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /** Each Split line's other side when it is a Transfer side, else what it may be linked with. */
@@ -71,6 +77,21 @@ async function loadLineTransfers(
   return Object.fromEntries(entries);
 }
 
+/** Where the Transaction sits in its list; null with no list, or one whose filters don't read. */
+async function locateInList(
+  ctx: ServiceContext,
+  list: TransactionSearch | null,
+  id: string,
+): Promise<TransactionPlace | null> {
+  if (!list?.query) return null;
+  try {
+    return await locateTransaction(ctx, list.query, id);
+  } catch (error: unknown) {
+    if (error instanceof ValidationError) return null;
+    throw error;
+  }
+}
+
 async function loadTransaction(id: string): Promise<TransactionDetail> {
   try {
     return await getTransaction(await getServiceContext(), id);
@@ -87,15 +108,17 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
  * against Rules) and link as a Transfer. On the right, wide, what is known about it: the bank
  * fields and its History.
  */
-export default async function TransactionPage({ params }: TransactionPageProps) {
+export default async function TransactionPage({ params, searchParams }: TransactionPageProps) {
   const { id } = await params;
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
   const isSplit = transaction.splitLines.length > 0;
-  const [history, fmt, classification, groups, payees, tags, counterpart, lineTransfers] =
+  const fmt = await getFormatter();
+  const list = readDetailList(await searchParams, fmt.settings.numberFormat);
+  const [history, place, classification, groups, payees, tags, counterpart, lineTransfers] =
     await Promise.all([
       listHistory(ctx, { entityType: 'transaction', entityId: transaction.id }),
-      getFormatter(),
+      locateInList(ctx, list, transaction.id),
       getClassification(ctx, transaction.id),
       listCategoryGroups(ctx),
       listPayees(ctx),
@@ -106,7 +129,10 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
 
   return (
     <section className="flex flex-col gap-5">
-      <BackToTransactions />
+      <div className={DETAIL_TOP_LINE_CLASS}>
+        <BackToTransactions />
+        {list && place && <ListStepper place={place} values={list.values} />}
+      </div>
       <TransactionHeader
         transaction={transaction}
         badges={transactionBadges(transaction, classification)}

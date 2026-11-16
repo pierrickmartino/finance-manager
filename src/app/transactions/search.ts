@@ -105,6 +105,34 @@ export function transactionsHref(values: SearchValues, page = 1, selected = ''):
 }
 
 /**
+ * The marker of a Transaction detail URL built by a Transactions list link (ADR-0013): it
+ * tells the unfiltered list from a bare link, which shows no Previous and Next.
+ */
+export const DETAIL_LIST_MARKER = 'list';
+
+/**
+ * The Transaction detail of `id` within the list of these search values: the marker, then the
+ * non-blank filters. The list's page and selection are left out; the detail derives them.
+ */
+export function transactionDetailHref(id: string, values: SearchValues): string {
+  const filters = withSearch('', values).replace(/^\?/, '&');
+  return `/transactions/${id}?${DETAIL_LIST_MARKER}=1${filters}`;
+}
+
+/**
+ * The list a Transaction detail was opened from, read from its URL as the list reads its own,
+ * without a page or selection; null for a bare detail URL.
+ */
+export function readDetailList(
+  params: Params,
+  numberFormat: NumberFormat,
+): TransactionSearch | null {
+  if (params[DETAIL_LIST_MARKER] === undefined) return null;
+  const { page: _page, selected: _selected, ...filters } = params;
+  return readTransactionSearch(filters, numberFormat);
+}
+
+/**
  * The row the preview pane shows: the selected one when it is on this page, else the first.
  * Only rows already on the page qualify, so an id in the URL never loads anything by itself.
  */

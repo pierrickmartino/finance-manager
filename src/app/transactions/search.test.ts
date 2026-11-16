@@ -2,8 +2,10 @@ import { describe, expect, test } from 'vitest';
 import {
   bulkFilterOf,
   pickSelected,
+  readDetailList,
   readTransactionSearch,
   SEARCH_FIELDS,
+  transactionDetailHref,
   transactionsHref,
   type SearchValues,
 } from './search';
@@ -81,5 +83,50 @@ describe('bulkFilterOf', () => {
 
   test('gives an empty filter for a query that is only a page', () => {
     expect(bulkFilterOf({ page: 2 })).toEqual({});
+  });
+});
+
+describe('transactionDetailHref', () => {
+  test("carries the list's filters and the list marker, dropping blanks", () => {
+    const href = transactionDetailHref('abc', { ...BLANK, text: 'coop', unclassified: 'true' });
+
+    expect(href).toBe('/transactions/abc?list=1&text=coop&unclassified=true');
+  });
+
+  test('marks the unfiltered list, so it differs from a bare link', () => {
+    expect(transactionDetailHref('abc', BLANK)).toBe('/transactions/abc?list=1');
+  });
+});
+
+describe('readDetailList', () => {
+  test('reads no list from a bare detail URL', () => {
+    expect(readDetailList({}, 'apostrophe')).toBeNull();
+    expect(readDetailList({ text: 'coop' }, 'apostrophe')).toBeNull();
+  });
+
+  test('reads the filters of the list the detail was opened from', () => {
+    const search = readDetailList({ list: '1', text: 'coop', accountId: '' }, 'apostrophe');
+
+    expect(search?.values).toEqual({ ...BLANK, text: 'coop' });
+    expect(search?.query?.text).toBe('coop');
+  });
+
+  test('reads the unfiltered list from the marker alone', () => {
+    expect(readDetailList({ list: '1' }, 'apostrophe')?.values).toEqual(BLANK);
+  });
+
+  test('ignores a page or selection in the detail URL', () => {
+    const search = readDetailList({ list: '1', page: '3', selected: 'x' }, 'apostrophe');
+
+    expect([search?.page, search?.selected, search?.query?.page]).toEqual([1, '', 1]);
+  });
+
+  test('round-trips the filters of a detail URL it built', () => {
+    const values = { ...BLANK, from: '2025-10-01', amountMin: '-50.00', transfer: 'exclude' };
+    const params = Object.fromEntries(
+      new URL(transactionDetailHref('abc', values), 'http://x').searchParams,
+    );
+
+    expect(readDetailList(params, 'apostrophe')?.values).toEqual(values);
   });
 });

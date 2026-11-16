@@ -83,6 +83,62 @@ test('searches imported Transactions and opens one with its bank fields and Hist
   await expect(page).toHaveURL(detailUrl);
 });
 
+test('steps through the Transactions list it was opened from with Previous and Next', async ({
+  page,
+}) => {
+  const accountName = await importUbsAccount(page, 'Stepping');
+  await page.setViewportSize(WIDE);
+  const rows = await listAccount(page, accountName);
+  const newest = await rows.nth(0).getByRole('link').innerText();
+  const second = await rows.nth(1).getByRole('link').innerText();
+  const title = page.getByRole('heading', { level: 1 });
+
+  // Opened from the Account's list: the first of its 14, nothing before it
+  await page
+    .getByRole('complementary', { name: 'Transaction preview' })
+    .getByRole('link', { name: 'Open & classify' })
+    .click();
+  await detailShown(page);
+  const stepper = listStepper(page);
+  await expect(stepper.getByText('1 of 14', { exact: true })).toBeVisible();
+  await expect(stepper.getByRole('link', { name: 'Previous Transaction' })).toHaveCount(0);
+  await expect(title).toHaveText(newest);
+
+  // Next and Previous open the neighbouring Transactions of that list, without animation
+  const stepping = await viewTransitionMotionDuring(page, async () => {
+    await stepper.getByRole('link', { name: 'Next Transaction' }).click();
+    await expect(stepper.getByText('2 of 14', { exact: true })).toBeVisible();
+    await expect(title).toHaveText(second);
+  });
+  expect(stepping).toEqual([]);
+  await stepper.getByRole('link', { name: 'Previous Transaction' }).click();
+  await expect(stepper.getByText('1 of 14', { exact: true })).toBeVisible();
+  await expect(title).toHaveText(newest);
+
+  // The list is in the URL, so a reload keeps it
+  await stepper.getByRole('link', { name: 'Next Transaction' }).click();
+  await expect(stepper.getByText('2 of 14', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(stepper.getByText('2 of 14', { exact: true })).toBeVisible();
+
+  // Opened from the oldest row: the last of the list, nothing after it
+  await listAccount(page, accountName);
+  await page.setViewportSize(NARROW);
+  await rows.last().getByRole('link').click();
+  await detailShown(page);
+  await expect(stepper.getByText('14 of 14', { exact: true })).toBeVisible();
+  await expect(stepper.getByRole('link', { name: 'Next Transaction' })).toHaveCount(0);
+  await expect(stepper.getByRole('link', { name: 'Previous Transaction' })).toBeVisible();
+
+  // A bare link knows no list, so it shows no navigation
+  const bare = new URL(page.url());
+  bare.search = '';
+  await page.goto(bare.toString());
+  await expect(page.getByRole('heading', { name: 'From the bank' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '← Transactions' })).toBeVisible();
+  await expect(stepper).toHaveCount(0);
+});
+
 test.describe('opening a Transaction morphs it into its Transaction detail', () => {
   test('below xl, the tapped row expands into the detail and shrinks back', async ({ page }) => {
     const accountName = await importUbsAccount(page, 'Morph narrow');
@@ -232,8 +288,13 @@ async function listAccount(page: Page, accountName: string): Promise<Locator> {
 
 /** The Transaction detail has loaded: its content, not only its skeleton. */
 async function detailShown(page: Page): Promise<void> {
-  await expect(page).toHaveURL(/\/transactions\/[^/?]+$/);
+  await expect(page).toHaveURL(/\/transactions\/[^/?]+(\?|$)/);
   await expect(page.getByRole('heading', { name: 'From the bank' })).toBeVisible();
+}
+
+/** Previous, the position and Next on a Transaction detail opened from the Transactions list. */
+function listStepper(page: Page): Locator {
+  return page.getByRole('navigation', { name: 'Transactions list' });
 }
 
 /**

@@ -23,6 +23,7 @@ export {
   type SplitLine,
 } from './classification';
 export { removeSplit, splitTransaction, type SplitLineInput } from './split';
+export { locateTransaction, type TransactionPlace } from './locate';
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type TransactionQuery } from './query';
 
 /** A Transaction as the list shows it: with the name of its Account and its classification. */

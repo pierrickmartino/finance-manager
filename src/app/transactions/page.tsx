@@ -19,6 +19,7 @@ import {
   bulkFilterOf,
   pickSelected,
   readTransactionSearch,
+  transactionDetailHref,
   transactionsHref,
   type SearchValues,
 } from './search';
@@ -99,7 +100,13 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
             ))}
         </div>
 
-        {selected && <TransactionPreview fmt={fmt} transaction={selected} />}
+        {selected && (
+          <TransactionPreview
+            fmt={fmt}
+            transaction={selected}
+            detailHref={transactionDetailHref(selected.id, search.values)}
+          />
+        )}
       </div>
     </section>
   );

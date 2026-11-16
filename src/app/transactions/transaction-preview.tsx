@@ -9,10 +9,12 @@ import { TransactionMorph } from './transaction-morph';
 interface TransactionPreviewProps {
   fmt: Formatter;
   transaction: TransactionListItem;
+  /** Its Transaction detail within the list beside it (ADR-0013), for "Open & classify". */
+  detailHref: string;
 }
 
 /** Read-only summary of the selected row, beside the list from `xl` up. */
-export function TransactionPreview({ fmt, transaction }: TransactionPreviewProps) {
+export function TransactionPreview({ fmt, transaction, detailHref }: TransactionPreviewProps) {
   return (
     <aside
       aria-label="Transaction preview"
@@ -49,10 +51,7 @@ export function TransactionPreview({ fmt, transaction }: TransactionPreviewProps
         {transaction.rawDescription || '(no description)'}
       </p>
       {transaction.notes && <p className="text-sm whitespace-pre-line">{transaction.notes}</p>}
-      <Link
-        href={`/transactions/${transaction.id}`}
-        className={`${PRIMARY_BUTTON_CLASS} text-center`}
-      >
+      <Link href={detailHref} className={`${PRIMARY_BUTTON_CLASS} text-center`}>
         Open & classify
       </Link>
     </aside>

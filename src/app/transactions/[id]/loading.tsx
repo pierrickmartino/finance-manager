@@ -1,11 +1,13 @@
 'use client';
 
 import type { ReactElement } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { PLACEHOLDER_CLASS } from '@/components/surface';
+import { DETAIL_LIST_MARKER } from '../search';
 import { TransactionMorph } from '../transaction-morph';
 import {
   DETAIL_COLUMNS_CLASS,
+  DETAIL_TOP_LINE_CLASS,
   DETAIL_HEADER_CLASS,
   DETAIL_HEADER_INITIAL_CLASS,
   DETAIL_HEADER_TITLE_CLASS,
@@ -20,10 +22,15 @@ import {
  */
 export default function Loading(): ReactElement {
   const { id } = useParams<{ id: string }>();
+  // Opened from the Transactions list: its Previous / Next will sit at the line's right.
+  const hasList = useSearchParams().has(DETAIL_LIST_MARKER);
   return (
     <section aria-label="Loading the Transaction" aria-busy="true" className="flex flex-col gap-5">
       <span className="sr-only">Loading</span>
-      <div className={`${PLACEHOLDER_CLASS} h-5 w-28`} />
+      <div className={DETAIL_TOP_LINE_CLASS}>
+        <div className={`${PLACEHOLDER_CLASS} h-5 w-28`} />
+        {hasList && <div className={`${PLACEHOLDER_CLASS} h-5 w-16 sm:w-48`} />}
+      </div>
       <TransactionMorph transactionId={id} part="detail">
         <header aria-hidden="true" className={DETAIL_HEADER_CLASS}>
           <div className={`${PLACEHOLDER_CLASS} ${DETAIL_HEADER_INITIAL_CLASS}`} />
