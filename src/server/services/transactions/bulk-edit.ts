@@ -7,7 +7,12 @@ import { NotFoundError, parseInput, ValidationError } from '../errors';
 import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName, type Tag } from '../tags/model';
 import { CLASSIFICATION_FIELDS, recordClassificationChanges } from './classification';
-import { UNCLASSIFIED_CONDITION } from './query';
+import {
+  filterConditions,
+  transactionQueryInput,
+  UNCLASSIFIED_CONDITION,
+  type TransactionQuery,
+} from './query';
 import { IS_SPLIT } from './split-guard';
 
 /**
@@ -26,8 +31,17 @@ import { IS_SPLIT } from './split-guard';
  * Transactions took 15 s. Set-based, they take 1.3 s (see `bulk-edit.perf.test.ts`).
  */
 
-/** Most Transactions one bulk edit takes by id (a whole group has no limit). */
-export const MAX_BULK_IDS = 10_000;
+/**
+ * Most Transactions one Bulk edit takes, whatever its scope (ids, a group or a filter): one
+ * click can't change a whole history by accident. A larger scope is refused before any write.
+ */
+export const MAX_BULK_EDIT = 10_000;
+
+/** A count as the limit messages show it, e.g. "12,400". */
+const formatCount = (count: number): string => count.toLocaleString('en-US');
+
+const LIMIT = formatCount(MAX_BULK_EDIT);
+const TOO_MANY_IDS = `Select at most ${LIMIT} Transactions per edit`;
 
 /** A Bulk edit only sets values: clearing a Category or Payee stays a per-Transaction edit. */
 const ONLY_SETS = 'A Bulk edit only sets values: it cannot clear a Payee or Category';
@@ -70,12 +84,20 @@ const bulkEditInput = z.object({
   /** Transactions picked one by one. */
   transactionIds: z
     .array(z.uuid({ error: 'Transaction not found' }))
-    .max(MAX_BULK_IDS, `Select at most ${MAX_BULK_IDS} Transactions`)
+    .max(MAX_BULK_EDIT, TOO_MANY_IDS)
     .optional(),
   /** A whole Unclassified group: every member still Unclassified when the edit runs. */
   groupKey: z.string().optional(),
+  /**
+   * Every Transaction the Transactions list's filter matches, across all its pages (#149).
+   * Its page and page size, if given, are ignored.
+   */
+  filter: transactionQueryInput.optional(),
   changes: bulkChanges,
 });
+
+/** A Transactions list filter as a Bulk edit scope: the list's query without its page. */
+export type BulkFilter = Omit<TransactionQuery, 'page' | 'pageSize'>;
 
 export type BulkEditInput = z.input<typeof bulkEditInput>;
 /** Payee, Category and Tags only: notes stay a per-Transaction field. */
@@ -90,27 +112,63 @@ export interface BulkEditResult {
 }
 
 /**
- * The selected Transaction ids, without repeats: the ones given plus the members of the chosen
- * Unclassified group (locked here, so the group can't change under the edit). A split member
+ * The ids of the Transactions `from` (a `FROM "transaction" t ... WHERE ...` clause) selects,
+ * locked so they can't change under the edit. More than MAX_BULK_EDIT is refused with
+ * `tooMany(count)`, without locking or counting beyond what that needs.
+ */
+async function lockedMatches(
+  { tx }: MutationScope,
+  from: { sql: string; params: unknown[] },
+  tooMany: (count: string) => string,
+): Promise<string[]> {
+  const matches = await tx.query<{ id: string }>(
+    `SELECT t.id ${from.sql}
+     ORDER BY t.booking_date, t.entry_order
+     LIMIT ${MAX_BULK_EDIT + 1}
+     FOR UPDATE OF t`,
+    from.params,
+  );
+  if (matches.rows.length > MAX_BULK_EDIT) {
+    const count = await tx.query<{ total: number }>(
+      `SELECT count(*)::int AS total ${from.sql}`,
+      from.params,
+    );
+    throw new ValidationError(tooMany(formatCount(count.rows[0]?.total ?? 0)));
+  }
+  return matches.rows.map((match) => match.id);
+}
+
+/**
+ * The selected Transaction ids, without repeats: the ones given, plus the members of the chosen
+ * Unclassified group, plus the filter's matches. The filter uses the list's own conditions, so
+ * it selects exactly the Transactions the list shows for it, on every page. A split member
  * (Unclassified while a line has neither a Category nor a Transfer, ADR-0005) stays selected:
  * the Category change leaves it out (`leftOutOfCategory`), the other changes still apply.
  */
 async function resolveSelectedIds(
-  { tx }: MutationScope,
+  scope: MutationScope,
   input: z.output<typeof bulkEditInput>,
 ): Promise<string[]> {
   const ids = [...(input.transactionIds ?? [])];
   if (input.groupKey !== undefined) {
-    const members = await tx.query<{ id: string }>(
-      `SELECT t.id FROM "transaction" t
-       WHERE t.description_key = $1 AND ${UNCLASSIFIED_CONDITION}
-       ORDER BY t.booking_date, t.entry_order
-       FOR UPDATE`,
-      [input.groupKey],
-    );
-    ids.push(...members.rows.map((member) => member.id));
+    const group = {
+      sql: `FROM "transaction" t WHERE t.description_key = $1 AND ${UNCLASSIFIED_CONDITION}`,
+      params: [input.groupKey],
+    };
+    const tooMany = (count: string) =>
+      `This group has ${count} Transactions, at most ${LIMIT} per edit`;
+    ids.push(...(await lockedMatches(scope, group, tooMany)));
   }
-  return [...new Set(ids)];
+  if (input.filter !== undefined) {
+    const where = filterConditions(input.filter);
+    const filter = { sql: `FROM "transaction" t ${where.sql}`, params: where.params };
+    const tooMany = (count: string) =>
+      `Narrow the filter: ${count} match, at most ${LIMIT} per edit`;
+    ids.push(...(await lockedMatches(scope, filter, tooMany)));
+  }
+  const unique = [...new Set(ids)];
+  if (unique.length > MAX_BULK_EDIT) throw new ValidationError(TOO_MANY_IDS);
+  return unique;
 }
 
 /** Resolved values: absent = field untouched. */
