@@ -1,71 +1,185 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { BulkActionBar, type BulkTag } from '@/components/bulk-edit/bulk-action-bar';
+import { useFormatter } from '@/components/formatter-provider';
 import { CARD_CLASS } from '@/components/surface';
-import type { Formatter } from '@/lib/format';
+import type { CategoryGroup } from '@/server/services/categories';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { transactionsHref, type SearchValues } from './search';
 import { amountClass, CategoryLabel, transactionName } from './transaction-display';
 import { TransactionMorph } from './transaction-morph';
 
 const CELL = 'px-3 py-2 align-top';
+/** The checkbox column: room enough to hit the box, nothing more. */
+const CHECK_CELL = 'w-0 py-2 pr-1 pl-3 align-top';
 
 interface TransactionListProps {
-  fmt: Formatter;
   transactions: TransactionListItem[];
   values: SearchValues;
   page: number;
   /** The row the preview pane shows (`xl` and up). */
   selectedId: string | null;
+  /** What the Bulk edit bar offers. */
+  lists: { groups: CategoryGroup[]; payeeNames: string[]; tags: BulkTag[] };
+  /** Shown under the table (the pagination). */
+  children?: ReactNode;
 }
 
 /**
  * The page of Transactions. From `xl` up a row's link previews it in the pane beside the
  * list; below, there is no pane, so the link opens the Transaction itself.
+ *
+ * Rows can be ticked for a Bulk edit: one by one, a range with shift-click from the last
+ * ticked row, or the whole page from the header. The selection lives here only, never in the
+ * URL: the page mounts the list afresh (by key) on every page or filter change, which clears it.
  */
 export function TransactionList({
-  fmt,
   transactions,
   values,
   page,
   selectedId,
+  lists,
+  children,
 }: TransactionListProps) {
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
+  const [anchorId, setAnchorId] = useState<string | null>(null);
+  // Only listed rows count: an edit can move a ticked row out of the filter.
+  const selected = transactions.filter((transaction) => ticked.has(transaction.id));
+
+  const tick = (id: string, isChecked: boolean, isRange: boolean): void => {
+    const ids = transactions.map((transaction) => transaction.id);
+    const from = anchorId === null ? -1 : ids.indexOf(anchorId);
+    const to = ids.indexOf(id);
+    const range =
+      isRange && from !== -1 ? ids.slice(Math.min(from, to), Math.max(from, to) + 1) : [id];
+    setTicked((current) => {
+      const next = new Set(current);
+      for (const rangeId of range) {
+        if (isChecked) next.add(rangeId);
+        else next.delete(rangeId);
+      }
+      return next;
+    });
+    setAnchorId(id);
+  };
+
+  const tickPage = (isChecked: boolean): void => {
+    setTicked(new Set(isChecked ? transactions.map((transaction) => transaction.id) : []));
+    setAnchorId(null);
+  };
+
+  const clear = (): void => tickPage(false);
+
   return (
-    <div className={`${CARD_CLASS} overflow-x-auto`}>
-      <table aria-label="Transactions" className="w-full text-sm">
-        <thead className="border-b border-rule text-xs text-muted">
-          <tr>
-            <th className={`${CELL} text-left font-medium`}>Date</th>
-            <th className={`${CELL} text-left font-medium`}>Transaction</th>
-            <th className={`${CELL} text-right font-medium`}>Amount</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-rule">
-          {transactions.map((transaction) => (
-            <Row
-              key={transaction.id}
-              fmt={fmt}
-              transaction={transaction}
-              previewHref={transactionsHref(values, page, transaction.id)}
-              isSelected={transaction.id === selectedId}
-            />
-          ))}
-        </tbody>
-      </table>
+    <div className="flex flex-col gap-3">
+      <BulkActionBar
+        scope={{ transactionIds: selected.map((transaction) => transaction.id) }}
+        count={selected.length}
+        groups={lists.groups}
+        payeeNames={lists.payeeNames}
+        tags={lists.tags}
+        removableTags={tagsOf(selected)}
+        onClear={clear}
+      />
+      <div className={`${CARD_CLASS} overflow-x-auto`}>
+        <table aria-label="Transactions" className="w-full text-sm">
+          <thead className="border-b border-rule text-xs text-muted">
+            <tr>
+              <th className={CHECK_CELL}>
+                <PageCheckbox
+                  selectedCount={selected.length}
+                  rowCount={transactions.length}
+                  onChange={tickPage}
+                />
+              </th>
+              <th className={`${CELL} text-left font-medium`}>Date</th>
+              <th className={`${CELL} text-left font-medium`}>Transaction</th>
+              <th className={`${CELL} text-right font-medium`}>Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule">
+            {transactions.map((transaction) => (
+              <Row
+                key={transaction.id}
+                transaction={transaction}
+                previewHref={transactionsHref(values, page, transaction.id)}
+                isPreviewed={transaction.id === selectedId}
+                isTicked={ticked.has(transaction.id)}
+                onTick={(isChecked, isRange) => tick(transaction.id, isChecked, isRange)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {children}
     </div>
   );
 }
 
-interface RowProps {
-  fmt: Formatter;
-  transaction: TransactionListItem;
-  previewHref: string;
-  isSelected: boolean;
+/** The Tags on these Transactions (their own, not their Split lines'), by name. */
+function tagsOf(transactions: TransactionListItem[]): BulkTag[] {
+  const tags = new Map(transactions.flatMap((t) => t.tags).map((tag) => [tag.id, tag]));
+  return [...tags.values()]
+    .map(({ id, name }) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
+interface PageCheckboxProps {
+  selectedCount: number;
+  rowCount: number;
+  onChange: (isChecked: boolean) => void;
+}
+
+/** Ticks or unticks every row on the page; mixed while only some are ticked. */
+function PageCheckbox({ selectedCount, rowCount, onChange }: PageCheckboxProps) {
+  const ref = useRef<HTMLInputElement>(null);
+  const isAll = rowCount > 0 && selectedCount === rowCount;
+  const isMixed = selectedCount > 0 && !isAll;
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = isMixed;
+  }, [isMixed]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={isAll}
+      onChange={() => onChange(!isAll)}
+      aria-label="Select every Transaction on this page"
+      className="accent-accent-ink"
+    />
+  );
+}
+
+interface RowProps {
+  transaction: TransactionListItem;
+  previewHref: string;
+  isPreviewed: boolean;
+  isTicked: boolean;
+  /** `isRange`: shift was held, so the rows from the last ticked one follow. */
+  onTick: (isChecked: boolean, isRange: boolean) => void;
+}
+
+function Row({ transaction, previewHref, isPreviewed, isTicked, onTick }: RowProps) {
+  const fmt = useFormatter();
   const name = transactionName(transaction);
+  const rowClass = isTicked ? 'bg-accent-tint' : isPreviewed ? 'xl:bg-sunken' : 'hover:bg-paper';
   return (
     <TransactionMorph transactionId={transaction.id} part="row">
-      <tr className={isSelected ? 'xl:bg-sunken' : 'hover:bg-paper'}>
+      <tr className={rowClass}>
+        <td className={CHECK_CELL}>
+          <input
+            type="checkbox"
+            checked={isTicked}
+            // React's change event for a checkbox is its click, which knows about shift.
+            onChange={(event) =>
+              onTick(event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)
+            }
+            aria-label={`Select ${name} on ${fmt.date(transaction.bookingDate)}`}
+            className="mt-0.5 accent-accent-ink"
+          />
+        </td>
         <td className={`${CELL} whitespace-nowrap text-muted tabular-nums`}>
           {fmt.date(transaction.bookingDate)}
         </td>
@@ -73,7 +187,7 @@ function Row({ fmt, transaction, previewHref, isSelected }: RowProps) {
           <Link
             href={previewHref}
             scroll={false}
-            aria-current={isSelected ? 'true' : undefined}
+            aria-current={isPreviewed ? 'true' : undefined}
             className="hidden truncate font-medium hover:underline xl:block"
           >
             {name}
