@@ -11,13 +11,16 @@ interface ListStepperProps {
 
 /**
  * "‹ Previous · 12 of 48 · Next ›" on a Transaction detail opened from the Transactions list
- * ("12/48" on narrow screens). An end with no neighbour is shown but is not a link, so the
+ * ("12/48" on narrow screens). A Transaction that no longer matches the list (just classified
+ * out of it, or a Transfer counterpart outside it) shows "— of 19" and says so; it still steps
+ * to its neighbours in the list's order. An end with no neighbour is shown but is not a link, so the
  * list never wraps round.
  */
 export function ListStepper({ place, values }: ListStepperProps): ReactElement {
   const position = place.position ?? '—';
   return (
-    <nav aria-label="Transactions list" className="flex items-center gap-3 text-sm">
+    <nav aria-label="Transactions list" className="flex flex-wrap items-center gap-3 text-sm">
+      {!place.matches && <span className="text-muted">No longer matches this list</span>}
       <Step id={place.previousId} values={values} label="Previous Transaction">
         ‹ Previous
       </Step>

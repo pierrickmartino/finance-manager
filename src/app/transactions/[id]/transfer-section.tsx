@@ -9,6 +9,7 @@ import {
   type TransferSideRef,
   type TransferSideView,
 } from '@/server/services/transfers';
+import { transactionDetailHref, type SearchValues } from '../search';
 import { linkTransferAction, unlinkTransferAction } from './actions';
 import { SECTION_TITLE_CLASS } from '@/components/surface';
 
@@ -19,6 +20,8 @@ interface TransferSectionProps {
   /** Sides it may be linked with, when it is not in a Transfer. */
   options: TransferSideView[];
   fmt: Formatter;
+  /** The Transactions list the detail was opened from, carried on to the counterpart. */
+  list?: SearchValues | null;
   /** Classes of the section, e.g. to draw it as a card. */
   className?: string;
 }
@@ -43,14 +46,21 @@ export function describeSide(side: TransferSideView, fmt: Formatter): string {
 interface TransferCounterpartProps {
   counterpart: TransferSideView;
   fmt: Formatter;
+  /** The Transactions list the detail was opened from; the counterpart keeps it (ADR-0013). */
+  list?: SearchValues | null;
 }
 
-/** "Transfer with <the other side>", linking to the other side's Transaction. */
-export function TransferCounterpart({ counterpart, fmt }: TransferCounterpartProps) {
+/**
+ * "Transfer with <the other side>", linking to the other side's Transaction, within the list
+ * the detail was opened from when there is one.
+ */
+export function TransferCounterpart({ counterpart, fmt, list = null }: TransferCounterpartProps) {
+  const { id } = counterpart.transaction;
+  const href = list ? transactionDetailHref(id, list) : `/transactions/${id}`;
   return (
     <>
       Transfer with{' '}
-      <Link href={`/transactions/${counterpart.transaction.id}`} className="underline">
+      <Link href={href} className="underline">
         {describeSide(counterpart, fmt)}
       </Link>
     </>
@@ -134,6 +144,7 @@ export function TransferSection({
   counterpart,
   options,
   fmt,
+  list = null,
   className = 'flex flex-col gap-3',
 }: TransferSectionProps) {
   return (
@@ -144,8 +155,8 @@ export function TransferSection({
       {counterpart ? (
         <div className="flex flex-col gap-2 text-sm">
           <p>
-            <TransferCounterpart counterpart={counterpart} fmt={fmt} />. A Transfer has no Category
-            and is left out of income and expense.
+            <TransferCounterpart counterpart={counterpart} fmt={fmt} list={list} />. A Transfer has
+            no Category and is left out of income and expense.
           </p>
           <UnlinkTransferForm
             transactionId={transactionId}

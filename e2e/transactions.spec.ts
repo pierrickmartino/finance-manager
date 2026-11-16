@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openAccountPage, openNewAccountForm } from './support/accounts';
+import { addExpenseCategory } from './support/categories';
 import { openTransaction } from './support/transactions';
 import { breakpointPx } from '../src/lib/breakpoints';
 import { viewTransitionMotionDuring } from './support/view-transitions';
@@ -137,6 +138,46 @@ test('steps through the Transactions list it was opened from with Previous and N
   await expect(page.getByRole('heading', { name: 'From the bank' })).toBeVisible();
   await expect(page.getByRole('link', { name: '← Transactions' })).toBeVisible();
   await expect(stepper).toHaveCount(0);
+});
+
+test('a Transaction classified out of an Unclassified list stays open and Next continues', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const groupName = `Stepping group ${suffix}`;
+  const categoryName = `Stepping category ${suffix}`;
+  await addExpenseCategory(page, groupName, categoryName);
+  const accountName = await importUbsAccount(page, 'Unclassified stepping');
+  await page.setViewportSize(NARROW);
+  await listAccount(page, accountName);
+  const search = page.getByRole('form', { name: 'Search Transactions' });
+  await search.getByLabel('Unclassified only').check();
+  await search.getByRole('button', { name: 'Search' }).click();
+  const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
+  // Rules from other specs share the E2E database, so the count is read, not assumed.
+  await expect(page).toHaveURL(/unclassified=true/);
+  await expect(rows.first()).toBeVisible();
+  const total = await rows.count();
+  expect(total).toBeGreaterThan(2);
+  const third = await rows.nth(2).getByRole('link').innerText();
+  await page.waitForLoadState('networkidle');
+  await rows.nth(1).getByRole('link').click();
+  await detailShown(page);
+  const stepper = listStepper(page);
+  await expect(stepper.getByText(`2 of ${total}`, { exact: true })).toBeVisible();
+
+  // Classified, it no longer matches: the user stays on it and the count drops by one
+  const form = page.getByRole('form', { name: 'Classification' });
+  await form.getByLabel('Category').selectOption({ label: categoryName });
+  await form.getByRole('button', { name: 'Save classification' }).click();
+  await expect(stepper.getByText(`— of ${total - 1}`, { exact: true })).toBeVisible();
+  await expect(stepper.getByText('No longer matches this list')).toBeVisible();
+
+  // Next goes on to its neighbour among those still matching
+  await stepper.getByRole('link', { name: 'Next Transaction' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(third);
+  await expect(stepper.getByText(`2 of ${total - 1}`, { exact: true })).toBeVisible();
+  await expect(stepper.getByText('No longer matches this list')).toHaveCount(0);
 });
 
 test.describe('opening a Transaction morphs it into its Transaction detail', () => {

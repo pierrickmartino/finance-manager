@@ -145,6 +145,7 @@ export default async function TransactionPage({ params, searchParams }: Transact
         payees={payees}
         lineTransfers={lineTransfers}
         fmt={fmt}
+        list={list?.values}
         className={`${DETAIL_PANEL_CLASS} gap-4`}
       />
       <div className={DETAIL_COLUMNS_CLASS}>
@@ -182,6 +183,7 @@ export default async function TransactionPage({ params, searchParams }: Transact
                 counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))
               }
               fmt={fmt}
+              list={list?.values}
               className={DETAIL_PANEL_CLASS}
             />
           )}

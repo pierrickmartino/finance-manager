@@ -61,9 +61,21 @@ test('confirms a Transfer candidate in the Import preview', async ({ page }) => 
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Transfer');
   await openTransaction(page, rows.first());
-  await expect(page.getByRole('region', { name: 'Transfer' })).toContainText(
-    `Transfer with ${bcge}`,
-  );
+  const transfer = page.getByRole('region', { name: 'Transfer' });
+  await expect(transfer).toContainText(`Transfer with ${bcge}`);
+
+  // The counterpart, on another Account, is outside the list but keeps it (ADR-0013)
+  const stepper = page.getByRole('navigation', { name: 'Transactions list' });
+  await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
+  await transfer.getByRole('link', { name: new RegExp(bcge) }).click();
+  await expect(transfer).toContainText(`Transfer with ${ubs}`);
+  await expect(stepper.getByText('— of 1', { exact: true })).toBeVisible();
+  await expect(stepper.getByText('No longer matches this list')).toBeVisible();
+  // Same booking date, entered before the UBS side: it sits just after it in the list's order
+  await expect(stepper.getByRole('link', { name: 'Next Transaction' })).toHaveCount(0);
+  await stepper.getByRole('link', { name: 'Previous Transaction' }).click();
+  await expect(transfer).toContainText(`Transfer with ${bcge}`);
+  await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
 });
 
 /** Creates a Bank and a manual Account, and adds one Manual transaction to it; returns its id. */

@@ -99,10 +99,12 @@ describe('locateTransaction', () => {
   it('gives the neighbours of a Transaction that stopped matching, without a position', async () => {
     const category = await groceries();
     const [oct1, oct2, oct3] = await seed(days(3));
+    const before = await locateTransaction(t.ctx, { unclassified: true }, oct2!);
     await editClassification(t.ctx, oct2!, { categoryId: category.id });
 
     const place = await locateTransaction(t.ctx, { unclassified: true }, oct2!);
 
+    expect(before).toMatchObject({ matches: true, position: 2, total: 3 });
     expect(place).toEqual({
       matches: false,
       position: null,
