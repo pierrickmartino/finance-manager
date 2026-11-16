@@ -35,7 +35,12 @@ import {
   unlockFieldAction,
 } from './actions';
 import { BackToTransactions } from '../back-to-list';
-import { readDetailList, transactionsBackHref, type TransactionSearch } from '../search';
+import {
+  readDetailList,
+  transactionsBackHref,
+  type SearchValues,
+  type TransactionSearch,
+} from '../search';
 import { BankDetails } from './bank-details';
 import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS, DETAIL_TOP_LINE_CLASS } from './detail-layout';
 import { ListStepper } from './list-stepper';
@@ -139,7 +144,7 @@ export default async function TransactionPage({ params, searchParams }: Transact
         transaction={transaction}
         badges={transactionBadges(transaction, classification)}
         fmt={fmt}
-        actions={<TransactionActions transaction={transaction} />}
+        actions={<TransactionActions transaction={transaction} list={list?.values ?? null} />}
       />
       <SplitSection
         transaction={transaction}
@@ -214,8 +219,14 @@ export default async function TransactionPage({ params, searchParams }: Transact
   );
 }
 
+interface TransactionActionsProps {
+  transaction: TransactionDetail;
+  /** The list it was opened from, which deleting it returns to; null for a bare detail. */
+  list: SearchValues | null;
+}
+
 /** Edit the details of a Manual transaction; delete any Transaction. */
-function TransactionActions({ transaction }: { transaction: TransactionDetail }) {
+function TransactionActions({ transaction, list }: TransactionActionsProps) {
   return (
     <>
       {transaction.isManual && (
@@ -227,7 +238,12 @@ function TransactionActions({ transaction }: { transaction: TransactionDetail })
         </Link>
       )}
       <ActionForm
-        action={deleteTransactionFromDetailAction.bind(null, transaction.id, transaction.isManual)}
+        action={deleteTransactionFromDetailAction.bind(
+          null,
+          transaction.id,
+          transaction.isManual,
+          list,
+        )}
         label="Delete Transaction"
         confirmMessage={
           transaction.isManual

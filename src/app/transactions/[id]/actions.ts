@@ -20,6 +20,7 @@ import {
   editClassification,
   getClassification,
   getTransaction,
+  locateTransaction,
   removeSplit,
   splitTransaction,
   unlockFields,
@@ -27,7 +28,16 @@ import {
   type Classification,
   type ClassificationChanges,
   type ClassificationField,
+  type TransactionPlace,
+  type TransactionQuery,
 } from '@/server/services/transactions';
+import type { ServiceContext } from '@/server/services/context';
+import {
+  readTransactionSearch,
+  transactionsBackHref,
+  transactionsHref,
+  type SearchValues,
+} from '../search';
 import type { SplitLineDraft } from './split-lines';
 
 const sameText = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -206,18 +216,46 @@ export async function unlinkTransferAction(
   return result;
 }
 
-/** Deletes a Transaction and goes back to the list (the detail page is gone). */
+/** Where `id` sits in the list of `query`; null when the list's filters don't validate. */
+async function placeIn(
+  ctx: ServiceContext,
+  query: TransactionQuery,
+  id: string,
+): Promise<TransactionPlace | null> {
+  try {
+    return await locateTransaction(ctx, query, id);
+  } catch (error: unknown) {
+    if (error instanceof ValidationError) return null;
+    throw error;
+  }
+}
+
+/**
+ * Deletes a Transaction (the detail page is gone) and goes back to the Transactions list it was
+ * opened from (`list`, ADR-0013): at the page holding its neighbour, the next one, else the
+ * previous, with it selected. With no list, the bare list.
+ */
 export async function deleteTransactionFromDetailAction(
   id: string,
   isManual: boolean,
+  list: SearchValues | null,
   _previous: ActionResult<unknown> | null,
 ): Promise<ActionResult<unknown>> {
   const result = await runAction(async () => {
     const ctx = await getServiceContext();
+    const { numberFormat } = await getRequestDisplaySettings();
+    const search = list ? readTransactionSearch(list, numberFormat) : null;
+    const before = search?.query ? await placeIn(ctx, search.query, id) : null;
+    const neighbourId = before ? (before.nextId ?? before.previousId) : null;
     await (isManual ? deleteManualTransaction(ctx, id) : deleteImportedTransaction(ctx, id));
+    if (!search) return '/transactions';
+    if (!search.query || !neighbourId) return transactionsHref(search.values);
+    // Deleting it moves its neighbours up the list, so their page is read again afterwards.
+    const neighbour = await placeIn(ctx, search.query, neighbourId);
+    return transactionsBackHref(search.values, neighbour, neighbourId);
   });
   if (!result.ok) return result;
   revalidatePath('/transactions');
   revalidatePath('/accounts', 'layout');
-  redirect('/transactions');
+  redirect(result.data);
 }

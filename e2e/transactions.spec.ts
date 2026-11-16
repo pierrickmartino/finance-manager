@@ -377,13 +377,84 @@ test('"← Transactions" returns to the list page holding the Transaction, with 
   );
 });
 
+test('deleting a Transaction opened from a list returns to that list, its neighbour selected', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const accountId = await seedLongAccount(suffix);
+  const item = (n: number) => longItemName(n, suffix);
+  await page.setViewportSize(WIDE);
+  const preview = page.getByRole('complementary', { name: 'Transaction preview' });
+  const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
+  const title = page.getByRole('heading', { level: 1 });
+  const stepper = listStepper(page);
+  const listOf = (account: string) => `/transactions?accountId=${account}`;
+  const openFromList = async (url: string, name: string, position: string) => {
+    await page.goto(url);
+    await page.waitForLoadState('networkidle');
+    await openTransaction(page, rows.filter({ hasText: name }));
+    await expect(title).toHaveText(name);
+    await expect(stepper.getByText(position, { exact: true })).toBeVisible();
+  };
+  const listParam = (name: string) => new URL(page.url()).searchParams.get(name);
+  const selectedIs = async (n: number) => {
+    await expect(rows.filter({ hasText: item(n) }).getByRole('link')).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    await expect(preview).toContainText(item(n));
+  };
+
+  // The 50th of 52: back on page 1 of the Account's list, the next one (now 50th) selected
+  await openFromList(listOf(accountId), item(3), '50 of 52');
+  await deleteTransaction(page);
+  await expect(rows).toHaveCount(50);
+  expect(listParam('accountId')).toBe(accountId);
+  expect(listParam('page')).toBeNull();
+  await expect(rows.filter({ hasText: item(3) })).toHaveCount(0);
+  await selectedIs(2);
+
+  // The last of the list: the previous one selected, on its page
+  await openFromList(`${listOf(accountId)}&page=2`, item(1), '51 of 51');
+  await deleteTransaction(page);
+  await expect(rows).toHaveCount(50);
+  expect(listParam('accountId')).toBe(accountId);
+  await selectedIs(2);
+
+  // A bare detail URL knows no list: back to the bare Transactions list
+  await openFromList(listOf(accountId), item(52), '1 of 50');
+  await page.goto(new URL(page.url()).pathname);
+  await expect(title).toHaveText(item(52));
+  await deleteTransaction(page);
+  await expect(page).toHaveURL(/\/transactions$/);
+
+  // The only Transaction of its list: that list, still filtered, now empty
+  const lone = Date.now();
+  const loneAccountId = await seedLongAccount(lone, 1);
+  await openFromList(listOf(loneAccountId), longItemName(1, lone), '1 of 1');
+  await deleteTransaction(page);
+  await expect(page.getByText('No Transactions match.')).toBeVisible();
+  expect(listParam('accountId')).toBe(loneAccountId);
+  expect(listParam('selected')).toBeNull();
+});
+
+/** Deletes the Transaction open on its detail, confirming, and waits for the list. */
+async function deleteTransaction(page: Page): Promise<void> {
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Delete Transaction' }).click();
+  await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
+}
+
 /** More than a page of the list (50 rows), so there is a second page. */
 const LONG_SEEDED = 52;
 
 const longItemName = (n: number, suffix: number) => `Long ${String(n).padStart(2, '0')} ${suffix}`;
 
-/** An Account with 52 manual Transactions, "Long 01" oldest to "Long 52" newest (one per day). */
-async function seedLongAccount(suffix: number): Promise<string> {
+/**
+ * An Account with `count` (52 by default) manual Transactions, "Long 01" oldest to "Long 52"
+ * newest (one per day).
+ */
+async function seedLongAccount(suffix: number, count = LONG_SEEDED): Promise<string> {
   return withServices(async (ctx) => {
     const bank = await createBank(ctx, { name: `Long bank ${suffix}` });
     const account = await createAccount(ctx, {
@@ -395,7 +466,7 @@ async function seedLongAccount(suffix: number): Promise<string> {
       openingBalanceMinor: 0,
       openingDate: '2024-01-01',
     });
-    for (let n = 1; n <= LONG_SEEDED; n += 1) {
+    for (let n = 1; n <= count; n += 1) {
       await createManualTransaction(ctx, {
         accountId: account.id,
         bookingDate: new Date(Date.UTC(2025, 0, n)).toISOString().slice(0, 10),
