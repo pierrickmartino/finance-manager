@@ -15,9 +15,10 @@ import {
 } from './detail-layout';
 
 /**
- * The Transaction detail the moment a Transaction is opened, before its data arrives. Its
- * header carries the Transaction's name, so the row or the preview morphs into it straight
- * away (ADR-0012) and the page's content streams in behind. It draws with the page's own
+ * The Transaction detail the moment a Transaction is opened, before its data arrives. Opened
+ * from the Transactions list, its header carries the Transaction's name, so the row or the
+ * preview morphs into it straight away (ADR-0012) and the page's content streams in behind;
+ * reached from another Transaction detail, it doesn't, so the step swaps without motion. It draws with the page's own
  * layout classes (`detail-layout.ts`), so the morph lands where the page's header will be.
  */
 export default function Loading(): ReactElement {
@@ -31,7 +32,7 @@ export default function Loading(): ReactElement {
         <div className={`${PLACEHOLDER_CLASS} h-5 w-28`} />
         {hasList && <div className={`${PLACEHOLDER_CLASS} h-5 w-16 sm:w-48`} />}
       </div>
-      <TransactionMorph transactionId={id} part="detail">
+      <TransactionMorph transactionId={id} part="loading">
         <header aria-hidden="true" className={DETAIL_HEADER_CLASS}>
           <div className={`${PLACEHOLDER_CLASS} ${DETAIL_HEADER_INITIAL_CLASS}`} />
           <div className={DETAIL_HEADER_TITLE_CLASS}>

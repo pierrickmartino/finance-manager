@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { useGuardedPush } from '@/components/unsaved-changes';
 import { listStepFor } from '@/lib/list-step-keys';
 
@@ -24,7 +24,9 @@ interface ListStepKeysProps {
 export function ListStepKeys({ previousHref, nextHref }: ListStepKeysProps): null {
   const stepTo = useStepThroughList();
 
-  useEffect(() => {
+  // A layout effect, so the keys work from the moment the stepper shows: React holds passive
+  // effects back until a running view transition (the open's morph, ADR-0012) has ended.
+  useLayoutEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       const target = event.target instanceof HTMLElement ? event.target : null;

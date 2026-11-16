@@ -1,6 +1,13 @@
 'use client';
 
-import { useSyncExternalStore, ViewTransition, type ReactElement, type ReactNode } from 'react';
+import {
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+  ViewTransition,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { minWidthQuery } from '@/lib/breakpoints';
 import { createSharedSubscription } from '@/lib/shared-subscription';
 import { isMorphing, type MorphPart } from '@/lib/transaction-morph';
@@ -31,6 +38,32 @@ function useIsWide(): boolean | null {
   );
 }
 
+/*
+ * How many Transaction detail headers are mounted. Counted in layout effects, which run in the
+ * commit itself: React holds passive effects back until a running view transition ends.
+ */
+let detailsShown = 0;
+
+function useCountDetailShown(part: MorphPart): void {
+  useLayoutEffect(() => {
+    if (part !== 'detail') return;
+    detailsShown += 1;
+    return () => {
+      detailsShown -= 1;
+    };
+  }, [part]);
+}
+
+/**
+ * For the loading skeleton: whether another Transaction detail was on screen when it started
+ * loading. Read once, while the skeleton first renders: the detail it replaces is unmounted only
+ * when the skeleton commits.
+ */
+function useIsFromDetail(part: MorphPart): boolean {
+  const [isFromDetail] = useState(() => part === 'loading' && detailsShown > 0);
+  return isFromDetail;
+}
+
 interface TransactionMorphProps {
   transactionId: string;
   part: MorphPart;
@@ -43,14 +76,16 @@ interface TransactionMorphProps {
  * into the Transaction detail's header, and going back reverses it. Only one source is named per
  * width (`isMorphing`), so a name is never mounted twice. Nothing else animates: a boundary never
  * enters, leaves or updates on its own, so picking another Transaction in the preview stays
- * instant.
+ * instant, and so does stepping from one Transaction detail to another.
  */
 export function TransactionMorph({
   transactionId,
   part,
   children,
 }: TransactionMorphProps): ReactElement {
-  const isNamed = isMorphing(part, useIsWide());
+  useCountDetailShown(part);
+  const fromDetail = useIsFromDetail(part);
+  const isNamed = isMorphing(part, useIsWide(), { fromDetail });
   return (
     // A boundary that gains or loses the name (across `xl`, or once hydrated) is a new one: React
     // tracks a name from its boundary's mount to its unmount, so naming or unnaming a mounted

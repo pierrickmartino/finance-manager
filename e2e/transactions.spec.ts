@@ -6,9 +6,9 @@ import { createManualTransaction } from '../src/server/services/transactions/man
 import { openAccountPage, openNewAccountForm } from './support/accounts';
 import { addExpenseCategory } from './support/categories';
 import { withServices } from './support/services';
-import { openTransaction } from './support/transactions';
+import { openTransaction, slowTransactionDetails } from './support/transactions';
 import { breakpointPx } from '../src/lib/breakpoints';
-import { viewTransitionMotionDuring } from './support/view-transitions';
+import { slowViewTransitions, viewTransitionMotionDuring } from './support/view-transitions';
 
 const UBS_OCTOBER = path.join(
   import.meta.dirname,
@@ -109,7 +109,9 @@ test('steps through the Transactions list it was opened from with Previous and N
   await expect(stepper.getByRole('link', { name: 'Previous Transaction' })).toHaveCount(0);
   await expect(title).toHaveText(newest);
 
-  // Next and Previous open the neighbouring Transactions of that list, without animation
+  // Next and Previous open the neighbouring Transactions of that list, without animation, even
+  // when the next one is slow to arrive and its loading skeleton shows first
+  await slowTransactionDetails(page, 1000);
   const stepping = await viewTransitionMotionDuring(page, async () => {
     await stepper.getByRole('link', { name: 'Next Transaction' }).click();
     await expect(stepper.getByText('2 of 14', { exact: true })).toBeVisible();
@@ -254,6 +256,29 @@ test('j and k step through the Transactions list, but never while typing in a fi
   await page.keyboard.press('j');
   await expect(title).toHaveText(newest);
   expect(page.url()).toBe(bare.toString());
+});
+
+test('j steps on as soon as the Transaction detail shows, while its morph still runs', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const accountId = await seedLongAccount(suffix, 3);
+  await page.setViewportSize(NARROW);
+  await page.goto(`/transactions?accountId=${accountId}`);
+  const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
+  await expect(rows).toHaveCount(3);
+  await page.waitForLoadState('networkidle');
+  // The row morphs into the loading skeleton, then the skeleton into the page: the detail
+  // arrives after the first morph has ended, and the page shows while the second still runs.
+  await slowViewTransitions(page, 1000);
+  await slowTransactionDetails(page, 2000);
+
+  await rows.first().getByRole('link').click();
+  const stepper = listStepper(page);
+  await expect(stepper.getByText('1 of 3', { exact: true })).toBeVisible();
+  await page.keyboard.press('j');
+  await expect(stepper.getByText('2 of 3', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(longItemName(2, suffix));
 });
 
 test('unsaved classification edits are never lost or saved by stepping through the list', async ({
