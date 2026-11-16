@@ -10,6 +10,7 @@ import { splitLabel } from '../transaction-display';
 import { removeSplitAction, splitTransactionAction } from './actions';
 import { SplitForm } from './split-form';
 import { initialSplitDrafts } from './split-lines';
+import type { SearchValues } from '../search';
 import { LinkTransferForm, TransferCounterpart, UnlinkTransferForm } from './transfer-section';
 import { SECTION_TITLE_CLASS } from '@/components/surface';
 
@@ -32,6 +33,8 @@ interface SplitSectionProps {
   payees: PayeeRef[];
   lineTransfers: LineTransfers;
   fmt: Formatter;
+  /** The Transactions list the detail was opened from, carried on to Transfer counterparts. */
+  list?: SearchValues | null;
   /** Classes of the section, e.g. to draw it as a card. */
   className?: string;
 }
@@ -46,6 +49,7 @@ export function SplitSection({
   payees,
   lineTransfers,
   fmt,
+  list = null,
   className = 'flex flex-col gap-3',
 }: SplitSectionProps) {
   const isSplit = transaction.splitLines.length > 0;
@@ -53,7 +57,12 @@ export function SplitSection({
   const transfers = Object.fromEntries(
     Object.entries(lineTransfers).flatMap(([lineId, { counterpart }]) =>
       counterpart
-        ? [[lineId, <TransferCounterpart key={lineId} counterpart={counterpart} fmt={fmt} />]]
+        ? [
+            [
+              lineId,
+              <TransferCounterpart key={lineId} counterpart={counterpart} fmt={fmt} list={list} />,
+            ],
+          ]
         : [],
     ),
   );
@@ -90,7 +99,12 @@ export function SplitSection({
       </div>
       {isSplit ? (
         <>
-          <SplitLinesTable transaction={transaction} lineTransfers={lineTransfers} fmt={fmt} />
+          <SplitLinesTable
+            transaction={transaction}
+            lineTransfers={lineTransfers}
+            fmt={fmt}
+            list={list}
+          />
           <details className="w-full">
             <summary className={SUMMARY}>Edit Split</summary>
             <div className="pt-4">{form}</div>
@@ -109,9 +123,9 @@ export function SplitSection({
   );
 }
 
-type TableProps = Pick<SplitSectionProps, 'transaction' | 'lineTransfers' | 'fmt'>;
+type TableProps = Pick<SplitSectionProps, 'transaction' | 'lineTransfers' | 'fmt' | 'list'>;
 
-function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
+function SplitLinesTable({ transaction, lineTransfers, fmt, list = null }: TableProps) {
   return (
     <div className="overflow-x-auto">
       <table aria-label="Split lines" className="w-full text-sm">
@@ -134,6 +148,7 @@ function SplitLinesTable({ transaction, lineTransfers, fmt }: TableProps) {
                   position={index + 1}
                   transfer={lineTransfers[line.id]}
                   fmt={fmt}
+                  list={list}
                 />
               </td>
               <td className={CELL}>
@@ -174,6 +189,7 @@ interface LineClassificationProps {
   position: number;
   transfer: LineTransfers[string] | undefined;
   fmt: Formatter;
+  list: SearchValues | null;
 }
 
 /**
@@ -186,12 +202,13 @@ function LineClassification({
   position,
   transfer,
   fmt,
+  list,
 }: LineClassificationProps) {
   if (transfer?.counterpart) {
     return (
       <div className="flex flex-col gap-1">
         <span className="text-info">
-          <TransferCounterpart counterpart={transfer.counterpart} fmt={fmt} />
+          <TransferCounterpart counterpart={transfer.counterpart} fmt={fmt} list={list} />
         </span>
         <UnlinkTransferForm
           transactionId={transactionId}
