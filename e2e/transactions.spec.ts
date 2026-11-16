@@ -256,6 +256,118 @@ test('j and k step through the Transactions list, but never while typing in a fi
   expect(page.url()).toBe(bare.toString());
 });
 
+test('unsaved classification edits are never lost or saved by stepping through the list', async ({
+  page,
+}) => {
+  const accountName = await importUbsAccount(page, 'Unsaved');
+  await page.setViewportSize(NARROW);
+  const rows = await listAccount(page, accountName);
+  const title = page.getByRole('heading', { level: 1 });
+  const stepper = listStepper(page);
+  const position = (text: string) => stepper.getByText(text, { exact: true });
+  const classification = page.getByRole('form', { name: 'Classification' });
+  const notes = classification.getByLabel('Notes');
+
+  await rows.nth(0).getByRole('link').click();
+  await detailShown(page);
+  await expect(position('1 of 14')).toBeVisible();
+  const newest = await title.innerText();
+
+  // A changed note, then Next: asked first; staying keeps the edit as it was
+  await notes.fill('Half-written note');
+  const dismissed = nextDialog(page, 'dismiss');
+  await stepper.getByRole('link', { name: 'Next Transaction' }).click();
+  expect(await dismissed).toBe('Discard unsaved changes?');
+  await expect(notes).toHaveValue('Half-written note');
+  await expect(position('1 of 14')).toBeVisible();
+  await expect(title).toHaveText(newest);
+
+  // Confirming leaves, and nothing was saved on the way
+  const accepted = nextDialog(page, 'accept');
+  await stepper.getByRole('link', { name: 'Next Transaction' }).click();
+  expect(await accepted).toBe('Discard unsaved changes?');
+  await expect(position('2 of 14')).toBeVisible();
+  await stepper.getByRole('link', { name: 'Previous Transaction' }).click();
+  await expect(position('1 of 14')).toBeVisible();
+  await expect(notes).toHaveValue('');
+});
+
+test('j, k, "← Transactions" and the browser ask before discarding a changed Category or Split, until it is saved', async ({
+  page,
+}) => {
+  const accountName = await importUbsAccount(page, 'Guarded');
+  const groceries = `Groceries ${Date.now()}`;
+  await addExpenseCategory(page, `Food ${Date.now()}`, groceries);
+  await page.setViewportSize(NARROW);
+  const rows = await listAccount(page, accountName);
+  const stepper = listStepper(page);
+  const position = (text: string) => stepper.getByText(text, { exact: true });
+  const classification = page.getByRole('form', { name: 'Classification' });
+  const category = classification.getByLabel('Category');
+
+  await rows.nth(1).getByRole('link').click();
+  await detailShown(page);
+  await expect(position('2 of 14')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+
+  // Nothing changed: stepping goes without a word
+  const quiet = recordDialogs(page);
+  await stepTo(page, 'Next', '3 of 14');
+  await stepTo(page, 'Previous', '2 of 14');
+  expect(quiet).toEqual([]);
+  page.removeAllListeners('dialog');
+
+  // A changed Category: j, k and "← Transactions" each ask, and staying keeps it
+  await category.selectOption({ label: groceries });
+  await category.blur();
+  for (const leave of [
+    () => page.keyboard.press('j'),
+    () => page.keyboard.press('k'),
+    () => page.getByRole('link', { name: '← Transactions' }).click(),
+  ]) {
+    const asked = nextDialog(page, 'dismiss');
+    await leave();
+    expect(await asked).toBe('Discard unsaved changes?');
+    await expect(position('2 of 14')).toBeVisible();
+    await expect(category.locator('option:checked')).toHaveText(groceries);
+  }
+
+  // Reloading or closing the tab warns too
+  const unload = nextDialog(page, 'dismiss', 'beforeunload');
+  await page.close({ runBeforeUnload: true });
+  await unload;
+  expect(page.isClosed()).toBe(false);
+
+  // Once saved, leaving no longer asks, and the saved Category stays
+  await classification.getByRole('button', { name: 'Save classification' }).click();
+  await expect(classification.getByText('Saved.')).toBeVisible();
+  const saved = recordDialogs(page);
+  await stepTo(page, 'Next', '3 of 14');
+  await stepTo(page, 'Previous', '2 of 14');
+  await expect(category.locator('option:checked')).toHaveText(groceries);
+  expect(saved).toEqual([]);
+  page.removeAllListeners('dialog');
+
+  // A changed Split draft asks the same way
+  await page.getByText('Split Transaction', { exact: true }).click();
+  const splitNote = page.getByRole('form', { name: 'Split' }).getByLabel('Note of line 1');
+  await splitNote.fill('Half a Split');
+  const split = nextDialog(page, 'dismiss');
+  await stepper.getByRole('link', { name: 'Next Transaction' }).click();
+  expect(await split).toBe('Discard unsaved changes?');
+  await expect(position('2 of 14')).toBeVisible();
+  const confirmed = nextDialog(page, 'accept');
+  await page.getByRole('link', { name: '← Transactions' }).click();
+  expect(await confirmed).toBe('Discard unsaved changes?');
+  await expect(page).toHaveURL(/\/transactions\?/);
+
+  // With nothing unsaved, the tab closes without a warning
+  const closing = recordDialogs(page);
+  await page.close({ runBeforeUnload: true });
+  await expect.poll(() => page.isClosed()).toBe(true);
+  expect(closing).toEqual([]);
+});
+
 test.describe('opening a Transaction morphs it into its Transaction detail', () => {
   test('below xl, the tapped row expands into the detail and shrinks back', async ({ page }) => {
     const accountName = await importUbsAccount(page, 'Morph narrow');
@@ -580,6 +692,41 @@ async function backToList(page: Page): Promise<void> {
 async function listShown(rows: Locator): Promise<void> {
   await expect(rows.page()).toHaveURL(/\/transactions\?/);
   await expect(rows).toHaveCount(14);
+}
+
+/** Collects every dialog's message from now on, dismissing each one. */
+function recordDialogs(page: Page): string[] {
+  const messages: string[] = [];
+  page.on('dialog', (dialog) => {
+    messages.push(dialog.message());
+    void dialog.dismiss();
+  });
+  return messages;
+}
+
+/** Steps to the Previous or Next Transaction by its link and waits for its `position`. */
+async function stepTo(page: Page, step: 'Previous' | 'Next', position: string): Promise<void> {
+  const stepper = listStepper(page);
+  await stepper.getByRole('link', { name: `${step} Transaction` }).click();
+  await expect(stepper.getByText(position, { exact: true })).toBeVisible();
+}
+
+/** Answers the next dialog of `type` the page opens and resolves with its message. */
+function nextDialog(
+  page: Page,
+  answer: 'accept' | 'dismiss',
+  type: 'confirm' | 'beforeunload' = 'confirm',
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    page.once('dialog', (dialog) => {
+      if (dialog.type() !== type) {
+        reject(new Error(`Expected a ${type} dialog, got ${dialog.type()}`));
+        return;
+      }
+      const message = dialog.message();
+      void (answer === 'accept' ? dialog.accept() : dialog.dismiss()).then(() => resolve(message));
+    });
+  });
 }
 
 /**

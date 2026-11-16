@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import type { ReactElement, ReactNode } from 'react';
+import { GuardedLink } from '@/components/unsaved-changes';
 import { LIST_STEP_KEYS } from '@/lib/list-step-keys';
 import type { TransactionPlace } from '@/server/services/transactions';
 import { transactionDetailHref, type SearchValues } from '../search';
@@ -62,7 +62,7 @@ function Step({ href, label, shortcut, children }: StepProps): ReactElement {
     );
   }
   return (
-    <Link
+    <GuardedLink
       href={href}
       aria-label={label}
       aria-keyshortcuts={shortcut}
@@ -70,7 +70,7 @@ function Step({ href, label, shortcut, children }: StepProps): ReactElement {
     >
       {children}
       <KeyHint>{shortcut}</KeyHint>
-    </Link>
+    </GuardedLink>
   );
 }
 

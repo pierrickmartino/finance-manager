@@ -1,7 +1,8 @@
 'use client';
 
-import { startTransition, useActionState } from 'react';
+import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
+import { useReportUnsaved } from '@/components/unsaved-changes';
 import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
@@ -20,6 +21,22 @@ interface ClassificationFormProps {
   ) => Promise<ActionResult<unknown>>;
 }
 
+/** The fields a save writes; the rest of the form only describes them. */
+const FIELDS = ['payee', 'categoryId', 'tags', 'notes'] as const;
+
+/**
+ * What the form holds now, read from its fields (disabled ones too, so a Category that a Split
+ * disables still compares), to tell whether it differs from what was last saved.
+ */
+function draftOf(form: HTMLFormElement): string {
+  return JSON.stringify(
+    FIELDS.map((name) => {
+      const field = form.elements.namedItem(name);
+      return field && 'value' in field ? field.value : '';
+    }),
+  );
+}
+
 const LOCKED = <span className="text-xs font-normal text-warning">locked</span>;
 
 /** Payee, Category, Tags and notes of one Transaction (spec 63). Saving locks what changed. */
@@ -30,18 +47,40 @@ export function ClassificationForm({
   tagNames,
   action,
 }: ClassificationFormProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  /** The draft as last saved, and the one being saved: what the form is compared with. */
+  const saved = useRef<string | null>(null);
+  const submitted = useRef<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  useReportUnsaved('classification', isDirty);
+  useEffect(() => {
+    if (formRef.current) saved.current = draftOf(formRef.current);
+  }, []);
+  const compare = () => {
+    if (formRef.current) setIsDirty(draftOf(formRef.current) !== saved.current);
+  };
+
   const [state, formAction, isPending] = useActionState(action, null);
+  // A save makes what was submitted the new saved draft; edits typed since stay unsaved.
+  useEffect(() => {
+    if (!state?.ok || !formRef.current) return;
+    saved.current = submitted.current;
+    setIsDirty(draftOf(formRef.current) !== saved.current);
+  }, [state]);
   const locked = new Set(classification.lockedFields);
   const isLocked = (field: Classification['lockedFields'][number]) => locked.has(field) && LOCKED;
   const splitCount = classification.splitLines.length;
 
   return (
     <form
+      ref={formRef}
       aria-label="Classification"
+      onChange={compare}
       // Submitted by hand so a rejected form keeps what was typed (React resets action forms).
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
+        submitted.current = draftOf(event.currentTarget);
         startTransition(() => formAction(formData));
       }}
       className="flex max-w-xl flex-col gap-3"

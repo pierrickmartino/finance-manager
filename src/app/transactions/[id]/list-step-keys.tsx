@@ -1,17 +1,16 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useGuardedPush } from '@/components/unsaved-changes';
 import { listStepFor } from '@/lib/list-step-keys';
 
 /**
  * Opens a neighbouring Transaction of the Transactions list from its Transaction detail. The
- * one path the `j` / `k` keys navigate by, so a guard against losing unsaved edits (spec #152,
- * story 27) wraps the keys here, as it wraps the Previous / Next links.
+ * one path the `j` / `k` keys navigate by: like the Previous / Next links, it asks before
+ * discarding unsaved edits (spec #152, story 27).
  */
 export function useStepThroughList(): (href: string) => void {
-  const router = useRouter();
-  return useCallback((href: string) => router.push(href), [router]);
+  return useGuardedPush();
 }
 
 interface ListStepKeysProps {
