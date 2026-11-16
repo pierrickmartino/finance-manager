@@ -17,8 +17,21 @@ import type { TransactionListItem } from '@/server/services/transactions';
 import { transactionDetailHref, transactionsHref, type SearchValues } from './search';
 import { amountClass, CategoryLabel, transactionName } from './transaction-display';
 import { TransactionMorph } from './transaction-morph';
+import { PrototypeSwitcher, useVariant } from '@/components/prototype-switcher';
+import type { BulkVariantProps } from './bulk-prototype/shared';
+import { VariantBDock } from './bulk-prototype/variant-b-dock';
+import { VariantCHeader } from './bulk-prototype/variant-c-header';
+import { VariantDDrawer } from './bulk-prototype/variant-d-drawer';
 
 const CELL = 'px-3 py-2 align-top';
+
+/** PROTOTYPE: the bulk actions variants, `?variant=A…D`. */
+const BULK_VARIANTS = [
+  { key: 'A', name: 'Current bar' },
+  { key: 'B', name: 'Floating dock' },
+  { key: 'C', name: 'Header takeover' },
+  { key: 'D', name: 'Staged edit panel' },
+] as const;
 
 interface TransactionListProps {
   transactions: TransactionListItem[];
@@ -62,22 +75,53 @@ export function TransactionList({
   const selected = transactions.filter((transaction) => ticked.has(transaction.id));
   const isPageTicked = transactions.length > 0 && selected.length === transactions.length;
   const isAll = isWholeScope && isPageTicked;
+  // PROTOTYPE: bulk actions redesign. A = today's bar; B, C, D in ./bulk-prototype.
+  const variant = useVariant(BULK_VARIANTS);
+  const variantProps: BulkVariantProps = {
+    scope: isAll ? { filter } : { transactionIds: selected.map((transaction) => transaction.id) },
+    count: isAll ? total : selected.length,
+    isAll,
+    selected,
+    pageCount: transactions.length,
+    total,
+    onWholeScope: setWholeScope,
+    lists,
+    // Beyond this page the selection's Tags aren't known: every Tag is offered.
+    removableTags: isAll ? lists.tags : tagsOf(selected),
+    onClear: () => tickAll(false),
+  };
+  const headerCheckbox = (
+    <HeaderCheckbox
+      selectedCount={selected.length}
+      rowCount={transactions.length}
+      onChange={tickAll}
+      label="Select every Transaction on this page"
+    />
+  );
+  const columns = (
+    <>
+      <th className={`${CELL} text-left font-medium`}>Date</th>
+      <th className={`${CELL} text-left font-medium`}>Transaction</th>
+      <th className={`${CELL} text-right font-medium`}>Amount</th>
+    </>
+  );
 
   return (
     <div className="flex flex-col gap-3">
-      <BulkActionBar
-        scope={
-          isAll ? { filter } : { transactionIds: selected.map((transaction) => transaction.id) }
-        }
-        count={isAll ? total : selected.length}
-        groups={lists.groups}
-        payeeNames={lists.payeeNames}
-        tags={lists.tags}
-        // Beyond this page the selection's Tags aren't known: every Tag is offered.
-        removableTags={isAll ? lists.tags : tagsOf(selected)}
-        onClear={() => tickAll(false)}
-      />
-      {isPageTicked && total > transactions.length && (
+      {variant === 'A' && (
+        <BulkActionBar
+          scope={variantProps.scope}
+          count={variantProps.count}
+          groups={lists.groups}
+          payeeNames={lists.payeeNames}
+          tags={lists.tags}
+          removableTags={variantProps.removableTags}
+          onClear={variantProps.onClear}
+        />
+      )}
+      {variant === 'B' && <VariantBDock {...variantProps} />}
+      {variant === 'D' && <VariantDDrawer {...variantProps} />}
+      {(variant === 'A' || variant === 'D') && isPageTicked && total > transactions.length && (
         <SelectAllMatching
           pageCount={transactions.length}
           total={total}
@@ -85,22 +129,23 @@ export function TransactionList({
           onChange={setWholeScope}
         />
       )}
-      <div className={`${CARD_CLASS} overflow-x-auto`}>
+      <PrototypeSwitcher variants={BULK_VARIANTS} current={variant} />
+      <div className={`${CARD_CLASS} ${variant === 'C' ? '' : 'overflow-x-auto'}`}>
         <table aria-label="Transactions" className="w-full text-sm">
           <thead className="border-b border-rule text-xs text-muted">
-            <tr>
-              <th className={CHECK_CELL_CLASS}>
-                <HeaderCheckbox
-                  selectedCount={selected.length}
-                  rowCount={transactions.length}
-                  onChange={tickAll}
-                  label="Select every Transaction on this page"
-                />
-              </th>
-              <th className={`${CELL} text-left font-medium`}>Date</th>
-              <th className={`${CELL} text-left font-medium`}>Transaction</th>
-              <th className={`${CELL} text-right font-medium`}>Amount</th>
-            </tr>
+            {variant === 'C' ? (
+              <VariantCHeader
+                {...variantProps}
+                checkbox={headerCheckbox}
+                columns={columns}
+                span={3}
+              />
+            ) : (
+              <tr>
+                <th className={CHECK_CELL_CLASS}>{headerCheckbox}</th>
+                {columns}
+              </tr>
+            )}
           </thead>
           <tbody className="divide-y divide-rule">
             {transactions.map((transaction) => (
