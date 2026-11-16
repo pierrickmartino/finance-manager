@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { BulkActionBar, type BulkTag } from '@/components/bulk-edit/bulk-action-bar';
+import { HeaderCheckbox, tagsOf, useRowSelection } from '@/components/bulk-edit/row-selection';
 import { useFormatter } from '@/components/formatter-provider';
 import { CARD_CLASS } from '@/components/surface';
 import type { CategoryGroup } from '@/server/services/categories';
@@ -43,32 +44,13 @@ export function TransactionList({
   lists,
   children,
 }: TransactionListProps) {
-  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
-  const [anchorId, setAnchorId] = useState<string | null>(null);
+  const {
+    ticked,
+    tick,
+    tickAll: tickPage,
+  } = useRowSelection(transactions.map((transaction) => transaction.id));
   // Only listed rows count: an edit can move a ticked row out of the filter.
   const selected = transactions.filter((transaction) => ticked.has(transaction.id));
-
-  const tick = (id: string, isChecked: boolean, isRange: boolean): void => {
-    const ids = transactions.map((transaction) => transaction.id);
-    const from = anchorId === null ? -1 : ids.indexOf(anchorId);
-    const to = ids.indexOf(id);
-    const range =
-      isRange && from !== -1 ? ids.slice(Math.min(from, to), Math.max(from, to) + 1) : [id];
-    setTicked((current) => {
-      const next = new Set(current);
-      for (const rangeId of range) {
-        if (isChecked) next.add(rangeId);
-        else next.delete(rangeId);
-      }
-      return next;
-    });
-    setAnchorId(id);
-  };
-
-  const tickPage = (isChecked: boolean): void => {
-    setTicked(new Set(isChecked ? transactions.map((transaction) => transaction.id) : []));
-    setAnchorId(null);
-  };
 
   const clear = (): void => tickPage(false);
 
@@ -88,10 +70,11 @@ export function TransactionList({
           <thead className="border-b border-rule text-xs text-muted">
             <tr>
               <th className={CHECK_CELL}>
-                <PageCheckbox
+                <HeaderCheckbox
                   selectedCount={selected.length}
                   rowCount={transactions.length}
                   onChange={tickPage}
+                  label="Select every Transaction on this page"
                 />
               </th>
               <th className={`${CELL} text-left font-medium`}>Date</th>
@@ -115,40 +98,6 @@ export function TransactionList({
       </div>
       {children}
     </div>
-  );
-}
-
-/** The Tags on these Transactions (their own, not their Split lines'), by name. */
-function tagsOf(transactions: TransactionListItem[]): BulkTag[] {
-  const tags = new Map(transactions.flatMap((t) => t.tags).map((tag) => [tag.id, tag]));
-  return [...tags.values()]
-    .map(({ id, name }) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-interface PageCheckboxProps {
-  selectedCount: number;
-  rowCount: number;
-  onChange: (isChecked: boolean) => void;
-}
-
-/** Ticks or unticks every row on the page; mixed while only some are ticked. */
-function PageCheckbox({ selectedCount, rowCount, onChange }: PageCheckboxProps) {
-  const ref = useRef<HTMLInputElement>(null);
-  const isAll = rowCount > 0 && selectedCount === rowCount;
-  const isMixed = selectedCount > 0 && !isAll;
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = isMixed;
-  }, [isMixed]);
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      checked={isAll}
-      onChange={() => onChange(!isAll)}
-      aria-label="Select every Transaction on this page"
-      className="accent-accent-ink"
-    />
   );
 }
 
