@@ -169,6 +169,71 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await expect(rows.first().getByRole('checkbox')).not.toBeChecked();
 });
 
+test('selects every Transaction the filter matches, across pages, and bulk edits them', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { accountId, groceriesName } = await seedAccount(suffix);
+  const item = (n: number) => itemName(n, suffix);
+
+  await page.setViewportSize(WIDE);
+  await page.goto(`/transactions?accountId=${accountId}`);
+  const rows = page.getByRole('table', { name: 'Transactions' }).locator('tbody tr');
+  await expect(rows).toHaveCount(50);
+  await page.waitForLoadState('networkidle');
+  const bar = page.getByRole('region', { name: 'Bulk edit' });
+  const header = page.getByRole('checkbox', { name: 'Select every Transaction on this page' });
+  const selectAll = page.getByRole('button', { name: `Select all ${SEEDED} matching this filter` });
+  const onlyPage = page.getByRole('button', { name: 'Select only this page' });
+  const pages = page.getByRole('navigation', { name: 'Pages' });
+
+  // Filter on the search text too, so the scope is a filter of more than one field
+  const search = page.getByRole('form', { name: 'Search Transactions' });
+  await search.getByLabel('Search').fill(`${suffix}`);
+  await search.getByRole('button', { name: 'Search' }).click();
+  await expect(page.getByText(`${SEEDED} Transactions`)).toBeVisible();
+  await expect(rows).toHaveCount(50);
+
+  // "Select all N matching" only appears once every visible row is selected
+  await rows.first().getByRole('checkbox').check();
+  await expect(bar).toContainText('1 selected');
+  await expect(selectAll).toBeHidden();
+  await header.check();
+  await expect(bar).toContainText('50 selected');
+
+  // It selects the filter's total, and can be undone
+  await selectAll.click();
+  await expect(bar).toContainText(`${SEEDED} selected`);
+  await onlyPage.click();
+  await expect(bar).toContainText('50 selected');
+  await selectAll.click();
+  await expect(bar).toContainText(`${SEEDED} selected`);
+
+  // Set Category edits every match, on every page; the split one is left out
+  await bar.getByRole('button', { name: 'Set Category' }).click();
+  await bar.getByLabel('Category').selectOption({ label: groceriesName });
+  await bar.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByRole('status')).toHaveText(
+    `Set ${groceriesName} on ${SEEDED - 1} Transactions · 1 split or Transfer left out.`,
+  );
+  await expect(header).not.toBeChecked();
+  await pages.getByRole('link', { name: 'Next' }).click();
+  await expect(rows).toHaveCount(2);
+  for (const n of [1, 2]) {
+    await expect(rows.filter({ hasText: item(n) })).toContainText(groceriesName);
+  }
+
+  // A page change clears a "select all"
+  await pages.getByRole('link', { name: 'Previous' }).click();
+  await expect(rows).toHaveCount(50);
+  await header.check();
+  await selectAll.click();
+  await expect(bar).toContainText(`${SEEDED} selected`);
+  await pages.getByRole('link', { name: 'Next' }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(bar).toBeHidden();
+});
+
 test('on a phone the action bar is fixed to the bottom of the screen', async ({ page }) => {
   const suffix = Date.now();
   const { accountId } = await seedAccount(suffix);

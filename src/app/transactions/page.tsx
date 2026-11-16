@@ -8,6 +8,7 @@ import { listCategoryGroups } from '@/server/services/categories';
 import { listPayees } from '@/server/services/payees';
 import { listTags } from '@/server/services/tags';
 import { ServiceError } from '@/server/services/errors';
+import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 import {
   listTransactions,
   type TransactionPage,
@@ -36,6 +37,11 @@ async function loadPage(
     if (error instanceof ServiceError) return { page: null, error: error.message };
     throw error;
   }
+}
+
+/** The list's filter without its page: what "Select all N matching this filter" edits. */
+function filterOf({ page: _page, pageSize: _pageSize, ...filter }: TransactionQuery): BulkFilter {
+  return filter;
 }
 
 /**
@@ -68,6 +74,7 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
         <div className="flex min-w-0 flex-col gap-3">
           {error && <FieldError message={error} />}
           {page &&
+            search.query &&
             (page.transactions.length === 0 ? (
               <p className="text-sm text-muted">No Transactions match.</p>
             ) : (
@@ -81,6 +88,8 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                   transactions={page.transactions}
                   values={search.values}
                   page={page.page}
+                  total={page.total}
+                  filter={filterOf(search.query)}
                   selectedId={selected?.id ?? null}
                   lists={{ groups, payeeNames: payees.map((payee) => payee.name), tags }}
                 >
