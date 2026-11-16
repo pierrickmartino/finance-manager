@@ -73,7 +73,12 @@ export function GroupTransactions({
         groups={lists.groups}
         payeeNames={lists.payeeNames}
         tags={lists.tags}
-        removableTags={tagsOf(isWholeGroup ? transactions : selected)}
+        // Beyond the rows shown the selection's Tags aren't known: every Tag is offered.
+        removableTags={
+          isWholeGroup && groupCount > transactions.length
+            ? lists.tags
+            : tagsOf(isWholeGroup ? transactions : selected)
+        }
         onClear={() => tickShown(false)}
       />
       {transactions.length === 0 ? (

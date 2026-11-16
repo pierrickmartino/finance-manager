@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { BulkActionBar, type BulkTag } from '@/components/bulk-edit/bulk-action-bar';
 import { HeaderCheckbox, tagsOf, useRowSelection } from '@/components/bulk-edit/row-selection';
 import { useFormatter } from '@/components/formatter-provider';
 import { CARD_CLASS } from '@/components/surface';
 import type { CategoryGroup } from '@/server/services/categories';
+import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { transactionsHref, type SearchValues } from './search';
 import { amountClass, CategoryLabel, transactionName } from './transaction-display';
@@ -20,6 +21,10 @@ interface TransactionListProps {
   transactions: TransactionListItem[];
   values: SearchValues;
   page: number;
+  /** How many Transactions the filter matches, on every page. */
+  total: number;
+  /** The list's filter: the scope of "Select all N matching this filter". */
+  filter: BulkFilter;
   /** The row the preview pane shows (`xl` and up). */
   selectedId: string | null;
   /** What the Bulk edit bar offers. */
@@ -35,36 +40,61 @@ interface TransactionListProps {
  * Rows can be ticked for a Bulk edit: one by one, a range with shift-click from the last
  * ticked row, or the whole page from the header. The selection lives here only, never in the
  * URL: the page mounts the list afresh (by key) on every page or filter change, which clears it.
+ * Once the whole page is ticked, "Select all N matching this filter" widens the selection to
+ * the filter itself, every page of it; any other change to the selection narrows it back.
  */
 export function TransactionList({
   transactions,
   values,
   page,
+  total,
+  filter,
   selectedId,
   lists,
   children,
 }: TransactionListProps) {
-  const {
-    ticked,
-    tick,
-    tickAll: tickPage,
-  } = useRowSelection(transactions.map((transaction) => transaction.id));
+  const selection = useRowSelection(transactions.map((transaction) => transaction.id));
+  const { ticked } = selection;
+  const [isAllMatching, setIsAllMatching] = useState(false);
   // Only listed rows count: an edit can move a ticked row out of the filter.
   const selected = transactions.filter((transaction) => ticked.has(transaction.id));
+  const isPageTicked = transactions.length > 0 && selected.length === transactions.length;
+  const isAll = isAllMatching && isPageTicked;
+
+  // Any change to the ticks narrows the selection back to the ticked rows.
+  const tick = (id: string, isChecked: boolean, isRange: boolean): void => {
+    setIsAllMatching(false);
+    selection.tick(id, isChecked, isRange);
+  };
+  const tickPage = (isChecked: boolean): void => {
+    setIsAllMatching(false);
+    selection.tickAll(isChecked);
+  };
 
   const clear = (): void => tickPage(false);
 
   return (
     <div className="flex flex-col gap-3">
       <BulkActionBar
-        scope={{ transactionIds: selected.map((transaction) => transaction.id) }}
-        count={selected.length}
+        scope={
+          isAll ? { filter } : { transactionIds: selected.map((transaction) => transaction.id) }
+        }
+        count={isAll ? total : selected.length}
         groups={lists.groups}
         payeeNames={lists.payeeNames}
         tags={lists.tags}
-        removableTags={tagsOf(selected)}
+        // Beyond this page the selection's Tags aren't known: every Tag is offered.
+        removableTags={isAll ? lists.tags : tagsOf(selected)}
         onClear={clear}
       />
+      {isPageTicked && total > transactions.length && (
+        <SelectAllMatching
+          pageCount={transactions.length}
+          total={total}
+          isAll={isAll}
+          onChange={setIsAllMatching}
+        />
+      )}
       <div className={`${CARD_CLASS} overflow-x-auto`}>
         <table aria-label="Transactions" className="w-full text-sm">
           <thead className="border-b border-rule text-xs text-muted">
@@ -98,6 +128,34 @@ export function TransactionList({
       </div>
       {children}
     </div>
+  );
+}
+
+interface SelectAllMatchingProps {
+  /** Rows on this page. */
+  pageCount: number;
+  /** Transactions the filter matches. */
+  total: number;
+  /** Whether the selection is the whole filter rather than this page. */
+  isAll: boolean;
+  onChange: (isAll: boolean) => void;
+}
+
+/** With the whole page ticked: widens the selection to every match of the filter, or back. */
+function SelectAllMatching({ pageCount, total, isAll, onChange }: SelectAllMatchingProps) {
+  return (
+    <p className="flex flex-wrap items-center justify-center gap-x-2 rounded-lg bg-sunken px-3 py-2 text-sm text-ink-soft">
+      {isAll
+        ? `All ${total} Transactions matching this filter are selected.`
+        : `All ${pageCount} Transactions on this page are selected.`}
+      <button
+        type="button"
+        onClick={() => onChange(!isAll)}
+        className="font-medium text-ink underline hover:no-underline"
+      >
+        {isAll ? 'Select only this page' : `Select all ${total} matching this filter`}
+      </button>
+    </p>
   );
 }
 
