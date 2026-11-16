@@ -6,6 +6,9 @@ import { CARD_CLASS } from '@/components/surface';
  * from these: a change here moves the page and its skeleton together.
  */
 
+/** The line above the header: "← Transactions", and Previous / Next at its right. */
+export const DETAIL_TOP_LINE_CLASS = 'flex min-h-5 flex-wrap items-center justify-between gap-3';
+
 /** One of the page's cards: the Split section, Classification, Transfer, bank fields. */
 export const DETAIL_PANEL_CLASS = `${CARD_CLASS} flex flex-col gap-3 p-5`;
 

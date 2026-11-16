@@ -72,6 +72,17 @@ export const PILL_BUTTON_CLASS =
 /** A quiet action that sits inside a row or toolbar. */
 export const GHOST_BUTTON_CLASS =
   'rounded-md px-2 py-1 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink disabled:opacity-30';
+/**
+ * A quiet step link of a toolbar, such as Previous / Next on a Transaction detail: soft ink,
+ * underlined on hover. Its `_DISABLED` twin is the same step at an end, not a link: faint.
+ */
+export const STEP_LINK_CLASS =
+  'inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:underline';
+export const STEP_LINK_DISABLED_CLASS =
+  'inline-flex items-center gap-1.5 text-sm font-medium text-faint';
+/** A keyboard shortcut's hint beside the control it triggers (`j`, `k`): a small key cap. */
+export const KEY_HINT_CLASS =
+  'rounded-md border border-rule bg-sunken px-1 font-mono text-xs leading-4 font-normal text-muted';
 /** A button that reads as a link within a sentence or notice (Select all N matching). */
 export const LINK_BUTTON_CLASS = 'font-medium text-ink underline hover:no-underline';
 /** Destructive actions: delete, remove. Text only, so they never look like the main action. */

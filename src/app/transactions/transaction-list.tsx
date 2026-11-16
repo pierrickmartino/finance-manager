@@ -14,7 +14,7 @@ import { useFormatter } from '@/components/formatter-provider';
 import { CARD_CLASS, INFO_NOTICE_CLASS, LINK_BUTTON_CLASS } from '@/components/surface';
 import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 import type { TransactionListItem } from '@/server/services/transactions';
-import { transactionsHref, type SearchValues } from './search';
+import { transactionDetailHref, transactionsHref, type SearchValues } from './search';
 import { amountClass, CategoryLabel, transactionName } from './transaction-display';
 import { TransactionMorph } from './transaction-morph';
 
@@ -108,6 +108,7 @@ export function TransactionList({
                 key={transaction.id}
                 transaction={transaction}
                 previewHref={transactionsHref(values, page, transaction.id)}
+                detailHref={transactionDetailHref(transaction.id, values)}
                 isPreviewed={transaction.id === selectedId}
                 isTicked={ticked.has(transaction.id)}
                 onTick={(isChecked, isRange) => tick(transaction.id, isChecked, isRange)}
@@ -148,13 +149,15 @@ function SelectAllMatching({ pageCount, total, isAll, onChange }: SelectAllMatch
 interface RowProps {
   transaction: TransactionListItem;
   previewHref: string;
+  /** Its Transaction detail within this list (ADR-0013), opened from the row below `xl`. */
+  detailHref: string;
   isPreviewed: boolean;
   isTicked: boolean;
   /** `isRange`: shift was held, so the rows from the last ticked one follow. */
   onTick: (isChecked: boolean, isRange: boolean) => void;
 }
 
-function Row({ transaction, previewHref, isPreviewed, isTicked, onTick }: RowProps) {
+function Row({ transaction, previewHref, detailHref, isPreviewed, isTicked, onTick }: RowProps) {
   const fmt = useFormatter();
   const name = transactionName(transaction);
   const rowClass = isTicked ? 'bg-accent-tint' : isPreviewed ? 'xl:bg-sunken' : 'hover:bg-paper';
@@ -178,10 +181,7 @@ function Row({ transaction, previewHref, isPreviewed, isTicked, onTick }: RowPro
           >
             {name}
           </Link>
-          <Link
-            href={`/transactions/${transaction.id}`}
-            className="block truncate font-medium hover:underline xl:hidden"
-          >
+          <Link href={detailHref} className="block truncate font-medium hover:underline xl:hidden">
             {name}
           </Link>
           <div className="truncate text-xs text-muted">

@@ -28,6 +28,8 @@ import {
   type ClassificationChanges,
   type ClassificationField,
 } from '@/server/services/transactions';
+import { readTransactionSearch, transactionsAfterDeleteHref, type SearchValues } from '../search';
+import { locateInList } from './locate-in-list';
 import type { SplitLineDraft } from './split-lines';
 
 const sameText = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -206,18 +208,27 @@ export async function unlinkTransferAction(
   return result;
 }
 
-/** Deletes a Transaction and goes back to the list (the detail page is gone). */
+/**
+ * Deletes a Transaction (the detail page is gone) and goes back to the Transactions list it was
+ * opened from (`listFilters`, ADR-0013): at the page holding its neighbour, the next one, else
+ * the previous, with it selected. With no list, the bare list.
+ */
 export async function deleteTransactionFromDetailAction(
   id: string,
   isManual: boolean,
+  listFilters: SearchValues | null,
   _previous: ActionResult<unknown> | null,
 ): Promise<ActionResult<unknown>> {
   const result = await runAction(async () => {
     const ctx = await getServiceContext();
+    const { numberFormat } = await getRequestDisplaySettings();
+    const listSearch = listFilters ? readTransactionSearch(listFilters, numberFormat) : null;
+    const before = await locateInList(ctx, listSearch, id);
     await (isManual ? deleteManualTransaction(ctx, id) : deleteImportedTransaction(ctx, id));
+    return transactionsAfterDeleteHref(listFilters, before);
   });
   if (!result.ok) return result;
   revalidatePath('/transactions');
   revalidatePath('/accounts', 'layout');
-  redirect('/transactions');
+  redirect(result.data);
 }

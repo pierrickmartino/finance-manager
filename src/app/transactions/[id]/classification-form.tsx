@@ -1,7 +1,8 @@
 'use client';
 
-import { startTransition, useActionState } from 'react';
+import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
+import { useUnsavedDraft } from '@/components/unsaved-changes';
 import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
@@ -20,6 +21,22 @@ interface ClassificationFormProps {
   ) => Promise<ActionResult<unknown>>;
 }
 
+/** The fields a save writes; the rest of the form only describes them. */
+const FIELDS = ['payee', 'categoryId', 'tags', 'notes'] as const;
+
+/**
+ * What the form holds now, read from its fields (disabled ones too, so a Category that a Split
+ * disables still compares), to tell whether it differs from what was last saved.
+ */
+function draftOf(form: HTMLFormElement): string {
+  return JSON.stringify(
+    FIELDS.map((name) => {
+      const field = form.elements.namedItem(name);
+      return field && 'value' in field ? field.value : '';
+    }),
+  );
+}
+
 const LOCKED = <span className="text-xs font-normal text-warning">locked</span>;
 
 /** Payee, Category, Tags and notes of one Transaction (spec 63). Saving locks what changed. */
@@ -30,18 +47,28 @@ export function ClassificationForm({
   tagNames,
   action,
 }: ClassificationFormProps) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState(action, null);
+  /** What the form holds, read from its fields once mounted and on every change. */
+  const [draft, setDraft] = useState<string | null>(null);
+  useEffect(() => {
+    if (formRef.current) setDraft(draftOf(formRef.current));
+  }, []);
+  const markSubmitted = useUnsavedDraft('classification', draft, state);
   const locked = new Set(classification.lockedFields);
   const isLocked = (field: Classification['lockedFields'][number]) => locked.has(field) && LOCKED;
   const splitCount = classification.splitLines.length;
 
   return (
     <form
+      ref={formRef}
       aria-label="Classification"
+      onChange={(event) => setDraft(draftOf(event.currentTarget))}
       // Submitted by hand so a rejected form keeps what was typed (React resets action forms).
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
+        markSubmitted();
         startTransition(() => formAction(formData));
       }}
       className="flex max-w-xl flex-col gap-3"

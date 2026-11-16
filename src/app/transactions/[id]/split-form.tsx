@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useRef, useState, type ReactNode } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
+import { useUnsavedDraft } from '@/components/unsaved-changes';
 import { useFormatter } from '@/components/formatter-provider';
 import { BUTTON_CLASS } from '@/components/named-list';
 import { MAX_NOTES_LENGTH } from '@/lib/classification';
@@ -74,6 +75,8 @@ export function SplitForm({
   );
   const nextKey = useRef(initialLines.length);
   const drafts = lines.map((line) => line.draft);
+  const payload = JSON.stringify(drafts);
+  const markSubmitted = useUnsavedDraft('split', payload, state);
   const allocation = splitAllocation(
     amountMinor,
     drafts.map((draft) => draft.amount),
@@ -103,12 +106,13 @@ export function SplitForm({
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
+        markSubmitted();
         startTransition(() => formAction(formData));
       }}
       className="flex flex-col gap-4"
     >
       {/* One structured payload: every line's fields together, in order. */}
-      <input type="hidden" name="lines" value={JSON.stringify(drafts)} />
+      <input type="hidden" name="lines" value={payload} />
       <AllocationBar
         totalMinor={amountMinor}
         allocation={allocation}

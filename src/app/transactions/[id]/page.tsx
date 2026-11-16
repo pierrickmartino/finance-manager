@@ -33,8 +33,16 @@ import {
   unlockFieldAction,
 } from './actions';
 import { BackToTransactions } from '../back-to-list';
+import {
+  readDetailList,
+  transactionDetailHref,
+  transactionsBackHref,
+  type SearchValues,
+} from '../search';
 import { BankDetails } from './bank-details';
-import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS } from './detail-layout';
+import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS, DETAIL_TOP_LINE_CLASS } from './detail-layout';
+import { ListStepper } from './list-stepper';
+import { locateInList } from './locate-in-list';
 import { ClassificationForm } from './classification-form';
 import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
@@ -53,6 +61,8 @@ const EDITS_COLUMN =
 
 interface TransactionPageProps {
   params: Promise<{ id: string }>;
+  /** The Transactions list it was opened from, if any (ADR-0013). */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /** Each Split line's other side when it is a Transfer side, else what it may be linked with. */
@@ -87,15 +97,21 @@ async function loadTransaction(id: string): Promise<TransactionDetail> {
  * against Rules) and link as a Transfer. On the right, wide, what is known about it: the bank
  * fields and its History.
  */
-export default async function TransactionPage({ params }: TransactionPageProps) {
+export default async function TransactionPage({ params, searchParams }: TransactionPageProps) {
   const { id } = await params;
   const transaction = await loadTransaction(id);
   const ctx = await getServiceContext();
   const isSplit = transaction.splitLines.length > 0;
-  const [history, fmt, classification, groups, payees, tags, counterpart, lineTransfers] =
+  const fmt = await getFormatter();
+  const listSearch = readDetailList(await searchParams, fmt.settings.numberFormat);
+  const listFilters = listSearch?.values ?? null;
+  // A Transfer's other side opens within the same list, if any (spec #152, story 23).
+  const counterpartHref = (counterpartId: string) =>
+    transactionDetailHref(counterpartId, listFilters);
+  const [history, place, classification, groups, payees, tags, counterpart, lineTransfers] =
     await Promise.all([
       listHistory(ctx, { entityType: 'transaction', entityId: transaction.id }),
-      getFormatter(),
+      locateInList(ctx, listSearch, transaction.id),
       getClassification(ctx, transaction.id),
       listCategoryGroups(ctx),
       listPayees(ctx),
@@ -106,12 +122,15 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
 
   return (
     <section className="flex flex-col gap-5">
-      <BackToTransactions />
+      <div className={DETAIL_TOP_LINE_CLASS}>
+        <BackToTransactions href={transactionsBackHref(listFilters, place, transaction.id)} />
+        {listFilters && place && <ListStepper place={place} listFilters={listFilters} />}
+      </div>
       <TransactionHeader
         transaction={transaction}
         badges={transactionBadges(transaction, classification)}
         fmt={fmt}
-        actions={<TransactionActions transaction={transaction} />}
+        actions={<TransactionActions transaction={transaction} listFilters={listFilters} />}
       />
       <SplitSection
         transaction={transaction}
@@ -119,6 +138,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
         payees={payees}
         lineTransfers={lineTransfers}
         fmt={fmt}
+        counterpartHref={counterpartHref}
         className={`${DETAIL_PANEL_CLASS} gap-4`}
       />
       <div className={DETAIL_COLUMNS_CLASS}>
@@ -156,6 +176,7 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
                 counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))
               }
               fmt={fmt}
+              counterpartHref={counterpartHref}
               className={DETAIL_PANEL_CLASS}
             />
           )}
@@ -186,8 +207,14 @@ export default async function TransactionPage({ params }: TransactionPageProps) 
   );
 }
 
+interface TransactionActionsProps {
+  transaction: TransactionDetail;
+  /** The filters of the list it was opened from, which deleting it returns to; null for a bare detail. */
+  listFilters: SearchValues | null;
+}
+
 /** Edit the details of a Manual transaction; delete any Transaction. */
-function TransactionActions({ transaction }: { transaction: TransactionDetail }) {
+function TransactionActions({ transaction, listFilters }: TransactionActionsProps) {
   return (
     <>
       {transaction.isManual && (
@@ -199,7 +226,12 @@ function TransactionActions({ transaction }: { transaction: TransactionDetail })
         </Link>
       )}
       <ActionForm
-        action={deleteTransactionFromDetailAction.bind(null, transaction.id, transaction.isManual)}
+        action={deleteTransactionFromDetailAction.bind(
+          null,
+          transaction.id,
+          transaction.isManual,
+          listFilters,
+        )}
         label="Delete Transaction"
         confirmMessage={
           transaction.isManual

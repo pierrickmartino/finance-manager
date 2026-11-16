@@ -22,4 +22,21 @@ describe('isMorphing', () => {
     expect(isMorphing('row', null)).toBe(false);
     expect(isMorphing('preview', null)).toBe(false);
   });
+
+  test('opened from the Transactions list, the loading skeleton morphs, whatever the width', () => {
+    expect(isMorphing('loading', true)).toBe(true);
+    expect(isMorphing('loading', false)).toBe(true);
+    expect(isMorphing('loading', null)).toBe(true);
+  });
+
+  test('stepping from another Transaction detail, the loading skeleton does not morph', () => {
+    // Named, its swap for the page's header would pair the two and morph (spec #152, story 33).
+    expect(isMorphing('loading', true, true)).toBe(false);
+    expect(isMorphing('loading', false, true)).toBe(false);
+    expect(isMorphing('loading', null, true)).toBe(false);
+  });
+
+  test('the Transaction detail header morphs even when reached from another detail', () => {
+    expect(isMorphing('detail', false, true)).toBe(true);
+  });
 });

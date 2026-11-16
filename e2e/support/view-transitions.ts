@@ -98,3 +98,13 @@ async function stopRecording(): Promise<ViewTransitionAnimation[]> {
   delete window.__viewTransitionRecorder;
   return recorder.animations;
 }
+
+/**
+ * Makes every view-transition animation of the current document last `ms`, so a step taken
+ * right after a navigation lands while its view transition still runs.
+ */
+export async function slowViewTransitions(page: Page, ms = 1500): Promise<void> {
+  await page.addStyleTag({
+    content: `::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: ${ms}ms !important; }`,
+  });
+}

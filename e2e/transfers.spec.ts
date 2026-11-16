@@ -61,9 +61,43 @@ test('confirms a Transfer candidate in the Import preview', async ({ page }) => 
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Transfer');
   await openTransaction(page, rows.first());
-  await expect(page.getByRole('region', { name: 'Transfer' })).toContainText(
-    `Transfer with ${bcge}`,
+  const transfer = page.getByRole('region', { name: 'Transfer' });
+  await expect(transfer).toContainText(`Transfer with ${bcge}`);
+
+  // The counterpart, on another Account, is outside the list but keeps it (ADR-0013)
+  const stepper = page.getByRole('navigation', { name: 'Transactions list' });
+  await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
+  // With an unsaved edit, following the counterpart asks first; staying keeps the edit
+  const notes = page.getByRole('form', { name: 'Classification' }).getByLabel('Notes');
+  await notes.fill('Not yet saved');
+  const asked = new Promise<string>((resolve) =>
+    page.once('dialog', (dialog) => {
+      const message = dialog.message();
+      void dialog.dismiss().then(() => resolve(message));
+    }),
   );
+  await transfer.getByRole('link', { name: new RegExp(bcge) }).click();
+  expect(await asked).toBe('Discard unsaved changes?');
+  await expect(notes).toHaveValue('Not yet saved');
+  await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
+  // Undone, the edit is no longer unsaved: the counterpart opens without a word
+  await notes.fill('');
+  await transfer.getByRole('link', { name: new RegExp(bcge) }).click();
+  await expect(transfer).toContainText(`Transfer with ${ubs}`);
+  await expect(stepper.getByText('— of 1', { exact: true })).toBeVisible();
+  await expect(stepper.getByText('No longer matches this list')).toBeVisible();
+  // Same booking date, entered before the UBS side: it sits just after it in the list's order
+  await expect(stepper.getByRole('link', { name: 'Next Transaction' })).toHaveCount(0);
+  // "← Transactions" goes back to that list, not the counterpart's Account
+  await page.getByRole('link', { name: '← Transactions' }).click();
+  await expect(page).toHaveURL(new RegExp(`accountId=${ubsId}`));
+  await expect(page).toHaveURL(/transfer=only/);
+  await expect(rows).toHaveCount(1);
+  await page.goBack();
+  await expect(stepper.getByText('— of 1', { exact: true })).toBeVisible();
+  await stepper.getByRole('link', { name: 'Previous Transaction' }).click();
+  await expect(transfer).toContainText(`Transfer with ${bcge}`);
+  await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
 });
 
 /** Creates a Bank and a manual Account, and adds one Manual transaction to it; returns its id. */
