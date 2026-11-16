@@ -43,6 +43,7 @@ Motion: route navigations animate with View Transitions (ADR-0012). `--motion-du
 | `HEADLINE_AMOUNT_CLASS` | The number a page is about: an Account's balance, a Bank's total, the selected Transaction's amount. |
 | `CARD_CLASS` | A separate object: a list, a detail panel, a Widget. Not every block. |
 | `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch. Put it on the notice itself, never on rows inside it; mark problem rows with `text-warning`. |
+| `INFO_NOTICE_CLASS` | A quiet notice about the view's own state that asks for nothing: "All 50 Transactions on this page are selected". Not an alert; attention takes `WARNING_NOTICE_CLASS`. |
 | `BADGE_CLASS[tone]` | A short label beside a row's name: `warning` asks for attention (Missed, a price increase), `info` is neutral status (New, "Not yet imported"), `neutral` a plain fact. `rounded-md`, never decoration. |
 | `TILE_CLASS` | A card of the Dashboard's grid (the overview row and each Widget). |
 | `PLACEHOLDER_CLASS` | A quiet block standing in for content still loading: a Dashboard card's chart or line of text while its query runs. Pulses gently, and holds still under reduced motion (`motion-safe:animate-pulse`); its container carries `aria-busy`. |
@@ -51,9 +52,10 @@ Motion: route navigations animate with View Transitions (ADR-0012). `--motion-du
 | `ACCENT_BUTTON_CLASS` | The main action of the Dashboard Story's own views: Done in Edit mode, Save in the Widget editor. |
 | `SECONDARY_BUTTON_CLASS` / `SMALL_BUTTON_CLASS` | Every other action, and links styled as buttons; the small one in dense rows. |
 | `GHOST_BUTTON_CLASS` | Quiet actions inside rows and toolbars. |
+| `LINK_BUTTON_CLASS` | A button that reads as a link within a sentence or notice ("Select all 120 matching this filter"). |
 | `DANGER_BUTTON_CLASS` | Delete and remove: text only, so it never reads as the main action. |
 
-Form fields come from `src/components/form.tsx` (`TextField`, `SubmitButton`, `FieldError`) and the list pages' `INPUT_CLASS` / `BUTTON_CLASS` in `src/components/named-list.tsx`.
+Form fields come from `src/components/form.tsx` (`TextField`, `SubmitButton`, `FieldError`, and `FIELD_LABEL_CLASS` for a `<label>` that wraps its own control) and the list pages' `INPUT_CLASS` / `BUTTON_CLASS` in `src/components/named-list.tsx`.
 
 ## The app shell
 

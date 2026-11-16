@@ -13,13 +13,14 @@ export interface Payee {
 /** A Payee by id and name, as a classification or a picker refers to it. */
 export type PayeeRef = Pick<Payee, 'id' | 'name'>;
 
-const MAX_NAME_LENGTH = 100;
+/** Longest Payee name; pickers cap their input at it too. */
+export const MAX_PAYEE_NAME_LENGTH = 100;
 
 export const payeeName = z
   .string()
   .trim()
   .min(1, 'Payee name is required')
-  .max(MAX_NAME_LENGTH, `Payee name must be at most ${MAX_NAME_LENGTH} characters`);
+  .max(MAX_PAYEE_NAME_LENGTH, `Payee name must be at most ${MAX_PAYEE_NAME_LENGTH} characters`);
 
 /**
  * SQL: the ids of the Transactions using a Payee, directly or via a Split line (ADR-0006), each

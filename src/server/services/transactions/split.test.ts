@@ -336,9 +336,8 @@ describe('remove a Split', () => {
 });
 
 describe("a split Transaction's classification", () => {
-  it('refuses a Category change, directly or by bulk edit, telling the user to edit or remove the Split', async () => {
+  it('refuses a direct Category change, telling the user to edit or remove the Split', async () => {
     const id = await transaction();
-    const other = await transaction();
     await splitInTwo(id);
     const groceries = await category('Groceries', 'Food');
     const refusal = { code: 'validation', message: expect.stringMatching(/Split/) };
@@ -349,14 +348,29 @@ describe("a split Transaction's classification", () => {
     await expect(editClassification(t.ctx, id, { categoryId: null })).rejects.toMatchObject(
       refusal,
     );
-    await expect(
-      bulkEditClassification(t.ctx, {
-        transactionIds: [other, id],
-        changes: { categoryId: groceries.id },
-      }),
-    ).rejects.toMatchObject(refusal);
-    expect((await getTransaction(t.ctx, other)).category).toBeNull();
     expect((await getTransaction(t.ctx, id)).splitLines).toHaveLength(2);
+  });
+
+  it('is left out of a Category bulk edit, which still classifies the rest', async () => {
+    const id = await transaction();
+    const other = await transaction();
+    await splitInTwo(id);
+    const groceries = await category('Groceries', 'Food');
+    const before = await getTransaction(t.ctx, id);
+
+    const result = await bulkEditClassification(t.ctx, {
+      transactionIds: [other, id],
+      changes: { categoryId: groceries.id },
+    });
+
+    expect(result).toMatchObject({ count: 1, leftOut: 1 });
+    expect((await getTransaction(t.ctx, other)).category).toMatchObject({ id: groceries.id });
+    expect(await getTransaction(t.ctx, id)).toMatchObject({
+      category: null,
+      lockedFields: before.lockedFields,
+    });
+    expect((await getTransaction(t.ctx, id)).splitLines).toHaveLength(2);
+    expect(await listHistory(t.ctx, { batchId: result.batchId, entityId: id })).toEqual([]);
   });
 
   it('keeps its Payee, Tags and notes editable, by hand and by bulk edit', async () => {
@@ -364,11 +378,14 @@ describe("a split Transaction's classification", () => {
     await splitInTwo(id);
 
     await editClassification(t.ctx, id, { payeeName: 'Migros', tagNames: ['Family'], notes: 'n' });
-    await bulkEditClassification(t.ctx, { transactionIds: [id], changes: { tagNames: ['Trip'] } });
+    await bulkEditClassification(t.ctx, {
+      transactionIds: [id],
+      changes: { addTagNames: ['Trip'] },
+    });
 
     expect(await getTransaction(t.ctx, id)).toMatchObject({
       payee: { name: 'Migros' },
-      tags: [{ name: 'Trip' }],
+      tags: [{ name: 'Family' }, { name: 'Trip' }],
       notes: 'n',
       category: null,
     });

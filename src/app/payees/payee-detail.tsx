@@ -4,6 +4,7 @@ import { Menu } from '@/components/menu';
 import { INPUT_CLASS } from '@/components/named-list';
 import { CARD_CLASS, DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
+import { transactionCountLabel } from '@/lib/text';
 import type { Payee } from '@/server/services/payees';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { categoryText } from '@/app/transactions/transaction-display';
@@ -18,10 +19,6 @@ interface PayeeDetailProps {
   fmt: Formatter;
 }
 
-function transactionsLabel(count: number): string {
-  return `${count} Transaction${count === 1 ? '' : 's'}`;
-}
-
 /** The detail pane: one Payee's header and edits, and its latest Transactions. */
 export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
   const { id, name, transactionCount } = payee;
@@ -32,7 +29,7 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="truncate font-display text-2xl tracking-tight">{name}</h2>
           <Link href={transactionsHref} className="text-sm text-faint hover:underline">
-            {transactionsLabel(transactionCount)}
+            {transactionCountLabel(transactionCount)}
           </Link>
           {transactionCount === 0 && (
             <span className="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
@@ -62,7 +59,7 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
           href={transactionsHref}
           className="border-t border-rule px-4 py-3 text-sm font-medium text-ink-soft hover:bg-paper"
         >
-          All {transactionsLabel(transactionCount)} →
+          All {transactionCountLabel(transactionCount)} →
         </Link>
       )}
     </section>

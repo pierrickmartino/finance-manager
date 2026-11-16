@@ -15,7 +15,13 @@ import {
 } from '@/server/services/transactions';
 import { RememberTransactionsList } from './back-to-list';
 import { FilterRail } from './filter-rail';
-import { pickSelected, readTransactionSearch, transactionsHref, type SearchValues } from './search';
+import {
+  bulkFilterOf,
+  pickSelected,
+  readTransactionSearch,
+  transactionsHref,
+  type SearchValues,
+} from './search';
 import { TransactionList } from './transaction-list';
 import { TransactionPreview } from './transaction-preview';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
@@ -68,6 +74,7 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
         <div className="flex min-w-0 flex-col gap-3">
           {error && <FieldError message={error} />}
           {page &&
+            search.query &&
             (page.transactions.length === 0 ? (
               <p className="text-sm text-muted">No Transactions match.</p>
             ) : (
@@ -76,13 +83,18 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                   {page.total} Transaction{page.total === 1 ? '' : 's'}
                 </p>
                 <TransactionList
-                  fmt={fmt}
+                  // A new page or filter mounts a new list, so the selection clears.
+                  key={transactionsHref(search.values, page.page)}
                   transactions={page.transactions}
                   values={search.values}
                   page={page.page}
+                  total={page.total}
+                  filter={bulkFilterOf(search.query)}
                   selectedId={selected?.id ?? null}
-                />
-                <Pagination values={search.values} page={page} />
+                  lists={{ groups, payeeNames: payees.map((payee) => payee.name), tags }}
+                >
+                  <Pagination values={search.values} page={page} />
+                </TransactionList>
               </>
             ))}
         </div>

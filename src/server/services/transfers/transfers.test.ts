@@ -213,7 +213,7 @@ describe('Transfers carry no Category', () => {
     );
   });
 
-  it("a Transfer can't be given a Category, alone or in a bulk edit", async () => {
+  it("a Transfer can't be given a Category", async () => {
     const { out, into } = await pair();
     const category = await groceries();
     await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
@@ -221,13 +221,36 @@ describe('Transfers carry no Category', () => {
     await expect(editClassification(t.ctx, out, { categoryId: category.id })).rejects.toThrow(
       "A Transfer can't have a Category",
     );
-    await expect(
-      bulkEditClassification(t.ctx, {
-        transactionIds: [out],
-        changes: { categoryId: category.id },
-      }),
-    ).rejects.toThrow("A Transfer can't have a Category");
     expect((await getClassification(t.ctx, out)).category).toBeNull();
+  });
+
+  it("a bulk edit leaves a Transfer out of its Category change, and still sets the Transfer's Payee and Tags", async () => {
+    const { bcge, out, into } = await pair();
+    const plain = await seedOne(bcge, { amountMinor: -3000, rawDescription: 'MIGROS' });
+    const category = await groceries();
+    await linkTransfer(t.ctx, { sides: [transactionSide(out), transactionSide(into)] });
+
+    const result = await bulkEditClassification(t.ctx, {
+      transactionIds: [out, plain],
+      changes: { categoryId: category.id, payeeName: 'Me', addTagNames: ['Savings'] },
+    });
+
+    expect(result).toMatchObject({ count: 2, leftOut: 1 });
+    expect(await getClassification(t.ctx, plain)).toMatchObject({
+      category: { id: category.id },
+      payee: { name: 'Me' },
+      lockedFields: ['payee', 'category', 'tags'],
+    });
+    expect(await getClassification(t.ctx, out)).toMatchObject({
+      category: null,
+      payee: { name: 'Me' },
+      tags: [{ name: 'Savings', source: 'manual' }],
+      lockedFields: ['payee', 'tags'],
+    });
+    const entries = await listHistory(t.ctx, { batchId: result.batchId, entityId: out });
+    const fields = entries.map((entry) => entry.field);
+    expect(fields).toEqual(expect.arrayContaining(['payee', 'tags']));
+    expect(fields).not.toContain('category');
   });
 
   it('a Transfer can still get a Payee, Tags and notes', async () => {

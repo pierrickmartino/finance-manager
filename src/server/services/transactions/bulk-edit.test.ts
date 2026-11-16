@@ -5,7 +5,7 @@ import { createAccount } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
 import { getBatchSummaries, listHistory } from '../history';
-import { bulkEditClassification } from './bulk-edit';
+import { bulkEditClassification, type BulkChanges } from './bulk-edit';
 import { editClassification, getClassification } from './classification';
 import { listUnclassifiedGroups } from './unclassified';
 
@@ -43,7 +43,7 @@ describe('bulk edit', () => {
 
     const result = await bulkEditClassification(t.ctx, {
       groupKey: 'migros',
-      changes: { payeeName: 'Migros', categoryId: category.id, tagNames: ['Food'] },
+      changes: { payeeName: 'Migros', categoryId: category.id, addTagNames: ['Food'] },
     });
 
     expect(result.count).toBe(2);
@@ -67,7 +67,7 @@ describe('bulk edit', () => {
     expect(new Set(entries.map((entry) => entry.entityId))).toEqual(new Set([migros1, migros2]));
     expect(await getBatchSummaries(t.ctx, [result.batchId])).toEqual({
       [result.batchId]:
-        'Bulk edit of 2 Transactions: Payee Migros, Category Food › Groceries, Tags Food',
+        'Bulk edit of 2 Transactions: Payee Migros, Category Food › Groceries, Tags added Food',
     });
     expect((await listUnclassifiedGroups(t.ctx)).groups.map((group) => group.key)).toEqual([
       'coop',
@@ -90,6 +90,28 @@ describe('bulk edit', () => {
       lockedFields: ['payee', 'notes'],
     });
     expect(await getClassification(t.ctx, third!)).toMatchObject({ payee: null });
+  });
+
+  it('counts only the Transactions whose values changed, yet locks every selected one', async () => {
+    const [already, other] = await seed([row('SHOP ONE'), row('SHOP TWO')]);
+    await editClassification(t.ctx, already!, { payeeName: 'Shop' });
+    await t.ctx.db.query(`UPDATE "transaction" SET locked_fields = '{}' WHERE id = $1`, [already]);
+
+    const result = await bulkEditClassification(t.ctx, {
+      transactionIds: [already!, other!],
+      changes: { payeeName: 'Shop' },
+    });
+
+    expect(result.count).toBe(1);
+    for (const id of [already!, other!]) {
+      expect(await getClassification(t.ctx, id)).toMatchObject({
+        payee: { name: 'Shop' },
+        lockedFields: ['payee'],
+      });
+    }
+    expect(await getBatchSummaries(t.ctx, [result.batchId])).toEqual({
+      [result.batchId]: 'Bulk edit of 1 Transaction: Payee Shop',
+    });
   });
 
   it('only takes group members that are still Unclassified', async () => {
@@ -116,6 +138,24 @@ describe('bulk edit', () => {
     await expect(
       bulkEditClassification(t.ctx, { transactionIds: [], changes: { payeeName: 'X' } }),
     ).rejects.toThrow('Select at least one Transaction');
+  });
+
+  it('refuses to clear a Category or Payee: a bulk edit only sets values', async () => {
+    const [id] = await seed([row('A')]);
+    const category = await groceries();
+    await editClassification(t.ctx, id!, { payeeName: 'Shop', categoryId: category.id });
+
+    // Untyped input, as a form or another caller might send it.
+    const clearing = [{ categoryId: null }, { payeeId: null }, { payeeName: null }];
+    for (const changes of clearing as unknown as BulkChanges[]) {
+      await expect(
+        bulkEditClassification(t.ctx, { transactionIds: [id!], changes }),
+      ).rejects.toMatchObject({ code: 'validation', message: expect.stringMatching(/only sets/) });
+    }
+    expect(await getClassification(t.ctx, id!)).toMatchObject({
+      payee: { name: 'Shop' },
+      category: { id: category.id },
+    });
   });
 
   it('changes nothing when one Transaction fails', async () => {

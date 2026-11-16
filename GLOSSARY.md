@@ -115,6 +115,10 @@ _Avoid_: Label, project
 The state of a Transaction that has neither a Category nor a Transfer, or that has a Split line with neither.
 _Avoid_: Uncategorised, inbox
 
+**Bulk edit**:
+One manual edit applied to many selected Transactions at once: setting a Category or a Payee, or adding or removing a Tag. Tags already on a Transaction are never replaced. A Split or Transfer Transaction is left out of a Category change, and the edit says how many were left out.
+_Avoid_: Mass edit, batch edit
+
 **Rule**:
 An ordered condition-to-action pair that classifies Transactions. For each field, the first matching Rule wins; a manual edit always beats any Rule.
 _Avoid_: Filter, automation

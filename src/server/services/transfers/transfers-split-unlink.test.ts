@@ -242,7 +242,7 @@ describe('a Transaction with an unlinked Split line is Unclassified', () => {
     expect((await unclassifiedState(debit)).listed).toBe(false);
   });
 
-  it('is skipped by a Category bulk edit of its Unclassified group: only its lines hold Categories', async () => {
+  it('is left out of a Category bulk edit of its Unclassified group: only its lines hold Categories', async () => {
     const { bcge, debit, toSavings, rent } = await linkedAggregatedDebit();
     await unlinkTransfer(t.ctx, splitLineSide(toSavings));
     const plain = await seedOne(bcge, { amountMinor: -2000 });
@@ -255,8 +255,29 @@ describe('a Transaction with an unlinked Split line is Unclassified', () => {
       changes: { categoryId: rent.id },
     });
 
-    expect(result.count).toBe(1);
+    expect(result).toMatchObject({ count: 1, leftOut: 1 });
     expect((await getClassification(t.ctx, plain)).category).toMatchObject({ id: rent.id });
+    expect((await unclassifiedState(debit)).listed).toBe(true);
+  });
+
+  it('still gets the Payee of a group bulk edit that leaves it out of the Category', async () => {
+    const { bcge, debit, toSavings, rent } = await linkedAggregatedDebit();
+    await unlinkTransfer(t.ctx, splitLineSide(toSavings));
+    await seedOne(bcge, { amountMinor: -2000 });
+    const [group] = (await listUnclassifiedGroups(t.ctx)).groups.filter(
+      ({ description }) => description === 'ORDRE E-BANKING',
+    );
+
+    const result = await bulkEditClassification(t.ctx, {
+      groupKey: group!.key,
+      changes: { categoryId: rent.id, payeeName: 'Bank transfer' },
+    });
+
+    expect(result).toMatchObject({ count: 2, leftOut: 1 });
+    expect(await getClassification(t.ctx, debit)).toMatchObject({
+      payee: { name: 'Bank transfer' },
+      category: null,
+    });
     expect((await unclassifiedState(debit)).listed).toBe(true);
   });
 
