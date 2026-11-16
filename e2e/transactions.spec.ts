@@ -180,6 +180,78 @@ test('a Transaction classified out of an Unclassified list stays open and Next c
   await expect(stepper.getByText('No longer matches this list')).toHaveCount(0);
 });
 
+test('j and k step through the Transactions list, but never while typing in a field', async ({
+  page,
+}) => {
+  const accountName = await importUbsAccount(page, 'Keys');
+  await page.setViewportSize(NARROW);
+  const rows = await listAccount(page, accountName);
+  const newest = await rows.nth(0).getByRole('link').innerText();
+  const second = await rows.nth(1).getByRole('link').innerText();
+  const title = page.getByRole('heading', { level: 1 });
+  const stepper = listStepper(page);
+  const position = (text: string) => stepper.getByText(text, { exact: true });
+
+  // The last of the list: j has nowhere to go, k steps back
+  await rows.last().getByRole('link').click();
+  await detailShown(page);
+  await expect(position('14 of 14')).toBeVisible();
+  const oldest = await title.innerText();
+  await page.keyboard.press('j');
+  await expect(position('14 of 14')).toBeVisible();
+  await expect(title).toHaveText(oldest);
+  await page.keyboard.press('k');
+  await expect(position('13 of 14')).toBeVisible();
+
+  // The first of the list: k has nowhere to go, j steps on; the buttons show their keys
+  await listAccount(page, accountName);
+  await rows.nth(0).getByRole('link').click();
+  await detailShown(page);
+  await expect(position('1 of 14')).toBeVisible();
+  await expect(stepper.getByText('k', { exact: true })).toBeVisible();
+  await expect(
+    stepper.getByRole('link', { name: 'Next Transaction' }).getByText('j', { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press('k');
+  await expect(position('1 of 14')).toBeVisible();
+  await page.keyboard.press('j');
+  await expect(position('2 of 14')).toBeVisible();
+  await expect(title).toHaveText(second);
+  await page.keyboard.press('k');
+  await expect(position('1 of 14')).toBeVisible();
+  await expect(title).toHaveText(newest);
+
+  // With a modifier held, the keys are the browser's
+  for (const chord of ['Control+j', 'Alt+j', 'Meta+j', 'Shift+J']) {
+    await page.keyboard.press(chord);
+  }
+  await expect(position('1 of 14')).toBeVisible();
+
+  // Typing in the Payee, Tags or Notes field, or in a Split line, never navigates
+  const url = page.url();
+  const classification = page.getByRole('form', { name: 'Classification' });
+  await classification.getByLabel('Payee').pressSequentially('jk');
+  await classification.getByLabel('Tags').pressSequentially('jk');
+  await classification.getByLabel('Notes').pressSequentially('jk');
+  await page.getByText('Split Transaction', { exact: true }).click();
+  const line = page.getByRole('form', { name: 'Split' }).getByLabel('Note of line 1');
+  await line.pressSequentially('jk');
+  await expect(classification.getByLabel('Payee')).toHaveValue(/jk$/);
+  await expect(classification.getByLabel('Notes')).toHaveValue(/jk$/);
+  await expect(line).toHaveValue(/jk$/);
+  await expect(position('1 of 14')).toBeVisible();
+  expect(page.url()).toBe(url);
+
+  // A bare link knows no list, so j and k do nothing
+  const bare = new URL(url);
+  bare.search = '';
+  await page.goto(bare.toString());
+  await page.waitForLoadState('networkidle');
+  await page.keyboard.press('j');
+  await expect(title).toHaveText(newest);
+  expect(page.url()).toBe(bare.toString());
+});
+
 test.describe('opening a Transaction morphs it into its Transaction detail', () => {
   test('below xl, the tapped row expands into the detail and shrinks back', async ({ page }) => {
     const accountName = await importUbsAccount(page, 'Morph narrow');
