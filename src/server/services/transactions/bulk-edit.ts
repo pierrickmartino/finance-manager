@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import type { Queryable } from '@/server/db/client';
 import { categoryLabel } from '@/lib/classification';
+import { transactionCountLabel } from '@/lib/text';
 import { findCategory } from '../categories/model';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ValidationError } from '../errors';
 import { findOrCreatePayee, findPayee, payeeName } from '../payees/model';
 import { findOrCreateTags, findTag, tagName, type Tag } from '../tags/model';
-import { CLASSIFICATION_FIELDS, recordClassificationChanges } from './classification';
+import { CLASSIFICATION_FIELDS, recordChangedClassifications } from './classification';
 import {
   filterConditions,
   transactionQueryInput,
@@ -41,7 +42,8 @@ export const MAX_BULK_EDIT = 10_000;
 const formatCount = (count: number): string => count.toLocaleString('en-US');
 
 const LIMIT = formatCount(MAX_BULK_EDIT);
-const TOO_MANY_IDS = `Select at most ${LIMIT} Transactions per edit`;
+const tooManyIds = (count: number): string =>
+  `${formatCount(count)} Transactions selected, at most ${LIMIT} per edit`;
 
 /** A Bulk edit only sets values: clearing a Category or Payee stays a per-Transaction edit. */
 const ONLY_SETS = 'A Bulk edit only sets values: it cannot clear a Payee or Category';
@@ -84,7 +86,7 @@ const bulkEditInput = z.object({
   /** Transactions picked one by one. */
   transactionIds: z
     .array(z.uuid({ error: 'Transaction not found' }))
-    .max(MAX_BULK_EDIT, TOO_MANY_IDS)
+    .max(MAX_BULK_EDIT, { error: (issue) => tooManyIds((issue.input as unknown[]).length) })
     .optional(),
   /** A whole Unclassified group: every member still Unclassified when the edit runs. */
   groupKey: z.string().optional(),
@@ -105,7 +107,10 @@ export type BulkChanges = z.input<typeof bulkChanges>;
 
 export interface BulkEditResult {
   batchId: string;
-  /** Transactions the edit changed. */
+  /**
+   * Transactions the edit changed: at least one value differs. Every selected one is still
+   * locked, so one that already had the values counts as unchanged.
+   */
   count: number;
   /** Split and Transfer Transactions left out of a Category change (0 without one). */
   leftOut: number;
@@ -167,7 +172,7 @@ async function resolveSelectedIds(
     ids.push(...(await lockedMatches(scope, filter, tooMany)));
   }
   const unique = [...new Set(ids)];
-  if (unique.length > MAX_BULK_EDIT) throw new ValidationError(TOO_MANY_IDS);
+  if (unique.length > MAX_BULK_EDIT) throw new ValidationError(tooManyIds(unique.length));
   return unique;
 }
 
@@ -187,16 +192,19 @@ interface ResolvedChanges {
   summary: string[];
 }
 
-/** Tags by name (creating missing ones) or by id, without repeats. */
-async function resolveTags(
-  scope: MutationScope,
-  ids: readonly string[] | undefined,
-  names: readonly string[] | undefined,
-): Promise<Tag[]> {
-  const tags = names
-    ? await findOrCreateTags(scope, names)
-    : await Promise.all((ids ?? []).map((id) => findTag(scope.tx, id)));
-  return [...new Map(tags.map((tag) => [tag.id, tag])).values()];
+/** The Tags without repeats, in order. */
+const uniqueTags = (tags: readonly Tag[]): Tag[] => [
+  ...new Map(tags.map((tag) => [tag.id, tag])).values(),
+];
+
+/** Tags by id, without repeats; NotFoundError for an unknown one. */
+async function tagsById(scope: MutationScope, ids: readonly string[]): Promise<Tag[]> {
+  return uniqueTags(await Promise.all(ids.map((id) => findTag(scope.tx, id))));
+}
+
+/** Tags by name, creating missing ones, without repeats. */
+async function tagsByName(scope: MutationScope, names: readonly string[]): Promise<Tag[]> {
+  return uniqueTags(await findOrCreateTags(scope, names));
 }
 
 /**
@@ -226,12 +234,15 @@ async function resolveChanges(
     summary.push(`Category ${categoryLabel(category)}`);
   }
   if (input.addTagNames !== undefined || input.addTagIds !== undefined) {
-    const tags = await resolveTags(scope, input.addTagIds, input.addTagNames);
+    const tags =
+      input.addTagNames !== undefined
+        ? await tagsByName(scope, input.addTagNames)
+        : await tagsById(scope, input.addTagIds ?? []);
     changes.addTagIds = tags.map((tag) => tag.id);
     summary.push(`Tags added ${tags.map((tag) => tag.name).join(', ')}`);
   }
   if (input.removeTagIds !== undefined) {
-    const tags = await resolveTags(scope, input.removeTagIds, undefined);
+    const tags = await tagsById(scope, input.removeTagIds);
     changes.removeTagIds = tags.map((tag) => tag.id);
     summary.push(`Tags removed ${tags.map((tag) => tag.name).join(', ')}`);
   }
@@ -344,14 +355,14 @@ export async function bulkEditClassification(
       changes.categoryId === undefined ? new Set<string>() : await leftOutOfCategory(scope.tx, ids);
     const categoryIds =
       changes.categoryId === undefined ? [] : ids.filter((id) => !leftOut.has(id));
-    await recordClassificationChanges(scope, ids, () => writeAll(scope, ids, categoryIds, changes));
-    // A left-out Transaction is still changed when the edit sets anything besides the Category.
-    const changesMore = editedFields(changes).some((field) => field !== 'category');
-    const count = changesMore ? ids.length : categoryIds.length;
-    const noun = count === 1 ? 'Transaction' : 'Transactions';
-    const leftOutNote = leftOut.size > 0 ? ` (${leftOut.size} split or Transfer left out)` : '';
+    const { changedIds } = await recordChangedClassifications(scope, ids, () =>
+      writeAll(scope, ids, categoryIds, changes),
+    );
+    // Locked on every selected Transaction, but counted only where a value changed.
+    const count = changedIds.length;
+    const leftOutSummary = leftOut.size > 0 ? ` (${leftOut.size} split or Transfer left out)` : '';
     await scope.history.summarize(
-      `Bulk edit of ${count} ${noun}: ${summary.join(', ')}${leftOutNote}`,
+      `Bulk edit of ${transactionCountLabel(count)}: ${summary.join(', ')}${leftOutSummary}`,
     );
     return { batchId: scope.history.batchId, count, leftOut: leftOut.size };
   });

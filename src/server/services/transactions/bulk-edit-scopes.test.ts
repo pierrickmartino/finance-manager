@@ -164,7 +164,7 @@ describe('the Bulk edit limit', () => {
       bulkEditClassification(t.ctx, { transactionIds: ids.slice(0, OVER_LIMIT), changes }),
     ).rejects.toMatchObject({
       code: 'validation',
-      message: 'Select at most 10,000 Transactions per edit',
+      message: '10,001 Transactions selected, at most 10,000 per edit',
     });
 
     expect((await listTags(t.ctx)).map((tag) => tag.name)).not.toContain('Too many');

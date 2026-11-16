@@ -238,6 +238,29 @@ export async function recordClassificationChanges<T>(
   transactionIds: readonly string[],
   change: () => Promise<T>,
 ): Promise<T> {
+  return (await recordChangedClassifications(scope, transactionIds, change)).result;
+}
+
+/** What `recordChangedClassifications` returns: the change's result, and whom it changed. */
+export interface RecordedClassificationChanges<T> {
+  result: T;
+  /** The Transactions with at least one value (not a lock) that differs after the change. */
+  changedIds: string[];
+}
+
+/** A snapshot's values without its locks, as comparable text. */
+const valuesOf = (snapshot: HistorySnapshot): string =>
+  JSON.stringify(Object.entries(snapshot).filter(([field]) => field !== 'lockedFields'));
+
+/**
+ * `recordClassificationChanges`, also telling which Transactions the change gave a different
+ * Payee, Category, Tags, notes or Split. A change of locks alone doesn't count.
+ */
+export async function recordChangedClassifications<T>(
+  scope: Pick<MutationScope, 'tx' | 'history'>,
+  transactionIds: readonly string[],
+  change: () => Promise<T>,
+): Promise<RecordedClassificationChanges<T>> {
   await scope.tx.query('SELECT 1 FROM "transaction" WHERE id = ANY($1::uuid[]) FOR UPDATE', [
     transactionIds,
   ]);
@@ -246,18 +269,19 @@ export async function recordClassificationChanges<T>(
   const after = new Map(
     (await loadClassifications(scope.tx, transactionIds)).map((row) => [row.transactionId, row]),
   );
-  await scope.history.recordMany(
-    'transaction',
-    before.map((old) => {
-      const now = after.get(old.transactionId);
-      return {
-        entityId: old.transactionId,
-        before: classificationSnapshot(old),
-        after: now ? classificationSnapshot(now) : null,
-      };
-    }),
-  );
-  return result;
+  const changes = before.map((old) => {
+    const now = after.get(old.transactionId);
+    return {
+      entityId: old.transactionId,
+      before: classificationSnapshot(old),
+      after: now ? classificationSnapshot(now) : null,
+    };
+  });
+  await scope.history.recordMany('transaction', changes);
+  const changedIds = changes
+    .filter(({ before: old, after: now }) => now === null || valuesOf(old) !== valuesOf(now))
+    .map((entry) => entry.entityId);
+  return { result, changedIds };
 }
 
 const transactionId = z.uuid();
