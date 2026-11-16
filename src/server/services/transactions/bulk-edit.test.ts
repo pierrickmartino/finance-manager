@@ -5,7 +5,7 @@ import { createAccount } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
 import { getBatchSummaries, listHistory } from '../history';
-import { bulkEditClassification } from './bulk-edit';
+import { bulkEditClassification, type BulkChanges } from './bulk-edit';
 import { editClassification, getClassification } from './classification';
 import { listUnclassifiedGroups } from './unclassified';
 
@@ -116,6 +116,24 @@ describe('bulk edit', () => {
     await expect(
       bulkEditClassification(t.ctx, { transactionIds: [], changes: { payeeName: 'X' } }),
     ).rejects.toThrow('Select at least one Transaction');
+  });
+
+  it('refuses to clear a Category or Payee: a bulk edit only sets values', async () => {
+    const [id] = await seed([row('A')]);
+    const category = await groceries();
+    await editClassification(t.ctx, id!, { payeeName: 'Shop', categoryId: category.id });
+
+    // Untyped input, as a form or another caller might send it.
+    const clearing = [{ categoryId: null }, { payeeId: null }, { payeeName: null }];
+    for (const changes of clearing as unknown as BulkChanges[]) {
+      await expect(
+        bulkEditClassification(t.ctx, { transactionIds: [id!], changes }),
+      ).rejects.toMatchObject({ code: 'validation', message: expect.stringMatching(/only sets/) });
+    }
+    expect(await getClassification(t.ctx, id!)).toMatchObject({
+      payee: { name: 'Shop' },
+      category: { id: category.id },
+    });
   });
 
   it('changes nothing when one Transaction fails', async () => {

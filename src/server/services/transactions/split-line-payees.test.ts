@@ -114,6 +114,27 @@ describe("a blank line follows its Transaction's Payee; a picked one stays pinne
     expect(await reported(id)).toEqual(['Migros', 'Coop']);
   });
 
+  it('after a bulk edit that also sets a Category, which leaves the split Transaction out', async () => {
+    const id = await transaction(-10000);
+    const groceries = await category('Groceries');
+    const migros = await createPayee(t.ctx, 'Migros');
+    await splitTransaction(t.ctx, id, [
+      { amountMinor: -7000, categoryId: groceries.id, payeeId: migros.id },
+      { amountMinor: -3000, categoryId: groceries.id },
+    ]);
+    const restaurants = await category('Restaurants');
+
+    const result = await bulkEditClassification(t.ctx, {
+      transactionIds: [id],
+      changes: { payeeName: 'Coop', categoryId: restaurants.id },
+    });
+
+    expect(result).toMatchObject({ count: 1, leftOut: 1 });
+    expect((await getTransaction(t.ctx, id)).payee?.name).toBe('Coop');
+    expect(await own(id)).toEqual(['Migros', null]);
+    expect(await reported(id)).toEqual(['Migros', 'Coop']);
+  });
+
   it("after a Rule sets the Transaction's Payee, which never sets a line's", async () => {
     const id = await pinnedAndBlank();
     await unlockFields(t.ctx, id, ['payee']);
