@@ -1,6 +1,7 @@
 import type { NumberFormat } from '@/lib/format';
 import { parseAmount } from '@/lib/format/parse-amount';
 import type { TransactionQuery } from '@/server/services/transactions';
+import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 
 /**
  * The Transaction list's URL parameters (a GET form), as the form shows them and as the
@@ -114,4 +115,10 @@ export function pickSelected<T extends { id: string }>(rows: T[], selected: stri
 /** The CSV export URL for these search values: the same filters, every page. */
 export function transactionsExportHref(values: SearchValues): string {
   return withSearch('/api/transactions/export', values);
+}
+
+/** The list's query without its page: the filter "Select all N matching this filter" edits. */
+export function bulkFilterOf(query: TransactionQuery): BulkFilter {
+  const { page: _page, pageSize: _pageSize, ...filter } = query;
+  return filter;
 }

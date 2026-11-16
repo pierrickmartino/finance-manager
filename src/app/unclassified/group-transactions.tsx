@@ -1,19 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { BulkActionBar, type BulkTag } from '@/components/bulk-edit/bulk-action-bar';
-import type { BulkScope } from '@/components/bulk-edit/actions';
-import { HeaderCheckbox, tagsOf, useRowSelection } from '@/components/bulk-edit/row-selection';
+import { BulkActionBar, type BulkEditLists } from '@/components/bulk-edit/bulk-action-bar';
+import type { BulkScope } from '@/components/bulk-edit/scope';
+import {
+  CHECK_CELL_CLASS,
+  HeaderCheckbox,
+  RowCheckboxCell,
+  tagsOf,
+  useRowSelection,
+} from '@/components/bulk-edit/row-selection';
 import { useFormatter } from '@/components/formatter-provider';
 import { SECONDARY_BUTTON_CLASS } from '@/components/surface';
-import type { CategoryGroup } from '@/server/services/categories';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { unclassifiedHref } from './view';
 
 const CELL = 'px-3 py-2 text-left align-top';
-/** The checkbox column: room enough to hit the box, nothing more. */
-const CHECK_CELL = 'w-0 py-2 pr-1 pl-3 align-top';
 
 interface GroupTransactionsProps {
   groupKey: string;
@@ -24,7 +26,7 @@ interface GroupTransactionsProps {
   /** Every member of the group still Unclassified, including those not shown. */
   groupCount: number;
   /** What the Bulk edit bar offers. */
-  lists: { groups: CategoryGroup[]; payeeNames: string[]; tags: BulkTag[] };
+  lists: BulkEditLists;
 }
 
 /**
@@ -42,24 +44,15 @@ export function GroupTransactions({
   lists,
 }: GroupTransactionsProps) {
   const fmt = useFormatter();
-  const { ticked, tick, tickAll } = useRowSelection(transactions.map((t) => t.id));
-  const [isWholeGroup, setIsWholeGroup] = useState(false);
+  const {
+    ticked,
+    tick,
+    tickAll,
+    isWholeScope: isWholeGroup,
+    setWholeScope,
+  } = useRowSelection(transactions.map((t) => t.id));
   // Only listed rows count: classified ones leave the group.
   const selected = transactions.filter((transaction) => ticked.has(transaction.id));
-
-  // Any change to the ticks narrows the scope back to the ticked rows.
-  const tickRow = (id: string, isChecked: boolean, isRange: boolean): void => {
-    setIsWholeGroup(false);
-    tick(id, isChecked, isRange);
-  };
-  const tickShown = (isChecked: boolean): void => {
-    setIsWholeGroup(false);
-    tickAll(isChecked);
-  };
-  const selectGroup = (): void => {
-    tickAll(true);
-    setIsWholeGroup(true);
-  };
 
   const scope: BulkScope = isWholeGroup
     ? { groupKey }
@@ -79,7 +72,7 @@ export function GroupTransactions({
             ? lists.tags
             : tagsOf(isWholeGroup ? transactions : selected)
         }
-        onClear={() => tickShown(false)}
+        onClear={() => tickAll(false)}
       />
       {transactions.length === 0 ? (
         <div className="flex flex-col gap-2">
@@ -94,7 +87,7 @@ export function GroupTransactions({
             <button
               type="button"
               aria-pressed={isWholeGroup}
-              onClick={selectGroup}
+              onClick={() => setWholeScope(true)}
               className={`${SECONDARY_BUTTON_CLASS} ${isWholeGroup ? 'bg-accent-tint' : ''}`}
             >
               Select all {groupCount}
@@ -104,11 +97,11 @@ export function GroupTransactions({
             <table aria-label={`Transactions in ${description}`} className="w-full text-sm">
               <thead className="border-b border-rule">
                 <tr>
-                  <th className={CHECK_CELL}>
+                  <th className={CHECK_CELL_CLASS}>
                     <HeaderCheckbox
                       selectedCount={selected.length}
                       rowCount={transactions.length}
-                      onChange={tickShown}
+                      onChange={tickAll}
                       label="Select every Transaction shown"
                     />
                   </th>
@@ -130,22 +123,11 @@ export function GroupTransactions({
                       key={transaction.id}
                       className={ticked.has(transaction.id) ? 'bg-accent-tint' : undefined}
                     >
-                      <td className={CHECK_CELL}>
-                        <input
-                          type="checkbox"
-                          checked={ticked.has(transaction.id)}
-                          // React's change event for a checkbox is its click, which knows shift.
-                          onChange={(event) =>
-                            tickRow(
-                              transaction.id,
-                              event.target.checked,
-                              (event.nativeEvent as MouseEvent).shiftKey,
-                            )
-                          }
-                          aria-label={`Select ${name} on ${date}`}
-                          className="mt-0.5 accent-accent-ink"
-                        />
-                      </td>
+                      <RowCheckboxCell
+                        isTicked={ticked.has(transaction.id)}
+                        onTick={(isChecked, isRange) => tick(transaction.id, isChecked, isRange)}
+                        label={`Select ${name} on ${date}`}
+                      />
                       <td className={`${CELL} whitespace-nowrap tabular-nums`}>{date}</td>
                       <td className={CELL}>
                         {transaction.accountName}

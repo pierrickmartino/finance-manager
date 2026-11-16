@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState, useTransition, type FormEvent, type ReactNode } from 'react';
-import { FieldError } from '@/components/form';
+import { FIELD_LABEL_CLASS, FieldError } from '@/components/form';
 import { INPUT_CLASS } from '@/components/named-list';
 import {
   CARD_CLASS,
@@ -9,29 +9,31 @@ import {
   PRIMARY_BUTTON_CLASS,
   SMALL_BUTTON_CLASS,
 } from '@/components/surface';
+import { transactionCountLabel } from '@/lib/text';
 import type { CategoryGroup } from '@/server/services/categories';
+import { MAX_PAYEE_NAME_LENGTH } from '@/server/services/payees/model';
+import type { Tag } from '@/server/services/tags';
 import type { BulkChanges, BulkEditResult } from '@/server/services/transactions/bulk-edit';
-import { bulkEditAction, type BulkScope } from './actions';
+import { bulkEditAction } from './actions';
+import type { BulkScope } from './scope';
 
-/** A Tag as the bar lists it. */
-export interface BulkTag {
-  id: string;
-  name: string;
-}
-
-export interface BulkActionBarProps {
-  /** The Transactions an action applies to. */
-  scope: BulkScope;
-  /** How many Transactions the scope holds ("n selected"); the bar hides at 0. */
-  count: number;
+/** What the bar's pickers offer, as the page loads it. */
+export interface BulkEditLists {
   /** For Set Category. */
   groups: CategoryGroup[];
   /** Existing Payees offered by Set Payee (a new name is accepted too). */
   payeeNames: string[];
   /** Existing Tags offered by Add Tag (a new name is accepted too). */
-  tags: BulkTag[];
+  tags: Pick<Tag, 'id' | 'name'>[];
+}
+
+export interface BulkActionBarProps extends BulkEditLists {
+  /** The Transactions an action applies to. */
+  scope: BulkScope;
+  /** How many Transactions the scope holds ("n selected"); the bar hides at 0. */
+  count: number;
   /** The Tags Remove Tag offers: those on the selected Transactions. */
-  removableTags: BulkTag[];
+  removableTags: BulkEditLists['tags'];
   /** Empties the selection: on Clear selection, and after an edit succeeds. */
   onClear: () => void;
 }
@@ -45,17 +47,22 @@ const ACTIONS: { kind: ActionKind; label: string }[] = [
   { kind: 'removeTag', label: 'Remove Tag' },
 ];
 
-/** One action, ready to send: the change and how the result message names it. */
+/** One action, ready to send: the change, and what the result message calls it. */
 interface Edit {
   changes: BulkChanges;
-  message: (result: BulkEditResult) => string;
+  /** The action in words, e.g. "Set Groceries". */
+  label: string;
 }
 
-const transactions = (count: number): string => `${count} Transaction${count === 1 ? '' : 's'}`;
-
-/** "· 2 split or Transfer left out", or nothing. */
-const leftOutNote = (leftOut: number): string =>
-  leftOut > 0 ? ` · ${leftOut} split or Transfer left out` : '';
+/**
+ * What an applied edit reports: how many Transactions it changed (a selected one that already
+ * had the value is locked but unchanged), and how many it left out, e.g.
+ * "Set Groceries: 3 Transactions changed · 1 split or Transfer left out."
+ */
+function resultMessage(label: string, { count, leftOut }: BulkEditResult): string {
+  const leftOutPart = leftOut > 0 ? ` · ${leftOut} split or Transfer left out` : '';
+  return `${label}: ${transactionCountLabel(count)} changed${leftOutPart}.`;
+}
 
 /**
  * The Bulk edit action bar: while Transactions are selected, "n selected", Set Category,
@@ -86,7 +93,7 @@ export function BulkActionBar({
         setError(result.error);
         return;
       }
-      setMessage(`${edit.message(result.data)}.`);
+      setMessage(resultMessage(edit.label, result.data));
       setOpen(null);
       onClear();
     });
@@ -201,21 +208,18 @@ function PanelForm({ isPending, edit, onApply, children }: PanelFormProps) {
   );
 }
 
-const LABEL_CLASS = 'flex flex-col gap-1 text-sm font-medium';
-
 function CategoryPanel({ groups, isPending, onApply }: PanelProps) {
   const [categoryId, setCategoryId] = useState('');
   const category = groups.flatMap((group) => group.categories).find((c) => c.id === categoryId);
   const edit: Edit | null = category
     ? {
         changes: { categoryId: category.id },
-        message: ({ count, leftOut }) =>
-          `Set ${category.name} on ${transactions(count)}${leftOutNote(leftOut)}`,
+        label: `Set ${category.name}`,
       }
     : null;
   return (
     <PanelForm isPending={isPending} edit={edit} onApply={onApply}>
-      <label className={LABEL_CLASS}>
+      <label className={FIELD_LABEL_CLASS}>
         Category
         <select
           autoFocus
@@ -246,19 +250,19 @@ function PayeePanel({ payeeNames, isPending, onApply }: PanelProps) {
   const edit: Edit | null = payeeName
     ? {
         changes: { payeeName },
-        message: ({ count }) => `Set ${payeeName} on ${transactions(count)}`,
+        label: `Set ${payeeName}`,
       }
     : null;
   return (
     <PanelForm isPending={isPending} edit={edit} onApply={onApply}>
-      <label className={LABEL_CLASS}>
+      <label className={FIELD_LABEL_CLASS}>
         Payee
         <input
           autoFocus
           value={name}
           onChange={(event) => setName(event.target.value)}
           list={listId}
-          maxLength={100}
+          maxLength={MAX_PAYEE_NAME_LENGTH}
           autoComplete="off"
           placeholder="Pick or type a new name"
           className={INPUT_CLASS}
@@ -280,12 +284,12 @@ function AddTagPanel({ tags, isPending, onApply }: PanelProps) {
   const edit: Edit | null = tagName
     ? {
         changes: { addTagNames: [tagName] },
-        message: ({ count }) => `Added ${tagName} to ${transactions(count)}`,
+        label: `Added ${tagName}`,
       }
     : null;
   return (
     <PanelForm isPending={isPending} edit={edit} onApply={onApply}>
-      <label className={LABEL_CLASS}>
+      <label className={FIELD_LABEL_CLASS}>
         Tag
         <input
           autoFocus
@@ -316,12 +320,12 @@ function RemoveTagPanel({ removableTags, isPending, onApply }: PanelProps) {
   const edit: Edit | null = tag
     ? {
         changes: { removeTagIds: [tag.id] },
-        message: ({ count }) => `Removed ${tag.name} from ${transactions(count)}`,
+        label: `Removed ${tag.name}`,
       }
     : null;
   return (
     <PanelForm isPending={isPending} edit={edit} onApply={onApply}>
-      <label className={LABEL_CLASS}>
+      <label className={FIELD_LABEL_CLASS}>
         Tag
         <select
           autoFocus

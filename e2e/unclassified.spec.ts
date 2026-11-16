@@ -80,7 +80,7 @@ test('classifies a whole group and selected Transactions from the Unclassified v
   await bar.getByRole('button', { name: 'Set Category' }).click();
   await bar.getByLabel('Category').selectOption({ label: categoryName });
   await bar.getByRole('button', { name: 'Apply' }).click();
-  await expect(bar.getByRole('status')).toHaveText(`Set ${categoryName} on 2 Transactions.`);
+  await expect(bar.getByRole('status')).toHaveText(`Set ${categoryName}: 2 Transactions changed.`);
   await expect(page.getByText('This group has no Unclassified Transactions left.')).toBeVisible();
 
   // Both are classified and their Category is locked
@@ -110,7 +110,7 @@ test('classifies a whole group and selected Transactions from the Unclassified v
   await bar.getByRole('button', { name: 'Add Tag' }).click();
   await bar.getByLabel('Tag', { exact: true }).fill(snacks);
   await bar.getByRole('button', { name: 'Apply' }).click();
-  await expect(bar.getByRole('status')).toHaveText(`Added ${snacks} to 1 Transaction.`);
+  await expect(bar.getByRole('status')).toHaveText(`Added ${snacks}: 1 Transaction changed.`);
   await expect(tick(0)).not.toBeChecked();
 
   // A shift-click ticks the range from the last ticked row; the header shows it is partial
@@ -124,7 +124,7 @@ test('classifies a whole group and selected Transactions from the Unclassified v
   await bar.getByRole('button', { name: 'Add Tag' }).click();
   await bar.getByLabel('Tag', { exact: true }).fill(treats);
   await bar.getByRole('button', { name: 'Apply' }).click();
-  await expect(bar.getByRole('status')).toHaveText(`Added ${treats} to 2 Transactions.`);
+  await expect(bar.getByRole('status')).toHaveText(`Added ${treats}: 2 Transactions changed.`);
   await expect(kioskRows).toHaveCount(3);
 
   await kioskRows.first().getByRole('link', { name: 'Open' }).click();
@@ -191,7 +191,7 @@ test('a group Category edit leaves a split member out and says so', async ({ pag
   await bar.getByRole('button', { name: 'Apply' }).click();
 
   await expect(bar.getByRole('status')).toHaveText(
-    `Set ${rentName} on 1 Transaction · 1 split or Transfer left out.`,
+    `Set ${rentName}: 1 Transaction changed · 1 split or Transfer left out.`,
   );
   // The split member stays in the group: only its lines can take a Category.
   await expect(ordre.getByRole('table').locator('tbody tr')).toHaveCount(1);

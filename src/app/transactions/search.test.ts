@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  bulkFilterOf,
   pickSelected,
   readTransactionSearch,
   SEARCH_FIELDS,
@@ -56,5 +57,29 @@ describe('pickSelected', () => {
 
   test('returns null for an empty page', () => {
     expect(pickSelected([], 'a')).toBeNull();
+  });
+});
+
+describe('bulkFilterOf', () => {
+  test("drops the page and page size, keeping every filter of the list's query", () => {
+    const filter = bulkFilterOf({
+      text: 'coop',
+      accountId: 'account-1',
+      amountMin: -10_000,
+      status: 'manual',
+      page: 3,
+      pageSize: 50,
+    });
+
+    expect(filter).toEqual({
+      text: 'coop',
+      accountId: 'account-1',
+      amountMin: -10_000,
+      status: 'manual',
+    });
+  });
+
+  test('gives an empty filter for a query that is only a page', () => {
+    expect(bulkFilterOf({ page: 2 })).toEqual({});
   });
 });

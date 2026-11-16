@@ -95,7 +95,7 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await bar.getByLabel('Category').selectOption({ label: groceriesName });
   await bar.getByRole('button', { name: 'Apply' }).click();
   await expect(page.getByRole('status')).toHaveText(
-    `Set ${groceriesName} on 3 Transactions · 1 split or Transfer left out.`,
+    `Set ${groceriesName}: 3 Transactions changed · 1 split or Transfer left out.`,
   );
   for (const n of [52, 51, 49]) await expect(row(n)).toContainText(groceriesName);
   await expect(row(50)).toContainText('Split (2)');
@@ -109,7 +109,9 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await bar.getByRole('button', { name: 'Add Tag' }).click();
   await bar.getByLabel('Tag', { exact: true }).fill(`Vacation ${suffix}`);
   await bar.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByRole('status')).toHaveText(`Added Vacation ${suffix} to 2 Transactions.`);
+  await expect(page.getByRole('status')).toHaveText(
+    `Added Vacation ${suffix}: 2 Transactions changed.`,
+  );
   await expect(row(51)).toContainText(`#Trip ${suffix}`);
   await expect(row(51)).toContainText(`#Vacation ${suffix}`);
   await expect(row(52)).toContainText(`#Vacation ${suffix}`);
@@ -121,7 +123,9 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await expect(removable.getByRole('option')).toHaveText([`Trip ${suffix}`, `Vacation ${suffix}`]);
   await removable.selectOption({ label: `Trip ${suffix}` });
   await bar.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByRole('status')).toHaveText(`Removed Trip ${suffix} from 1 Transaction.`);
+  await expect(page.getByRole('status')).toHaveText(
+    `Removed Trip ${suffix}: 1 Transaction changed.`,
+  );
   await expect(row(51)).not.toContainText(`#Trip ${suffix}`);
   await expect(row(51)).toContainText(`#Vacation ${suffix}`);
 
@@ -132,7 +136,9 @@ test('selects Transactions on the list and bulk edits them from the action bar',
   await bar.getByRole('button', { name: 'Set Payee' }).click();
   await bar.getByLabel('Payee').fill(`Corner shop ${suffix}`);
   await bar.getByLabel('Payee').press('Enter');
-  await expect(page.getByRole('status')).toHaveText(`Set Corner shop ${suffix} on 1 Transaction.`);
+  await expect(page.getByRole('status')).toHaveText(
+    `Set Corner shop ${suffix}: 1 Transaction changed.`,
+  );
   // The row now goes by its Payee
   const shop = rows.filter({ hasText: `Corner shop ${suffix}` });
   await expect(shop).toContainText('-48.00');
@@ -214,7 +220,7 @@ test('selects every Transaction the filter matches, across pages, and bulk edits
   await bar.getByLabel('Category').selectOption({ label: groceriesName });
   await bar.getByRole('button', { name: 'Apply' }).click();
   await expect(page.getByRole('status')).toHaveText(
-    `Set ${groceriesName} on ${SEEDED - 1} Transactions · 1 split or Transfer left out.`,
+    `Set ${groceriesName}: ${SEEDED - 1} Transactions changed · 1 split or Transfer left out.`,
   );
   await expect(header).not.toBeChecked();
   await pages.getByRole('link', { name: 'Next' }).click();
