@@ -2,7 +2,12 @@ import Link from 'next/link';
 import { ActionForm } from '@/components/action-form';
 import { Menu } from '@/components/menu';
 import { INPUT_CLASS } from '@/components/named-list';
-import { CARD_CLASS, DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
+import {
+  BADGE_CLASS,
+  CARD_CLASS,
+  DANGER_BUTTON_CLASS,
+  GHOST_BUTTON_CLASS,
+} from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import { transactionCountLabel } from '@/lib/text';
 import type { Tag, TagActivity } from '@/server/services/tags';
@@ -42,11 +47,7 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
                 : `${fmt.date(firstDate)} – ${fmt.date(lastDate)}`}
             </span>
           )}
-          {transactionCount === 0 && (
-            <span className="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
-              Unused
-            </span>
-          )}
+          {transactionCount === 0 && <span className={BADGE_CLASS.warning}>Unused</span>}
         </div>
         <TagMenu tag={tag} tags={tags} />
       </div>

@@ -34,7 +34,7 @@ const CHIP = 'inline-flex rounded-md px-2 py-0.5 text-xs font-medium break-words
 const ACTION_TONES: Record<RuleActionPart['kind'], string> = {
   payee: 'bg-info-tint text-info',
   category: 'bg-positive-tint text-positive',
-  tag: 'bg-warning-tint text-warning',
+  tag: 'bg-sunken text-ink-soft',
 };
 
 /** The selected Rule spelled out: when it matches, what it sets, and everything to do with it. */

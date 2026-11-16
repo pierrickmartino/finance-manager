@@ -2,7 +2,12 @@ import Link from 'next/link';
 import { ActionForm } from '@/components/action-form';
 import { Menu } from '@/components/menu';
 import { INPUT_CLASS } from '@/components/named-list';
-import { CARD_CLASS, DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
+import {
+  BADGE_CLASS,
+  CARD_CLASS,
+  DANGER_BUTTON_CLASS,
+  GHOST_BUTTON_CLASS,
+} from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import { transactionCountLabel } from '@/lib/text';
 import type { Payee } from '@/server/services/payees';
@@ -31,11 +36,7 @@ export function PayeeDetail({ payee, payees, recent, fmt }: PayeeDetailProps) {
           <Link href={transactionsHref} className="text-sm text-faint hover:underline">
             {transactionCountLabel(transactionCount)}
           </Link>
-          {transactionCount === 0 && (
-            <span className="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/20 ring-inset">
-              Unused
-            </span>
-          )}
+          {transactionCount === 0 && <span className={BADGE_CLASS.warning}>Unused</span>}
         </div>
         <PayeeMenu payee={payee} payees={payees} />
       </div>

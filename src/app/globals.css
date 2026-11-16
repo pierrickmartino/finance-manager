@@ -42,9 +42,11 @@
   --color-positive-tint: #ecfdf5;
   --color-negative: #be123c;
   --color-negative-tint: #fff1f2;
-  --color-warning: #b45309;
-  --color-warning-tint: #fffbeb;
-  --color-warning-rule: #fcd34d;
+  /* Warning is terracotta, a red-orange well apart from the amber accent, so attention never
+     reads as a link or a selection. AA on surface (5.2:1) and on its tint (4.8:1). */
+  --color-warning: #c2410c;
+  --color-warning-tint: #fff4ed;
+  --color-warning-rule: #fdba74;
   --color-info: #0369a1;
   --color-info-tint: #f0f9ff;
 
