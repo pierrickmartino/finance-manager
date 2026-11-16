@@ -67,6 +67,21 @@ test('confirms a Transfer candidate in the Import preview', async ({ page }) => 
   // The counterpart, on another Account, is outside the list but keeps it (ADR-0013)
   const stepper = page.getByRole('navigation', { name: 'Transactions list' });
   await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
+  // With an unsaved edit, following the counterpart asks first; staying keeps the edit
+  const notes = page.getByRole('form', { name: 'Classification' }).getByLabel('Notes');
+  await notes.fill('Not yet saved');
+  const asked = new Promise<string>((resolve) =>
+    page.once('dialog', (dialog) => {
+      const message = dialog.message();
+      void dialog.dismiss().then(() => resolve(message));
+    }),
+  );
+  await transfer.getByRole('link', { name: new RegExp(bcge) }).click();
+  expect(await asked).toBe('Discard unsaved changes?');
+  await expect(notes).toHaveValue('Not yet saved');
+  await expect(stepper.getByText('1 of 1', { exact: true })).toBeVisible();
+  // Undone, the edit is no longer unsaved: the counterpart opens without a word
+  await notes.fill('');
   await transfer.getByRole('link', { name: new RegExp(bcge) }).click();
   await expect(transfer).toContainText(`Transfer with ${ubs}`);
   await expect(stepper.getByText('— of 1', { exact: true })).toBeVisible();

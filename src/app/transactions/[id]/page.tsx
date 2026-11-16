@@ -6,7 +6,7 @@ import { BUTTON_CLASS } from '@/components/named-list';
 import { CARD_CLASS, DANGER_BUTTON_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
-import { NotFoundError, ValidationError } from '@/server/services/errors';
+import { NotFoundError } from '@/server/services/errors';
 import { listCategoryGroups } from '@/server/services/categories';
 import { listHistory } from '@/server/services/history';
 import { listPayees } from '@/server/services/payees';
@@ -15,10 +15,8 @@ import {
   CLASSIFICATION_FIELD_LABELS,
   getClassification,
   getTransaction,
-  locateTransaction,
   type Classification,
   type TransactionDetail,
-  type TransactionPlace,
 } from '@/server/services/transactions';
 import type { ServiceContext } from '@/server/services/context';
 import {
@@ -37,13 +35,14 @@ import {
 import { BackToTransactions } from '../back-to-list';
 import {
   readDetailList,
+  transactionDetailHref,
   transactionsBackHref,
   type SearchValues,
-  type TransactionSearch,
 } from '../search';
 import { BankDetails } from './bank-details';
 import { DETAIL_COLUMNS_CLASS, DETAIL_PANEL_CLASS, DETAIL_TOP_LINE_CLASS } from './detail-layout';
 import { ListStepper } from './list-stepper';
+import { locateInList } from './locate-in-list';
 import { ClassificationForm } from './classification-form';
 import { SplitSection, type LineTransfers } from './split-section';
 import { transactionBadges } from './transaction-badges';
@@ -82,21 +81,6 @@ async function loadLineTransfers(
   return Object.fromEntries(entries);
 }
 
-/** Where the Transaction sits in its list; null with no list, or one whose filters don't read. */
-async function locateInList(
-  ctx: ServiceContext,
-  list: TransactionSearch | null,
-  id: string,
-): Promise<TransactionPlace | null> {
-  if (!list?.query) return null;
-  try {
-    return await locateTransaction(ctx, list.query, id);
-  } catch (error: unknown) {
-    if (error instanceof ValidationError) return null;
-    throw error;
-  }
-}
-
 async function loadTransaction(id: string): Promise<TransactionDetail> {
   try {
     return await getTransaction(await getServiceContext(), id);
@@ -119,11 +103,15 @@ export default async function TransactionPage({ params, searchParams }: Transact
   const ctx = await getServiceContext();
   const isSplit = transaction.splitLines.length > 0;
   const fmt = await getFormatter();
-  const list = readDetailList(await searchParams, fmt.settings.numberFormat);
+  const listSearch = readDetailList(await searchParams, fmt.settings.numberFormat);
+  const listFilters = listSearch?.values ?? null;
+  // A Transfer's other side opens within the same list, if any (spec #152, story 23).
+  const counterpartHref = (counterpartId: string) =>
+    transactionDetailHref(counterpartId, listFilters);
   const [history, place, classification, groups, payees, tags, counterpart, lineTransfers] =
     await Promise.all([
       listHistory(ctx, { entityType: 'transaction', entityId: transaction.id }),
-      locateInList(ctx, list, transaction.id),
+      locateInList(ctx, listSearch, transaction.id),
       getClassification(ctx, transaction.id),
       listCategoryGroups(ctx),
       listPayees(ctx),
@@ -135,16 +123,14 @@ export default async function TransactionPage({ params, searchParams }: Transact
   return (
     <section className="flex flex-col gap-5">
       <div className={DETAIL_TOP_LINE_CLASS}>
-        <BackToTransactions
-          href={transactionsBackHref(list?.values ?? null, place, transaction.id)}
-        />
-        {list && place && <ListStepper place={place} values={list.values} />}
+        <BackToTransactions href={transactionsBackHref(listFilters, place, transaction.id)} />
+        {listFilters && place && <ListStepper place={place} listFilters={listFilters} />}
       </div>
       <TransactionHeader
         transaction={transaction}
         badges={transactionBadges(transaction, classification)}
         fmt={fmt}
-        actions={<TransactionActions transaction={transaction} list={list?.values ?? null} />}
+        actions={<TransactionActions transaction={transaction} listFilters={listFilters} />}
       />
       <SplitSection
         transaction={transaction}
@@ -152,7 +138,7 @@ export default async function TransactionPage({ params, searchParams }: Transact
         payees={payees}
         lineTransfers={lineTransfers}
         fmt={fmt}
-        list={list?.values}
+        counterpartHref={counterpartHref}
         className={`${DETAIL_PANEL_CLASS} gap-4`}
       />
       <div className={DETAIL_COLUMNS_CLASS}>
@@ -190,7 +176,7 @@ export default async function TransactionPage({ params, searchParams }: Transact
                 counterpart ? [] : await listLinkOptions(ctx, transactionSide(transaction.id))
               }
               fmt={fmt}
-              list={list?.values}
+              counterpartHref={counterpartHref}
               className={DETAIL_PANEL_CLASS}
             />
           )}
@@ -223,12 +209,12 @@ export default async function TransactionPage({ params, searchParams }: Transact
 
 interface TransactionActionsProps {
   transaction: TransactionDetail;
-  /** The list it was opened from, which deleting it returns to; null for a bare detail. */
-  list: SearchValues | null;
+  /** The filters of the list it was opened from, which deleting it returns to; null for a bare detail. */
+  listFilters: SearchValues | null;
 }
 
 /** Edit the details of a Manual transaction; delete any Transaction. */
-function TransactionActions({ transaction, list }: TransactionActionsProps) {
+function TransactionActions({ transaction, listFilters }: TransactionActionsProps) {
   return (
     <>
       {transaction.isManual && (
@@ -244,7 +230,7 @@ function TransactionActions({ transaction, list }: TransactionActionsProps) {
           null,
           transaction.id,
           transaction.isManual,
-          list,
+          listFilters,
         )}
         label="Delete Transaction"
         confirmMessage={

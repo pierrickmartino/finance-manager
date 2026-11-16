@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import type { Formatter } from '@/lib/format';
 import { ActionForm } from '@/components/action-form';
+import { GuardedLink } from '@/components/unsaved-changes';
 import { BUTTON_CLASS } from '@/components/named-list';
 import {
   sideOptionValue,
@@ -9,7 +9,6 @@ import {
   type TransferSideRef,
   type TransferSideView,
 } from '@/server/services/transfers';
-import { transactionDetailHref, type SearchValues } from '../search';
 import { linkTransferAction, unlinkTransferAction } from './actions';
 import { SECTION_TITLE_CLASS } from '@/components/surface';
 
@@ -20,8 +19,8 @@ interface TransferSectionProps {
   /** Sides it may be linked with, when it is not in a Transfer. */
   options: TransferSideView[];
   fmt: Formatter;
-  /** The Transactions list the detail was opened from, carried on to the counterpart. */
-  list?: SearchValues | null;
+  /** The other side's detail, within the detail's Transactions list if any (ADR-0013). */
+  counterpartHref: (transactionId: string) => string;
   /** Classes of the section, e.g. to draw it as a card. */
   className?: string;
 }
@@ -46,23 +45,21 @@ export function describeSide(side: TransferSideView, fmt: Formatter): string {
 interface TransferCounterpartProps {
   counterpart: TransferSideView;
   fmt: Formatter;
-  /** The Transactions list the detail was opened from; the counterpart keeps it (ADR-0013). */
-  list?: SearchValues | null;
+  /** The other side's Transaction detail, within the list the detail was opened from if any. */
+  href: string;
 }
 
 /**
- * "Transfer with <the other side>", linking to the other side's Transaction, within the list
- * the detail was opened from when there is one.
+ * "Transfer with <the other side>", linking to the other side's Transaction. Following it asks
+ * before discarding unsaved edits, like every way off a Transaction detail.
  */
-export function TransferCounterpart({ counterpart, fmt, list = null }: TransferCounterpartProps) {
-  const { id } = counterpart.transaction;
-  const href = list ? transactionDetailHref(id, list) : `/transactions/${id}`;
+export function TransferCounterpart({ counterpart, fmt, href }: TransferCounterpartProps) {
   return (
     <>
       Transfer with{' '}
-      <Link href={href} className="underline">
+      <GuardedLink href={href} className="underline">
         {describeSide(counterpart, fmt)}
-      </Link>
+      </GuardedLink>
     </>
   );
 }
@@ -144,7 +141,7 @@ export function TransferSection({
   counterpart,
   options,
   fmt,
-  list = null,
+  counterpartHref,
   className = 'flex flex-col gap-3',
 }: TransferSectionProps) {
   return (
@@ -155,8 +152,12 @@ export function TransferSection({
       {counterpart ? (
         <div className="flex flex-col gap-2 text-sm">
           <p>
-            <TransferCounterpart counterpart={counterpart} fmt={fmt} list={list} />. A Transfer has
-            no Category and is left out of income and expense.
+            <TransferCounterpart
+              counterpart={counterpart}
+              fmt={fmt}
+              href={counterpartHref(counterpart.transaction.id)}
+            />
+            . A Transfer has no Category and is left out of income and expense.
           </p>
           <UnlinkTransferForm
             transactionId={transactionId}

@@ -1,7 +1,11 @@
 'use client';
 
 import {
+  createContext,
+  useContext,
   useLayoutEffect,
+  useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   ViewTransition,
@@ -38,20 +42,47 @@ function useIsWide(): boolean | null {
   );
 }
 
-/*
- * How many Transaction detail headers are mounted. Counted in layout effects, which run in the
- * commit itself: React holds passive effects back until a running view transition ends.
- */
-let detailsShown = 0;
+interface DetailsOnScreen {
+  /** Counts a Transaction detail header in until the returned function counts it out. */
+  show: () => () => void;
+  /** Whether any Transaction detail header is mounted. */
+  isAnyShown: () => boolean;
+}
 
+const DetailsOnScreenContext = createContext<DetailsOnScreen | null>(null);
+
+/**
+ * Wraps the Transactions list and its Transaction details, and keeps count of the detail
+ * headers on screen across navigations between them, so a loading skeleton can tell whether it
+ * replaces another detail (`useIsFromDetail`). Outside it, a skeleton always morphs.
+ */
+export function TransactionMorphScope({ children }: { children: ReactNode }): ReactElement {
+  const detailsShown = useRef(0);
+  const details = useMemo<DetailsOnScreen>(
+    () => ({
+      show() {
+        detailsShown.current += 1;
+        return () => {
+          detailsShown.current -= 1;
+        };
+      },
+      isAnyShown: () => detailsShown.current > 0,
+    }),
+    [],
+  );
+  return <DetailsOnScreenContext value={details}>{children}</DetailsOnScreenContext>;
+}
+
+/*
+ * Counts a Transaction detail header in while it is mounted. In a layout effect, which runs in
+ * the commit itself: React holds passive effects back until a running view transition ends.
+ */
 function useCountDetailShown(part: MorphPart): void {
+  const details = useContext(DetailsOnScreenContext);
   useLayoutEffect(() => {
-    if (part !== 'detail') return;
-    detailsShown += 1;
-    return () => {
-      detailsShown -= 1;
-    };
-  }, [part]);
+    if (part !== 'detail' || !details) return;
+    return details.show();
+  }, [part, details]);
 }
 
 /**
@@ -60,7 +91,8 @@ function useCountDetailShown(part: MorphPart): void {
  * when the skeleton commits.
  */
 function useIsFromDetail(part: MorphPart): boolean {
-  const [isFromDetail] = useState(() => part === 'loading' && detailsShown > 0);
+  const details = useContext(DetailsOnScreenContext);
+  const [isFromDetail] = useState(() => part === 'loading' && (details?.isAnyShown() ?? false));
   return isFromDetail;
 }
 
@@ -85,7 +117,7 @@ export function TransactionMorph({
 }: TransactionMorphProps): ReactElement {
   useCountDetailShown(part);
   const fromDetail = useIsFromDetail(part);
-  const isNamed = isMorphing(part, useIsWide(), { fromDetail });
+  const isNamed = isMorphing(part, useIsWide(), fromDetail);
   return (
     // A boundary that gains or loses the name (across `xl`, or once hydrated) is a new one: React
     // tracks a name from its boundary's mount to its unmount, so naming or unnaming a mounted

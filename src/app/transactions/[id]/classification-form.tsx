@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
 import { FieldError, SubmitButton } from '@/components/form';
-import { useReportUnsaved } from '@/components/unsaved-changes';
+import { useUnsavedDraft } from '@/components/unsaved-changes';
 import { MAX_NOTES_LENGTH } from '@/lib/classification';
 import type { ActionResult } from '@/server/actions';
 import type { CategoryGroup } from '@/server/services/categories';
@@ -48,25 +48,13 @@ export function ClassificationForm({
   action,
 }: ClassificationFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
-  /** The draft as last saved, and the one being saved: what the form is compared with. */
-  const saved = useRef<string | null>(null);
-  const submitted = useRef<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
-  useReportUnsaved('classification', isDirty);
-  useEffect(() => {
-    if (formRef.current) saved.current = draftOf(formRef.current);
-  }, []);
-  const compare = () => {
-    if (formRef.current) setIsDirty(draftOf(formRef.current) !== saved.current);
-  };
-
   const [state, formAction, isPending] = useActionState(action, null);
-  // A save makes what was submitted the new saved draft; edits typed since stay unsaved.
+  /** What the form holds, read from its fields once mounted and on every change. */
+  const [draft, setDraft] = useState<string | null>(null);
   useEffect(() => {
-    if (!state?.ok || !formRef.current) return;
-    saved.current = submitted.current;
-    setIsDirty(draftOf(formRef.current) !== saved.current);
-  }, [state]);
+    if (formRef.current) setDraft(draftOf(formRef.current));
+  }, []);
+  const markSubmitted = useUnsavedDraft('classification', draft, state);
   const locked = new Set(classification.lockedFields);
   const isLocked = (field: Classification['lockedFields'][number]) => locked.has(field) && LOCKED;
   const splitCount = classification.splitLines.length;
@@ -75,12 +63,12 @@ export function ClassificationForm({
     <form
       ref={formRef}
       aria-label="Classification"
-      onChange={compare}
+      onChange={(event) => setDraft(draftOf(event.currentTarget))}
       // Submitted by hand so a rejected form keeps what was typed (React resets action forms).
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
-        submitted.current = draftOf(event.currentTarget);
+        markSubmitted();
         startTransition(() => formAction(formData));
       }}
       className="flex max-w-xl flex-col gap-3"

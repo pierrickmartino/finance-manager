@@ -52,6 +52,8 @@ Motion: route navigations animate with View Transitions (ADR-0012). `--motion-du
 | `ACCENT_BUTTON_CLASS` | The main action of the Dashboard Story's own views: Done in Edit mode, Save in the Widget editor. |
 | `SECONDARY_BUTTON_CLASS` / `SMALL_BUTTON_CLASS` | Every other action, and links styled as buttons; the small one in dense rows. |
 | `GHOST_BUTTON_CLASS` | Quiet actions inside rows and toolbars. |
+| `STEP_LINK_CLASS` / `STEP_LINK_DISABLED_CLASS` | Quiet step links of a toolbar (Previous / Next on a Transaction detail); the disabled one, faint and not a link, at an end. |
+| `KEY_HINT_CLASS` | A keyboard shortcut's key cap beside its control (`j`, `k`). Decorative: the control names its shortcut in `aria-keyshortcuts`. |
 | `LINK_BUTTON_CLASS` | A button that reads as a link within a sentence or notice ("Select all 120 matching this filter"). |
 | `DANGER_BUTTON_CLASS` | Delete and remove: text only, so it never reads as the main action. |
 

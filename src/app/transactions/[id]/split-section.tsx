@@ -10,7 +10,6 @@ import { splitLabel } from '../transaction-display';
 import { removeSplitAction, splitTransactionAction } from './actions';
 import { SplitForm } from './split-form';
 import { initialSplitDrafts } from './split-lines';
-import type { SearchValues } from '../search';
 import { LinkTransferForm, TransferCounterpart, UnlinkTransferForm } from './transfer-section';
 import { SECTION_TITLE_CLASS } from '@/components/surface';
 
@@ -33,8 +32,8 @@ interface SplitSectionProps {
   payees: PayeeRef[];
   lineTransfers: LineTransfers;
   fmt: Formatter;
-  /** The Transactions list the detail was opened from, carried on to Transfer counterparts. */
-  list?: SearchValues | null;
+  /** A Transfer line's other side's detail, within the detail's Transactions list if any. */
+  counterpartHref: (transactionId: string) => string;
   /** Classes of the section, e.g. to draw it as a card. */
   className?: string;
 }
@@ -49,7 +48,7 @@ export function SplitSection({
   payees,
   lineTransfers,
   fmt,
-  list = null,
+  counterpartHref,
   className = 'flex flex-col gap-3',
 }: SplitSectionProps) {
   const isSplit = transaction.splitLines.length > 0;
@@ -60,7 +59,12 @@ export function SplitSection({
         ? [
             [
               lineId,
-              <TransferCounterpart key={lineId} counterpart={counterpart} fmt={fmt} list={list} />,
+              <TransferCounterpart
+                key={lineId}
+                counterpart={counterpart}
+                fmt={fmt}
+                href={counterpartHref(counterpart.transaction.id)}
+              />,
             ],
           ]
         : [],
@@ -103,7 +107,7 @@ export function SplitSection({
             transaction={transaction}
             lineTransfers={lineTransfers}
             fmt={fmt}
-            list={list}
+            counterpartHref={counterpartHref}
           />
           <details className="w-full">
             <summary className={SUMMARY}>Edit Split</summary>
@@ -123,9 +127,12 @@ export function SplitSection({
   );
 }
 
-type TableProps = Pick<SplitSectionProps, 'transaction' | 'lineTransfers' | 'fmt' | 'list'>;
+type TableProps = Pick<
+  SplitSectionProps,
+  'transaction' | 'lineTransfers' | 'fmt' | 'counterpartHref'
+>;
 
-function SplitLinesTable({ transaction, lineTransfers, fmt, list = null }: TableProps) {
+function SplitLinesTable({ transaction, lineTransfers, fmt, counterpartHref }: TableProps) {
   return (
     <div className="overflow-x-auto">
       <table aria-label="Split lines" className="w-full text-sm">
@@ -148,7 +155,7 @@ function SplitLinesTable({ transaction, lineTransfers, fmt, list = null }: Table
                   position={index + 1}
                   transfer={lineTransfers[line.id]}
                   fmt={fmt}
-                  list={list}
+                  counterpartHref={counterpartHref}
                 />
               </td>
               <td className={CELL}>
@@ -189,7 +196,7 @@ interface LineClassificationProps {
   position: number;
   transfer: LineTransfers[string] | undefined;
   fmt: Formatter;
-  list: SearchValues | null;
+  counterpartHref: (transactionId: string) => string;
 }
 
 /**
@@ -202,13 +209,17 @@ function LineClassification({
   position,
   transfer,
   fmt,
-  list,
+  counterpartHref,
 }: LineClassificationProps) {
   if (transfer?.counterpart) {
     return (
       <div className="flex flex-col gap-1">
         <span className="text-info">
-          <TransferCounterpart counterpart={transfer.counterpart} fmt={fmt} list={list} />
+          <TransferCounterpart
+            counterpart={transfer.counterpart}
+            fmt={fmt}
+            href={counterpartHref(transfer.counterpart.transaction.id)}
+          />
         </span>
         <UnlinkTransferForm
           transactionId={transactionId}

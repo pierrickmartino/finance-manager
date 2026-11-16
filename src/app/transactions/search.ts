@@ -1,6 +1,6 @@
 import type { NumberFormat } from '@/lib/format';
 import { parseAmount } from '@/lib/format/parse-amount';
-import type { TransactionQuery } from '@/server/services/transactions';
+import type { TransactionPlace, TransactionQuery } from '@/server/services/transactions';
 import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 
 /**
@@ -87,37 +87,80 @@ export function readTransactionSearch(
   return { values, page, selected, query, error: null };
 }
 
-/**
- * `path` with the non-blank search values (and the page, after the first, and the previewed
- * Transaction, if any) as its query.
- */
-function withSearch(path: string, values: SearchValues, page = 1, selected = ''): string {
-  const query = new URLSearchParams(Object.entries(values).filter(([, value]) => value));
-  if (page > 1) query.set('page', String(page));
-  if (selected) query.set('selected', selected);
+/** `path` with `query` as its query string, if it has any parameter. */
+function withQuery(path: string, query: URLSearchParams): string {
   const search = query.toString();
   return search ? `${path}?${search}` : path;
 }
 
+/** The non-blank search values as URL parameters, after any `leading` ones. */
+function filterParams(values: SearchValues, leading: [string, string][] = []): URLSearchParams {
+  return new URLSearchParams([...leading, ...Object.entries(values).filter(([, value]) => value)]);
+}
+
 /** The list URL for these search values on a given page, optionally previewing a Transaction. */
 export function transactionsHref(values: SearchValues, page = 1, selected = ''): string {
-  return withSearch('/transactions', values, page, selected);
+  const query = filterParams(values);
+  if (page > 1) query.set('page', String(page));
+  if (selected) query.set('selected', selected);
+  return withQuery('/transactions', query);
+}
+
+/**
+ * The Transaction to select on returning to the list from one that no longer matches it: its
+ * next neighbour, else its previous one, with the list page each sits on. Null when nothing
+ * matches. The next one takes the place the Transaction would hold, so it is on its page; the
+ * previous one, only there when nothing older matches, is the list's last.
+ */
+function neighbourToSelect(place: TransactionPlace): { id: string; page: number } | null {
+  if (place.nextId) return { id: place.nextId, page: place.page };
+  if (place.previousId) {
+    return { id: place.previousId, page: Math.ceil(place.total / place.pageSize) };
+  }
+  return null;
 }
 
 /**
  * "← Transactions" from the Transaction detail of `id` (ADR-0013): the list it was opened from
  * (`values`, null for a bare detail), at the page holding the Transaction (`place`, from
- * `locateTransaction`), with it selected. With a list but no known place (its filters don't
- * read), the list's first page.
+ * `locateTransaction`), with it selected. A Transaction that no longer matches the list isn't
+ * in it: its neighbour is selected instead, as after deleting it. With a list but no known
+ * place (its filters don't read), or nothing left in it, the list's first page.
  */
 export function transactionsBackHref(
   values: SearchValues | null,
-  place: { page: number } | null,
+  place: TransactionPlace | null,
   id: string,
 ): string {
   if (!values) return '/transactions';
   if (!place) return transactionsHref(values);
-  return transactionsHref(values, place.page, id);
+  if (place.matches) return transactionsHref(values, place.page, id);
+  const neighbour = neighbourToSelect(place);
+  return neighbour
+    ? transactionsHref(values, neighbour.page, neighbour.id)
+    : transactionsHref(values);
+}
+
+/**
+ * Where deleting a Transaction from its detail returns to: the list it was opened from
+ * (`values`, null for a bare detail), with the deleted Transaction's neighbour selected on the
+ * page it is on once the Transaction is gone. `place` is where it sat before the delete.
+ */
+export function transactionsAfterDeleteHref(
+  values: SearchValues | null,
+  place: TransactionPlace | null,
+): string {
+  if (!values) return '/transactions';
+  if (!place) return transactionsHref(values);
+  // Gone, it is like a Transaction that no longer matches, in a list one shorter.
+  const neighbour = neighbourToSelect({
+    ...place,
+    matches: false,
+    total: place.matches ? place.total - 1 : place.total,
+  });
+  return neighbour
+    ? transactionsHref(values, neighbour.page, neighbour.id)
+    : transactionsHref(values);
 }
 
 /**
@@ -129,10 +172,12 @@ export const DETAIL_LIST_MARKER = 'list';
 /**
  * The Transaction detail of `id` within the list of these search values: the marker, then the
  * non-blank filters. The list's page and selection are left out; the detail derives them.
+ * Without a list (`values` null), the bare detail.
  */
-export function transactionDetailHref(id: string, values: SearchValues): string {
-  const filters = withSearch('', values).replace(/^\?/, '&');
-  return `/transactions/${id}?${DETAIL_LIST_MARKER}=1${filters}`;
+export function transactionDetailHref(id: string, values: SearchValues | null): string {
+  const path = `/transactions/${id}`;
+  if (!values) return path;
+  return withQuery(path, filterParams(values, [[DETAIL_LIST_MARKER, '1']]));
 }
 
 /**
@@ -158,7 +203,7 @@ export function pickSelected<T extends { id: string }>(rows: T[], selected: stri
 
 /** The CSV export URL for these search values: the same filters, every page. */
 export function transactionsExportHref(values: SearchValues): string {
-  return withSearch('/api/transactions/export', values);
+  return withQuery('/api/transactions/export', filterParams(values));
 }
 
 /** The list's query without its page: the filter "Select all N matching this filter" edits. */

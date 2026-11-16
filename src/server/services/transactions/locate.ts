@@ -15,11 +15,23 @@ export interface TransactionPlace {
   previousId: string | null;
   /** The matching Transaction just after it (older); null on the last. */
   nextId: string | null;
-  /** The list page (at the query's page size) it sits on, or would sit on if it matched. */
+  /** The list page (at `pageSize`) it sits on, or would sit on if it matched. */
   page: number;
+  /** Transactions per list page: the query's page size. */
+  pageSize: number;
 }
 
 const transactionId = z.uuid();
+
+/*
+ * In the query below, `located` is the Transaction being located and `t` a Transaction of the
+ * list (the alias the list's filters are written against). The list's order, newest first, is
+ * this key descending: entry order is unique, so it is a total order.
+ */
+const LIST_KEY = '(t.booking_date, t.entry_order)';
+const LOCATED_KEY = '(located.booking_date, located.entry_order)';
+const NEWER_THAN_LOCATED = `${LIST_KEY} > ${LOCATED_KEY}`;
+const OLDER_THAN_LOCATED = `${LIST_KEY} < ${LOCATED_KEY}`;
 
 /**
  * Locates a Transaction in the Transactions list of `query` (its page is ignored). The list's
@@ -34,39 +46,39 @@ export async function locateTransaction(
   const notFound = new NotFoundError('Transaction not found');
   if (!transactionId.safeParse(id).success) throw notFound;
   const input = parseInput(transactionQueryInput, { ...query, page: 1 });
-  const where = filterConditions(input);
-  const target = `$${where.params.length + 1}::uuid`;
-  const matching = (extra: string): string =>
-    `FROM "transaction" t ${where.sql ? `${where.sql} AND` : 'WHERE'} ${extra}`;
-  const key = '(t.booking_date, t.entry_order)';
-  const targetKey = '(x.booking_date, x.entry_order)';
+  const filters = filterConditions(input);
+  const locatedId = `$${filters.params.length + 1}::uuid`;
+  /** The list's Transactions that also meet `condition`. */
+  const listRowsWhere = (condition: string): string =>
+    `FROM "transaction" t ${filters.sql ? `${filters.sql} AND` : 'WHERE'} ${condition}`;
 
   const result = await ctx.db.query<{
     total: number;
-    newer: number;
+    newerCount: number;
     matches: boolean;
     previousId: string | null;
     nextId: string | null;
   }>(
     `SELECT
-       (SELECT count(*)::int ${matching('TRUE')}) AS total,
-       (SELECT count(*)::int ${matching(`${key} > ${targetKey}`)}) AS newer,
-       EXISTS (SELECT 1 ${matching(`t.id = x.id`)}) AS matches,
-       (SELECT t.id ${matching(`${key} > ${targetKey}`)}
+       (SELECT count(*)::int ${listRowsWhere('TRUE')}) AS total,
+       (SELECT count(*)::int ${listRowsWhere(NEWER_THAN_LOCATED)}) AS "newerCount",
+       EXISTS (SELECT 1 ${listRowsWhere('t.id = located.id')}) AS matches,
+       (SELECT t.id ${listRowsWhere(NEWER_THAN_LOCATED)}
           ORDER BY t.booking_date, t.entry_order LIMIT 1) AS "previousId",
-       (SELECT t.id ${matching(`${key} < ${targetKey}`)}
+       (SELECT t.id ${listRowsWhere(OLDER_THAN_LOCATED)}
           ORDER BY t.booking_date DESC, t.entry_order DESC LIMIT 1) AS "nextId"
-     FROM "transaction" x WHERE x.id = ${target}`,
-    [...where.params, id],
+     FROM "transaction" located WHERE located.id = ${locatedId}`,
+    [...filters.params, id],
   );
   const row = result.rows[0];
   if (!row) throw notFound;
   return {
     matches: row.matches,
-    position: row.matches ? row.newer + 1 : null,
+    position: row.matches ? row.newerCount + 1 : null,
     total: row.total,
     previousId: row.previousId,
     nextId: row.nextId,
-    page: Math.floor(row.newer / input.pageSize) + 1,
+    page: Math.floor(row.newerCount / input.pageSize) + 1,
+    pageSize: input.pageSize,
   };
 }

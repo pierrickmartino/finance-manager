@@ -31,12 +31,12 @@ describe('isMorphing', () => {
 
   test('stepping from another Transaction detail, the loading skeleton does not morph', () => {
     // Named, its swap for the page's header would pair the two and morph (spec #152, story 33).
-    expect(isMorphing('loading', true, { fromDetail: true })).toBe(false);
-    expect(isMorphing('loading', false, { fromDetail: true })).toBe(false);
-    expect(isMorphing('loading', null, { fromDetail: true })).toBe(false);
+    expect(isMorphing('loading', true, true)).toBe(false);
+    expect(isMorphing('loading', false, true)).toBe(false);
+    expect(isMorphing('loading', null, true)).toBe(false);
   });
 
   test('the Transaction detail header morphs even when reached from another detail', () => {
-    expect(isMorphing('detail', false, { fromDetail: true })).toBe(true);
+    expect(isMorphing('detail', false, true)).toBe(true);
   });
 });

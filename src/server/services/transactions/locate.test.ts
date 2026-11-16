@@ -54,6 +54,7 @@ describe('locateTransaction', () => {
       previousId: oct3,
       nextId: oct1,
       page: 1,
+      pageSize: 50,
     });
   });
 
@@ -93,6 +94,7 @@ describe('locateTransaction', () => {
       previousId: oct4,
       nextId: oct1,
       page: 1,
+      pageSize: 50,
     });
   });
 
@@ -112,6 +114,7 @@ describe('locateTransaction', () => {
       previousId: oct3,
       nextId: oct1,
       page: 1,
+      pageSize: 50,
     });
   });
 
@@ -155,6 +158,7 @@ describe('locateTransaction', () => {
       previousId: ids[4],
       nextId: ids[1],
       page: 1,
+      pageSize: 50,
     });
   });
 
