@@ -76,13 +76,16 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                   {page.total} Transaction{page.total === 1 ? '' : 's'}
                 </p>
                 <TransactionList
-                  fmt={fmt}
+                  // A new page or filter mounts a new list, so the selection clears.
+                  key={transactionsHref(search.values, page.page)}
                   transactions={page.transactions}
                   values={search.values}
                   page={page.page}
                   selectedId={selected?.id ?? null}
-                />
-                <Pagination values={search.values} page={page} />
+                  lists={{ groups, payeeNames: payees.map((payee) => payee.name), tags }}
+                >
+                  <Pagination values={search.values} page={page} />
+                </TransactionList>
               </>
             ))}
         </div>
