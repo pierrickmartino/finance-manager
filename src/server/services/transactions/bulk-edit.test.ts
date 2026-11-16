@@ -92,6 +92,28 @@ describe('bulk edit', () => {
     expect(await getClassification(t.ctx, third!)).toMatchObject({ payee: null });
   });
 
+  it('counts only the Transactions whose values changed, yet locks every selected one', async () => {
+    const [already, other] = await seed([row('SHOP ONE'), row('SHOP TWO')]);
+    await editClassification(t.ctx, already!, { payeeName: 'Shop' });
+    await t.ctx.db.query(`UPDATE "transaction" SET locked_fields = '{}' WHERE id = $1`, [already]);
+
+    const result = await bulkEditClassification(t.ctx, {
+      transactionIds: [already!, other!],
+      changes: { payeeName: 'Shop' },
+    });
+
+    expect(result.count).toBe(1);
+    for (const id of [already!, other!]) {
+      expect(await getClassification(t.ctx, id)).toMatchObject({
+        payee: { name: 'Shop' },
+        lockedFields: ['payee'],
+      });
+    }
+    expect(await getBatchSummaries(t.ctx, [result.batchId])).toEqual({
+      [result.batchId]: 'Bulk edit of 1 Transaction: Payee Shop',
+    });
+  });
+
   it('only takes group members that are still Unclassified', async () => {
     const [classified, open] = await seed([row('SBB'), row('SBB')]);
     const category = await groceries();

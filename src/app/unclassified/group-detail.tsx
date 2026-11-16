@@ -1,4 +1,4 @@
-import { CARD_CLASS } from '@/components/surface';
+import { CARD_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import { getServiceContext } from '@/server/app-context';
 import { listCategoryGroups } from '@/server/services/categories';
@@ -60,7 +60,7 @@ function GroupHeader({ description, members, fmt }: GroupHeaderProps) {
 
   return (
     <header className="flex flex-col gap-3">
-      <h2 className="font-display text-2xl tracking-tight break-words">{description}</h2>
+      <h2 className={`${SECTION_TITLE_CLASS} break-words`}>{description}</h2>
       <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <Fact term="Transactions" value={String(members.total)} />
         <Fact term={isPartial ? 'Total of those shown' : 'Total'} value={total} />

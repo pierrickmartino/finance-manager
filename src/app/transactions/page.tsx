@@ -8,7 +8,6 @@ import { listCategoryGroups } from '@/server/services/categories';
 import { listPayees } from '@/server/services/payees';
 import { listTags } from '@/server/services/tags';
 import { ServiceError } from '@/server/services/errors';
-import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 import {
   listTransactions,
   type TransactionPage,
@@ -16,7 +15,13 @@ import {
 } from '@/server/services/transactions';
 import { RememberTransactionsList } from './back-to-list';
 import { FilterRail } from './filter-rail';
-import { pickSelected, readTransactionSearch, transactionsHref, type SearchValues } from './search';
+import {
+  bulkFilterOf,
+  pickSelected,
+  readTransactionSearch,
+  transactionsHref,
+  type SearchValues,
+} from './search';
 import { TransactionList } from './transaction-list';
 import { TransactionPreview } from './transaction-preview';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
@@ -37,11 +42,6 @@ async function loadPage(
     if (error instanceof ServiceError) return { page: null, error: error.message };
     throw error;
   }
-}
-
-/** The list's filter without its page: what "Select all N matching this filter" edits. */
-function filterOf({ page: _page, pageSize: _pageSize, ...filter }: TransactionQuery): BulkFilter {
-  return filter;
 }
 
 /**
@@ -89,7 +89,7 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
                   values={search.values}
                   page={page.page}
                   total={page.total}
-                  filter={filterOf(search.query)}
+                  filter={bulkFilterOf(search.query)}
                   selectedId={selected?.id ?? null}
                   lists={{ groups, payeeNames: payees.map((payee) => payee.name), tags }}
                 >

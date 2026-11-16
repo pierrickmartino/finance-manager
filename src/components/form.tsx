@@ -4,6 +4,9 @@ import { PRIMARY_BUTTON_CLASS } from './surface';
 const INPUT_CLASS =
   'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm placeholder:text-faint';
 
+/** A `<label>` that wraps its control: the label's words, then the field below them. */
+export const FIELD_LABEL_CLASS = 'flex flex-col gap-1 text-sm font-medium';
+
 interface TextFieldProps extends Omit<ComponentProps<'input'>, 'id'> {
   label: string;
 }

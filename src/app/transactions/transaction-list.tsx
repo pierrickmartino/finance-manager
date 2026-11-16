@@ -1,12 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
-import { BulkActionBar, type BulkTag } from '@/components/bulk-edit/bulk-action-bar';
-import { HeaderCheckbox, tagsOf, useRowSelection } from '@/components/bulk-edit/row-selection';
+import type { ReactNode } from 'react';
+import { BulkActionBar, type BulkEditLists } from '@/components/bulk-edit/bulk-action-bar';
+import {
+  CHECK_CELL_CLASS,
+  HeaderCheckbox,
+  RowCheckboxCell,
+  tagsOf,
+  useRowSelection,
+} from '@/components/bulk-edit/row-selection';
 import { useFormatter } from '@/components/formatter-provider';
-import { CARD_CLASS } from '@/components/surface';
-import type { CategoryGroup } from '@/server/services/categories';
+import { CARD_CLASS, INFO_NOTICE_CLASS, LINK_BUTTON_CLASS } from '@/components/surface';
 import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { transactionsHref, type SearchValues } from './search';
@@ -14,8 +19,6 @@ import { amountClass, CategoryLabel, transactionName } from './transaction-displ
 import { TransactionMorph } from './transaction-morph';
 
 const CELL = 'px-3 py-2 align-top';
-/** The checkbox column: room enough to hit the box, nothing more. */
-const CHECK_CELL = 'w-0 py-2 pr-1 pl-3 align-top';
 
 interface TransactionListProps {
   transactions: TransactionListItem[];
@@ -28,7 +31,7 @@ interface TransactionListProps {
   /** The row the preview pane shows (`xl` and up). */
   selectedId: string | null;
   /** What the Bulk edit bar offers. */
-  lists: { groups: CategoryGroup[]; payeeNames: string[]; tags: BulkTag[] };
+  lists: BulkEditLists;
   /** Shown under the table (the pagination). */
   children?: ReactNode;
 }
@@ -54,24 +57,11 @@ export function TransactionList({
   children,
 }: TransactionListProps) {
   const selection = useRowSelection(transactions.map((transaction) => transaction.id));
-  const { ticked } = selection;
-  const [isAllMatching, setIsAllMatching] = useState(false);
+  const { ticked, tick, tickAll, isWholeScope, setWholeScope } = selection;
   // Only listed rows count: an edit can move a ticked row out of the filter.
   const selected = transactions.filter((transaction) => ticked.has(transaction.id));
   const isPageTicked = transactions.length > 0 && selected.length === transactions.length;
-  const isAll = isAllMatching && isPageTicked;
-
-  // Any change to the ticks narrows the selection back to the ticked rows.
-  const tick = (id: string, isChecked: boolean, isRange: boolean): void => {
-    setIsAllMatching(false);
-    selection.tick(id, isChecked, isRange);
-  };
-  const tickPage = (isChecked: boolean): void => {
-    setIsAllMatching(false);
-    selection.tickAll(isChecked);
-  };
-
-  const clear = (): void => tickPage(false);
+  const isAll = isWholeScope && isPageTicked;
 
   return (
     <div className="flex flex-col gap-3">
@@ -85,25 +75,25 @@ export function TransactionList({
         tags={lists.tags}
         // Beyond this page the selection's Tags aren't known: every Tag is offered.
         removableTags={isAll ? lists.tags : tagsOf(selected)}
-        onClear={clear}
+        onClear={() => tickAll(false)}
       />
       {isPageTicked && total > transactions.length && (
         <SelectAllMatching
           pageCount={transactions.length}
           total={total}
           isAll={isAll}
-          onChange={setIsAllMatching}
+          onChange={setWholeScope}
         />
       )}
       <div className={`${CARD_CLASS} overflow-x-auto`}>
         <table aria-label="Transactions" className="w-full text-sm">
           <thead className="border-b border-rule text-xs text-muted">
             <tr>
-              <th className={CHECK_CELL}>
+              <th className={CHECK_CELL_CLASS}>
                 <HeaderCheckbox
                   selectedCount={selected.length}
                   rowCount={transactions.length}
-                  onChange={tickPage}
+                  onChange={tickAll}
                   label="Select every Transaction on this page"
                 />
               </th>
@@ -144,15 +134,11 @@ interface SelectAllMatchingProps {
 /** With the whole page ticked: widens the selection to every match of the filter, or back. */
 function SelectAllMatching({ pageCount, total, isAll, onChange }: SelectAllMatchingProps) {
   return (
-    <p className="flex flex-wrap items-center justify-center gap-x-2 rounded-lg bg-sunken px-3 py-2 text-sm text-ink-soft">
+    <p className={`${INFO_NOTICE_CLASS} flex flex-wrap items-center justify-center gap-x-2`}>
       {isAll
         ? `All ${total} Transactions matching this filter are selected.`
         : `All ${pageCount} Transactions on this page are selected.`}
-      <button
-        type="button"
-        onClick={() => onChange(!isAll)}
-        className="font-medium text-ink underline hover:no-underline"
-      >
+      <button type="button" onClick={() => onChange(!isAll)} className={LINK_BUTTON_CLASS}>
         {isAll ? 'Select only this page' : `Select all ${total} matching this filter`}
       </button>
     </p>
@@ -175,18 +161,11 @@ function Row({ transaction, previewHref, isPreviewed, isTicked, onTick }: RowPro
   return (
     <TransactionMorph transactionId={transaction.id} part="row">
       <tr className={rowClass}>
-        <td className={CHECK_CELL}>
-          <input
-            type="checkbox"
-            checked={isTicked}
-            // React's change event for a checkbox is its click, which knows about shift.
-            onChange={(event) =>
-              onTick(event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)
-            }
-            aria-label={`Select ${name} on ${fmt.date(transaction.bookingDate)}`}
-            className="mt-0.5 accent-accent-ink"
-          />
-        </td>
+        <RowCheckboxCell
+          isTicked={isTicked}
+          onTick={onTick}
+          label={`Select ${name} on ${fmt.date(transaction.bookingDate)}`}
+        />
         <td className={`${CELL} whitespace-nowrap text-muted tabular-nums`}>
           {fmt.date(transaction.bookingDate)}
         </td>

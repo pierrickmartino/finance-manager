@@ -92,7 +92,8 @@ describe('bulk edit removing Tags', () => {
       changes: { removeTagIds: [food, trip!.id] },
     });
 
-    expect(result.count).toBe(3);
+    // `bare` had neither Tag, so nothing on it changed.
+    expect(result.count).toBe(2);
     expect(await tagsOf(ruled!)).toEqual([]);
     expect(await tagsOf(tagged!)).toEqual([
       { name: 'Family', source: 'manual' },

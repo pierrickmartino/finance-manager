@@ -4,6 +4,7 @@ import { Menu } from '@/components/menu';
 import { INPUT_CLASS } from '@/components/named-list';
 import { CARD_CLASS, DANGER_BUTTON_CLASS, GHOST_BUTTON_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
+import { transactionCountLabel } from '@/lib/text';
 import type { Tag, TagActivity } from '@/server/services/tags';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { categoryText } from '@/app/transactions/transaction-display';
@@ -21,10 +22,6 @@ interface TagDetailProps {
 
 const SECTION_HEADING = 'text-xs font-semibold tracking-wide text-faint uppercase';
 
-function transactionsLabel(count: number): string {
-  return `${count} Transaction${count === 1 ? '' : 's'}`;
-}
-
 /** The detail pane: one Tag's header and edits, its totals, Categories and latest Transactions. */
 export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) {
   const { id, name, transactionCount } = tag;
@@ -36,7 +33,7 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="truncate font-display text-2xl tracking-tight">{name}</h2>
           <Link href={transactionsHref} className="text-sm text-faint hover:underline">
-            {transactionsLabel(transactionCount)}
+            {transactionCountLabel(transactionCount)}
           </Link>
           {firstDate && lastDate && (
             <span className="text-sm text-faint tabular-nums">
@@ -86,7 +83,7 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
           href={transactionsHref}
           className="border-t border-rule px-4 py-3 text-sm font-medium text-ink-soft hover:bg-paper"
         >
-          All {transactionsLabel(transactionCount)} →
+          All {transactionCountLabel(transactionCount)} →
         </Link>
       )}
     </section>
@@ -188,7 +185,7 @@ function TagMenu({ tag, tags }: { tag: Tag; tags: Tag[] }) {
           confirmMessage={
             transactionCount === 0
               ? `Delete "${name}"?`
-              : `Delete "${name}"? It is removed from ${transactionsLabel(transactionCount)}.`
+              : `Delete "${name}"? It is removed from ${transactionCountLabel(transactionCount)}.`
           }
         >
           <button type="submit" className={DANGER_BUTTON_CLASS}>

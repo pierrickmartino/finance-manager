@@ -23,6 +23,11 @@ export const CARD_CLASS = 'rounded-xl border border-rule bg-surface shadow-sm';
  */
 export const WARNING_NOTICE_CLASS =
   'rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning';
+/**
+ * A quiet notice about the view's own state, which asks for nothing (all N on this page are
+ * selected): soft ink on a sunken fill. Not an alert: attention takes WARNING_NOTICE_CLASS.
+ */
+export const INFO_NOTICE_CLASS = 'rounded-lg bg-sunken px-3 py-2 text-sm text-ink-soft';
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 
@@ -67,5 +72,7 @@ export const PILL_BUTTON_CLASS =
 /** A quiet action that sits inside a row or toolbar. */
 export const GHOST_BUTTON_CLASS =
   'rounded-md px-2 py-1 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink disabled:opacity-30';
+/** A button that reads as a link within a sentence or notice (Select all N matching). */
+export const LINK_BUTTON_CLASS = 'font-medium text-ink underline hover:no-underline';
 /** Destructive actions: delete, remove. Text only, so they never look like the main action. */
 export const DANGER_BUTTON_CLASS = 'text-sm font-medium text-negative hover:underline';

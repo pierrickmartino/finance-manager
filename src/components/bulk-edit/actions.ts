@@ -6,27 +6,9 @@ import { getServiceContext } from '@/server/app-context';
 import {
   bulkEditClassification,
   type BulkChanges,
-  type BulkEditInput,
   type BulkEditResult,
-  type BulkFilter,
 } from '@/server/services/transactions/bulk-edit';
-
-/**
- * Which Transactions a Bulk edit applies to: picked by id, a whole Unclassified group, or every
- * Transaction a Transactions list filter matches ("Select all N matching this filter").
- */
-export type BulkScope =
-  { transactionIds: string[] } | { groupKey: string } | { filter: BulkFilter };
-
-type ScopeInput = Pick<BulkEditInput, 'transactionIds' | 'groupKey' | 'filter'>;
-
-/** Only the scope's own field reaches the service, which validates it. */
-function scopeInput(scope: BulkScope): ScopeInput {
-  if ('filter' in scope) return { filter: scope.filter };
-  return 'groupKey' in scope
-    ? { groupKey: scope.groupKey }
-    : { transactionIds: scope.transactionIds };
-}
+import { scopeInput, type BulkScope } from './scope';
 
 /**
  * The one Bulk edit action, shared by the Transactions list and the Unclassified page: applies
