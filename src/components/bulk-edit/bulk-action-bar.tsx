@@ -9,12 +9,12 @@ import {
   PRIMARY_BUTTON_CLASS,
   SMALL_BUTTON_CLASS,
 } from '@/components/surface';
-import { transactionCountLabel } from '@/lib/text';
 import type { CategoryGroup } from '@/server/services/categories';
 import { MAX_PAYEE_NAME_LENGTH } from '@/server/services/payees/model';
 import type { Tag } from '@/server/services/tags';
-import type { BulkChanges, BulkEditResult } from '@/server/services/transactions/bulk-edit';
+import type { BulkChanges } from '@/server/services/transactions/bulk-edit';
 import { bulkEditAction } from './actions';
+import { bulkResultMessage } from './dock-options';
 import type { BulkScope } from './scope';
 
 /** What the bar's pickers offer, as the page loads it. */
@@ -55,16 +55,6 @@ interface Edit {
 }
 
 /**
- * What an applied edit reports: how many Transactions it changed (a selected one that already
- * had the value is locked but unchanged), and how many it left out, e.g.
- * "Set Groceries: 3 Transactions changed · 1 split or Transfer left out."
- */
-function resultMessage(label: string, { count, leftOut }: BulkEditResult): string {
-  const leftOutPart = leftOut > 0 ? ` · ${leftOut} split or Transfer left out` : '';
-  return `${label}: ${transactionCountLabel(count)} changed${leftOutPart}.`;
-}
-
-/**
  * The Bulk edit action bar: while Transactions are selected, "n selected", Set Category,
  * Set Payee, Add Tag, Remove Tag and Clear selection. Each action applies at once as one Bulk
  * edit, reports what it changed (and what it left out), then clears the selection. Above the
@@ -93,7 +83,7 @@ export function BulkActionBar({
         setError(result.error);
         return;
       }
-      setMessage(resultMessage(edit.label, result.data));
+      setMessage(bulkResultMessage(edit.label, result.data));
       setOpen(null);
       onClear();
     });

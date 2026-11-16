@@ -43,7 +43,9 @@ Motion: route navigations animate with View Transitions (ADR-0012). `--motion-du
 | `HEADLINE_AMOUNT_CLASS` | The number a page is about: an Account's balance, a Bank's total, the selected Transaction's amount. |
 | `CARD_CLASS` | A separate object: a list, a detail panel, a Widget. Not every block. |
 | `WARNING_NOTICE_CLASS` | A notice that asks for attention (`role="alert"`): stale FX rates, a Balance snapshot mismatch. Put it on the notice itself, never on rows inside it; mark problem rows with `text-warning`. |
-| `INFO_NOTICE_CLASS` | A quiet notice about the view's own state that asks for nothing: "All 50 Transactions on this page are selected". Not an alert; attention takes `WARNING_NOTICE_CLASS`. |
+| `INFO_NOTICE_CLASS` | A quiet notice about the view's own state that asks for nothing. Not an alert; attention takes `WARNING_NOTICE_CLASS`. |
+| `DOCK_CLASS` / `DOCK_BUTTON_CLASS` | A dark toolbar floating over the bottom of the screen while something is selected (the Transactions list's Bulk edit dock), and its actions. Ink, so it reads as a tool above the page; its focus ring is `accent`, as `accent-ink` fails on ink. |
+| `POPOVER_CLASS` | A picker or menu floating over the page, opened from the dock or a toolbar. |
 | `BADGE_CLASS[tone]` | A short label beside a row's name: `warning` asks for attention (Missed, a price increase), `info` is neutral status (New, "Not yet imported"), `neutral` a plain fact. `rounded-md`, never decoration. |
 | `TILE_CLASS` | A card of the Dashboard's grid (the overview row and each Widget). |
 | `PLACEHOLDER_CLASS` | A quiet block standing in for content still loading: a Dashboard card's chart or line of text while its query runs. Pulses gently, and holds still under reduced motion (`motion-safe:animate-pulse`); its container carries `aria-busy`. |

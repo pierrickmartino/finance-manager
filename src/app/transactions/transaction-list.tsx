@@ -2,16 +2,16 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { BulkActionBar, type BulkEditLists } from '@/components/bulk-edit/bulk-action-bar';
+import type { BulkEditLists } from '@/components/bulk-edit/bulk-action-bar';
+import { BulkActionDock } from '@/components/bulk-edit/bulk-action-dock';
 import {
   CHECK_CELL_CLASS,
   HeaderCheckbox,
   RowCheckboxCell,
-  tagsOf,
   useRowSelection,
 } from '@/components/bulk-edit/row-selection';
 import { useFormatter } from '@/components/formatter-provider';
-import { CARD_CLASS, INFO_NOTICE_CLASS, LINK_BUTTON_CLASS } from '@/components/surface';
+import { CARD_CLASS } from '@/components/surface';
 import type { BulkFilter } from '@/server/services/transactions/bulk-edit';
 import type { TransactionListItem } from '@/server/services/transactions';
 import { transactionDetailHref, transactionsHref, type SearchValues } from './search';
@@ -30,7 +30,7 @@ interface TransactionListProps {
   filter: BulkFilter;
   /** The row the preview pane shows (`xl` and up). */
   selectedId: string | null;
-  /** What the Bulk edit bar offers. */
+  /** What the Bulk edit dock offers. */
   lists: BulkEditLists;
   /** Shown under the table (the pagination). */
   children?: ReactNode;
@@ -43,8 +43,9 @@ interface TransactionListProps {
  * Rows can be ticked for a Bulk edit: one by one, a range with shift-click from the last
  * ticked row, or the whole page from the header. The selection lives here only, never in the
  * URL: the page mounts the list afresh (by key) on every page or filter change, which clears it.
- * Once the whole page is ticked, "Select all N matching this filter" widens the selection to
- * the filter itself, every page of it; any other change to the selection narrows it back.
+ * Once the whole page is ticked, the Bulk edit dock offers "Select all N matching this filter",
+ * which widens the selection to the filter itself, every page of it; any other change to the
+ * selection narrows it back.
  */
 export function TransactionList({
   transactions,
@@ -64,27 +65,25 @@ export function TransactionList({
   const isAll = isWholeScope && isPageTicked;
 
   return (
-    <div className="flex flex-col gap-3">
-      <BulkActionBar
+    // Bottom room, so the dock never hides the last row or the pagination.
+    <div className="flex flex-col gap-3 pb-24">
+      <BulkActionDock
         scope={
           isAll ? { filter } : { transactionIds: selected.map((transaction) => transaction.id) }
         }
         count={isAll ? total : selected.length}
+        // Beyond this page the selection's Tags aren't known.
+        selectedTags={isAll ? null : selected.map((transaction) => transaction.tags)}
+        widen={
+          isPageTicked && total > transactions.length
+            ? { total, isAll, onChange: setWholeScope }
+            : null
+        }
         groups={lists.groups}
         payeeNames={lists.payeeNames}
         tags={lists.tags}
-        // Beyond this page the selection's Tags aren't known: every Tag is offered.
-        removableTags={isAll ? lists.tags : tagsOf(selected)}
         onClear={() => tickAll(false)}
       />
-      {isPageTicked && total > transactions.length && (
-        <SelectAllMatching
-          pageCount={transactions.length}
-          total={total}
-          isAll={isAll}
-          onChange={setWholeScope}
-        />
-      )}
       <div className={`${CARD_CLASS} overflow-x-auto`}>
         <table aria-label="Transactions" className="w-full text-sm">
           <thead className="border-b border-rule text-xs text-muted">
@@ -119,30 +118,6 @@ export function TransactionList({
       </div>
       {children}
     </div>
-  );
-}
-
-interface SelectAllMatchingProps {
-  /** Rows on this page. */
-  pageCount: number;
-  /** Transactions the filter matches. */
-  total: number;
-  /** Whether the selection is the whole filter rather than this page. */
-  isAll: boolean;
-  onChange: (isAll: boolean) => void;
-}
-
-/** With the whole page ticked: widens the selection to every match of the filter, or back. */
-function SelectAllMatching({ pageCount, total, isAll, onChange }: SelectAllMatchingProps) {
-  return (
-    <p className={`${INFO_NOTICE_CLASS} flex flex-wrap items-center justify-center gap-x-2`}>
-      {isAll
-        ? `All ${total} Transactions matching this filter are selected.`
-        : `All ${pageCount} Transactions on this page are selected.`}
-      <button type="button" onClick={() => onChange(!isAll)} className={LINK_BUTTON_CLASS}>
-        {isAll ? 'Select only this page' : `Select all ${total} matching this filter`}
-      </button>
-    </p>
   );
 }
 
