@@ -6,6 +6,7 @@ import {
   readTransactionSearch,
   SEARCH_FIELDS,
   transactionDetailHref,
+  transactionsBackHref,
   transactionsHref,
   type SearchValues,
 } from './search';
@@ -128,5 +129,39 @@ describe('readDetailList', () => {
     );
 
     expect(readDetailList(params, 'apostrophe')?.values).toEqual(values);
+  });
+});
+
+describe('transactionsBackHref', () => {
+  test('returns to the list page holding the Transaction, with it selected and the filters kept', () => {
+    const values = { ...BLANK, accountId: 'acc', unclassified: 'true' };
+
+    expect(transactionsBackHref(values, { page: 2 }, 'abc')).toBe(
+      '/transactions?accountId=acc&unclassified=true&page=2&selected=abc',
+    );
+  });
+
+  test('leaves the first page out of the URL', () => {
+    expect(transactionsBackHref(BLANK, { page: 1 }, 'abc')).toBe('/transactions?selected=abc');
+  });
+
+  test('goes to the bare list when the detail has no list', () => {
+    expect(transactionsBackHref(null, null, 'abc')).toBe('/transactions');
+  });
+
+  test("keeps the filters, on the first page, when the Transaction's place is unknown", () => {
+    expect(transactionsBackHref({ ...BLANK, amountMin: 'lots' }, null, 'abc')).toBe(
+      '/transactions?amountMin=lots',
+    );
+  });
+
+  test('round-trips through the list reader', () => {
+    const values = { ...BLANK, from: '2025-10-01', text: 'coop' };
+    const params = Object.fromEntries(
+      new URL(transactionsBackHref(values, { page: 3 }, 'abc'), 'http://x').searchParams,
+    );
+    const search = readTransactionSearch(params, 'apostrophe');
+
+    expect([search.values, search.page, search.selected]).toEqual([values, 3, 'abc']);
   });
 });
