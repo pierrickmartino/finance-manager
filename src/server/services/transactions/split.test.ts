@@ -364,11 +364,14 @@ describe("a split Transaction's classification", () => {
     await splitInTwo(id);
 
     await editClassification(t.ctx, id, { payeeName: 'Migros', tagNames: ['Family'], notes: 'n' });
-    await bulkEditClassification(t.ctx, { transactionIds: [id], changes: { tagNames: ['Trip'] } });
+    await bulkEditClassification(t.ctx, {
+      transactionIds: [id],
+      changes: { addTagNames: ['Trip'] },
+    });
 
     expect(await getTransaction(t.ctx, id)).toMatchObject({
       payee: { name: 'Migros' },
-      tags: [{ name: 'Trip' }],
+      tags: [{ name: 'Family' }, { name: 'Trip' }],
       notes: 'n',
       category: null,
     });

@@ -47,7 +47,7 @@ describe('bulk edit of 2 000 Transactions', () => {
     const start = performance.now();
     const result = await bulkEditClassification(t.ctx, {
       groupKey: 'twint migros geneve',
-      changes: { payeeName: 'Migros', categoryId: category.id, tagNames: ['Food'] },
+      changes: { payeeName: 'Migros', categoryId: category.id, addTagNames: ['Food'] },
     });
     const ms = performance.now() - start;
 

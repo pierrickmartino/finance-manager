@@ -89,4 +89,21 @@ test('classifies a whole group and a selected Transaction from the Unclassified 
   await expect(kiosk.getByRole('table').locator('tbody tr td').nth(3)).toHaveText(
     `Kiosk ${suffix}`,
   );
+
+  // Tags given in a Bulk edit are added: the ones the Transaction has stay
+  await kiosk.getByLabel('Payee').fill('');
+  await kiosk.getByLabel('Tags').fill(`Snacks ${suffix}`);
+  await Promise.all([
+    page.waitForResponse((response) => response.request().method() === 'POST'),
+    kiosk.getByRole('button', { name: 'Classify selected (1)' }).click(),
+  ]);
+  await kiosk.getByLabel('Tags').fill(tagName);
+  await Promise.all([
+    page.waitForResponse((response) => response.request().method() === 'POST'),
+    kiosk.getByRole('button', { name: 'Classify selected (1)' }).click(),
+  ]);
+  await kiosk.getByRole('link', { name: 'Open' }).click();
+  await expect(page.getByRole('form', { name: 'Classification' }).getByLabel('Tags')).toHaveValue(
+    `Snacks ${suffix}, ${tagName}`,
+  );
 });
