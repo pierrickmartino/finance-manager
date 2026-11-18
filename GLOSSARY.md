@@ -186,7 +186,7 @@ _Avoid_: Breakdown, detail view, cell Transactions
 A named set of Widgets laid out on a board of 12 columns and fixed-height rows, each Widget with its own place and size (ADR-0010). It is read as its Dashboard Story and arranged in place in Edit mode. Each Widget sits on at most one Dashboard.
 
 **Dashboard Story**:
-A Dashboard read as a grid of cards: an overview row (the headline amount, with the last 24 months of Net worth under it when it is Net worth today; the latest month's insight; the most recent Transactions), then the board, with one card per Widget drawn at the Widget's place and size, each saying in words what its chart shows. On narrow screens the cards read as one column, top to bottom then left to right.
+A Dashboard read as a grid of cards: an overview row (the headline amount, with a line of the last 24 months of Net worth beside it and its change over the last month, year and two years when it is Net worth today; the latest month's insight; the most recent Transactions), then the board, with one card per Widget drawn at the Widget's place and size, each saying in words what its chart shows. On narrow screens the cards read as one column, top to bottom then left to right.
 _Avoid_: Report, overview page, presentation
 
 **Card**:
