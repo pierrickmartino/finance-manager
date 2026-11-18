@@ -8,6 +8,7 @@ import {
 import type { ServiceContext } from '../context';
 import { loadRateTable } from '../fx';
 import { swissToday } from '../fx/dates';
+import { listCapitalMarkers } from './capital-markers';
 import type { ReportTable } from './engine';
 import { axisHeaders, type ReportHeader } from './headers';
 import { periodSpan, resolveRange, type DateSpan } from './periods';
@@ -121,9 +122,14 @@ async function runNetWorth(
   const asked: DatedAccount[] = dates.flatMap((date) =>
     accounts.filter((account) => isOpenOn(account, date)).map((account) => ({ account, date })),
   );
-  const [balances, rates] = await Promise.all([
+  const [balances, rates, markers] = await Promise.all([
     nativeBalancesAt(ctx.db, asked),
     dates.length === 0 ? null : loadRateTable(ctx, { from: dates[0]!, to: dates.at(-1)! }),
+    listCapitalMarkers(
+      ctx,
+      accounts.map((account) => account.id),
+      range,
+    ),
   ]);
   const values = new Map(dates.map((date) => [date, 0]));
   const unconverted = new Set<string>();
@@ -147,5 +153,6 @@ async function runNetWorth(
     columnTotals: [latest],
     total: latest,
     unconvertedCount: unconverted.size,
+    markers,
   };
 }

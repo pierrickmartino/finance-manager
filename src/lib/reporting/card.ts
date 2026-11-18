@@ -2,7 +2,14 @@ import { isTimeAxis, type ReportAxis, type TimeAxis } from '@/server/services/re
 import type { ReportHeader, Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
 import type { Size } from './board';
-import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
+import { periodKey, periodSpan } from '@/server/services/reporting/periods';
+import {
+  periodSumDrill,
+  toDonutSlices,
+  toSeriesChart,
+  type ChartMarker,
+  type ChartSource,
+} from './chart-data';
 import { averaged, drillUrl } from './drill-link';
 
 /**
@@ -177,7 +184,18 @@ export type CardMark =
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
   | { type: 'bars'; periods: PeriodValue[] }
-  | { type: 'netWorthLine'; points: PeriodValue[] };
+  | { type: 'netWorthLine'; points: PeriodValue[]; markers?: LineMarker[] };
+
+/** A Capital movement drawn on the Net worth line. */
+export interface LineMarker {
+  /** Where on the line, in points: 1.5 is halfway from the second point to the third. */
+  at: number;
+  date: string;
+  /** Its Payee (or Category) and CHF amount. */
+  title: string;
+  /** Its Transaction detail. */
+  href: string;
+}
 
 /**
  * A card's figure. Each links to its Drill-down (GLOSSARY), whose working gives the same
@@ -497,12 +515,51 @@ function netWorthSentences(points: PeriodValue[], money: Money): CardSentences {
   };
 }
 
+/** How many Capital movements the range holds. No Drill-down: the markers open each one. */
+function capitalFact(markers: readonly ChartMarker[]): CardFact {
+  return { label: 'Capital movements', value: String(markers.length), href: null };
+}
+
+const DAY_MS = 86_400_000;
+const dayNumber = (date: string): number => Date.parse(`${date}T00:00:00Z`) / DAY_MS;
+
+/**
+ * Each Capital movement on the line at its date: points stand at their period's last day, so
+ * a movement is that far through its period past the previous point (never before the first).
+ */
+function lineMarkers(
+  rows: ReportHeader[],
+  markers: readonly ChartMarker[],
+  axis: TimeAxis,
+  money: Money,
+): LineMarker[] {
+  return markers.flatMap((marker) => {
+    const index = rows.findIndex((row) => row.key === periodKey(marker.date, axis));
+    if (index < 0) return [];
+    const period = periodSpan(rows[index]!.key!, axis);
+    const start = dayNumber(period.from);
+    const through = (dayNumber(marker.date) - start + 1) / (dayNumber(period.to) - start + 1);
+    return [
+      {
+        at: Math.max(0, index - 1 + through),
+        date: marker.date,
+        title:
+          marker.amountMinor === null
+            ? marker.label
+            : `${marker.label}: ${money(marker.amountMinor)}`,
+        href: marker.href,
+      },
+    ];
+  });
+}
+
 /** What a card with rows says and draws; a flow is told as one whether bars or a line. */
 function readRows(
   kind: CardKind,
   data: ChartSource,
   slots: FlowSlots | null,
   money: Money,
+  axis: TimeAxis | null,
 ): Pick<CardReading, 'lead' | 'facts' | 'mark'> {
   const silent = { lead: null, facts: [] };
   switch (kind) {
@@ -525,9 +582,18 @@ function readRows(
       };
     case 'netWorthTrend': {
       const points = periodValues(data);
+      const sentences = netWorthSentences(points, money);
+      if (!data.markers || !axis) {
+        return { ...sentences, mark: { type: 'netWorthLine', points } };
+      }
       return {
-        ...netWorthSentences(points, money),
-        mark: { type: 'netWorthLine', points },
+        ...sentences,
+        facts: [...sentences.facts, capitalFact(data.markers)],
+        mark: {
+          type: 'netWorthLine',
+          points,
+          markers: lineMarkers(data.rows, data.markers, axis, money),
+        },
       };
     }
     case 'trend':
@@ -570,5 +636,5 @@ export function readCard(widget: CardWidget, money: Money): CardReading {
       flow,
     };
   }
-  return { kind, ...readRows(kind, data, slots, money), flow };
+  return { kind, ...readRows(kind, data, slots, money, widget.timeAxis), flow };
 }

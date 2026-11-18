@@ -2,6 +2,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { drillUrl, type DrillTarget } from '@/lib/reporting/drill-link';
 import { EDITOR, type DrillOrigin } from '@/lib/reporting/drill-origin';
 import type { CellRef, ReportHeader, ReportTable } from '@/server/services/reporting';
+import { transactionDetailHref } from '../transactions/search';
 
 /**
  * Where a report's values link: `hrefOf` gives each cell's link, and `drill` is where the
@@ -52,5 +53,11 @@ export function toPivotData(
       total: hrefOf({}),
     },
     drill,
+    ...(report.markers && {
+      markers: report.markers.map((marker) => ({
+        ...marker,
+        href: transactionDetailHref(marker.transactionId, null),
+      })),
+    }),
   };
 }

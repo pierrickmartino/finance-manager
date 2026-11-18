@@ -1,3 +1,4 @@
+import type { CapitalMarker } from '@/server/services/reporting/capital-markers';
 import type { CellRef } from '@/server/services/reporting/cell-ref';
 import type { ReportHeader } from '@/server/services/reporting/headers';
 import { isTimeAxis, type Measure, type TimeAxis } from '@/server/services/reporting/query';
@@ -29,7 +30,12 @@ export interface ChartSource {
    * when they don't (Account balances, which aren't Transactions).
    */
   drill: DrillTarget | null;
+  /** Net worth over time only: its Capital movements, each opening its Transaction. */
+  markers?: ChartMarker[];
 }
+
+/** A Capital movement on the Net worth line, and the Transaction detail it opens. */
+export type ChartMarker = CapitalMarker & { href: string };
 
 type Axis = 'rows' | 'columns';
 

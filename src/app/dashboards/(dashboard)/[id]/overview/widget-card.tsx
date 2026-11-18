@@ -38,7 +38,7 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
     case 'bars':
       return <MonthBars periods={mark.periods} />;
     case 'netWorthLine':
-      return <NetWorthLine points={mark.points} />;
+      return <NetWorthLine points={mark.points} markers={mark.markers} />;
   }
 }
 

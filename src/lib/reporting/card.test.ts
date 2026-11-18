@@ -729,6 +729,80 @@ describe('readCard: Net worth over time', () => {
     );
   });
 
+  describe('with Capital movements', () => {
+    const marker = (date: string, amountMinor: number | null, label: string) => ({
+      transactionId: `tx-${date}`,
+      lineId: null,
+      date,
+      amountMinor,
+      label,
+      href: `/transactions/tx-${date}`,
+    });
+    const withMarkers = (markers: ReturnType<typeof marker>[]): CardWidget => ({
+      ...rising,
+      data: { ...rising.data!, markers },
+    });
+
+    it('counts the Capital movements in the range', () => {
+      const reading = read(
+        withMarkers([
+          marker('2025-01-31', -300_000_00, 'Notary Dupont'),
+          marker('2025-03-16', 50_000_00, 'Inheritance'),
+        ]),
+      );
+
+      expect(reading.facts).toContainEqual({
+        label: 'Capital movements',
+        value: '2',
+        href: null,
+      });
+    });
+
+    it('says when there were none', () => {
+      expect(read(withMarkers([])).facts).toContainEqual({
+        label: 'Capital movements',
+        value: '0',
+        href: null,
+      });
+    });
+
+    it('places each marker on the line at its date, opening its Transaction', () => {
+      const mark = read(
+        withMarkers([
+          marker('2025-01-31', -300_000_00, 'Notary Dupont'),
+          marker('2025-02-14', null, 'Property'),
+          marker('2025-03-31', 50_000_00, 'Inheritance'),
+        ]),
+      ).mark;
+
+      // Points stand at each month's last day: Jan at 0, Feb at 1, Mar at 2. 14 Feb is half of
+      // February past January's point.
+      expect(mark).toMatchObject({
+        type: 'netWorthLine',
+        markers: [
+          {
+            at: 0,
+            date: '2025-01-31',
+            title: 'Notary Dupont: CHF -300000',
+            href: '/transactions/tx-2025-01-31',
+          },
+          {
+            at: 0.5,
+            date: '2025-02-14',
+            title: 'Property',
+            href: '/transactions/tx-2025-02-14',
+          },
+          {
+            at: 2,
+            date: '2025-03-31',
+            title: 'Inheritance: CHF 50000',
+            href: '/transactions/tx-2025-03-31',
+          },
+        ],
+      });
+    });
+  });
+
   it('draws an empty chart saying so when the filters leave no Account', () => {
     expect(read(netWorth([]))).toMatchObject({
       kind: 'netWorthTrend',
