@@ -81,12 +81,12 @@ export async function runAccountBalances(
 }
 
 /**
- * The day a Net worth point stands for: its period's last day, or the range's end when the
- * range stops earlier (a fixed range, or the current period up to today).
+ * The day a Net worth point stands for: its period's last day, even when the range stops
+ * earlier, or today while the period is still running.
  */
-export function netWorthPointDate(key: string, axis: TimeAxis, range: DateSpan): string {
+export function netWorthPointDate(key: string, axis: TimeAxis, today: string): string {
   const end = periodSpan(key, axis).to;
-  return end < range.to ? end : range.to;
+  return end > today ? today : end;
 }
 
 /** An Account adds nothing before its opening date. */
@@ -115,15 +115,18 @@ async function runNetWorth(
   query: WidgetQuery,
   axis: TimeAxis,
 ): Promise<ReportTable> {
-  const resolved = resolveRange(query.dateRange, swissToday());
-  const { range, partialPeriod } = resolved;
+  const today = swissToday();
+  const { range, partialPeriod } = resolveRange(query.dateRange, today);
   const accounts = (await listAccounts(ctx)).filter((account) =>
     isIncluded(account, query.filters),
   );
   // No Account left to count: no points at all, rather than a flat line at zero.
-  const rows =
+  const headers =
     accounts.length === 0 ? [] : await axisHeaders(ctx.db, axis, new Set(), range, partialPeriod);
-  const dates = rows.map((row) => netWorthPointDate(row.key!, axis, range));
+  const rows = headers
+    .filter((row) => periodSpan(row.key!, axis).from <= today)
+    .map((row) => ({ ...row, isPartial: row.isPartial || periodSpan(row.key!, axis).to > today }));
+  const dates = rows.map((row) => netWorthPointDate(row.key!, axis, today));
   const asked: DatedAccount[] = dates.flatMap((date) =>
     accounts.filter((account) => isOpenOn(account, date)).map((account) => ({ account, date })),
   );

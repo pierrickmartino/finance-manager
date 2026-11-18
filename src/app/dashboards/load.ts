@@ -46,7 +46,7 @@ export const BALANCE_LINKS: PivotLinks = { hrefOf: balanceHref, drill: null };
 export function netWorthLinks(report: ReportTable, axis: TimeAxis): PivotLinks {
   const latest = report.rows.at(-1)?.key;
   const dateOf = (key: string | null | undefined) =>
-    typeof key === 'string' ? netWorthPointDate(key, axis, report.range) : undefined;
+    typeof key === 'string' ? netWorthPointDate(key, axis, swissToday()) : undefined;
   return {
     hrefOf: (cell) =>
       accountsHref({

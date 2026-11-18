@@ -248,6 +248,40 @@ describe('Net worth over time (a balances Widget with a time axis)', () => {
     expect(report.rowTotals.at(-1)).toBe(115_000 + 95_000 - 250_000);
   });
 
+  it('values the last point of a fixed range ending mid-period at its period end', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2025-06-15T09:00:00Z') });
+    await setUpAccounts();
+
+    const report = await runNetWorth({
+      dateRange: { kind: 'fixed', from: '2025-02-01', to: '2025-03-10' },
+      rows: 'month',
+    });
+
+    // On 31 March, not 10 March: EUR at the 31 March rate (0.93), the period is over.
+    expect(report.rows.map((row) => [row.key, row.isPartial])).toEqual([
+      ['2025-02', false],
+      ['2025-03', false],
+    ]);
+    expect(report.rowTotals.at(-1)).toBe(115_000 + 93_000 - 250_000);
+  });
+
+  it('values a fixed range’s running period at today, and leaves out periods yet to come', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2025-03-20T09:00:00Z') });
+    await setUpAccounts();
+
+    const report = await runNetWorth({
+      dateRange: { kind: 'fixed', from: '2025-02-01', to: '2025-05-31' },
+      rows: 'month',
+    });
+
+    expect(report.rows.map((row) => [row.key, row.isPartial])).toEqual([
+      ['2025-02', false],
+      ['2025-03', true],
+    ]);
+    // On 20 March: EUR still at the 28 February rate.
+    expect(report.rowTotals.at(-1)).toBe(115_000 + 95_000 - 250_000);
+  });
+
   it('leaves out and counts an Account with no FX rate for its balance', async () => {
     const bank = await createBank(t.ctx, { name: 'BCGE' });
     const base = { bankId: bank.id, importFormat: null, kind: 'current' as const };
