@@ -80,7 +80,7 @@ function widget(overrides: Partial<CardWidget> & Pick<CardWidget, 'data'>): Card
     name: 'Widget',
     source: 'query',
     visualisation: 'line',
-    timeAxis: null,
+    query: { rows: null },
     ...overrides,
   };
 }
@@ -149,7 +149,7 @@ const framed = (
 ) => ({
   source,
   visualisation,
-  timeAxis,
+  query: { rows: timeAxis },
   data: { columns: Array.from({ length: seriesCount }, (_, i) => header(`C${i}`)) },
 });
 
@@ -199,7 +199,7 @@ describe('cardFrame', () => {
 
   it('hints at the mark the card will draw before its query has run', () => {
     const before = (source: WidgetSource, visualisation: Visualisation) =>
-      cardFrame({ source, visualisation, timeAxis: null, data: null }).placeholder;
+      cardFrame({ source, visualisation, query: { rows: null }, data: null }).placeholder;
 
     expect(before('query', 'number')).toBe('number');
     expect(before('account_balances', 'table')).toBe('ticks');
@@ -619,7 +619,7 @@ const KIND_LABELS = { current: 'Current', savings: 'Savings', '3a': '3a', loan: 
 
 /**
  * Net worth over time as the loader passes it: one row per period (key and label), one column
- * per Account kind (a plain number is all savings), each row's total its Net worth and the
+ * per account kind (a plain number is all savings), each row's total its Net worth and the
  * range's values the latest point's. Every point links to the Accounts as of its last day, a
  * band's point to that kind's Accounts.
  */
@@ -641,7 +641,7 @@ function netWorth(
     name: 'Net worth',
     source: 'account_balances',
     visualisation: 'line',
-    timeAxis: 'month',
+    query: { rows: 'month' },
     data: {
       measure: 'sum',
       rows: points.map(([key, label], r) => ({

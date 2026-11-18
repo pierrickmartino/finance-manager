@@ -5,7 +5,7 @@ import type { WidgetQuery } from './query';
 import { baseCte, SqlParams } from './sql';
 
 /**
- * A Capital movement on the Net worth line (GLOSSARY: Capital): a Transaction, or one Split
+ * A capital movement on the Net worth line (GLOSSARY: Capital): a Transaction, or one Split
  * line of it, classified under a Capital Category. It only annotates the line, whose balances
  * already hold it.
  */
@@ -31,7 +31,7 @@ interface MarkerRow {
 
 /**
  * Every Capital Transaction and Capital Split line booked in `range` on one of `accountIds`,
- * oldest first. Transfers are never Capital movements: the reporting rows leave them out.
+ * oldest first. Transfers are never capital movements: the reporting rows leave them out.
  */
 export async function listCapitalMarkers(
   ctx: ServiceContext,

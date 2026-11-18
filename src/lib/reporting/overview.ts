@@ -1,4 +1,4 @@
-import type { CardWidget, MonthFlow } from './card';
+import { timeAxisOf, type CardWidget, type MonthFlow } from './card';
 
 /**
  * The Dashboard Story's overview row (GLOSSARY: Dashboard Story, ADR-0009): its headline amount
@@ -20,7 +20,7 @@ export function headlineAmount(widgets: CardWidget[]): HeadlineAmount | null {
   const balances = widgets.find(
     (widget) =>
       widget.source === 'account_balances' &&
-      widget.timeAxis === null &&
+      timeAxisOf(widget.query) === null &&
       widget.data?.total != null,
   );
   const lead = balances ?? widgets.find((widget) => widget.data?.total != null);

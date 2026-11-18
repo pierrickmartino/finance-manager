@@ -72,7 +72,7 @@ async function loadEarlier(
 /**
  * Accounts (story 95, spec 43) as master / detail: the Accounts grouped by Bank on the left,
  * the selected one (`?account=`, else the first; `new` for the New Account form) on the right.
- * Balances are on `?date=`, today by default; `?kind=` narrows the list to one Account kind.
+ * Balances are on `?date=`, today by default; `?kind=` narrows the list to one account kind.
  */
 export default async function AccountsPage({ searchParams }: AccountsPageProps) {
   const ctx = await getServiceContext();

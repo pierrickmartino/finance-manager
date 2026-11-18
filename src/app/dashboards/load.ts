@@ -16,6 +16,7 @@ import {
 } from '@/server/services/reporting';
 import { daysBetween, swissToday } from '@/server/services/fx/dates';
 import type { TimeAxis } from '@/server/services/reporting/query';
+import { isAccountKind } from '@/server/services/accounts/input';
 import { accountsHref } from '../accounts/view';
 import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
@@ -40,7 +41,7 @@ export const BALANCE_LINKS: PivotLinks = { hrefOf: balanceHref, drill: null };
 
 /**
  * Net worth over time links each point to the Accounts as they stood on its date, a band's
- * point to that Account kind's Accounts then, and the range's values (its latest point's) to
+ * point to that account kind's Accounts then, and the range's values (its latest point's) to
  * the latest date. No Drill-down: balances aren't Transactions.
  */
 export function netWorthLinks(report: ReportTable, axis: TimeAxis): PivotLinks {
@@ -51,7 +52,7 @@ export function netWorthLinks(report: ReportTable, axis: TimeAxis): PivotLinks {
     hrefOf: (cell) =>
       accountsHref({
         date: dateOf(typeof cell.row === 'string' ? cell.row : latest),
-        kind: typeof cell.column === 'string' ? cell.column : undefined,
+        kind: isAccountKind(cell.column) ? cell.column : undefined,
       }),
     drill: null,
   };
@@ -99,7 +100,7 @@ export async function loadWidgetCard(ctx: ServiceContext, widget: Widget): Promi
     name: widget.name,
     source: widget.source,
     visualisation: widget.visualisation,
-    timeAxis: timeAxisOf(widget.query),
+    query: widget.query,
     layout: widget.layout,
     ...view,
   };

@@ -1,5 +1,10 @@
 import { listAccounts, type Account } from '../accounts';
-import { ACCOUNT_KIND_LABELS, ACCOUNT_KINDS, type AccountKind } from '../accounts/input';
+import {
+  ACCOUNT_KIND_LABELS,
+  ACCOUNT_KINDS,
+  matchesKinds,
+  type AccountKind,
+} from '../accounts/input';
 import {
   listAccountBalances,
   nativeBalancesAt,
@@ -9,10 +14,10 @@ import {
 import type { ServiceContext } from '../context';
 import { loadRateTable } from '../fx';
 import { swissToday } from '../fx/dates';
-import { listCapitalMarkers } from './capital-markers';
+import { listCapitalMarkers, type CapitalMarker } from './capital-markers';
 import type { ReportTable } from './engine';
 import { axisHeaders, type ReportHeader } from './headers';
-import { periodSpan, resolveRange, type DateSpan } from './periods';
+import { periodSpan, resolveRange, type ResolvedRange } from './periods';
 import { isTimeAxis, type ReportFilters, type TimeAxis, type WidgetQuery } from './query';
 
 /** The single column of the Account balances table. */
@@ -23,7 +28,7 @@ export const BALANCE_COLUMN: ReportHeader = {
 };
 
 /**
- * Whether an Account counts under a balances Widget's filters: its Account, Bank and Account
+ * Whether an Account counts under a balances Widget's filters: its Account, Bank and account
  * kind filters, each letting everything through when empty. Classification filters (Category,
  * Payee, Tag, group type, Currency) mean nothing for a balance and are ignored.
  */
@@ -33,7 +38,7 @@ function isIncluded(account: Account, filters: ReportFilters): boolean {
   return (
     allows(filters.accountIds, account.id) &&
     allows(filters.bankIds, account.bankId) &&
-    allows(filters.accountKinds, account.kind)
+    matchesKinds(account.kind, filters.accountKinds)
   );
 }
 
@@ -94,21 +99,128 @@ function isOpenOn(account: Account, date: string): boolean {
   return account.openingDate === null || account.openingDate <= date;
 }
 
-/** One column per Account kind held, in the kinds' order (key = the kind). */
-function kindColumns(accounts: readonly Account[]): ReportHeader[] {
+/** The account kinds the Accounts hold, in the kinds' order. */
+function heldKinds(accounts: readonly Account[]): AccountKind[] {
   const held = new Set(accounts.map((account) => account.kind));
-  return ACCOUNT_KINDS.filter((kind) => held.has(kind)).map((kind) => ({
-    key: kind,
-    label: ACCOUNT_KIND_LABELS[kind],
-    isPartial: false,
-  }));
+  return ACCOUNT_KINDS.filter((kind) => held.has(kind));
+}
+
+/**
+ * The periods of the range with a Net worth point: none yet to come, and one still running
+ * today flagged partial (its point stands at today).
+ */
+async function pointRows(
+  ctx: ServiceContext,
+  axis: TimeAxis,
+  { range, partialPeriod }: ResolvedRange,
+  today: string,
+): Promise<ReportHeader[]> {
+  const headers = await axisHeaders(ctx.db, axis, new Set(), range, partialPeriod);
+  return headers.flatMap((row) => {
+    const period = periodSpan(row.key!, axis);
+    if (period.from > today) return [];
+    return [{ ...row, isPartial: row.isPartial || period.to > today }];
+  });
+}
+
+/** An Account's balance on a point's date in CHF; null with no FX rate for it. */
+interface ValuedBalance extends DatedAccount {
+  chfMinor: number | null;
+}
+
+/**
+ * Every Account open on each date, its balance at the end of that day converted at that
+ * day's FX rate (ADR-0002). A zero balance needs no rate.
+ */
+async function valueBalances(
+  ctx: ServiceContext,
+  accounts: readonly Account[],
+  dates: readonly string[],
+): Promise<ValuedBalance[]> {
+  if (dates.length === 0) return [];
+  const asked: DatedAccount[] = dates.flatMap((date) =>
+    accounts.filter((account) => isOpenOn(account, date)).map((account) => ({ account, date })),
+  );
+  const [balances, rates] = await Promise.all([
+    nativeBalancesAt(ctx.db, asked),
+    loadRateTable(ctx, { from: dates[0]!, to: dates.at(-1)! }),
+  ]);
+  return asked.map(({ account, date }, index) => {
+    const balanceMinor = balances[index]!;
+    const chfMinor =
+      balanceMinor === 0
+        ? 0
+        : (rates.toChf(balanceMinor, account.currency, date)?.amountMinor ?? null);
+    return { account, date, chfMinor };
+  });
+}
+
+/** `cells[point][kind]`: the CHF sum of each kind's converted balances at each date. */
+function kindCells(
+  valued: readonly ValuedBalance[],
+  dates: readonly string[],
+  kinds: readonly AccountKind[],
+): number[][] {
+  return dates.map((date) =>
+    kinds.map((kind) =>
+      valued
+        .filter((balance) => balance.date === date && balance.account.kind === kind)
+        .reduce((sum, balance) => sum + (balance.chfMinor ?? 0), 0),
+    ),
+  );
+}
+
+/** What a Net worth table is built from. */
+interface NetWorthParts {
+  query: WidgetQuery;
+  axis: TimeAxis;
+  resolved: ResolvedRange;
+  rows: ReportHeader[];
+  dates: string[];
+  valued: ValuedBalance[];
+  markers: CapitalMarker[];
+}
+
+/**
+ * The Net worth table: one row per point, one column per account kind held (loans below zero),
+ * each row's total its Net worth, and the range's values its latest point's (a stock).
+ */
+function netWorthTable({
+  query,
+  axis,
+  resolved,
+  rows,
+  dates,
+  valued,
+  markers,
+}: NetWorthParts): ReportTable {
+  const kinds = heldKinds(valued.map(({ account }) => account));
+  const cells = kindCells(valued, dates, kinds);
+  const points = cells.map((row) => row.reduce((sum, value) => sum + value, 0));
+  const unconverted = valued.filter((balance) => balance.chfMinor === null);
+  return {
+    query: { ...query, rows: axis, columns: null, measure: 'sum' },
+    range: resolved.range,
+    partialPeriod: resolved.partialPeriod,
+    rows,
+    columns: kinds.map((kind) => ({
+      key: kind,
+      label: ACCOUNT_KIND_LABELS[kind],
+      isPartial: false,
+    })),
+    cells,
+    rowTotals: points,
+    columnTotals: cells.at(-1) ?? kinds.map(() => null),
+    total: points.at(-1) ?? null,
+    unconvertedCount: new Set(unconverted.map(({ account }) => account.id)).size,
+    markers,
+  };
 }
 
 /**
  * Net worth over time (ADR-0014): per period, every Account's balance at the end of the
- * period's last day, as the Accounts page computes it, converted at that day's FX rate
- * (ADR-0002). Each period has one value per Account kind (loans below zero), and its row
- * total is its Net worth. The range's values are its latest point's: Net worth is a stock.
+ * period's last day (today, while it runs), as the Accounts page computes it, converted at
+ * that day's FX rate (ADR-0002), and the capital movements on those Accounts in the range.
  */
 async function runNetWorth(
   ctx: ServiceContext,
@@ -116,53 +228,17 @@ async function runNetWorth(
   axis: TimeAxis,
 ): Promise<ReportTable> {
   const today = swissToday();
-  const { range, partialPeriod } = resolveRange(query.dateRange, today);
+  const resolved = resolveRange(query.dateRange, today);
   const accounts = (await listAccounts(ctx)).filter((account) =>
     isIncluded(account, query.filters),
   );
   // No Account left to count: no points at all, rather than a flat line at zero.
-  const headers =
-    accounts.length === 0 ? [] : await axisHeaders(ctx.db, axis, new Set(), range, partialPeriod);
-  const rows = headers
-    .filter((row) => periodSpan(row.key!, axis).from <= today)
-    .map((row) => ({ ...row, isPartial: row.isPartial || periodSpan(row.key!, axis).to > today }));
+  const rows = accounts.length === 0 ? [] : await pointRows(ctx, axis, resolved, today);
   const dates = rows.map((row) => netWorthPointDate(row.key!, axis, today));
-  const asked: DatedAccount[] = dates.flatMap((date) =>
-    accounts.filter((account) => isOpenOn(account, date)).map((account) => ({ account, date })),
-  );
-  const [balances, rates, markers] = await Promise.all([
-    nativeBalancesAt(ctx.db, asked),
-    dates.length === 0 ? null : loadRateTable(ctx, { from: dates[0]!, to: dates.at(-1)! }),
-    listCapitalMarkers(
-      ctx,
-      accounts.map((account) => account.id),
-      range,
-    ),
+  const accountIds = accounts.map((account) => account.id);
+  const [valued, markers] = await Promise.all([
+    valueBalances(ctx, accounts, dates),
+    listCapitalMarkers(ctx, accountIds, resolved.range),
   ]);
-  const columns = kindColumns(asked.map(({ account }) => account));
-  const kinds = columns.map((column) => column.key as AccountKind);
-  const cells = dates.map(() => kinds.map(() => 0));
-  const unconverted = new Set<string>();
-  asked.forEach(({ account, date }, index) => {
-    const balanceMinor = balances[index]!;
-    if (balanceMinor === 0) return;
-    const chf = rates?.toChf(balanceMinor, account.currency, date);
-    if (!chf) unconverted.add(account.id);
-    else cells[dates.indexOf(date)]![kinds.indexOf(account.kind)]! += chf.amountMinor;
-  });
-  const points = cells.map((row) => row.reduce((sum, value) => sum + value, 0));
-  const latest = points.at(-1) ?? null;
-  return {
-    query: { ...query, rows: axis, columns: null, measure: 'sum' },
-    range,
-    partialPeriod,
-    rows,
-    columns,
-    cells,
-    rowTotals: points,
-    columnTotals: cells.at(-1) ?? kinds.map(() => null),
-    total: latest,
-    unconvertedCount: unconverted.size,
-    markers,
-  };
+  return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
 }

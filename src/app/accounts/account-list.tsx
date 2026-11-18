@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { CARD_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { AccountBalance } from '@/server/services/accounts/balances';
+import type { AccountKind } from '@/server/services/accounts/input';
 import { accountsHref, groupByBank, NEW_ACCOUNT, totalChfMinor } from './view';
 
 interface AccountListProps {
@@ -11,7 +12,7 @@ interface AccountListProps {
   /** The requested `?date=`, kept by every link. */
   date: string;
   /** The `?kind=` the list is narrowed to, kept by every link. */
-  kind?: string;
+  kind?: AccountKind;
   mismatchedAccounts: ReadonlySet<string>;
   fmt: Formatter;
 }

@@ -82,7 +82,7 @@ async function widget(
     name: 'Widget',
     source: 'query',
     visualisation,
-    timeAxis: null,
+    query: { rows: null },
     data: toPivotData(report),
   };
 }

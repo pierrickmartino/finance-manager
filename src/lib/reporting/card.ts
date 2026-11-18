@@ -2,16 +2,13 @@ import { isTimeAxis, type ReportAxis, type TimeAxis } from '@/server/services/re
 import type { ReportHeader, Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
 import type { Size } from './board';
-import { periodKey, periodSpan } from '@/server/services/reporting/periods';
-import {
-  periodSumDrill,
-  toDonutSlices,
-  toSeriesChart,
-  type ChartCapital,
-  type ChartMarker,
-  type ChartSource,
-} from './chart-data';
+import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
 import { averaged, drillUrl } from './drill-link';
+import { readNetWorth, type NetWorthLineMark } from './net-worth-card';
+import { periodValues, type PeriodValue } from './period-values';
+
+export type { LineMarker, NetWorthBand } from './net-worth-card';
+export type { PeriodValue } from './period-values';
 
 /**
  * A Widget's card on the Dashboard Story (GLOSSARY: Card, ADR-0009): what it is before its
@@ -25,9 +22,16 @@ export interface CardWidget {
   name: string;
   source: WidgetSource;
   visualisation: Visualisation;
-  /** The Widget query's row axis when it is a time axis (`timeAxisOf`), else null. */
-  timeAxis: TimeAxis | null;
+  query: CardQuery;
   data: ChartSource | null;
+}
+
+/**
+ * Of a Widget's query, what its card reads: the row axis. A time axis makes the Account
+ * balances Net worth over time.
+ */
+export interface CardQuery {
+  rows?: ReportAxis | null;
 }
 
 /** A Widget as its card draws it: its data, and how its query went. */
@@ -41,7 +45,7 @@ export interface WidgetCardData extends CardWidget {
  * What a card's frame is read from. Of its data only the series (columns) count, so the server
  * and a placeholder can tell a card's kind without the whole chart.
  */
-export type CardSource = Pick<CardWidget, 'source' | 'visualisation' | 'timeAxis'> & {
+export type CardSource = Pick<CardWidget, 'source' | 'visualisation' | 'query'> & {
   data: Pick<ChartSource, 'columns'> | null;
 };
 
@@ -94,13 +98,13 @@ const KINDS: Record<CardKind, { sizes: CardSizes; placeholder: PlaceholderShape 
 };
 
 /** A Widget query's row axis when it is a time axis: what makes balances Net worth over time. */
-export function timeAxisOf(query: { rows: ReportAxis | null }): TimeAxis | null {
+export function timeAxisOf(query: CardQuery): TimeAxis | null {
   return isTimeAxis(query.rows) ? query.rows : null;
 }
 
 function kindOf(widget: CardSource): CardKind {
   // Net worth over time is its own card, whatever the visualisation.
-  if (widget.source === 'account_balances' && widget.timeAxis) return 'netWorthTrend';
+  if (widget.source === 'account_balances' && timeAxisOf(widget.query)) return 'netWorthTrend';
   if (widget.visualisation === 'number') return 'number';
   if (widget.source === 'account_balances') return 'share';
   if (widget.visualisation === 'table') return 'grid';
@@ -145,14 +149,6 @@ export interface MonthFlow {
   net: number;
 }
 
-/** One period's total and where it drills down to. */
-export interface PeriodValue {
-  label: string;
-  value: number;
-  href: string;
-  isPartial: boolean;
-}
-
 /** One part a card lists as a row of ticks: its name, its amount and its share of the whole. */
 export interface TickItem {
   key: string;
@@ -187,30 +183,7 @@ export type CardMark =
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
   | { type: 'bars'; periods: PeriodValue[] }
-  | {
-      type: 'netWorthLine';
-      points: PeriodValue[];
-      bands: NetWorthBand[];
-      markers?: LineMarker[];
-    };
-
-/** A Capital movement drawn on the Net worth line. */
-export interface LineMarker {
-  /** Where on the line, in points: 1.5 is halfway from the second point to the third. */
-  at: number;
-  date: string;
-  /** Its Payee (or Category) and CHF amount. */
-  title: string;
-  /** Its Transaction detail. */
-  href: string;
-}
-
-/** One Account kind's band under the Net worth line: its value at each point (loans below zero). */
-export interface NetWorthBand {
-  key: string;
-  label: string;
-  points: PeriodValue[];
-}
+  | NetWorthLineMark;
 
 /**
  * A card's figure. Each links to its Drill-down (GLOSSARY), whose working gives the same
@@ -363,16 +336,6 @@ function shareItems(data: ChartSource, money: Money): TickItem[] {
   }));
 }
 
-/** Each row's total (a period, for a trend or bars Widget), with its drill-down link. */
-function periodValues(data: ChartSource): PeriodValue[] {
-  return data.rows.map((row, r) => ({
-    label: row.label,
-    value: data.rowTotals[r] ?? 0,
-    href: data.hrefs.rowTotals[r] ?? data.hrefs.total,
-    isPartial: row.isPartial,
-  }));
-}
-
 type CardSentences = Pick<CardReading, 'lead' | 'facts'>;
 
 function shareSentences(data: ChartSource, money: Money): CardSentences {
@@ -500,104 +463,6 @@ function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardS
   return { lead: { headline: peak.label, detail: peak.value, href: peak.href }, facts };
 }
 
-/**
- * Net worth over time: where it stood at the latest point and how far it moved since the first,
- * every figure opening the Accounts as of its date.
- */
-/** Each Account kind's band: its value per period, each linking to that kind's Accounts then. */
-function netWorthBands(data: ChartSource): NetWorthBand[] {
-  return data.columns.map((column, c) => ({
-    key: column.key ?? '',
-    label: column.label,
-    points: data.rows.map((row, r) => ({
-      label: row.label,
-      value: data.cells[r]?.[c] ?? 0,
-      href: data.hrefs.cells[r]?.[c] ?? data.hrefs.rowTotals[r] ?? data.hrefs.total,
-      isPartial: row.isPartial,
-    })),
-  }));
-}
-
-/**
- * Each Account kind's share at the latest point, sized by magnitude as the balances share card
- * sizes its parts (so a loan's share is of everything held or owed); a kind at zero is left out.
- */
-function kindShareFacts(bands: NetWorthBand[], money: Money): CardFact[] {
-  const latest = bands.flatMap((band) => {
-    const point = band.points.at(-1);
-    return point && point.value !== 0 ? [{ label: band.label, point }] : [];
-  });
-  const whole = sum(latest.map(({ point }) => Math.abs(point.value)));
-  return latest.map(({ label, point }) => {
-    const share = Math.round((Math.abs(point.value) / whole) * 100);
-    return { label, value: `${money(point.value)} · ${share}%`, href: point.href };
-  });
-}
-
-function netWorthSentences(points: PeriodValue[], money: Money): CardSentences {
-  const first = points[0]!;
-  const latest = points.at(-1)!;
-  const change = latest.value - first.value;
-  const range = first === latest ? latest.label : `${first.label} – ${latest.label}`;
-  const movement =
-    change === 0 ? 'unchanged' : `${change > 0 ? 'up' : 'down'} ${money(Math.abs(change))}`;
-  const standing = latest.isPartial
-    ? `Net worth is ${money(latest.value)} so far in ${latest.label}`
-    : `Net worth was ${money(latest.value)} at the end of ${latest.label}`;
-  return {
-    lead: {
-      headline: `${standing}, ${movement} over ${range}.`,
-      detail: money(latest.value),
-      href: latest.href,
-    },
-    facts: [
-      {
-        label: `Change over ${range}`,
-        value: `${change > 0 ? '+' : ''}${money(change)}`,
-        href: latest.href,
-      },
-    ],
-  };
-}
-
-/** How many Capital movements the range holds, opening their Transactions list. */
-function capitalFact({ markers, href }: ChartCapital): CardFact {
-  return { label: 'Capital movements', value: String(markers.length), href };
-}
-
-const DAY_MS = 86_400_000;
-const dayNumber = (date: string): number => Date.parse(`${date}T00:00:00Z`) / DAY_MS;
-
-/**
- * Each Capital movement on the line at its date: points stand at their period's last day, so
- * a movement is that far through its period past the previous point (never before the first).
- */
-function lineMarkers(
-  rows: ReportHeader[],
-  markers: readonly ChartMarker[],
-  axis: TimeAxis,
-  money: Money,
-): LineMarker[] {
-  return markers.flatMap((marker) => {
-    const index = rows.findIndex((row) => row.key === periodKey(marker.date, axis));
-    if (index < 0) return [];
-    const period = periodSpan(rows[index]!.key!, axis);
-    const start = dayNumber(period.from);
-    const through = (dayNumber(marker.date) - start + 1) / (dayNumber(period.to) - start + 1);
-    return [
-      {
-        at: Math.max(0, index - 1 + through),
-        date: marker.date,
-        title:
-          marker.amountMinor === null
-            ? marker.label
-            : `${marker.label}: ${money(marker.amountMinor)}`,
-        href: marker.href,
-      },
-    ];
-  });
-}
-
 /** What a card with rows says and draws; a flow is told as one whether bars or a line. */
 function readRows(
   kind: CardKind,
@@ -625,29 +490,8 @@ function readRows(
         ...periodSentences(kind, data, money),
         mark: { type: 'ticks', items: rankingItems(data, money) },
       };
-    case 'netWorthTrend': {
-      const points = periodValues(data);
-      const bands = netWorthBands(data);
-      const { lead, facts } = netWorthSentences(points, money);
-      const kindFacts = kindShareFacts(bands, money);
-      if (!data.capital || !axis) {
-        return {
-          lead,
-          facts: [...facts, ...kindFacts],
-          mark: { type: 'netWorthLine', points, bands },
-        };
-      }
-      return {
-        lead,
-        facts: [...facts, ...kindFacts, capitalFact(data.capital)],
-        mark: {
-          type: 'netWorthLine',
-          points,
-          bands,
-          markers: lineMarkers(data.rows, data.capital.markers, axis, money),
-        },
-      };
-    }
+    case 'netWorthTrend':
+      return readNetWorth(data, axis, money);
     case 'trend':
     case 'bars':
       return slots
@@ -681,13 +525,7 @@ export function readCard(widget: CardWidget, money: Money): CardReading {
   const slots = flowSlotsOf(data);
   const flow = slots ? flowOf(data, slots) : null;
   if (data.rows.length === 0) {
-    return {
-      kind,
-      lead: null,
-      facts: [],
-      mark: emptyMark(widget),
-      flow,
-    };
+    return { kind, lead: null, facts: [], mark: emptyMark(widget), flow };
   }
-  return { kind, ...readRows(kind, data, slots, money, widget.timeAxis), flow };
+  return { kind, ...readRows(kind, data, slots, money, timeAxisOf(widget.query)), flow };
 }

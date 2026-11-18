@@ -30,18 +30,18 @@ export interface ChartSource {
    * when they don't (Account balances, which aren't Transactions).
    */
   drill: DrillTarget | null;
-  /** Net worth over time only: its Capital movements. */
+  /** Net worth over time only: its capital movements. */
   capital?: ChartCapital;
 }
 
-/** The Capital movements on the Net worth line: each opens its Transaction, `href` all of them. */
+/** The capital movements on the Net worth line: each opens its Transaction, `href` all of them. */
 export interface ChartCapital {
   markers: ChartMarker[];
-  /** The Transactions list of the range's Capital movements. */
+  /** The Transactions list of the range's capital movements. */
   href: string;
 }
 
-/** A Capital movement on the Net worth line, and the Transaction detail it opens. */
+/** A capital movement on the Net worth line, and the Transaction detail it opens. */
 export type ChartMarker = CapitalMarker & { href: string };
 
 type Axis = 'rows' | 'columns';

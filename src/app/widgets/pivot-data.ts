@@ -22,7 +22,7 @@ export function drillLinks(report: ReportTable, origin: DrillOrigin = EDITOR): P
 
 /**
  * The cell key for a header, or undefined (the whole axis) for the single all-values header of
- * an axis the query doesn't have. Net worth over time keys its columns by Account kind though
+ * an axis the query doesn't have. Net worth over time keys its columns by account kind though
  * its query has no column axis, so a keyed header keeps its key.
  */
 function key(axis: unknown, header: ReportHeader): string | null | undefined {
@@ -30,9 +30,9 @@ function key(axis: unknown, header: ReportHeader): string | null | undefined {
 }
 
 /**
- * Net worth over time's Capital movements: each opens its Transaction, and together they open
+ * Net worth over time's capital movements: each opens its Transaction, and together they open
  * the Transactions list of Capital in the range. The list filters by one Account at most (and
- * by no Bank or Account kind), so it narrows to the Widget's Account only when it counts one.
+ * by no Bank or account kind), so it narrows to the Widget's Account only when it counts one.
  */
 function capitalOf(report: ReportTable): ChartCapital | undefined {
   if (!report.markers) return undefined;

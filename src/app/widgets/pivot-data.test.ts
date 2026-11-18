@@ -3,7 +3,7 @@ import type { ReportTable } from '@/server/services/reporting';
 import { DEFAULT_NET_WORTH_QUERY } from '@/lib/reporting/widget-params';
 import { toPivotData } from './pivot-data';
 
-/** Net worth over Q1 2025 with one Capital movement, its Accounts filtered by `filters`. */
+/** Net worth over Q1 2025 with one capital movement, its Accounts filtered by `filters`. */
 function netWorthReport(filters: ReportTable['query']['filters']): ReportTable {
   return {
     query: { ...DEFAULT_NET_WORTH_QUERY, filters },
@@ -56,11 +56,13 @@ describe('toPivotData: Capital movements', () => {
   });
 
   it('leaves the Account out when the list cannot narrow to the Widget’s Accounts', () => {
-    // The list filters by one Account at most, and by no Bank or Account kind.
+    // The list filters by one Account at most, and by no Bank or account kind.
     const many = toPivotData(netWorthReport({ accountIds: ['a1', 'a2'] }), links);
     const byKind = toPivotData(netWorthReport({ accountKinds: ['savings'] }), links);
 
-    expect(many.capital?.href).toBe('/transactions?from=2025-01-01&to=2025-03-31&groupType=capital');
+    expect(many.capital?.href).toBe(
+      '/transactions?from=2025-01-01&to=2025-03-31&groupType=capital',
+    );
     expect(byKind.capital?.href).toBe(
       '/transactions?from=2025-01-01&to=2025-03-31&groupType=capital',
     );

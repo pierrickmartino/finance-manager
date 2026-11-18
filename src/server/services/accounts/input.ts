@@ -3,6 +3,21 @@ import { z } from 'zod';
 export const ACCOUNT_KINDS = ['current', 'savings', '3a', 'loan'] as const;
 export type AccountKind = (typeof ACCOUNT_KINDS)[number];
 
+export function isAccountKind(value: unknown): value is AccountKind {
+  return (ACCOUNT_KINDS as readonly unknown[]).includes(value);
+}
+
+/**
+ * The account kind filter of the Accounts page and the balances Widget: whether an Account of
+ * `kind` passes it. No kinds (null or empty) lets every kind through.
+ */
+export function matchesKinds(
+  kind: AccountKind,
+  kinds: readonly AccountKind[] | null | undefined,
+): boolean {
+  return !kinds || kinds.length === 0 || kinds.includes(kind);
+}
+
 /** The Import formats an Account can be bound to (ADR-0003). */
 export const IMPORT_FORMATS = ['camt053', 'ubs_csv', 'ofx'] as const;
 export type ImportFormat = (typeof IMPORT_FORMATS)[number];

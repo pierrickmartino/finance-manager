@@ -96,7 +96,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const pivot = report
     ? toPivotData(report, isBalances ? widgetLinks({ source }, report, EDITOR) : undefined)
     : null;
-  const timeAxis = timeAxisOf({ rows: query.rows ?? null });
+  const timeAxis = timeAxisOf(query);
   const backHref = dashboardId ? `/dashboards/${dashboardId}/edit` : '/widgets';
   const sourceHref = (choice: WidgetSource) =>
     resetHref(choice === 'account_balances' ? { ...kept, source: choice } : kept);
@@ -193,7 +193,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
                       name: title,
                       source,
                       visualisation,
-                      timeAxis,
+                      query,
                       data: pivot,
                       error: null,
                       unconvertedCount: report.unconvertedCount,

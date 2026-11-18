@@ -38,7 +38,7 @@ export interface ReportTable {
    * date (never counted as 0).
    */
   unconvertedCount: number;
-  /** Net worth over time only: the Capital movements on its Accounts in the range. */
+  /** Net worth over time only: the capital movements on its Accounts in the range. */
   markers?: CapitalMarker[];
 }
 

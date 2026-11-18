@@ -7,7 +7,7 @@ import {
   type Cell,
   type Size,
 } from '@/lib/reporting/board';
-import { cardFrame, timeAxisOf, type CardSource } from '@/lib/reporting/card';
+import { cardFrame, type CardSource } from '@/lib/reporting/card';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ServiceError } from '../errors';
@@ -292,7 +292,7 @@ export async function cardSourceOf(
   widget: Pick<Widget, 'source' | 'query' | 'visualisation'>,
 ): Promise<CardSource> {
   const { source, visualisation } = widget;
-  const framed = { source, visualisation, timeAxis: timeAxisOf(widget.query) };
+  const framed = { source, visualisation, query: widget.query };
   if (source !== 'query' || visualisation !== 'stacked_bar') return { ...framed, data: null };
   try {
     const report = await runSavedWidget(ctx, widget);

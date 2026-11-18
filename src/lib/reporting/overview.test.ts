@@ -29,7 +29,7 @@ const widget = (overrides: Partial<CardWidget> & Pick<CardWidget, 'data'>): Card
   name: 'Widget',
   source: 'query',
   visualisation: 'stacked_bar',
-  timeAxis: null,
+  query: { rows: null },
   ...overrides,
 });
 
@@ -63,7 +63,7 @@ describe('headlineAmount', () => {
       name: 'Net worth',
       source: 'account_balances',
       visualisation: 'line',
-      timeAxis: 'month',
+      query: { rows: 'month' },
       data: totalled(['2025-01', '2025-02'], [9000_00, 9500_00]),
     });
 

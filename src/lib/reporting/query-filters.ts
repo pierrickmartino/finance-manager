@@ -109,7 +109,7 @@ export type BalanceFilterChoices = ReadonlyArray<
 
 /**
  * A balances Widget's filters: only those that choose which Accounts count (Account, Bank,
- * Account kind). The Banks are those holding an Account, by name.
+ * account kind). The Banks are those holding an Account, by name.
  */
 export function balanceFilterLists(
   filters: Partial<ReportFilters>,

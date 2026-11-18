@@ -116,7 +116,7 @@ describe('Net worth over time (a balances Widget with a time axis)', () => {
       rows: 'month',
     });
 
-    // One column per Account kind held, in the kinds' order; loans below zero.
+    // One column per account kind held, in the kinds' order; loans below zero.
     expect(report.columns).toEqual([
       { key: 'current', label: 'Current', isPartial: false },
       { key: 'savings', label: 'Savings', isPartial: false },

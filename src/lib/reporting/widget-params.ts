@@ -14,7 +14,7 @@ import {
  * `range=fixed&from&to` | `range=last&count&unit[&current=1]` | `range=yearToDate[&current=1]`,
  * `rows`, `columns` (empty = none), `measure`, `per`, `capital=1`, and repeated filter
  * parameters `account`, `group`, `category`, `payee`, `tag`, `type`, `currency`. A balances
- * query reads only `account`, `bank` and `kind` (Account kind).
+ * query reads only `account`, `bank` and `kind` (account kind).
  */
 
 export type UrlParams = Record<string, string | string[] | undefined>;
@@ -47,8 +47,10 @@ const BALANCE_FILTER_PARAMS = [
   ['kind', 'accountKinds'],
 ] as const satisfies ReadonlyArray<readonly [string, keyof ReportFilters]>;
 
-/** Every filter parameter a query can be written with, each once. */
-const ALL_FILTER_PARAMS = [...FILTER_PARAMS, ...BALANCE_FILTER_PARAMS.slice(1)] as const;
+/** Every filter parameter a query can be written with, each once (both lists have `account`). */
+const ALL_FILTER_PARAMS = [
+  ...new Map([...FILTER_PARAMS, ...BALANCE_FILTER_PARAMS].map((pair) => [pair[0], pair])).values(),
+];
 
 function first(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
@@ -112,7 +114,7 @@ export const DEFAULT_NET_WORTH_QUERY: WidgetQuery = {
 
 /**
  * Reads a balances Widget's query from URL parameters: its time axis (`rows`), date range and
- * Account, Bank and Account kind filters. Any other `rows` is no axis, stored by Account as
+ * Account, Bank and account kind filters. Any other `rows` is no axis, stored by Account as
  * today; there are no columns, no classification filters and no Capital switch. With no
  * `range`, Net worth over the last 24 months.
  */
