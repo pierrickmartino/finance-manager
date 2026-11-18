@@ -25,6 +25,10 @@ _Avoid_: Reporting currency, home currency
 The rate on a given date for converting one Currency into the Base currency.
 _Avoid_: Exchange rate, conversion rate
 
+**Net worth**:
+The sum, in the Base currency, of every Account's balance on a date, each converted at that date's FX rate. A loan's balance counts against it. It moves with FX rates even when no money moves.
+_Avoid_: Wealth, assets, total balance
+
 ### Transactions
 
 **Transaction**:
