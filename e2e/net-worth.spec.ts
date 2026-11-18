@@ -237,4 +237,12 @@ test('a Capital movement is a marker on the Net worth line that opens its Transa
 
   await marker.click();
   await expect(page).toHaveURL(new RegExp(`/transactions/${transactionId}$`));
+
+  // The count opens the Capital Transactions of the range, on the Widget's Account.
+  await page.goBack();
+  await boardCard(page, 'Wealth and capital').getByRole('link', { name: '1', exact: true }).click();
+  await expect(page).toHaveURL(
+    /\/transactions\?from=2025-01-01&to=2025-03-31&accountId=[^&]+&groupType=capital$/,
+  );
+  await expect(page.getByRole('link', { name: payee, exact: true })).toBeVisible();
 });

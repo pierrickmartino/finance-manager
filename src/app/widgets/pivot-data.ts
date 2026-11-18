@@ -1,8 +1,8 @@
-import type { ChartSource } from '@/lib/reporting/chart-data';
+import type { ChartCapital, ChartSource } from '@/lib/reporting/chart-data';
 import { drillUrl, type DrillTarget } from '@/lib/reporting/drill-link';
 import { EDITOR, type DrillOrigin } from '@/lib/reporting/drill-origin';
 import type { CellRef, ReportHeader, ReportTable } from '@/server/services/reporting';
-import { transactionDetailHref } from '../transactions/search';
+import { searchValues, transactionDetailHref, transactionsHref } from '../transactions/search';
 
 /**
  * Where a report's values link: `hrefOf` gives each cell's link, and `drill` is where the
@@ -27,6 +27,29 @@ export function drillLinks(report: ReportTable, origin: DrillOrigin = EDITOR): P
  */
 function key(axis: unknown, header: ReportHeader): string | null | undefined {
   return axis === null && header.key === null ? undefined : header.key;
+}
+
+/**
+ * Net worth over time's Capital movements: each opens its Transaction, and together they open
+ * the Transactions list of Capital in the range. The list filters by one Account at most (and
+ * by no Bank or Account kind), so it narrows to the Widget's Account only when it counts one.
+ */
+function capitalOf(report: ReportTable): ChartCapital | undefined {
+  if (!report.markers) return undefined;
+  const { accountIds = [] } = report.query.filters;
+  const values = searchValues({
+    from: report.range.from,
+    to: report.range.to,
+    accountId: accountIds.length === 1 ? accountIds[0] : '',
+    groupType: 'capital',
+  });
+  return {
+    markers: report.markers.map((marker) => ({
+      ...marker,
+      href: transactionDetailHref(marker.transactionId, null),
+    })),
+    href: transactionsHref(values),
+  };
 }
 
 /**
@@ -57,11 +80,6 @@ export function toPivotData(
       total: hrefOf({}),
     },
     drill,
-    ...(report.markers && {
-      markers: report.markers.map((marker) => ({
-        ...marker,
-        href: transactionDetailHref(marker.transactionId, null),
-      })),
-    }),
+    ...(report.markers && { capital: capitalOf(report) }),
   };
 }

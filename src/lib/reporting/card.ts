@@ -7,6 +7,7 @@ import {
   periodSumDrill,
   toDonutSlices,
   toSeriesChart,
+  type ChartCapital,
   type ChartMarker,
   type ChartSource,
 } from './chart-data';
@@ -559,9 +560,9 @@ function netWorthSentences(points: PeriodValue[], money: Money): CardSentences {
   };
 }
 
-/** How many Capital movements the range holds. No Drill-down: the markers open each one. */
-function capitalFact(markers: readonly ChartMarker[]): CardFact {
-  return { label: 'Capital movements', value: String(markers.length), href: null };
+/** How many Capital movements the range holds, opening their Transactions list. */
+function capitalFact({ markers, href }: ChartCapital): CardFact {
+  return { label: 'Capital movements', value: String(markers.length), href };
 }
 
 const DAY_MS = 86_400_000;
@@ -629,7 +630,7 @@ function readRows(
       const bands = netWorthBands(data);
       const { lead, facts } = netWorthSentences(points, money);
       const kindFacts = kindShareFacts(bands, money);
-      if (!data.markers || !axis) {
+      if (!data.capital || !axis) {
         return {
           lead,
           facts: [...facts, ...kindFacts],
@@ -638,12 +639,12 @@ function readRows(
       }
       return {
         lead,
-        facts: [...facts, ...kindFacts, capitalFact(data.markers)],
+        facts: [...facts, ...kindFacts, capitalFact(data.capital)],
         mark: {
           type: 'netWorthLine',
           points,
           bands,
-          markers: lineMarkers(data.rows, data.markers, axis, money),
+          markers: lineMarkers(data.rows, data.capital.markers, axis, money),
         },
       };
     }

@@ -26,6 +26,12 @@ export const SEARCH_FIELDS = [
 
 export type SearchValues = Record<(typeof SEARCH_FIELDS)[number], string>;
 
+/** Search values with only `values` set, every other field blank. */
+export function searchValues(values: Partial<SearchValues>): SearchValues {
+  const blank = Object.fromEntries(SEARCH_FIELDS.map((field) => [field, ''])) as SearchValues;
+  return { ...blank, ...values };
+}
+
 export interface TransactionSearch {
   values: SearchValues;
   page: number;

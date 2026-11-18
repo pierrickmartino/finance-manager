@@ -823,10 +823,10 @@ describe('readCard: Net worth over time', () => {
     });
     const withMarkers = (markers: ReturnType<typeof marker>[]): CardWidget => ({
       ...rising,
-      data: { ...rising.data!, markers },
+      data: { ...rising.data!, capital: { markers, href: '/transactions?groupType=capital' } },
     });
 
-    it('counts the Capital movements in the range', () => {
+    it('counts the Capital movements in the range, opening their list', () => {
       const reading = read(
         withMarkers([
           marker('2025-01-31', -300_000_00, 'Notary Dupont'),
@@ -837,7 +837,7 @@ describe('readCard: Net worth over time', () => {
       expect(reading.facts).toContainEqual({
         label: 'Capital movements',
         value: '2',
-        href: null,
+        href: '/transactions?groupType=capital',
       });
     });
 
@@ -845,7 +845,7 @@ describe('readCard: Net worth over time', () => {
       expect(read(withMarkers([])).facts).toContainEqual({
         label: 'Capital movements',
         value: '0',
-        href: null,
+        href: '/transactions?groupType=capital',
       });
     });
 
