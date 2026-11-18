@@ -13,7 +13,8 @@ import {
  *
  * `range=fixed&from&to` | `range=last&count&unit[&current=1]` | `range=yearToDate[&current=1]`,
  * `rows`, `columns` (empty = none), `measure`, `per`, `capital=1`, and repeated filter
- * parameters `account`, `group`, `category`, `payee`, `tag`, `type`, `currency`.
+ * parameters `account`, `group`, `category`, `payee`, `tag`, `type`, `currency`. A balances
+ * query reads only `account`, `bank` and `kind` (Account kind).
  */
 
 export type UrlParams = Record<string, string | string[] | undefined>;
@@ -38,6 +39,16 @@ const FILTER_PARAMS = [
   ['type', 'categoryGroupTypes'],
   ['currency', 'currencies'],
 ] as const satisfies ReadonlyArray<readonly [string, keyof ReportFilters]>;
+
+/** The filters that mean something for a balance: which Accounts count. */
+const BALANCE_FILTER_PARAMS = [
+  ['account', 'accountIds'],
+  ['bank', 'bankIds'],
+  ['kind', 'accountKinds'],
+] as const satisfies ReadonlyArray<readonly [string, keyof ReportFilters]>;
+
+/** Every filter parameter a query can be written with, each once. */
+const ALL_FILTER_PARAMS = [...FILTER_PARAMS, ...BALANCE_FILTER_PARAMS.slice(1)] as const;
 
 function first(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
@@ -65,16 +76,23 @@ function readRange(params: UrlParams): WidgetQueryInput['dateRange'] {
   }
 }
 
-/** Reads a Widget query from URL parameters; with no `range`, the default query. */
-export function queryFromParams(params: UrlParams): WidgetQueryInput {
-  if (!first(params.range)) return DEFAULT_WIDGET_QUERY;
+function readFilters(
+  params: UrlParams,
+  names: ReadonlyArray<readonly [string, keyof ReportFilters]>,
+): ReportFilters {
   const filters: Record<string, string[]> = {};
-  for (const [param, field] of FILTER_PARAMS) {
+  for (const [param, field] of names) {
     const values = all(params[param]);
     if (values.length) filters[field] = values;
   }
+  return filters as ReportFilters;
+}
+
+/** Reads a Widget query from URL parameters; with no `range`, the default query. */
+export function queryFromParams(params: UrlParams): WidgetQueryInput {
+  if (!first(params.range)) return DEFAULT_WIDGET_QUERY;
   return {
-    filters: filters as ReportFilters,
+    filters: readFilters(params, FILTER_PARAMS),
     dateRange: readRange(params),
     rows: (first(params.rows) || null) as WidgetQuery['rows'],
     columns: (first(params.columns) || null) as WidgetQuery['columns'],
@@ -93,8 +111,9 @@ export const DEFAULT_NET_WORTH_QUERY: WidgetQuery = {
 };
 
 /**
- * Reads a balances Widget's query from URL parameters: its time axis (`rows`) and date range.
- * Any other `rows` is no axis, stored by Account as today; there are no columns. With no
+ * Reads a balances Widget's query from URL parameters: its time axis (`rows`), date range and
+ * Account, Bank and Account kind filters. Any other `rows` is no axis, stored by Account as
+ * today; there are no columns, no classification filters and no Capital switch. With no
  * `range`, Net worth over the last 24 months.
  */
 export function balancesQueryFromParams(params: UrlParams): WidgetQueryInput {
@@ -102,9 +121,11 @@ export function balancesQueryFromParams(params: UrlParams): WidgetQueryInput {
   const query = queryFromParams(params);
   return {
     ...query,
+    filters: readFilters(params, BALANCE_FILTER_PARAMS),
     rows: isTimeAxis(query.rows) ? query.rows : 'account',
     columns: null,
     measure: 'sum',
+    includeCapital: false,
   };
 }
 
@@ -128,7 +149,7 @@ export function queryToParams(query: WidgetQueryInput): URLSearchParams {
   params.set('measure', query.measure ?? 'sum');
   params.set('per', query.averagePer ?? 'month');
   if (query.includeCapital) params.set('capital', '1');
-  for (const [param, field] of FILTER_PARAMS) {
+  for (const [param, field] of ALL_FILTER_PARAMS) {
     for (const value of query.filters?.[field] ?? []) params.append(param, value);
   }
   return params;

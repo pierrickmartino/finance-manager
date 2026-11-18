@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ACCOUNT_KINDS } from '../accounts/input';
 import { CATEGORY_GROUP_TYPES } from '../categories/model';
 
 /**
@@ -101,6 +102,12 @@ const filtersInput = z
       }),
     ),
     currencies: z.array(z.string().regex(/^[A-Z]{3}$/, 'Currency must be an ISO code')).max(50),
+    /** Account balances only (a Transactions query ignores it): the Accounts of these Banks. */
+    bankIds: ids('Bank'),
+    /** Account balances only (a Transactions query ignores it): the Accounts of these kinds. */
+    accountKinds: z.array(
+      z.enum(ACCOUNT_KINDS, { error: 'Account kind must be current, savings, 3a or loan' }),
+    ),
   })
   .partial();
 export type ReportFilters = z.output<typeof filtersInput>;

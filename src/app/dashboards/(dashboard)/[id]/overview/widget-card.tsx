@@ -7,7 +7,7 @@ import { useFormatter } from '@/components/formatter-provider';
 import { TILE_CLASS } from '@/components/surface';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
-import { DotMatrix, HeatmapGrid, MonthBars, NetWorthLine, TickList } from './marks';
+import { DotMatrix, EmptyChart, HeatmapGrid, MonthBars, NetWorthLine, TickList } from './marks';
 import { DonutRing } from './ring';
 
 type Money = (minor: number) => string;
@@ -18,7 +18,7 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
     case 'none':
       return null;
     case 'empty':
-      return <p className="text-muted">No data in this date range yet.</p>;
+      return <EmptyChart sentence={mark.sentence} />;
     case 'number':
       return mark.total === null ? (
         <p className="font-display text-5xl text-muted">—</p>

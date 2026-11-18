@@ -135,6 +135,18 @@ function linePositions(values: number[]): { x: number; y: number }[] {
 }
 
 /**
+ * A chart with nothing to draw: an empty plot over its baseline, the sentence saying why in
+ * its middle.
+ */
+export function EmptyChart({ sentence }: { sentence: string }) {
+  return (
+    <figure className="relative flex h-40 items-center justify-center border-b border-rule">
+      <figcaption className="px-4 text-center text-sm text-muted">{sentence}</figcaption>
+    </figure>
+  );
+}
+
+/**
  * Net worth over time: one navy line from zero up (or down), a dot per period that opens the
  * Accounts as of its last day, the latest point labelled; a running period's dot is hollow.
  */
