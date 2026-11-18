@@ -19,6 +19,8 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
     case 'none':
       return null;
     case 'empty':
+      return <p className="text-muted">{mark.sentence}</p>;
+    case 'emptyChart':
       return <EmptyChart sentence={mark.sentence} />;
     case 'number':
       return mark.total === null ? (

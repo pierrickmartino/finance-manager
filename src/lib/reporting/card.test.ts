@@ -591,7 +591,7 @@ describe('readCard: a number, no data and no rows', () => {
     });
   });
 
-  it('says there is no data yet when the date range has no rows', () => {
+  it('says there is no data yet when the date range has no rows, without an empty chart', () => {
     const reading = read(widget({ data: source([], ['Net'], []) }));
 
     expect(reading).toMatchObject({
@@ -608,7 +608,7 @@ describe('readCard: a number, no data and no rows', () => {
       kind: 'share',
       lead: null,
       facts: [],
-      mark: { type: 'empty', sentence: "No Account matches this Widget's filters." },
+      mark: { type: 'emptyChart', sentence: "No Account matches this Widget's filters." },
     });
   });
 });
@@ -891,7 +891,7 @@ describe('readCard: Net worth over time', () => {
       kind: 'netWorthTrend',
       lead: null,
       facts: [],
-      mark: { type: 'empty', sentence: "No Account matches this Widget's filters." },
+      mark: { type: 'emptyChart', sentence: "No Account matches this Widget's filters." },
     });
   });
 });

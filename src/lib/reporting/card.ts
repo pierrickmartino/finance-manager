@@ -176,8 +176,10 @@ export interface CardFlow {
 /** What a card draws under its sentence. Ring and grid draw from the data itself. */
 export type CardMark =
   | { type: 'none' }
-  /** An empty chart, and the sentence saying why it is empty. */
+  /** No rows: the sentence saying why, as plain text. */
   | { type: 'empty'; sentence: string }
+  /** A balances Widget with no Account: an empty chart, the sentence saying why. */
+  | { type: 'emptyChart'; sentence: string }
   | { type: 'number'; total: number | null; href: string }
   | { type: 'ticks'; items: TickItem[] }
   | { type: 'ring'; data: ChartSource }
@@ -660,13 +662,14 @@ function readRows(
 }
 
 /**
- * Why a card has no rows. A balances Widget always has a row (or a point) for each Account it
- * counts, so with none its filters leave no Account.
+ * What a card with no rows draws. A balances Widget always has a row (or a point) for each
+ * Account it counts, so with none its filters leave no Account: an empty chart says so. A
+ * query's range simply holds nothing yet.
  */
-function emptySentence(widget: CardWidget): string {
+function emptyMark(widget: CardWidget): CardMark {
   return widget.source === 'account_balances'
-    ? "No Account matches this Widget's filters."
-    : 'No data in this date range yet.';
+    ? { type: 'emptyChart', sentence: "No Account matches this Widget's filters." }
+    : { type: 'empty', sentence: 'No data in this date range yet.' };
 }
 
 /** What a Widget's card says about it in plain language, and the mark it draws. */
@@ -681,7 +684,7 @@ export function readCard(widget: CardWidget, money: Money): CardReading {
       kind,
       lead: null,
       facts: [],
-      mark: { type: 'empty', sentence: emptySentence(widget) },
+      mark: emptyMark(widget),
       flow,
     };
   }
