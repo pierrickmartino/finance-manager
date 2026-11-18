@@ -1,5 +1,6 @@
 import { divideRounded } from '@/lib/reporting/average';
 import type { ServiceContext } from '../context';
+import type { CapitalMarker } from './capital-markers';
 import { parseInput } from '../errors';
 import { swissToday } from '../fx/dates';
 import { ALL_HEADER, axisHeaders, type ReportHeader } from './headers';
@@ -37,6 +38,8 @@ export interface ReportTable {
    * date (never counted as 0).
    */
   unconvertedCount: number;
+  /** Net worth over time only: the capital movements on its Accounts in the range. */
+  markers?: CapitalMarker[];
 }
 
 type Grouping = 'cell' | 'row' | 'column' | 'all';

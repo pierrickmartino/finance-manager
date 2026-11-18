@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { CARD_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import type { AccountBalance } from '@/server/services/accounts/balances';
+import type { AccountKind } from '@/server/services/accounts/input';
 import { accountsHref, groupByBank, NEW_ACCOUNT, totalChfMinor } from './view';
 
 interface AccountListProps {
@@ -10,6 +11,8 @@ interface AccountListProps {
   selected: string;
   /** The requested `?date=`, kept by every link. */
   date: string;
+  /** The `?kind=` the list is narrowed to, kept by every link. */
+  kind?: AccountKind;
   mismatchedAccounts: ReadonlySet<string>;
   fmt: Formatter;
 }
@@ -22,6 +25,7 @@ export function AccountList({
   balances,
   selected,
   date,
+  kind,
   mismatchedAccounts,
   fmt,
 }: AccountListProps) {
@@ -41,7 +45,7 @@ export function AccountList({
               return (
                 <li key={account.id}>
                   <Link
-                    href={accountsHref({ account: account.id, date })}
+                    href={accountsHref({ account: account.id, date, kind })}
                     scroll={false}
                     aria-current={isSelected ? 'true' : undefined}
                     className={`flex items-center justify-between gap-3 rounded-md px-2 py-2 text-sm ${

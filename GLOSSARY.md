@@ -25,6 +25,10 @@ _Avoid_: Reporting currency, home currency
 The rate on a given date for converting one Currency into the Base currency.
 _Avoid_: Exchange rate, conversion rate
 
+**Net worth**:
+The sum, in the Base currency, of every Account's balance on a date, each converted at that date's FX rate. A loan's balance counts against it. It moves with FX rates even when no money moves.
+_Avoid_: Wealth, assets, total balance
+
 ### Transactions
 
 **Transaction**:
@@ -182,11 +186,11 @@ _Avoid_: Breakdown, detail view, cell Transactions
 A named set of Widgets laid out on a board of 12 columns and fixed-height rows, each Widget with its own place and size (ADR-0010). It is read as its Dashboard Story and arranged in place in Edit mode. Each Widget sits on at most one Dashboard.
 
 **Dashboard Story**:
-A Dashboard read as a grid of cards: an overview row (the headline amount, the latest month's insight, the most recent Transactions), then the board, with one card per Widget drawn at the Widget's place and size, each saying in words what its chart shows. On narrow screens the cards read as one column, top to bottom then left to right.
+A Dashboard read as a grid of cards: an overview row (the headline amount, with a line of the last 24 months of Net worth beside it and its change over the last month, year and two years when it is Net worth today; the latest month's insight; the most recent Transactions), then the board, with one card per Widget drawn at the Widget's place and size, each saying in words what its chart shows. On narrow screens the cards read as one column, top to bottom then left to right.
 _Avoid_: Report, overview page, presentation
 
 **Card**:
-How one Widget is drawn on the Dashboard Story: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per period) and the facts behind it, each linking to its Drill-down. A card's kind follows from its Widget's source, visualisation and data. A bars or line Widget whose two columns are its income and its expense is read as a flow.
+How one Widget is drawn on the Dashboard Story: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per period, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data. A bars or line Widget whose two columns are its income and its expense is read as a flow.
 _Avoid_: Chapter, tile
 
 **Edit mode**:

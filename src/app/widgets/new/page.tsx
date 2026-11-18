@@ -3,23 +3,28 @@ import Link from 'next/link';
 import { ActionForm } from '@/components/action-form';
 import { FieldError } from '@/components/form';
 import { ACCENT_BUTTON_CLASS, CARD_CLASS, PAGE_TITLE_CLASS } from '@/components/surface';
-import { queryFromParams, type UrlParams } from '@/lib/reporting/widget-params';
+import { timeAxisOf } from '@/lib/reporting/card';
+import { EDITOR } from '@/lib/reporting/drill-origin';
+import {
+  balancesQueryFromParams,
+  queryFromParams,
+  type UrlParams,
+} from '@/lib/reporting/widget-params';
 import { getServiceContext } from '@/server/app-context';
 import {
   getWidget,
-  runSavedWidget,
   VISUALISATIONS,
-  type ReportTable,
   type Visualisation,
   type Widget,
+  type WidgetSource,
 } from '@/server/services/reporting';
 import { NotFoundError } from '@/server/services/errors';
-import { BALANCE_LINKS } from '../../dashboards/load';
+import { widgetLinks } from '../../dashboards/load';
 import { saveWidgetAction } from '../actions';
-import { loadQueryFormLists, loadReport } from '../load';
-import { AutoSubmitForm } from '../auto-submit-form';
-import { PanelSection, VisualisationPicker } from '../editor-panel';
-import { HiddenFields, QueryForm } from '../query-form';
+import { loadQueryFormLists, loadReport, loadSavedWidget } from '../load';
+import { BalancesForm, SourcePicker } from '../balances-form';
+import { ALWAYS_NET_WORTH, ALWAYS_SHARE, PanelSection, VisualisationPicker } from '../editor-panel';
+import { QueryForm } from '../query-form';
 import { WidgetView } from '../widget-view';
 import { toPivotData } from '../pivot-data';
 import { CardPreview } from '../card-preview';
@@ -50,15 +55,16 @@ function isVisualisation(value: string): value is Visualisation {
   return (VISUALISATIONS as readonly string[]).includes(value);
 }
 
-/** The Account balances Widget has no query: only its visualisation and name change. */
-async function runBalancesWidget(widget: Widget): Promise<ReportTable> {
-  return runSavedWidget(await getServiceContext(), widget);
-}
-
-/** The editor with every field at its default, keeping the Widget or Dashboard. */
+/** The editor with every field at its default, keeping the Widget or Dashboard (and source). */
 function resetHref(hidden: Record<string, string>): string {
   const params = new URLSearchParams(hidden).toString();
   return params ? `/widgets/new?${params}` : '/widgets/new';
+}
+
+/** What a Widget shows: the edited Widget's source, else the `source` asked for. */
+function sourceOf(widget: Widget | null, params: UrlParams): WidgetSource {
+  if (widget) return widget.source;
+  return param(params, 'source') === 'account_balances' ? 'account_balances' : 'query';
 }
 
 /**
@@ -66,7 +72,8 @@ function resetHref(hidden: Record<string, string>): string {
  * Widget as the card it becomes on its Dashboard's board (and the raw table behind it),
  * refreshed on every change, under the name and Save. `widget=<id>` edits that Widget (its query
  * comes in the URL like any other); `dashboard=<id>` adds the new Widget to that Dashboard, in
- * the first free spot at the bottom of its board.
+ * the first free spot at the bottom of its board. `source=account_balances` makes a new Widget
+ * of the Account balances: a time axis and a date range make it Net worth over time.
  */
 export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const params = await searchParams;
@@ -74,25 +81,41 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
   const dashboardId = widget ? widget.dashboardId : param(params, 'dashboard') || null;
   const requested = param(params, 'vis');
   const visualisation = isVisualisation(requested) ? requested : (widget?.visualisation ?? 'table');
-  const isBalances = widget?.source === 'account_balances';
-  const query = isBalances ? widget.query : queryFromParams(params);
+  const source = sourceOf(widget, params);
+  const isBalances = source === 'account_balances';
+  const query = isBalances ? balancesQueryFromParams(params) : queryFromParams(params);
   const [{ report, error }, lists] = await Promise.all([
-    isBalances
-      ? runBalancesWidget(widget).then((table) => ({ report: table, error: null }))
-      : loadReport(query),
+    isBalances ? loadSavedWidget({ source, query }) : loadReport(query),
     loadQueryFormLists(),
   ]);
-  const hidden: Record<string, string> = {};
-  if (widget) hidden.widget = widget.id;
-  else if (dashboardId) hidden.dashboard = dashboardId;
+  const kept: Record<string, string> = {};
+  if (widget) kept.widget = widget.id;
+  else if (dashboardId) kept.dashboard = dashboardId;
+  const hidden = isBalances && !widget ? { ...kept, source } : kept;
   const title = widget?.name ?? 'New Widget';
-  const pivot = report ? toPivotData(report, isBalances ? BALANCE_LINKS : undefined) : null;
+  const pivot = report
+    ? toPivotData(report, isBalances ? widgetLinks({ source }, report, EDITOR) : undefined)
+    : null;
+  const timeAxis = timeAxisOf(query);
   const backHref = dashboardId ? `/dashboards/${dashboardId}/edit` : '/widgets';
+  const sourceHref = (choice: WidgetSource) =>
+    resetHref(choice === 'account_balances' ? { ...kept, source: choice } : kept);
 
-  const visualisationSection = (
-    <PanelSection title="Visualisation">
-      <VisualisationPicker value={visualisation} isAlwaysShare={isBalances} />
-    </PanelSection>
+  const settingsSections = (
+    <>
+      {!widget && (
+        <SourcePicker
+          value={source}
+          hrefs={{ query: sourceHref('query'), account_balances: sourceHref('account_balances') }}
+        />
+      )}
+      <PanelSection title="Visualisation">
+        <VisualisationPicker
+          value={visualisation}
+          alwaysShownAs={isBalances ? (timeAxis ? ALWAYS_NET_WORTH : ALWAYS_SHARE) : null}
+        />
+      </PanelSection>
+    </>
   );
 
   return (
@@ -118,13 +141,17 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
             </a>
           </div>
           {isBalances ? (
-            <AutoSubmitForm action="/widgets/new" label="Widget query">
-              <HiddenFields fields={hidden} />
-              {visualisationSection}
-            </AutoSubmitForm>
+            <BalancesForm
+              query={query}
+              accounts={lists.accounts}
+              hidden={hidden}
+              shownRange={report?.range}
+            >
+              {settingsSections}
+            </BalancesForm>
           ) : (
             <QueryForm query={query} lists={lists} hidden={hidden} shownRange={report?.range}>
-              {visualisationSection}
+              {settingsSections}
             </QueryForm>
           )}
         </aside>
@@ -141,6 +168,7 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
             {!widget && dashboardId && (
               <input type="hidden" name="dashboardId" value={dashboardId} />
             )}
+            {!widget && <input type="hidden" name="source" value={source} />}
             <input
               name="name"
               required
@@ -163,8 +191,9 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
                     card={{
                       id: widget?.id ?? 'preview',
                       name: title,
-                      source: isBalances ? 'account_balances' : 'query',
+                      source,
                       visualisation,
+                      query,
                       data: pivot,
                       error: null,
                       unconvertedCount: report.unconvertedCount,

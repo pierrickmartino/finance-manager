@@ -11,6 +11,7 @@ import {
   updateWidget,
   type Visualisation,
   type WidgetQueryInput,
+  type WidgetSource,
 } from '@/server/services/reporting';
 import { addWidget } from '@/server/services/dashboards';
 
@@ -36,7 +37,12 @@ export async function saveWidgetAction(_previous: Result | null, formData: FormD
       visualisation: (formText(formData, 'visualisation') || undefined) as Visualisation,
     };
     if (widgetId) return updateWidget(ctx, widgetId, input);
-    return dashboardId ? addWidget(ctx, dashboardId, input) : createWidget(ctx, input);
+    // A new Widget's source; an edited Widget keeps its own.
+    const created = {
+      ...input,
+      source: (formText(formData, 'source') || undefined) as WidgetSource | undefined,
+    };
+    return dashboardId ? addWidget(ctx, dashboardId, created) : createWidget(ctx, created);
   });
   if (!result.ok) return result;
   revalidatePath('/widgets', 'layout');

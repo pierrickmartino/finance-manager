@@ -1,31 +1,48 @@
-import type { CardWidget, MonthFlow } from './card';
+import { timeAxisOf, type CardWidget, type MonthFlow } from './card';
+import type { HeadlineTrend } from './net-worth-headline';
+
+export type { HeadlineTrend };
 
 /**
  * The Dashboard Story's overview row (GLOSSARY: Dashboard Story, ADR-0009): its headline amount
  * and the latest month's insight, worked out from the Widgets' cards. Amounts in minor units.
  */
 
-/** The overview row's opening number and where it drills down to. */
+/** The overview row's opening number, where it drills down to, and Net worth under it. */
 export interface HeadlineAmount {
   label: string;
   value: number;
   href: string;
+  /** The last 24 months of Net worth: only under net worth today. */
+  trend: HeadlineTrend | null;
 }
 
+/** Whether a Widget is Net worth over time: a balances Widget with a time axis. */
+const isNetWorthOverTime = (widget: CardWidget): boolean =>
+  widget.source === 'account_balances' && timeAxisOf(widget.query) !== null;
+
 /**
- * The opening number: net worth from the Account balances when the Dashboard has them, else
- * the first Widget total.
+ * The opening number: net worth today from the Account balances when the Dashboard has them,
+ * with the Net worth trend under it, valued at the trend's latest point (every Account, today)
+ * when it has one. Else the first other Widget's total. Net worth over time never leads, nor
+ * names it: its total is its latest period's.
  */
-export function headlineAmount(widgets: CardWidget[]): HeadlineAmount | null {
-  const balances = widgets.find(
-    (widget) => widget.source === 'account_balances' && widget.data?.total != null,
+export function headlineAmount(
+  widgets: CardWidget[],
+  trend: HeadlineTrend | null = null,
+): HeadlineAmount | null {
+  const totalled = widgets.filter(
+    (widget) => !isNetWorthOverTime(widget) && widget.data?.total != null,
   );
-  const lead = balances ?? widgets.find((widget) => widget.data?.total != null);
+  const balances = totalled.find((widget) => widget.source === 'account_balances');
+  const lead = balances ?? totalled[0];
   if (!lead?.data || lead.data.total == null) return null;
+  const latest = balances ? trend?.points.at(-1) : undefined;
   return {
     label: balances ? 'Your net worth today' : lead.name,
-    value: lead.data.total,
+    value: latest?.value ?? lead.data.total,
     href: lead.data.hrefs.total,
+    trend: latest ? trend : null,
   };
 }
 

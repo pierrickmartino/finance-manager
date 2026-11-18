@@ -5,7 +5,13 @@ import { widgetPickerOptions } from '@/lib/reporting/widget-picker';
 import { getServiceContext } from '@/server/app-context';
 import { listDashboards } from '@/server/services/dashboards';
 import { listWidgets } from '@/server/services/reporting';
-import { editWidgetHref, findDashboard, loadRecentActivity, loadWidgetCard } from '../../../load';
+import {
+  editWidgetHref,
+  findDashboard,
+  loadNetWorthTrend,
+  loadRecentActivity,
+  loadWidgetCard,
+} from '../../../load';
 import { DashboardTabs } from '../../../tabs';
 import { DashboardChrome, DashboardOverview, OverviewCards } from '../overview/dashboard-overview';
 import { AddWidgetMenu, EmptyBoard } from './add-widget';
@@ -21,7 +27,7 @@ export const metadata: Metadata = { title: 'Edit Dashboard · Finance Manager' }
 export default async function EditDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
-  const [dashboards, cards, recent, savedWidgets] = await Promise.all([
+  const [dashboards, cards, trend, recent, savedWidgets] = await Promise.all([
     listDashboards(ctx),
     Promise.all(
       dashboard.widgets.map(async (widget) => ({
@@ -29,6 +35,7 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
         editHref: editWidgetHref(widget),
       })),
     ),
+    loadNetWorthTrend(ctx, dashboard.widgets),
     loadRecentActivity(ctx),
     listWidgets(ctx),
   ]);
@@ -55,7 +62,7 @@ export default async function EditDashboardPage({ params }: { params: Promise<{ 
           </>
         }
         isEmpty={cards.length === 0}
-        overview={<OverviewCards cards={cards} recent={recent} />}
+        overview={<OverviewCards cards={cards} trend={trend} recent={recent} />}
         board={
           <EditBoard
             // A new set of Widgets (added, duplicated, removed) starts again from the server's board.

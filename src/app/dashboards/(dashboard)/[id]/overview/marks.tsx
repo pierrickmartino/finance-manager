@@ -122,6 +122,23 @@ export function MonthBars({ periods }: { periods: PeriodValue[] }) {
   );
 }
 
+interface EmptyChartProps {
+  /** Why there is nothing to draw. */
+  sentence: string;
+}
+
+/**
+ * A chart with nothing to draw: an empty plot over its baseline, the sentence saying why in
+ * its middle.
+ */
+export function EmptyChart({ sentence }: EmptyChartProps) {
+  return (
+    <figure className="relative flex h-40 items-center justify-center border-b border-rule">
+      <figcaption className="px-4 text-center text-sm text-muted">{sentence}</figcaption>
+    </figure>
+  );
+}
+
 const TICKS = 12;
 
 /** Parts of a whole, largest first: each a row with a bar of ticks and its share. */

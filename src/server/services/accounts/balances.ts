@@ -73,6 +73,52 @@ function balanceOn(account: Account, date: string, laterMinor: number): number {
   return account.balanceMinor - laterMinor - opening;
 }
 
+/** An Account and the day whose end its balance is asked for. */
+export interface DatedAccount {
+  account: Account;
+  date: string;
+}
+
+/**
+ * The native balance of each given Account at the end of its date, in the order given, in one
+ * query for all of them; an Account may be asked for at many dates. As `listAccountBalances`
+ * computes it: from Transactions, or a snapshot-only Account's latest Balance snapshot by then.
+ */
+export async function nativeBalancesAt(
+  db: Queryable,
+  datedAccounts: readonly DatedAccount[],
+): Promise<number[]> {
+  if (datedAccounts.length === 0) return [];
+  const result = await db.query<{
+    n: number;
+    laterMinor: number;
+    snapshotDate: string | null;
+    snapshotMinor: number | null;
+  }>(
+    `SELECT d.n::integer AS n, later.sum AS "laterMinor",
+            snapshot.date AS "snapshotDate", snapshot.balance_minor AS "snapshotMinor"
+     FROM unnest($1::uuid[], $2::date[]) WITH ORDINALITY AS d(account_id, date, n)
+     CROSS JOIN LATERAL (
+       SELECT coalesce(sum(t.amount_minor), 0)::bigint AS sum FROM "transaction" t
+       WHERE t.account_id = d.account_id AND t.booking_date > d.date) later
+     LEFT JOIN LATERAL (
+       SELECT s.date, s.balance_minor FROM balance_snapshot s
+       WHERE s.account_id = d.account_id AND s.date <= d.date
+       ORDER BY s.date DESC LIMIT 1) snapshot ON true`,
+    [datedAccounts.map(({ account }) => account.id), datedAccounts.map(({ date }) => date)],
+  );
+  const byIndex = new Map(result.rows.map((row) => [row.n - 1, row]));
+  return datedAccounts.map(({ account, date }, index) => {
+    const row = byIndex.get(index);
+    if (!account.balanceSnapshotDate) return balanceOn(account, date, row?.laterMinor ?? 0);
+    const snapshot =
+      row?.snapshotDate != null && row.snapshotMinor != null
+        ? { date: row.snapshotDate, balanceMinor: row.snapshotMinor }
+        : undefined;
+    return snapshotBalanceOn(account, date, snapshot).balanceMinor;
+  });
+}
+
 /**
  * The native balance of each given Account at the end of its own date, keyed by Account id, in
  * one query for all of them. As `listAccountBalances` computes it for an Account with
@@ -80,22 +126,10 @@ function balanceOn(account: Account, date: string, laterMinor: number): number {
  */
 export async function nativeBalancesOn(
   db: Queryable,
-  datedAccounts: ReadonlyArray<{ account: Account; date: string }>,
+  datedAccounts: readonly DatedAccount[],
 ): Promise<Map<string, number>> {
-  const result = await db.query<{ accountId: string; laterMinor: number }>(
-    `SELECT d.account_id AS "accountId", coalesce(sum(t.amount_minor), 0)::bigint AS "laterMinor"
-     FROM unnest($1::uuid[], $2::date[]) AS d(account_id, date)
-     LEFT JOIN "transaction" t ON t.account_id = d.account_id AND t.booking_date > d.date
-     GROUP BY d.account_id`,
-    [datedAccounts.map(({ account }) => account.id), datedAccounts.map(({ date }) => date)],
-  );
-  const laterById = new Map(result.rows.map((row) => [row.accountId, row.laterMinor]));
-  return new Map(
-    datedAccounts.map(({ account, date }) => [
-      account.id,
-      balanceOn(account, date, laterById.get(account.id) ?? 0),
-    ]),
-  );
+  const balances = await nativeBalancesAt(db, datedAccounts);
+  return new Map(datedAccounts.map(({ account }, index) => [account.id, balances[index]!]));
 }
 
 /**

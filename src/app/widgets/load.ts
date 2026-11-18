@@ -26,9 +26,9 @@ export async function loadReport(
   }
 }
 
-/** Runs a saved Widget (its query, or the Account balances), like `loadReport`. */
+/** Runs a Widget (its query, or the Account balances), saved or not, like `loadReport`. */
 export async function loadSavedWidget(
-  widget: Widget,
+  widget: Pick<Widget, 'source'> & { query: WidgetQueryInput },
 ): Promise<{ report: ReportTable | null; error: string | null }> {
   try {
     return { report: await runSavedWidget(await getServiceContext(), widget), error: null };

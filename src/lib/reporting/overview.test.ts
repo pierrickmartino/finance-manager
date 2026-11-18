@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CardWidget, MonthFlow } from './card';
 import type { ChartSource } from './chart-data';
-import { flowSummary, headlineAmount, litTicks, spendingBars, spendingInsight } from './overview';
+import {
+  flowSummary,
+  headlineAmount,
+  type HeadlineTrend,
+  litTicks,
+  spendingBars,
+  spendingInsight,
+} from './overview';
 
 /** A one-column source whose total opens `total`. */
 function totalled(rows: string[], values: number[]): ChartSource {
@@ -29,6 +36,7 @@ const widget = (overrides: Partial<CardWidget> & Pick<CardWidget, 'data'>): Card
   name: 'Widget',
   source: 'query',
   visualisation: 'stacked_bar',
+  query: { rows: null },
   ...overrides,
 });
 
@@ -54,6 +62,62 @@ describe('headlineAmount', () => {
       label: 'Your net worth today',
       value: 10000_00,
       href: 'total',
+      trend: null,
+    });
+  });
+
+  const overTime = widget({
+    name: 'Net worth',
+    source: 'account_balances',
+    visualisation: 'line',
+    query: { rows: 'month' },
+    data: totalled(['2025-01', '2025-02'], [9000_00, 9500_00]),
+  });
+
+  it('never reads Net worth over time as net worth today', () => {
+    expect(headlineAmount([overTime, balances])).toMatchObject({
+      label: 'Your net worth today',
+      value: 10000_00,
+    });
+  });
+
+  it('never leads with Net worth over time, nor takes its name', () => {
+    expect(headlineAmount([overTime, spending])).toEqual({
+      label: 'Spending',
+      value: -800_00,
+      href: 'total',
+      trend: null,
+    });
+    expect(headlineAmount([overTime])).toBeNull();
+  });
+
+  const trend: HeadlineTrend = {
+    points: [
+      { label: 'Jan 2025', value: 9000_00, href: 'accounts:2025-01', isPartial: false },
+      { label: 'Feb 2025', value: 10250_00, href: 'accounts:2025-02', isPartial: true },
+    ],
+    changes: [
+      { label: '1M', months: 1, since: 'Jan 2025', change: 1250_00, href: 'accounts:2025-01' },
+    ],
+  };
+
+  it('carries the Net worth trend under net worth today, valued at its latest point', () => {
+    expect(headlineAmount([spending, balances], trend)).toEqual({
+      label: 'Your net worth today',
+      value: 10250_00,
+      href: 'total',
+      trend,
+    });
+  });
+
+  it('leaves the trend out when the headline is not net worth', () => {
+    expect(headlineAmount([spending], trend)?.trend).toBeNull();
+  });
+
+  it('keeps the balances total when the trend has no point', () => {
+    expect(headlineAmount([balances], { points: [], changes: [] })).toMatchObject({
+      value: 10000_00,
+      trend: null,
     });
   });
 
@@ -62,6 +126,7 @@ describe('headlineAmount', () => {
       label: 'Spending',
       value: -800_00,
       href: 'total',
+      trend: null,
     });
   });
 

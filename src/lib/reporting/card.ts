@@ -1,9 +1,14 @@
-import type { TimeAxis } from '@/server/services/reporting/query';
+import { isTimeAxis, type ReportAxis, type TimeAxis } from '@/server/services/reporting/query';
 import type { ReportHeader, Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
 import type { Size } from './board';
 import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
 import { averaged, drillUrl } from './drill-link';
+import { readNetWorth, type NetWorthLineMark } from './net-worth-card';
+import { periodValues, type PeriodValue } from './period-values';
+
+export type { LineMarker, NetWorthBand } from './net-worth-card';
+export type { PeriodValue } from './period-values';
 
 /**
  * A Widget's card on the Dashboard Story (GLOSSARY: Card, ADR-0009): what it is before its
@@ -17,7 +22,16 @@ export interface CardWidget {
   name: string;
   source: WidgetSource;
   visualisation: Visualisation;
+  query: CardQuery;
   data: ChartSource | null;
+}
+
+/**
+ * Of a Widget's query, what its card reads: the row axis. A time axis makes the Account
+ * balances Net worth over time.
+ */
+export interface CardQuery {
+  rows?: ReportAxis | null;
 }
 
 /** A Widget as its card draws it: its data, and how its query went. */
@@ -31,12 +45,13 @@ export interface WidgetCardData extends CardWidget {
  * What a card's frame is read from. Of its data only the series (columns) count, so the server
  * and a placeholder can tell a card's kind without the whole chart.
  */
-export type CardSource = Pick<CardWidget, 'source' | 'visualisation'> & {
+export type CardSource = Pick<CardWidget, 'source' | 'visualisation' | 'query'> & {
   data: Pick<ChartSource, 'columns'> | null;
 };
 
 /** How a card shows its Widget. */
-export type CardKind = 'trend' | 'bars' | 'ranking' | 'share' | 'grid' | 'ring' | 'number';
+export type CardKind =
+  'trend' | 'bars' | 'ranking' | 'share' | 'grid' | 'ring' | 'number' | 'netWorthTrend';
 
 /** The quiet mark a placeholder draws: a figure, tick rows, a ring, a grid of cells or bars. */
 export type PlaceholderShape = 'number' | 'ticks' | 'ring' | 'grid' | 'bars';
@@ -64,6 +79,8 @@ const SIZES = {
   list: { initial: { w: 4, h: 8 }, min: { w: 3, h: 5 } },
   grid: { initial: { w: 8, h: 8 }, min: { w: 4, h: 5 } },
   chart: { initial: { w: 8, h: 6 }, min: { w: 4, h: 4 } },
+  // The chart, then up to six facts: the change, each account kind's share, capital movements.
+  netWorth: { initial: { w: 8, h: 9 }, min: { w: 4, h: 9 } },
 } as const satisfies Record<string, CardSizes>;
 
 /**
@@ -79,9 +96,17 @@ const KINDS: Record<CardKind, { sizes: CardSizes; placeholder: PlaceholderShape 
   grid: { sizes: SIZES.grid, placeholder: 'grid' },
   trend: { sizes: SIZES.chart, placeholder: 'bars' },
   bars: { sizes: SIZES.chart, placeholder: 'bars' },
+  netWorthTrend: { sizes: SIZES.netWorth, placeholder: 'bars' },
 };
 
+/** A Widget query's row axis when it is a time axis: what makes balances Net worth over time. */
+export function timeAxisOf(query: CardQuery): TimeAxis | null {
+  return isTimeAxis(query.rows) ? query.rows : null;
+}
+
 function kindOf(widget: CardSource): CardKind {
+  // Net worth over time is its own card, whatever the visualisation.
+  if (widget.source === 'account_balances' && timeAxisOf(widget.query)) return 'netWorthTrend';
   if (widget.visualisation === 'number') return 'number';
   if (widget.source === 'account_balances') return 'share';
   if (widget.visualisation === 'table') return 'grid';
@@ -126,14 +151,6 @@ export interface MonthFlow {
   net: number;
 }
 
-/** One period's total and where it drills down to. */
-export interface PeriodValue {
-  label: string;
-  value: number;
-  href: string;
-  isPartial: boolean;
-}
-
 /** One part a card lists as a row of ticks: its name, its amount and its share of the whole. */
 export interface TickItem {
   key: string;
@@ -158,13 +175,17 @@ export interface CardFlow {
 /** What a card draws under its sentence. Ring and grid draw from the data itself. */
 export type CardMark =
   | { type: 'none' }
-  | { type: 'empty' }
+  /** No rows: the sentence saying why, as plain text. */
+  | { type: 'empty'; sentence: string }
+  /** A balances Widget with no Account: an empty chart, the sentence saying why. */
+  | { type: 'emptyChart'; sentence: string }
   | { type: 'number'; total: number | null; href: string }
   | { type: 'ticks'; items: TickItem[] }
   | { type: 'ring'; data: ChartSource }
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
-  | { type: 'bars'; periods: PeriodValue[] };
+  | { type: 'bars'; periods: PeriodValue[] }
+  | NetWorthLineMark;
 
 /**
  * A card's figure. Each links to its Drill-down (GLOSSARY), whose working gives the same
@@ -317,16 +338,6 @@ function shareItems(data: ChartSource, money: Money): TickItem[] {
   }));
 }
 
-/** Each row's total (a period, for a trend or bars Widget), with its drill-down link. */
-function periodValues(data: ChartSource): PeriodValue[] {
-  return data.rows.map((row, r) => ({
-    label: row.label,
-    value: data.rowTotals[r] ?? 0,
-    href: data.hrefs.rowTotals[r] ?? data.hrefs.total,
-    isPartial: row.isPartial,
-  }));
-}
-
 type CardSentences = Pick<CardReading, 'lead' | 'facts'>;
 
 function shareSentences(data: ChartSource, money: Money): CardSentences {
@@ -460,6 +471,7 @@ function readRows(
   data: ChartSource,
   slots: FlowSlots | null,
   money: Money,
+  axis: TimeAxis | null,
 ): Pick<CardReading, 'lead' | 'facts' | 'mark'> {
   const silent = { lead: null, facts: [] };
   switch (kind) {
@@ -480,6 +492,8 @@ function readRows(
         ...periodSentences(kind, data, money),
         mark: { type: 'ticks', items: rankingItems(data, money) },
       };
+    case 'netWorthTrend':
+      return readNetWorth(data, axis, money);
     case 'trend':
     case 'bars':
       return slots
@@ -494,6 +508,17 @@ function readRows(
   }
 }
 
+/**
+ * What a card with no rows draws. A balances Widget always has a row (or a point) for each
+ * Account it counts, so with none its filters leave no Account: an empty chart says so. A
+ * query's range simply holds nothing yet.
+ */
+function emptyMark(widget: CardWidget): CardMark {
+  return widget.source === 'account_balances'
+    ? { type: 'emptyChart', sentence: "No Account matches this Widget's filters." }
+    : { type: 'empty', sentence: 'No data in this date range yet.' };
+}
+
 /** What a Widget's card says about it in plain language, and the mark it draws. */
 export function readCard(widget: CardWidget, money: Money): CardReading {
   const { kind } = cardFrame(widget);
@@ -501,6 +526,8 @@ export function readCard(widget: CardWidget, money: Money): CardReading {
   if (!data) return { kind, lead: null, facts: [], mark: { type: 'none' }, flow: null };
   const slots = flowSlotsOf(data);
   const flow = slots ? flowOf(data, slots) : null;
-  if (data.rows.length === 0) return { kind, lead: null, facts: [], mark: { type: 'empty' }, flow };
-  return { kind, ...readRows(kind, data, slots, money), flow };
+  if (data.rows.length === 0) {
+    return { kind, lead: null, facts: [], mark: emptyMark(widget), flow };
+  }
+  return { kind, ...readRows(kind, data, slots, money, timeAxisOf(widget.query)), flow };
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { CHOICE_TILE_CLASS } from '@/components/surface';
 import { STORY_SHOWN_AS } from '@/lib/reporting/card';
 import {
   VISUALISATION_LABELS,
@@ -65,18 +66,34 @@ const VISUALISATION_PATHS: Record<Visualisation, string> = {
   number: 'M9 4L7 20M17 4l-2 16M4 9h16M3 15h16',
 };
 
-const ALWAYS_SHARE = { short: 'as a share', full: 'In the Story: a share band of the Accounts' };
+/** What a card says it becomes in the Dashboard Story, whatever the visualisation. */
+export interface ShownAs {
+  short: string;
+  full: string;
+}
+
+/** The Account balances on one date are always told as a share. */
+export const ALWAYS_SHARE: ShownAs = {
+  short: 'as a share',
+  full: 'In the Story: a share band of the Accounts',
+};
+
+/** The Account balances over time are always told as Net worth. */
+export const ALWAYS_NET_WORTH: ShownAs = {
+  short: 'as Net worth',
+  full: 'In the Story: a Net worth line and its change over the range',
+};
 
 /**
  * The visualisation as a row of icon tiles (radio buttons sent as `vis`), each saying what it
- * becomes in the Dashboard Story. The Account balances are always told as a share.
+ * becomes in the Dashboard Story; `alwaysShownAs` when the card is the same for every one.
  */
 export function VisualisationPicker({
   value,
-  isAlwaysShare = false,
+  alwaysShownAs = null,
 }: {
   value: Visualisation;
-  isAlwaysShare?: boolean;
+  alwaysShownAs?: ShownAs | null;
 }) {
   return (
     <fieldset className="min-w-0">
@@ -85,8 +102,8 @@ export function VisualisationPicker({
         {VISUALISATIONS.map((visualisation) => (
           <label
             key={visualisation}
-            title={(isAlwaysShare ? ALWAYS_SHARE : STORY_SHOWN_AS[visualisation]).full}
-            className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-rule-strong bg-surface px-1 py-2 text-center text-[11px] leading-tight hover:border-faint has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-info"
+            title={(alwaysShownAs ?? STORY_SHOWN_AS[visualisation]).full}
+            className={`${CHOICE_TILE_CLASS} flex cursor-pointer flex-col items-center gap-1 px-1 py-2 text-center text-[11px] leading-tight`}
           >
             <input
               type="radio"
@@ -109,7 +126,7 @@ export function VisualisationPicker({
             </svg>
             {VISUALISATION_LABELS[visualisation]}
             <span className="text-[10px] text-muted">
-              {(isAlwaysShare ? ALWAYS_SHARE : STORY_SHOWN_AS[visualisation]).short}
+              {(alwaysShownAs ?? STORY_SHOWN_AS[visualisation]).short}
             </span>
           </label>
         ))}

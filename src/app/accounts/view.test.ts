@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
+  accountKindOf,
   accountsHref,
   balanceDates,
+  filterByKind,
   groupByBank,
   selectAccount,
   totalChfMinor,
@@ -29,6 +31,43 @@ describe('accountsHref', () => {
       '/accounts?account=a1&date=2026-03-31',
     );
     expect(accountsHref({ account: 'new' })).toBe('/accounts?account=new');
+  });
+
+  test('keeps the Account kind it is narrowed to', () => {
+    expect(accountsHref({ date: '2025-02-28', kind: 'loan' })).toBe(
+      '/accounts?date=2025-02-28&kind=loan',
+    );
+    expect(accountsHref({ account: 'a1', kind: '3a' })).toBe('/accounts?account=a1&kind=3a');
+  });
+});
+
+describe('accountKindOf', () => {
+  test('reads a known Account kind from the URL', () => {
+    expect(accountKindOf('savings')).toBe('savings');
+    expect(accountKindOf('3a')).toBe('3a');
+  });
+
+  test('is null for no kind or one it does not know', () => {
+    expect(accountKindOf(undefined)).toBeNull();
+    expect(accountKindOf('')).toBeNull();
+    expect(accountKindOf('shares')).toBeNull();
+  });
+});
+
+describe('filterByKind', () => {
+  const rows = [
+    { account: { id: 'a1', kind: 'current' as const } },
+    { account: { id: 'a2', kind: 'loan' as const } },
+    { account: { id: 'a3', kind: 'current' as const } },
+  ];
+
+  test('keeps only the Accounts of the kind', () => {
+    expect(filterByKind(rows, 'current').map((r) => r.account.id)).toEqual(['a1', 'a3']);
+    expect(filterByKind(rows, 'savings')).toEqual([]);
+  });
+
+  test('keeps every Account with no kind', () => {
+    expect(filterByKind(rows, null)).toEqual(rows);
   });
 });
 

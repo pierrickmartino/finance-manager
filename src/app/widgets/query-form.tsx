@@ -106,7 +106,8 @@ function DataSection({ query }: { query: WidgetQueryInput }) {
   );
 }
 
-function PeriodSection({
+/** The date range: last N periods, year to date or fixed dates. */
+export function PeriodSection({
   query,
   shownRange,
 }: {
@@ -209,8 +210,8 @@ function FilterChecklist({ list }: { list: FilterList }) {
   );
 }
 
-function FiltersSection({ query, lists }: { query: WidgetQueryInput; lists: QueryFormLists }) {
-  const filterLists = queryFilterLists(query.filters ?? {}, lists);
+/** The Filters section: one checklist per filter, open when one already narrows the query. */
+export function FiltersSection({ filterLists }: { filterLists: FilterList[] }) {
   const active = activeFilterCount(filterLists);
   return (
     <PanelSection
@@ -238,7 +239,7 @@ export function QueryForm({ query, lists, hidden = {}, shownRange, children }: Q
       {children}
       <DataSection query={query} />
       <PeriodSection query={query} shownRange={shownRange} />
-      <FiltersSection query={query} lists={lists} />
+      <FiltersSection filterLists={queryFilterLists(query.filters ?? {}, lists)} />
       <noscript>
         <div className="p-4">
           <button type="submit" className="text-sm underline">

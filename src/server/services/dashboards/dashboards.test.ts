@@ -89,6 +89,9 @@ const SPENDING: WidgetQueryInput = {
   columns: 'category',
 };
 
+/** The Account balances on one date, as the Dashboard's "Account balances" button adds them. */
+const BALANCES: WidgetQueryInput = { ...SPENDING, rows: 'account', columns: null };
+
 describe('Widgets on a Dashboard', () => {
   it('adds Widgets at their default size in the first free spot, recording their creation', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
@@ -105,7 +108,7 @@ describe('Widgets on a Dashboard', () => {
     });
     const balances = await addWidget(t.ctx, dashboard.id, {
       name: 'Balances',
-      query: SPENDING,
+      query: BALANCES,
       source: 'account_balances',
     });
     const table = await addWidget(t.ctx, dashboard.id, { name: 'Table', query: SPENDING });
@@ -127,6 +130,22 @@ describe('Widgets on a Dashboard', () => {
         expect.objectContaining({ field: 'visualisation', after: 'line' }),
       ]),
     );
+  });
+
+  it('adds Net worth over time (balances with a time axis) tall enough for its facts', async () => {
+    const dashboard = await createDashboard(t.ctx, { name: 'Home' });
+
+    const netWorth = await addWidget(t.ctx, dashboard.id, {
+      name: 'Net worth',
+      query: { ...BALANCES, rows: 'month' },
+      source: 'account_balances',
+    });
+
+    expect(netWorth).toMatchObject({
+      source: 'account_balances',
+      query: { rows: 'month' },
+      layout: { x: 0, y: 0, w: 8, h: 9 },
+    });
   });
 
   it('refuses a Widget for an unknown Dashboard', async () => {
@@ -288,7 +307,7 @@ describe('Widgets on a Dashboard', () => {
     });
     const balances = await addWidget(t.ctx, dashboard.id, {
       name: 'Balances',
-      query: SPENDING,
+      query: BALANCES,
       source: 'account_balances',
     });
 
@@ -514,7 +533,7 @@ describe('Widgets on a Dashboard', () => {
     });
     const balances = await addWidget(t.ctx, home.id, {
       name: 'Balances',
-      query: SPENDING,
+      query: BALANCES,
       source: 'account_balances',
       layout: { x: 4, y: 0, w: 8, h: 5 },
     });

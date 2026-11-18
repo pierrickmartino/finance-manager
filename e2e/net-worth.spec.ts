@@ -1,0 +1,358 @@
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { createAccount } from '../src/server/services/accounts';
+import { createBank } from '../src/server/services/banks';
+import { createCategory, createCategoryGroup } from '../src/server/services/categories';
+import {
+  addWidget,
+  createDashboard as createDashboardRecord,
+} from '../src/server/services/dashboards';
+import { editClassification } from '../src/server/services/transactions';
+import { createManualTransaction } from '../src/server/services/transactions/manual';
+import { withServices } from './support/services';
+
+/**
+ * A Widget's card on the board. Not `widgetCard`: on a Dashboard without Account balances the
+ * overview's headline is labelled with this Widget's name too.
+ */
+function boardCard(page: Page, name: string): Locator {
+  return page.locator('section[aria-labelledby^="card-"]', {
+    has: page.getByRole('heading', { name, exact: true }),
+  });
+}
+
+// The e2e database is shared by every spec, so totals include other specs' Accounts: these
+// tests check the wording, the dates and the links, not the amounts.
+
+test('a Net worth Widget tells its change, and a point opens the Accounts as of that date', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Net worth bank ${suffix}` });
+    await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'savings',
+      importFormat: null,
+      name: `Net worth savings ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 1000_00,
+      openingDate: '2025-02-10',
+    });
+    const dashboard = await createDashboardRecord(ctx, { name: `Net worth ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Wealth over time',
+      source: 'account_balances',
+      visualisation: 'line',
+      query: {
+        dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' },
+        rows: 'month',
+      },
+    });
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const card = boardCard(page, 'Wealth over time');
+  await expect(card).toContainText(
+    /Net worth was CHF [^,]+ at the end of Mar 2025, (up CHF [^ ]+|down CHF [^ ]+|unchanged) over Jan 2025 – Mar 2025\./,
+  );
+  await expect(card.getByRole('link', { name: /^(Jan|Feb|Mar) 2025: CHF/ })).toHaveCount(3);
+
+  await card.getByText('Change over Jan 2025 – Mar 2025').locator('..').getByRole('link').click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-03-31$/);
+
+  await page.goBack();
+  await boardCard(page, 'Wealth over time')
+    .getByRole('link', { name: /^Feb 2025: CHF/ })
+    .click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-02-28$/);
+  await expect(page.getByLabel('Balances on')).toHaveValue('2025-02-28');
+});
+
+test("a Net worth band's point and its kind's share open that kind's Accounts as of the date", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { dashboardId, savingsName, loanName } = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Net worth bands bank ${suffix}` });
+    const base = { bankId: bank.id, importFormat: null, currency: 'CHF' } as const;
+    const savings = await createAccount(ctx, {
+      ...base,
+      kind: 'savings',
+      name: `Bands savings ${suffix}`,
+      openingBalanceMinor: 5000_00,
+      openingDate: '2025-01-05',
+    });
+    const loan = await createAccount(ctx, {
+      ...base,
+      kind: 'loan',
+      name: `Bands loan ${suffix}`,
+      openingBalanceMinor: -3000_00,
+      openingDate: '2025-01-05',
+    });
+    const dashboard = await createDashboardRecord(ctx, { name: `Net worth bands ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Wealth by kind',
+      source: 'account_balances',
+      visualisation: 'line',
+      query: {
+        dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' },
+        rows: 'month',
+      },
+    });
+    return { dashboardId: dashboard.id, savingsName: savings.name, loanName: loan.name };
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const card = boardCard(page, 'Wealth by kind');
+  // Each kind's share at the latest point, as an amount and a percentage.
+  const share = (kind: string) =>
+    card
+      .locator('dt', { hasText: new RegExp(`^${kind}$`) })
+      .locator('..')
+      .getByRole('link');
+  await expect(share('Savings')).toHaveText(/^CHF .+ · \d+%$/);
+  await expect(share('Loan')).toHaveText(/^CHF .+ · \d+%$/);
+
+  await card.getByRole('link', { name: /^Loan, Feb 2025: CHF/ }).click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-02-28&kind=loan$/);
+  await expect(page.getByLabel('Balances on')).toHaveValue('2025-02-28');
+  await expect(page.getByLabel('Kind')).toHaveValue('loan');
+  const list = page.getByRole('navigation', { name: 'Account list' });
+  await expect(list.getByText(loanName)).toBeVisible();
+  await expect(list.getByText(savingsName)).toHaveCount(0);
+
+  await page.goBack();
+  await share('Savings').click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-03-31&kind=savings$/);
+  await expect(list.getByText(savingsName)).toBeVisible();
+  await expect(list.getByText(loanName)).toHaveCount(0);
+});
+
+test('a new balances Widget in the editor is Net worth by month over the last 24 months', async ({
+  page,
+}) => {
+  await page.goto('/widgets/new');
+  await page
+    .getByRole('navigation', { name: 'Widget source' })
+    .getByText('Account balances')
+    .click();
+
+  await expect(page).toHaveURL(/source=account_balances/);
+  await expect(page.getByRole('combobox', { name: 'Time axis' })).toHaveValue('month');
+  await expect(page.getByRole('spinbutton', { name: 'Number of periods' })).toHaveValue('24');
+  await expect(page.getByText('as Net worth').first()).toBeVisible();
+});
+
+test('a balances Widget filters by Account, Bank and Account kind, and says when none is left', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const bankName = `Filtered bank ${suffix}`;
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: bankName });
+    await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'savings',
+      importFormat: null,
+      name: `Filtered savings ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 1000_00,
+      openingDate: '2025-02-10',
+    });
+  });
+
+  await page.goto('/widgets/new?source=account_balances');
+  const form = page.getByRole('form', { name: 'Widget query' });
+  await form.locator('summary', { hasText: 'Filters' }).click();
+  for (const filter of ['Accounts', 'Banks', 'Account kinds']) {
+    await expect(form.locator('summary', { hasText: filter })).toBeVisible();
+  }
+  for (const filter of ['Categories', 'Payees', 'Tags', 'Currencies']) {
+    await expect(form.locator('summary', { hasText: filter })).toHaveCount(0);
+  }
+
+  // Only this Bank's Accounts count: its savings Account alone.
+  await form.locator('summary', { hasText: 'Banks' }).click();
+  await form.getByRole('checkbox', { name: bankName }).check();
+  await expect(page).toHaveURL(/[?&]bank=/);
+  await expect(page.getByText(/Net worth was CHF 1\D?000 at the end of/)).toBeVisible();
+
+  // The Bank holds no loan: no Account is left.
+  await form.locator('summary', { hasText: 'Account kinds' }).click();
+  await form.getByRole('checkbox', { name: 'Loan' }).check();
+  await expect(page).toHaveURL(/[?&]kind=loan/);
+  await expect(page.getByText("No Account matches this Widget's filters.")).toBeVisible();
+});
+
+/** The calendar month `back` months before this one (Swiss time): its 10th, last day and label. */
+function monthBefore(back: number): { tenth: string; end: string; label: string } {
+  const [year, month] = new Date()
+    .toLocaleDateString('sv-SE', { timeZone: 'Europe/Zurich' })
+    .split('-')
+    .map(Number) as [number, number];
+  const start = new Date(Date.UTC(year, month - 1 - back, 1));
+  const end = new Date(Date.UTC(year, month - back, 0));
+  const iso = (date: Date) => date.toISOString().slice(0, 10);
+  const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
+  const label = `${MONTHS[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
+  return { tenth: iso(start).replace(/-01$/, '-10'), end: iso(end), label };
+}
+
+test("the headline's Net worth sparkline and its 1M, 1Y and 2Y changes open the Accounts as of their date", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const lastMonth = monthBefore(1);
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Headline bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Headline current ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 80_000_00,
+      openingDate: '2023-01-01',
+    });
+    const group = await createCategoryGroup(ctx, { name: `Assets ${suffix}`, type: 'capital' });
+    const shares = await createCategory(ctx, { groupId: group.id, name: 'Shares' });
+    const purchase = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: lastMonth.tenth,
+      amountMinor: -20_000_00,
+      description: `Share purchase ${suffix}`,
+    });
+    await editClassification(ctx, purchase.id, {
+      categoryId: shares.id,
+      payeeName: `Broker ${suffix}`,
+    });
+    const dashboard = await createDashboardRecord(ctx, { name: `Headline ${suffix}` });
+    // Filtered to one Bank: the headline's trend ignores it and counts every Account.
+    await addWidget(ctx, dashboard.id, {
+      name: 'Balances',
+      source: 'account_balances',
+      visualisation: 'table',
+      query: {
+        dateRange: { kind: 'last', count: 12, unit: 'month' },
+        rows: 'account',
+        filters: { bankIds: [bank.id] },
+      },
+    });
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const headline = page.locator('section[aria-labelledby="overview-headline"]');
+  await expect(headline.getByRole('heading')).toHaveText('Your net worth today');
+  const sparkline = headline.getByRole('group', { name: 'Net worth over the last 24 months' });
+  // Today and the 24 month-ends before it.
+  await expect(sparkline.getByRole('link', { name: /^\w{3} \d{4}: CHF/ })).toHaveCount(25);
+  // Capital movements stay on the Net worth over time card, not in the headline.
+  await expect(headline.getByRole('link', { name: /^Capital movement/ })).toHaveCount(0);
+
+  const changes = headline.getByRole('list', { name: 'Change in Net worth' });
+  for (const [label, back] of [
+    ['1M', 1],
+    ['1Y', 12],
+    ['2Y', 24],
+  ] as const) {
+    const since = monthBefore(back);
+    await expect(
+      changes.getByRole('link', {
+        name: new RegExp(`^${label}: (up|down) CHF [\\d']+ since the end of ${since.label}$`),
+      }),
+    ).toHaveAttribute('href', `/accounts?date=${since.end}`);
+  }
+
+  await changes.getByRole('link', { name: /^1Y: / }).click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${monthBefore(12).end}$`));
+
+  await page.goBack();
+  await page
+    .locator('section[aria-labelledby="overview-headline"]')
+    .getByRole('group', { name: 'Net worth over the last 24 months' })
+    .getByRole('link', { name: new RegExp(`^${lastMonth.label}: CHF`) })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${lastMonth.end}$`));
+});
+
+test('a Net worth over time Widget never becomes the headline', async ({ page }) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const dashboard = await createDashboardRecord(ctx, { name: `No headline ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: `Only over time ${suffix}`,
+      source: 'account_balances',
+      visualisation: 'line',
+      query: { dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' }, rows: 'month' },
+    });
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  await expect(boardCard(page, `Only over time ${suffix}`)).toBeVisible();
+  await expect(page.locator('section[aria-labelledby="overview-headline"]')).toHaveCount(0);
+});
+
+test('a Capital movement is a marker on the Net worth line that opens its Transaction', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const payee = `Notary ${suffix}`;
+  const { dashboardId, transactionId } = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Capital bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Capital current ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 500_000_00,
+      openingDate: '2025-01-01',
+    });
+    const group = await createCategoryGroup(ctx, { name: `Capital ${suffix}`, type: 'capital' });
+    const property = await createCategory(ctx, { groupId: group.id, name: 'Property' });
+    const purchase = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: '2025-02-20',
+      amountMinor: -300_000_00,
+      description: `Flat deposit ${suffix}`,
+    });
+    await editClassification(ctx, purchase.id, { categoryId: property.id, payeeName: payee });
+    const dashboard = await createDashboardRecord(ctx, { name: `Capital ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Wealth and capital',
+      source: 'account_balances',
+      visualisation: 'line',
+      query: {
+        dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' },
+        rows: 'month',
+        filters: { accountIds: [account.id] },
+      },
+    });
+    return { dashboardId: dashboard.id, transactionId: purchase.id };
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const card = boardCard(page, 'Wealth and capital');
+  // Filtered to its own Account, so the count isn't touched by other specs' Transactions.
+  await expect(card.getByText('Capital movements', { exact: true }).locator('..')).toHaveText(
+    'Capital movements1',
+  );
+  const marker = card.getByRole('link', {
+    name: new RegExp(`^Capital movement on 2025-02-20: ${payee}: CHF`),
+  });
+  await expect(marker).toHaveCount(1);
+
+  await marker.click();
+  await expect(page).toHaveURL(new RegExp(`/transactions/${transactionId}$`));
+
+  // The count opens the Capital Transactions of the range, on the Widget's Account.
+  await page.goBack();
+  await boardCard(page, 'Wealth and capital').getByRole('link', { name: '1', exact: true }).click();
+  await expect(page).toHaveURL(
+    /\/transactions\?from=2025-01-01&to=2025-03-31&accountId=[^&]+&groupType=capital$/,
+  );
+  await expect(page.getByRole('link', { name: payee, exact: true })).toBeVisible();
+});

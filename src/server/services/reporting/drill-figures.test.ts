@@ -77,7 +77,14 @@ async function widget(
   visualisation: Visualisation,
 ): Promise<CardWidget & { data: ChartSource }> {
   const report = await runWidgetQuery(t.ctx, query);
-  return { id: 'w', name: 'Widget', source: 'query', visualisation, data: toPivotData(report) };
+  return {
+    id: 'w',
+    name: 'Widget',
+    source: 'query',
+    visualisation,
+    query: { rows: null },
+    data: toPivotData(report),
+  };
 }
 
 /** Opens a Drill-down link as its page does: its query and its cell, read from the URL. */

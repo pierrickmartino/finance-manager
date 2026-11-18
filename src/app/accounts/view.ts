@@ -1,5 +1,7 @@
 /** Pure helpers for the Accounts page: its links, the selected Account, grouping and totals. */
 
+import { isAccountKind, matchesKinds, type AccountKind } from '@/server/services/accounts/input';
+
 /** The fields of an Account balance these helpers read (an `AccountBalance` fits). */
 export interface BalanceRow {
   account: { id: string; bankName: string; archivedAt: Date | null };
@@ -9,13 +11,34 @@ export interface BalanceRow {
 /** `?account=new` shows the New Account form in the detail pane. */
 export const NEW_ACCOUNT = 'new';
 
-/** An Accounts page link: the selected Account (or the New Account form) and the date. */
-export function accountsHref(params: { account?: string; date?: string }): string {
+/**
+ * An Accounts page link: the selected Account (or the New Account form), the date and the
+ * account kind the list is narrowed to.
+ */
+export function accountsHref(params: {
+  account?: string;
+  date?: string;
+  kind?: AccountKind;
+}): string {
   const search = new URLSearchParams();
   if (params.account) search.set('account', params.account);
   if (params.date) search.set('date', params.date);
+  if (params.kind) search.set('kind', params.kind);
   const query = search.toString();
   return query ? `/accounts?${query}` : '/accounts';
+}
+
+/** The `?kind=` the list is narrowed to, or null for every kind (also for one it doesn't know). */
+export function accountKindOf(param: string | undefined): AccountKind | null {
+  return isAccountKind(param) ? param : null;
+}
+
+/** The rows of Accounts of `kind`; every row when there is none. */
+export function filterByKind<T extends { account: { kind: AccountKind } }>(
+  rows: readonly T[],
+  kind: AccountKind | null,
+): T[] {
+  return rows.filter((row) => matchesKinds(row.account.kind, kind && [kind]));
 }
 
 export type Selection<T> = { type: 'new' } | { type: 'account'; row: T };
