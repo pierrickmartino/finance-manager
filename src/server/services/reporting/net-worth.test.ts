@@ -76,7 +76,7 @@ async function runNetWorth(query: WidgetQueryInput) {
 }
 
 const points = (report: Awaited<ReturnType<typeof runNetWorth>>) =>
-  report.rows.map((row, r) => [row.key, report.cells[r]![0]]);
+  report.rows.map((row, r) => [row.key, report.rowTotals[r]]);
 
 describe('Net worth over time (a balances Widget with a time axis)', () => {
   it('gives each month the Net worth in CHF at its last day', async () => {
@@ -101,14 +101,73 @@ describe('Net worth over time (a balances Widget with a time axis)', () => {
       query: { rows: 'month', columns: null, measure: 'sum' },
       range: { from: '2024-12-01', to: '2025-04-30' },
       partialPeriod: null,
-      columns: [{ key: null, label: 'Net worth in CHF', isPartial: false }],
       // A stock: the range's Net worth is its latest point's, not the sum of the points.
       total: -42_000,
-      columnTotals: [-42_000],
       unconvertedCount: 0,
     });
     expect(report.rows[0]).toEqual({ key: '2024-12', label: 'Dec 2024', isPartial: false });
-    expect(report.rowTotals).toEqual(report.cells.map((row) => row[0]));
+  });
+
+  it('splits each point by Account kind, the kinds summing to its Net worth', async () => {
+    await setUpAccounts();
+
+    const report = await runNetWorth({
+      dateRange: { kind: 'fixed', from: '2024-12-01', to: '2025-03-31' },
+      rows: 'month',
+    });
+
+    // One column per Account kind held, in the kinds' order; loans below zero.
+    expect(report.columns).toEqual([
+      { key: 'current', label: 'Current', isPartial: false },
+      { key: 'savings', label: 'Savings', isPartial: false },
+      { key: 'loan', label: 'Loan', isPartial: false },
+    ]);
+    expect(report.cells).toEqual([
+      [0, 94_000, 0],
+      [100_000, 94_000, -300_000],
+      [120_000, 95_000, -250_000],
+      [115_000, 93_000, -250_000],
+    ]);
+    for (const [r, row] of report.cells.entries()) {
+      expect(row.reduce<number>((sum, value) => sum + (value ?? 0), 0)).toBe(report.rowTotals[r]);
+    }
+    // Each kind's range value is its latest point's, as the total is.
+    expect(report.columnTotals).toEqual([115_000, 93_000, -250_000]);
+    expect(report.total).toBe(-42_000);
+  });
+
+  it('holds a snapshot-tracked loan constant between its Balance snapshots', async () => {
+    const bank = await createBank(t.ctx, { name: 'BCGE' });
+    const loan = await createAccount(t.ctx, {
+      bankId: bank.id,
+      importFormat: null,
+      kind: 'loan',
+      name: 'Mortgage',
+      currency: 'CHF',
+      openingBalanceMinor: -500_000,
+      openingDate: '2024-12-01',
+    });
+    for (const [date, balanceMinor] of [
+      ['2025-01-15', -480_000],
+      ['2025-04-10', -450_000],
+    ] as const) {
+      await recordBalanceSnapshot(t.ctx, { accountId: loan.id, date, balanceMinor });
+    }
+
+    const report = await runNetWorth({
+      dateRange: { kind: 'fixed', from: '2024-12-01', to: '2025-05-31' },
+      rows: 'month',
+    });
+
+    expect(report.columns.map((column) => column.key)).toEqual(['loan']);
+    expect(report.cells).toEqual([
+      [-500_000],
+      [-480_000],
+      [-480_000],
+      [-480_000],
+      [-450_000],
+      [-450_000],
+    ]);
   });
 
   it('adds up, at each point, every Account balance the Accounts page shows for that day', async () => {
@@ -125,7 +184,7 @@ describe('Net worth over time (a balances Widget with a time axis)', () => {
       const expected = balances
         .filter((balance) => ids.has(balance.account.id))
         .reduce((sum, balance) => sum + (balance.chf?.amountMinor ?? 0), 0);
-      expect(report.cells[r]![0]).toBe(expected);
+      expect(report.rowTotals[r]).toBe(expected);
     }
   });
 
@@ -186,7 +245,7 @@ describe('Net worth over time (a balances Widget with a time axis)', () => {
       ['2025-03', true],
     ]);
     // On 20 March: Francs after its 5 March Transaction, EUR at the 28 February rate.
-    expect(report.cells.at(-1)).toEqual([115_000 + 95_000 - 250_000]);
+    expect(report.rowTotals.at(-1)).toBe(115_000 + 95_000 - 250_000);
   });
 
   it('leaves out and counts an Account with no FX rate for its balance', async () => {

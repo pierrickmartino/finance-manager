@@ -184,7 +184,12 @@ export type CardMark =
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
   | { type: 'bars'; periods: PeriodValue[] }
-  | { type: 'netWorthLine'; points: PeriodValue[]; markers?: LineMarker[] };
+  | {
+      type: 'netWorthLine';
+      points: PeriodValue[];
+      bands: NetWorthBand[];
+      markers?: LineMarker[];
+    };
 
 /** A Capital movement drawn on the Net worth line. */
 export interface LineMarker {
@@ -195,6 +200,13 @@ export interface LineMarker {
   title: string;
   /** Its Transaction detail. */
   href: string;
+}
+
+/** One Account kind's band under the Net worth line: its value at each point (loans below zero). */
+export interface NetWorthBand {
+  key: string;
+  label: string;
+  points: PeriodValue[];
 }
 
 /**
@@ -489,6 +501,36 @@ function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardS
  * Net worth over time: where it stood at the latest point and how far it moved since the first,
  * every figure opening the Accounts as of its date.
  */
+/** Each Account kind's band: its value per period, each linking to that kind's Accounts then. */
+function netWorthBands(data: ChartSource): NetWorthBand[] {
+  return data.columns.map((column, c) => ({
+    key: column.key ?? '',
+    label: column.label,
+    points: data.rows.map((row, r) => ({
+      label: row.label,
+      value: data.cells[r]?.[c] ?? 0,
+      href: data.hrefs.cells[r]?.[c] ?? data.hrefs.rowTotals[r] ?? data.hrefs.total,
+      isPartial: row.isPartial,
+    })),
+  }));
+}
+
+/**
+ * Each Account kind's share at the latest point, sized by magnitude as the balances share card
+ * sizes its parts (so a loan's share is of everything held or owed); a kind at zero is left out.
+ */
+function kindShareFacts(bands: NetWorthBand[], money: Money): CardFact[] {
+  const latest = bands.flatMap((band) => {
+    const point = band.points.at(-1);
+    return point && point.value !== 0 ? [{ label: band.label, point }] : [];
+  });
+  const whole = sum(latest.map(({ point }) => Math.abs(point.value)));
+  return latest.map(({ label, point }) => {
+    const share = Math.round((Math.abs(point.value) / whole) * 100);
+    return { label, value: `${money(point.value)} · ${share}%`, href: point.href };
+  });
+}
+
 function netWorthSentences(points: PeriodValue[], money: Money): CardSentences {
   const first = points[0]!;
   const latest = points.at(-1)!;
@@ -582,16 +624,23 @@ function readRows(
       };
     case 'netWorthTrend': {
       const points = periodValues(data);
-      const sentences = netWorthSentences(points, money);
+      const bands = netWorthBands(data);
+      const { lead, facts } = netWorthSentences(points, money);
+      const kindFacts = kindShareFacts(bands, money);
       if (!data.markers || !axis) {
-        return { ...sentences, mark: { type: 'netWorthLine', points } };
+        return {
+          lead,
+          facts: [...facts, ...kindFacts],
+          mark: { type: 'netWorthLine', points, bands },
+        };
       }
       return {
-        ...sentences,
-        facts: [...sentences.facts, capitalFact(data.markers)],
+        lead,
+        facts: [...facts, ...kindFacts, capitalFact(data.markers)],
         mark: {
           type: 'netWorthLine',
           points,
+          bands,
           markers: lineMarkers(data.rows, data.markers, axis, money),
         },
       };

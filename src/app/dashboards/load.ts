@@ -39,17 +39,20 @@ export function balanceHref(cell: CellRef): string {
 export const BALANCE_LINKS: PivotLinks = { hrefOf: balanceHref, drill: null };
 
 /**
- * Net worth over time links each point to the Accounts as they stood on its date, and the
- * range's Net worth (its latest point) to the latest date. No Drill-down: balances aren't
- * Transactions.
+ * Net worth over time links each point to the Accounts as they stood on its date, a band's
+ * point to that Account kind's Accounts then, and the range's values (its latest point's) to
+ * the latest date. No Drill-down: balances aren't Transactions.
  */
 export function netWorthLinks(report: ReportTable, axis: TimeAxis): PivotLinks {
-  const dateOf = (key: string) => netWorthPointDate(key, axis, report.range);
   const latest = report.rows.at(-1)?.key;
-  const latestHref = latest ? accountsHref({ date: dateOf(latest) }) : accountsHref({});
+  const dateOf = (key: string | null | undefined) =>
+    typeof key === 'string' ? netWorthPointDate(key, axis, report.range) : undefined;
   return {
     hrefOf: (cell) =>
-      typeof cell.row === 'string' ? accountsHref({ date: dateOf(cell.row) }) : latestHref,
+      accountsHref({
+        date: dateOf(typeof cell.row === 'string' ? cell.row : latest),
+        kind: typeof cell.column === 'string' ? cell.column : undefined,
+      }),
     drill: null,
   };
 }

@@ -20,9 +20,13 @@ export function drillLinks(report: ReportTable, origin: DrillOrigin = EDITOR): P
   return { hrefOf: (cell) => drillUrl(drill, cell), drill };
 }
 
-/** The cell key for a header, or undefined (the whole axis) when the report has no such axis. */
+/**
+ * The cell key for a header, or undefined (the whole axis) for the single all-values header of
+ * an axis the query doesn't have. Net worth over time keys its columns by Account kind though
+ * its query has no column axis, so a keyed header keeps its key.
+ */
 function key(axis: unknown, header: ReportHeader): string | null | undefined {
-  return axis === null ? undefined : header.key;
+  return axis === null && header.key === null ? undefined : header.key;
 }
 
 /**

@@ -6,7 +6,6 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { compactValue, HEAT_LEVELS, toHeatmap } from '@/lib/reporting/heatmap';
 import {
   latestFullIndex,
-  type LineMarker,
   type MonthFlow,
   type PeriodValue,
   type TickItem,
@@ -123,18 +122,6 @@ export function MonthBars({ periods }: { periods: PeriodValue[] }) {
   );
 }
 
-/** Where each point sits in the line's box, in percent: x across, y down from the top. */
-function linePositions(values: number[]): { x: number; y: number }[] {
-  const low = Math.min(0, ...values);
-  const high = Math.max(0, ...values);
-  const span = high - low || 1;
-  const step = values.length > 1 ? 100 / (values.length - 1) : 0;
-  return values.map((value, i) => ({
-    x: values.length > 1 ? i * step : 50,
-    y: 100 - ((value - low) / span) * 100,
-  }));
-}
-
 /**
  * A chart with nothing to draw: an empty plot over its baseline, the sentence saying why in
  * its middle.
@@ -143,113 +130,6 @@ export function EmptyChart({ sentence }: { sentence: string }) {
   return (
     <figure className="relative flex h-40 items-center justify-center border-b border-rule">
       <figcaption className="px-4 text-center text-sm text-muted">{sentence}</figcaption>
-    </figure>
-  );
-}
-
-/** Where a marker `at` points along the line sits: between the two points either side of it. */
-function alongLine(positions: { x: number; y: number }[], at: number): { x: number; y: number } {
-  const before = Math.min(Math.floor(at), positions.length - 1);
-  const after = Math.min(before + 1, positions.length - 1);
-  const through = at - before;
-  const [from, to] = [positions[before]!, positions[after]!];
-  return { x: from.x + (to.x - from.x) * through, y: from.y + (to.y - from.y) * through };
-}
-
-/** A Capital movement on the line: an amber diamond that opens its Transaction. */
-function CapitalMarkerLink({ marker, x, y }: { marker: LineMarker; x: number; y: number }) {
-  return (
-    <Link
-      href={marker.href}
-      aria-label={`Capital movement on ${marker.date}: ${marker.title}`}
-      title={`${marker.date} · ${marker.title}`}
-      className="group absolute z-10 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-      style={{ left: `${x}%`, top: `${y}%` }}
-    >
-      <span className="h-2.5 w-2.5 rotate-45 border border-accent-ink bg-accent group-hover:scale-125" />
-    </Link>
-  );
-}
-
-/**
- * Net worth over time: one navy line from zero up (or down), a dot per period that opens the
- * Accounts as of its last day, the latest point labelled; a running period's dot is hollow.
- * Capital movements sit on the line at their dates as amber diamonds.
- */
-export function NetWorthLine({
-  points,
-  markers = [],
-}: {
-  points: PeriodValue[];
-  markers?: LineMarker[];
-}) {
-  const money = useMoney();
-  const positions = linePositions(points.map((point) => point.value));
-  const values = points.map((point) => point.value);
-  const zeroY = linePositions([...values, 0]).at(-1)!.y;
-  const latest = points.length - 1;
-  return (
-    <figure>
-      <div className="relative mx-2 mt-8 h-40">
-        <svg
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          className="absolute inset-0 h-full w-full overflow-visible text-hero-deep"
-          aria-hidden
-        >
-          <line
-            x1={0}
-            x2={100}
-            y1={zeroY}
-            y2={zeroY}
-            className="stroke-rule"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
-          <polyline
-            points={positions.map(({ x, y }) => `${x},${y}`).join(' ')}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-        {points.map((point, i) => (
-          <Link
-            key={point.label}
-            href={point.href}
-            aria-label={`${point.label}: ${money(point.value)}`}
-            title={`${point.label}: ${money(point.value)}`}
-            className="group absolute flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-            style={{ left: `${positions[i]!.x}%`, top: `${positions[i]!.y}%` }}
-          >
-            {i === latest && (
-              <span className="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2 py-1 text-xs whitespace-nowrap text-paper">
-                {money(point.value)}
-              </span>
-            )}
-            <span
-              className={`h-2.5 w-2.5 rounded-full border-2 border-hero-deep group-hover:scale-125 ${
-                point.isPartial ? 'bg-surface' : 'bg-hero-deep'
-              }`}
-            />
-          </Link>
-        ))}
-        {markers.map((marker, i) => (
-          <CapitalMarkerLink
-            key={`${marker.href}-${i}`}
-            marker={marker}
-            {...alongLine(positions, marker.at)}
-          />
-        ))}
-      </div>
-      {points.length > 0 && (
-        <div className="mt-3 flex justify-between text-xs text-muted" aria-hidden>
-          <span>{points[0]!.label}</span>
-          {points.length > 1 && <span>{points[latest]!.label}</span>}
-        </div>
-      )}
     </figure>
   );
 }

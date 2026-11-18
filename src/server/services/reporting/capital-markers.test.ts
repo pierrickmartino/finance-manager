@@ -163,11 +163,8 @@ describe('Capital markers on Net worth over time', () => {
 
     expect(after.markers).toHaveLength(1);
     expect(after.cells).toEqual(before.cells);
+    expect(after.rowTotals).toEqual(before.rowTotals);
     // Francs 10,000 − 3,000 from February, Euros 10,000 EUR at each month's rate.
-    expect(after.cells.map(([value]) => value)).toEqual([
-      1_000_000 + 940_000,
-      700_000 + 950_000,
-      700_000 + 950_000,
-    ]);
+    expect(after.rowTotals).toEqual([1_000_000 + 940_000, 700_000 + 950_000, 700_000 + 950_000]);
   });
 });

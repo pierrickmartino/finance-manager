@@ -613,16 +613,29 @@ describe('readCard: a number, no data and no rows', () => {
   });
 });
 
+type KindValues = Partial<Record<'current' | 'savings' | '3a' | 'loan', number>>;
+
+const KIND_LABELS = { current: 'Current', savings: 'Savings', '3a': '3a', loan: 'Loan' };
+
 /**
- * Net worth over time as the loader passes it: one row per period (key and label), one column,
- * the total the latest point's, every point linking to the Accounts as of its last day.
+ * Net worth over time as the loader passes it: one row per period (key and label), one column
+ * per Account kind (a plain number is all savings), each row's total its Net worth and the
+ * range's values the latest point's. Every point links to the Accounts as of its last day, a
+ * band's point to that kind's Accounts.
  */
 function netWorth(
-  points: [key: string, label: string, value: number][],
+  points: [key: string, label: string, values: number | KindValues][],
   { lastIsPartial = false } = {},
 ): CardWidget {
-  const values = points.map(([, , value]) => value);
-  const latest = values.at(-1) ?? null;
+  const perKind = points.map(([, , values]) =>
+    typeof values === 'number' ? { savings: values } : values,
+  );
+  const kinds = (['current', 'savings', '3a', 'loan'] as const).filter((kind) =>
+    perKind.some((values) => kind in values),
+  );
+  const cells = perKind.map((values) => kinds.map((kind) => values[kind] ?? 0));
+  const rowTotals = cells.map((row) => row.reduce((a, v) => a + v, 0));
+  const latest = rowTotals.at(-1) ?? null;
   return widget({
     id: 'net-worth',
     name: 'Net worth',
@@ -636,15 +649,15 @@ function netWorth(
         label,
         isPartial: lastIsPartial && r === points.length - 1,
       })),
-      columns: [{ key: null, label: 'Net worth in CHF', isPartial: false }],
-      cells: values.map((value) => [value]),
-      rowTotals: values,
-      columnTotals: [latest],
+      columns: kinds.map((kind) => ({ key: kind, label: KIND_LABELS[kind], isPartial: false })),
+      cells,
+      rowTotals,
+      columnTotals: cells.at(-1) ?? kinds.map(() => null),
       total: latest,
       hrefs: {
-        cells: points.map(([key]) => [`accounts:${key}`]),
+        cells: points.map(([key]) => kinds.map((kind) => `accounts:${key}:${kind}`)),
         rowTotals: points.map(([key]) => `accounts:${key}`),
-        columnTotals: ['accounts:latest'],
+        columnTotals: kinds.map((kind) => `accounts:latest:${kind}`),
         total: 'accounts:latest',
       },
       drill: null,
@@ -669,13 +682,15 @@ describe('readCard: Net worth over time', () => {
       detail: 'CHF 1500',
       href: 'accounts:2025-03',
     });
-    expect(reading.facts).toEqual([
-      { label: 'Change over Jan 2025 – Mar 2025', value: '+CHF 500', href: 'accounts:2025-03' },
-    ]);
+    expect(reading.facts[0]).toEqual({
+      label: 'Change over Jan 2025 – Mar 2025',
+      value: '+CHF 500',
+      href: 'accounts:2025-03',
+    });
   });
 
   it('draws the line, each point opening the Accounts as of its period', () => {
-    expect(read(rising).mark).toEqual({
+    expect(read(rising).mark).toMatchObject({
       type: 'netWorthLine',
       points: [
         { label: 'Jan 2025', value: 1000_00, href: 'accounts:2025-01', isPartial: false },
@@ -683,6 +698,74 @@ describe('readCard: Net worth over time', () => {
         { label: 'Mar 2025', value: 1500_00, href: 'accounts:2025-03', isPartial: false },
       ],
     });
+  });
+
+  const split = netWorth([
+    ['2025-01', 'Jan 2025', { current: 200_00, savings: 600_00, loan: -500_00 }],
+    ['2025-02', 'Feb 2025', { current: 300_00, '3a': 100_00, savings: 600_00, loan: -500_00 }],
+  ]);
+
+  it('draws a band per Account kind under the line, each point opening that kind as of its date', () => {
+    const mark = read(split).mark;
+
+    expect(mark).toMatchObject({ type: 'netWorthLine' });
+    expect(mark.type === 'netWorthLine' && mark.bands).toEqual([
+      {
+        key: 'current',
+        label: 'Current',
+        points: [
+          { label: 'Jan 2025', value: 200_00, href: 'accounts:2025-01:current', isPartial: false },
+          { label: 'Feb 2025', value: 300_00, href: 'accounts:2025-02:current', isPartial: false },
+        ],
+      },
+      {
+        key: 'savings',
+        label: 'Savings',
+        points: [
+          { label: 'Jan 2025', value: 600_00, href: 'accounts:2025-01:savings', isPartial: false },
+          { label: 'Feb 2025', value: 600_00, href: 'accounts:2025-02:savings', isPartial: false },
+        ],
+      },
+      {
+        key: '3a',
+        label: '3a',
+        points: [
+          { label: 'Jan 2025', value: 0, href: 'accounts:2025-01:3a', isPartial: false },
+          { label: 'Feb 2025', value: 100_00, href: 'accounts:2025-02:3a', isPartial: false },
+        ],
+      },
+      {
+        key: 'loan',
+        label: 'Loan',
+        points: [
+          { label: 'Jan 2025', value: -500_00, href: 'accounts:2025-01:loan', isPartial: false },
+          { label: 'Feb 2025', value: -500_00, href: 'accounts:2025-02:loan', isPartial: false },
+        ],
+      },
+    ]);
+  });
+
+  it("gives each Account kind's share at the latest point, linking to that kind's Accounts then", () => {
+    // Shares of everything held or owed (1500 in all), as the balances share card sizes parts.
+    expect(read(split).facts.slice(1)).toEqual([
+      { label: 'Current', value: 'CHF 300 · 20%', href: 'accounts:2025-02:current' },
+      { label: 'Savings', value: 'CHF 600 · 40%', href: 'accounts:2025-02:savings' },
+      { label: '3a', value: 'CHF 100 · 7%', href: 'accounts:2025-02:3a' },
+      { label: 'Loan', value: 'CHF -500 · 33%', href: 'accounts:2025-02:loan' },
+    ]);
+  });
+
+  it('leaves out a kind that holds nothing at the latest point', () => {
+    const reading = read(
+      netWorth([
+        ['2025-01', 'Jan 2025', { current: 100_00, savings: 300_00 }],
+        ['2025-02', 'Feb 2025', { current: 0, savings: 300_00 }],
+      ]),
+    );
+
+    expect(reading.facts.slice(1)).toEqual([
+      { label: 'Savings', value: 'CHF 300 · 100%', href: 'accounts:2025-02:savings' },
+    ]);
   });
 
   it('says how far it fell', () => {

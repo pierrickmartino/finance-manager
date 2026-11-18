@@ -69,7 +69,7 @@ describe('Account filters on a balances Widget', () => {
       filters: { accountIds: [current.id, pillar.id] },
     });
 
-    expect(report.cells).toEqual([[130_000], [130_000]]);
+    expect(report.rowTotals).toEqual([130_000, 130_000]);
     expect(report.total).toBe(130_000);
   });
 
@@ -91,7 +91,7 @@ describe('Account filters on a balances Widget', () => {
     const overTime = await runBalances({ ...OVER_TIME, filters: { bankIds: [ubs.id] } });
     const onOneDate = await runBalances({ ...ON_ONE_DATE, filters: { bankIds: [ubs.id] } });
 
-    expect(overTime.cells).toEqual([[-170_000], [-170_000]]);
+    expect(overTime.rowTotals).toEqual([-170_000, -170_000]);
     expect(onOneDate.rows.map((row) => row.key).sort()).toEqual([pillar.id, loan.id].sort());
     expect(onOneDate.total).toBe(-170_000);
   });
@@ -103,7 +103,7 @@ describe('Account filters on a balances Widget', () => {
     const overTime = await runBalances({ ...OVER_TIME, filters });
     const onOneDate = await runBalances({ ...ON_ONE_DATE, filters });
 
-    expect(overTime.cells).toEqual([[80_000], [80_000]]);
+    expect(overTime.rowTotals).toEqual([80_000, 80_000]);
     expect(onOneDate.rows.map((row) => row.key).sort()).toEqual([savings.id, pillar.id].sort());
     expect(onOneDate.total).toBe(80_000);
   });
