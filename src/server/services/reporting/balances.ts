@@ -12,7 +12,7 @@ import { swissToday } from '../fx/dates';
 import type { ReportTable } from './engine';
 import { axisHeaders, type ReportHeader } from './headers';
 import { periodSpan, resolveRange, type DateSpan } from './periods';
-import { isTimeAxis, type TimeAxis, type WidgetQuery } from './query';
+import { isTimeAxis, type ReportFilters, type TimeAxis, type WidgetQuery } from './query';
 
 /** The single column of the Account balances table. */
 export const BALANCE_COLUMN: ReportHeader = {
@@ -20,6 +20,21 @@ export const BALANCE_COLUMN: ReportHeader = {
   label: 'Balance in CHF',
   isPartial: false,
 };
+
+/**
+ * Whether an Account counts under a balances Widget's filters: its Account, Bank and Account
+ * kind filters, each letting everything through when empty. Classification filters (Category,
+ * Payee, Tag, group type, Currency) mean nothing for a balance and are ignored.
+ */
+function isIncluded(account: Account, filters: ReportFilters): boolean {
+  const allows = (values: readonly string[] | undefined, value: string) =>
+    !values || values.length === 0 || values.includes(value);
+  return (
+    allows(filters.accountIds, account.id) &&
+    allows(filters.bankIds, account.bankId) &&
+    allows(filters.accountKinds, account.kind)
+  );
+}
 
 /** An archived Account shows only while it still holds money. */
 function isShown(balance: AccountBalance): boolean {
@@ -39,8 +54,10 @@ export async function runAccountBalances(
   options: { date?: string } = {},
 ): Promise<ReportTable> {
   if (isTimeAxis(query.rows)) return runNetWorth(ctx, query, query.rows);
-  const balances = (await listAccountBalances(ctx, options)).filter(isShown);
-  const date = balances[0]?.date ?? options.date ?? '';
+  const balances = (await listAccountBalances(ctx, options)).filter(
+    (balance) => isShown(balance) && isIncluded(balance.account, query.filters),
+  );
+  const date = balances[0]?.date ?? options.date ?? swissToday();
   const values = balances.map((balance) => balance.chf?.amountMinor ?? null);
   const converted = values.filter((value): value is number => value !== null);
   const total = converted.length === 0 ? null : converted.reduce((sum, value) => sum + value, 0);
@@ -99,9 +116,13 @@ async function runNetWorth(
 ): Promise<ReportTable> {
   const resolved = resolveRange(query.dateRange, swissToday());
   const { range, partialPeriod } = resolved;
-  const rows = await axisHeaders(ctx.db, axis, new Set(), range, partialPeriod);
+  const accounts = (await listAccounts(ctx)).filter((account) =>
+    isIncluded(account, query.filters),
+  );
+  // No Account left to count: no points at all, rather than a flat line at zero.
+  const rows =
+    accounts.length === 0 ? [] : await axisHeaders(ctx.db, axis, new Set(), range, partialPeriod);
   const dates = rows.map((row) => netWorthPointDate(row.key!, axis, range));
-  const accounts = await listAccounts(ctx);
   const asked: DatedAccount[] = dates.flatMap((date) =>
     accounts.filter((account) => isOpenOn(account, date)).map((account) => ({ account, date })),
   );

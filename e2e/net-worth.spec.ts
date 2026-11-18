@@ -140,3 +140,44 @@ test('a new balances Widget in the editor is Net worth by month over the last 24
   await expect(page.getByRole('spinbutton', { name: 'Number of periods' })).toHaveValue('24');
   await expect(page.getByText('as Net worth').first()).toBeVisible();
 });
+
+test('a balances Widget filters by Account, Bank and Account kind, and says when none is left', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const bankName = `Filtered bank ${suffix}`;
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: bankName });
+    await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'savings',
+      importFormat: null,
+      name: `Filtered savings ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 1000_00,
+      openingDate: '2025-02-10',
+    });
+  });
+
+  await page.goto('/widgets/new?source=account_balances');
+  const form = page.getByRole('form', { name: 'Widget query' });
+  await form.locator('summary', { hasText: 'Filters' }).click();
+  for (const filter of ['Accounts', 'Banks', 'Account kinds']) {
+    await expect(form.locator('summary', { hasText: filter })).toBeVisible();
+  }
+  for (const filter of ['Categories', 'Payees', 'Tags', 'Currencies']) {
+    await expect(form.locator('summary', { hasText: filter })).toHaveCount(0);
+  }
+
+  // Only this Bank's Accounts count: its savings Account alone.
+  await form.locator('summary', { hasText: 'Banks' }).click();
+  await form.getByRole('checkbox', { name: bankName }).check();
+  await expect(page).toHaveURL(/[?&]bank=/);
+  await expect(page.getByText(/Net worth was CHF 1\D?000 at the end of/)).toBeVisible();
+
+  // The Bank holds no loan: no Account is left.
+  await form.locator('summary', { hasText: 'Account kinds' }).click();
+  await form.getByRole('checkbox', { name: 'Loan' }).check();
+  await expect(page).toHaveURL(/[?&]kind=loan/);
+  await expect(page.getByText("No Account matches this Widget's filters.")).toBeVisible();
+});

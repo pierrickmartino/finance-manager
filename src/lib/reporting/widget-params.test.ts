@@ -10,6 +10,7 @@ import {
 
 const ACCOUNT = '0b6f4c1e-3a52-4d8e-9a7e-1f2d3c4b5a60';
 const TAG = '1c7a5d2f-4b63-4e9f-8b8f-2a3e4d5c6b71';
+const BANK = '2d8b6e3a-5c74-4fa0-9c90-3b4f5e6d7c82';
 
 describe('Widget query URL parameters', () => {
   it('round-trips a full query through URL parameters', () => {
@@ -98,6 +99,43 @@ describe('Widget query URL parameters', () => {
         columns: null,
       });
     }
+  });
+
+  it('reads only the Account, Bank and Account kind filters of a balances query', () => {
+    const query = balancesQueryFromParams({
+      range: 'last',
+      count: '24',
+      unit: 'month',
+      rows: 'month',
+      account: ACCOUNT,
+      bank: BANK,
+      kind: ['savings', '3a'],
+      tag: TAG,
+      type: 'capital',
+      currency: 'EUR',
+      capital: '1',
+    });
+
+    expect(query.filters).toEqual({
+      accountIds: [ACCOUNT],
+      bankIds: [BANK],
+      accountKinds: ['savings', '3a'],
+    });
+    expect(query.includeCapital).toBe(false);
+  });
+
+  it('round-trips the Bank and Account kind filters through URL parameters', () => {
+    const query = {
+      dateRange: { kind: 'yearToDate' as const, includeCurrent: false },
+      rows: 'month' as const,
+      filters: { bankIds: [BANK], accountKinds: ['loan' as const] },
+    };
+
+    const params = queryToParams(query);
+
+    expect(params.getAll('bank')).toEqual([BANK]);
+    expect(params.getAll('kind')).toEqual(['loan']);
+    expect(balancesQueryFromParams(Object.fromEntries(params)).filters).toEqual(query.filters);
   });
 
   it('encodes a drill-down cell: absent means the whole axis, none the none bucket', () => {

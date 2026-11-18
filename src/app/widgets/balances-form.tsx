@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { balanceFilterLists, type BalanceFilterChoices } from '@/lib/reporting/query-filters';
 import {
   AXIS_LABELS,
   isTimeAxis,
@@ -9,7 +10,7 @@ import {
 } from '@/server/services/reporting';
 import { AutoSubmitForm } from './auto-submit-form';
 import { PANEL_INPUT, PanelRow, PanelSection } from './editor-panel';
-import { HiddenFields, PeriodSection } from './query-form';
+import { FiltersSection, HiddenFields, PeriodSection } from './query-form';
 
 const SOURCE_LABELS: Record<WidgetSource, string> = {
   query: 'Transactions',
@@ -47,6 +48,8 @@ export function SourcePicker({
 
 interface BalancesFormProps {
   query: WidgetQueryInput;
+  /** The Accounts the filters offer. */
+  accounts: BalanceFilterChoices;
   hidden: Record<string, string>;
   /** The dates the preview covers: what "Fixed dates" starts from when switched to. */
   shownRange?: { from: string; to: string };
@@ -55,9 +58,10 @@ interface BalancesFormProps {
 
 /**
  * The Account balances Widget's settings: a time axis (none for the balances on one date, or
- * month, quarter or year for Net worth over time) and the date range the axis covers.
+ * month, quarter or year for Net worth over time), the date range the axis covers, and the
+ * filters choosing which Accounts count (no classification filter means anything for a balance).
  */
-export function BalancesForm({ query, hidden, shownRange, children }: BalancesFormProps) {
+export function BalancesForm({ query, accounts, hidden, shownRange, children }: BalancesFormProps) {
   const axis = isTimeAxis(query.rows) ? query.rows : '';
   return (
     <AutoSubmitForm action="/widgets/new" label="Widget query">
@@ -76,6 +80,7 @@ export function BalancesForm({ query, hidden, shownRange, children }: BalancesFo
         </PanelRow>
       </PanelSection>
       <PeriodSection query={query} shownRange={shownRange} />
+      <FiltersSection filterLists={balanceFilterLists(query.filters ?? {}, accounts)} />
       <noscript>
         <div className="p-4">
           <button type="submit" className="text-sm underline">

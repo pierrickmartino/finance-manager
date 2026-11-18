@@ -141,7 +141,12 @@ export default async function BuilderPage({ searchParams }: BuilderPageProps) {
             </a>
           </div>
           {isBalances ? (
-            <BalancesForm query={query} hidden={hidden} shownRange={report?.range}>
+            <BalancesForm
+              query={query}
+              accounts={lists.accounts}
+              hidden={hidden}
+              shownRange={report?.range}
+            >
               {settingsSections}
             </BalancesForm>
           ) : (
