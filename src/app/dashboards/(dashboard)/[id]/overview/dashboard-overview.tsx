@@ -1,6 +1,7 @@
 import { ViewTransition, type ReactElement, type ReactNode } from 'react';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
 import type { WidgetCardData } from '@/lib/reporting/card';
+import type { ChartSource } from '@/lib/reporting/chart-data';
 
 interface DashboardOverviewProps {
   dashboardId: string;
@@ -124,15 +125,18 @@ export function OverviewRow({ children }: { children: ReactNode }) {
 /** The overview row's cards, every card already loaded: net worth, insight, recent activity. */
 export function OverviewCards({
   cards,
+  trend,
   recent,
 }: {
   /** In reading order. */
   cards: WidgetCardData[];
+  /** The headline's Net worth trend, when it is net worth today. */
+  trend: ChartSource | null;
   recent: RecentActivity[];
 }) {
   return (
     <>
-      <NetWorthCard cards={cards} />
+      <NetWorthCard cards={cards} trend={trend} />
       <InsightCard cards={cards} />
       <RecentActivityCard recent={recent} />
     </>

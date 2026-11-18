@@ -9,6 +9,7 @@ import { getDashboard, type DashboardWithWidgets } from '@/server/services/dashb
 import { NotFoundError, ServiceError } from '@/server/services/errors';
 import {
   netWorthPointDate,
+  runNetWorthTrend,
   runSavedWidget,
   type CellRef,
   type ReportTable,
@@ -104,6 +105,24 @@ export async function loadWidgetCard(ctx: ServiceContext, widget: Widget): Promi
     layout: widget.layout,
     ...view,
   };
+}
+
+/**
+ * The overview headline's Net worth trend, when the headline can be net worth today (the
+ * Dashboard holds Account balances on a date): every Account by month over the last 24
+ * months, its points opening the Accounts as of their date and its capital movements their
+ * Transaction. Null otherwise.
+ */
+export async function loadNetWorthTrend(
+  ctx: ServiceContext,
+  widgets: readonly Pick<Widget, 'source' | 'query'>[],
+): Promise<ChartSource | null> {
+  const hasBalances = widgets.some(
+    (widget) => widget.source === 'account_balances' && timeAxisOf(widget.query) === null,
+  );
+  if (!hasBalances) return null;
+  const report = await runNetWorthTrend(ctx);
+  return toPivotData(report, netWorthLinks(report, 'month'));
 }
 
 /** The Widget editor, opened on a Widget (its query, visualisation and Dashboard in the URL). */

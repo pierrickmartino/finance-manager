@@ -242,3 +242,26 @@ async function runNetWorth(
   ]);
   return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
 }
+
+/**
+ * The query of the overview headline's Net worth trend: every Account, no filters, by month
+ * over the last 24 months, the running one at today, so its latest point is net worth today.
+ */
+export const NET_WORTH_TREND_QUERY: WidgetQuery = {
+  dateRange: { kind: 'last', count: 23, unit: 'month', includeCurrent: true },
+  rows: 'month',
+  columns: null,
+  measure: 'sum',
+  averagePer: 'month',
+  filters: {},
+  includeCapital: false,
+};
+
+/**
+ * The overview headline's Net worth trend (GLOSSARY: Dashboard Story): Net worth over time on
+ * every Account, valued as a Net worth Widget's points are (ADR-0014), whatever any Widget's
+ * filters.
+ */
+export function runNetWorthTrend(ctx: ServiceContext): Promise<ReportTable> {
+  return runNetWorth(ctx, NET_WORTH_TREND_QUERY, 'month');
+}

@@ -79,6 +79,8 @@ const SIZES = {
   list: { initial: { w: 4, h: 8 }, min: { w: 3, h: 5 } },
   grid: { initial: { w: 8, h: 8 }, min: { w: 4, h: 5 } },
   chart: { initial: { w: 8, h: 6 }, min: { w: 4, h: 4 } },
+  // The chart, then up to six facts: the change, each account kind's share, capital movements.
+  netWorth: { initial: { w: 8, h: 9 }, min: { w: 4, h: 9 } },
 } as const satisfies Record<string, CardSizes>;
 
 /**
@@ -94,7 +96,7 @@ const KINDS: Record<CardKind, { sizes: CardSizes; placeholder: PlaceholderShape 
   grid: { sizes: SIZES.grid, placeholder: 'grid' },
   trend: { sizes: SIZES.chart, placeholder: 'bars' },
   bars: { sizes: SIZES.chart, placeholder: 'bars' },
-  netWorthTrend: { sizes: SIZES.chart, placeholder: 'bars' },
+  netWorthTrend: { sizes: SIZES.netWorth, placeholder: 'bars' },
 };
 
 /** A Widget query's row axis when it is a time axis: what makes balances Net worth over time. */

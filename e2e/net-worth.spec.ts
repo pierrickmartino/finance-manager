@@ -185,6 +185,100 @@ test('a balances Widget filters by Account, Bank and Account kind, and says when
   await expect(page.getByText("No Account matches this Widget's filters.")).toBeVisible();
 });
 
+/** The previous calendar month (Swiss time): its 10th, its last day and its label. */
+function previousMonth(): { tenth: string; end: string; label: string } {
+  const [year, month] = new Date()
+    .toLocaleDateString('sv-SE', { timeZone: 'Europe/Zurich' })
+    .split('-')
+    .map(Number) as [number, number];
+  const start = new Date(Date.UTC(year, month - 2, 1));
+  const end = new Date(Date.UTC(year, month - 1, 0));
+  const iso = (date: Date) => date.toISOString().slice(0, 10);
+  const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
+  const label = `${MONTHS[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
+  return { tenth: iso(start).replace(/-01$/, '-10'), end: iso(end), label };
+}
+
+test("the headline's Net worth trend opens the Accounts as of a point, and a Capital marker its Transaction", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const month = previousMonth();
+  const { dashboardId, transactionId } = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Headline bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Headline current ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 80_000_00,
+      openingDate: '2025-01-01',
+    });
+    const group = await createCategoryGroup(ctx, { name: `Assets ${suffix}`, type: 'capital' });
+    const shares = await createCategory(ctx, { groupId: group.id, name: 'Shares' });
+    const purchase = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: month.tenth,
+      amountMinor: -20_000_00,
+      description: `Share purchase ${suffix}`,
+    });
+    await editClassification(ctx, purchase.id, {
+      categoryId: shares.id,
+      payeeName: `Broker ${suffix}`,
+    });
+    const dashboard = await createDashboardRecord(ctx, { name: `Headline ${suffix}` });
+    // Filtered to one Bank: the headline's trend ignores it and counts every Account.
+    await addWidget(ctx, dashboard.id, {
+      name: 'Balances',
+      source: 'account_balances',
+      visualisation: 'table',
+      query: {
+        dateRange: { kind: 'last', count: 12, unit: 'month' },
+        rows: 'account',
+        filters: { bankIds: [bank.id] },
+      },
+    });
+    return { dashboardId: dashboard.id, transactionId: purchase.id };
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const headline = page.locator('section[aria-labelledby="overview-headline"]');
+  await expect(headline.getByRole('heading')).toHaveText('Your net worth today');
+  const trend = headline.getByRole('group', { name: 'Net worth over the last 24 months' });
+  await expect(trend.getByRole('link', { name: /^\w{3} \d{4}: CHF/ })).toHaveCount(24);
+
+  await trend.getByRole('link', { name: new RegExp(`^${month.label}: CHF`) }).click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${month.end}$`));
+
+  await page.goBack();
+  await page
+    .locator('section[aria-labelledby="overview-headline"]')
+    .getByRole('link', {
+      name: new RegExp(`^Capital movement on ${month.tenth}: Broker ${suffix}: CHF`),
+    })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/transactions/${transactionId}$`));
+});
+
+test('a Net worth over time Widget never becomes the headline', async ({ page }) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const dashboard = await createDashboardRecord(ctx, { name: `No headline ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: `Only over time ${suffix}`,
+      source: 'account_balances',
+      visualisation: 'line',
+      query: { dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' }, rows: 'month' },
+    });
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  await expect(boardCard(page, `Only over time ${suffix}`)).toBeVisible();
+  await expect(page.locator('section[aria-labelledby="overview-headline"]')).toHaveCount(0);
+});
+
 test('a Capital movement is a marker on the Net worth line that opens its Transaction', async ({
   page,
 }) => {

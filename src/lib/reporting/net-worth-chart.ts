@@ -71,6 +71,18 @@ export function bandPath(spans: readonly Span[], isStepped: boolean, scale: Scal
   return `M${[...top, ...bottom].join(' L')} Z`;
 }
 
+/** Which side of its point a value label hangs from, so it stays inside the plot's width. */
+export type LabelSide = 'start' | 'center' | 'end';
+
+/**
+ * A label past the middle ends at its point, one before it starts there, and one in the
+ * middle (a lone point) is centred on it.
+ */
+export function labelSide(x: number): LabelSide {
+  if (x > 50) return 'end';
+  return x < 50 ? 'start' : 'center';
+}
+
 /** Where a marker `at` points along the line sits: between the two points either side of it. */
 export function alongLine(points: readonly PeriodValue[], at: number, scale: Scale): Spot {
   const before = Math.min(Math.floor(at), points.length - 1);

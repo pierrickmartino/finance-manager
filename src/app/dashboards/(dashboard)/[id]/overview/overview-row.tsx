@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 import { useFormatter } from '@/components/formatter-provider';
 import { BADGE_CLASS, TILE_CLASS } from '@/components/surface';
 import { readCard, type CardFlow, type MonthFlow, type WidgetCardData } from '@/lib/reporting/card';
+import type { ChartSource } from '@/lib/reporting/chart-data';
+import { readHeadlineTrend } from '@/lib/reporting/net-worth-card';
 import {
   flowSummary,
   headlineAmount,
@@ -14,6 +16,7 @@ import {
 } from '@/lib/reporting/overview';
 import { relativeDay, spotlight } from '@/lib/reporting/recent-activity';
 import { FigureLink } from '../figure-link';
+import { NetWorthLine } from './net-worth-mark';
 
 /** A recent Transaction, as the Dashboard's activity card lists it. */
 export interface RecentActivity {
@@ -121,15 +124,22 @@ function FlowBreakdown({ summary, money }: { summary: FlowSummary; money: Money 
   );
 }
 
+interface NetWorthCardProps {
+  cards: WidgetCardData[];
+  /** Every Account's Net worth by month over the last 24 months; null when not loaded. */
+  trend: ChartSource | null;
+}
+
 /**
- * The opening number (net worth, else the first Widget's total) and, from an income-vs-expense
- * Widget, what came in, went out and was kept over its periods. With that breakdown it stands as
- * tall as Recent activity (both span the overview row's two rows from `lg` up).
+ * The opening number (net worth, else the first Widget's total), under net worth the last 24
+ * months of it, and, from an income-vs-expense Widget, what came in, went out and was kept over
+ * its periods. With that breakdown it stands as tall as Recent activity (both span the overview
+ * row's two rows from `lg` up).
  */
-export function NetWorthCard({ cards }: { cards: WidgetCardData[] }) {
+export function NetWorthCard({ cards, trend }: NetWorthCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const hero = headlineAmount(cards);
+  const hero = headlineAmount(cards, trend && readHeadlineTrend(trend, money));
   if (!hero) return null;
   const flow = overviewFlow(cards, money);
   const summary = flow ? flowSummary(flow.months) : null;
@@ -147,6 +157,16 @@ export function NetWorthCard({ cards }: { cards: WidgetCardData[] }) {
       >
         {money(hero.value)}
       </Link>
+      {hero.trend && (
+        <div aria-label="Net worth over the last 24 months" role="group" className="mt-2">
+          <NetWorthLine
+            points={hero.trend.points}
+            bands={[]}
+            markers={hero.trend.markers}
+            fit="compact"
+          />
+        </div>
+      )}
       {flow && summary && (
         <>
           <p className="mt-2 text-sm text-muted">

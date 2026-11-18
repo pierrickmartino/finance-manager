@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountKind } from '@/server/services/accounts/input';
 import type { NetWorthBand } from './net-worth-card';
-import { alongLine, bandPath, scaleOf, stackBands } from './net-worth-chart';
+import { alongLine, bandPath, labelSide, scaleOf, stackBands } from './net-worth-chart';
 import type { PeriodValue } from './period-values';
 
 const point = (value: number): PeriodValue => ({ label: '', value, href: '', isPartial: false });
@@ -93,5 +93,20 @@ describe('alongLine', () => {
 
   it('places a marker at the last point on it', () => {
     expect(alongLine(points, 2, scale)).toEqual({ x: 100, y: 0 });
+  });
+});
+
+describe('labelSide', () => {
+  it('keeps a label on the right half inside the plot, ending at its point', () => {
+    expect(labelSide(100)).toBe('end');
+    expect(labelSide(80)).toBe('end');
+  });
+
+  it('starts a label on the left half at its point', () => {
+    expect(labelSide(0)).toBe('start');
+  });
+
+  it('centres a label on a lone point', () => {
+    expect(labelSide(50)).toBe('center');
   });
 });

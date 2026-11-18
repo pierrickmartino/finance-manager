@@ -6,7 +6,9 @@ import { archiveAccount, createAccount } from '../accounts';
 import { listAccountBalances } from '../accounts/balances';
 import { recordBalanceSnapshot } from '../balance-snapshots';
 import { createBank } from '../banks';
-import { createWidget, runWidget, type WidgetQueryInput } from '.';
+import { createCategory, createCategoryGroup } from '../categories';
+import { editClassification } from '../transactions';
+import { createWidget, runNetWorthTrend, runWidget, type WidgetQueryInput } from '.';
 
 const t = setupTestDatabase();
 
@@ -307,6 +309,52 @@ describe('Net worth over time (a balances Widget with a time axis)', () => {
 
     expect(report.cells).toEqual([[50_000], [50_000]]);
     expect(report.unconvertedCount).toBe(1);
+  });
+});
+
+describe("the overview headline's Net worth trend", () => {
+  it('gives the last 24 months by month, the running one standing at today', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2025-03-20T09:00:00Z') });
+    await setUpAccounts();
+
+    const trend = await runNetWorthTrend(t.ctx);
+
+    expect(trend.rows).toHaveLength(24);
+    expect(trend.rows[0]).toMatchObject({ key: '2023-04', isPartial: false });
+    expect(trend.rows.at(-1)).toMatchObject({ key: '2025-03', isPartial: true });
+    // Before any Account opened, nothing; at the end of February, every Account, as the Widget.
+    expect(trend.rowTotals[0]).toBe(0);
+    expect(trend.rowTotals.at(-2)).toBe(120_000 + 95_000 - 250_000);
+  });
+
+  it('ends on net worth today: every Account, as the balances Widget totals them', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2025-03-20T09:00:00Z') });
+    await setUpAccounts();
+    const today = await runNetWorth({
+      dateRange: { kind: 'last', count: 12, unit: 'month' },
+      rows: 'account',
+      columns: null,
+    });
+
+    const trend = await runNetWorthTrend(t.ctx);
+
+    expect(trend.rowTotals.at(-1)).toBe(today.total);
+    expect(trend.total).toBe(today.total);
+  });
+
+  it('carries the capital movements of its range', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2025-03-20T09:00:00Z') });
+    const { francs } = await setUpAccounts();
+    const group = await createCategoryGroup(t.ctx, { name: 'Property', type: 'capital' });
+    const flat = await createCategory(t.ctx, { groupId: group.id, name: 'Flat' });
+    const [deposit] = await seedTransactions(t.ctx.db, francs, [
+      { bookingDate: '2025-02-20', amountMinor: -10_000 },
+    ]);
+    await editClassification(t.ctx, deposit!, { categoryId: flat.id });
+
+    const trend = await runNetWorthTrend(t.ctx);
+
+    expect(trend.markers).toMatchObject([{ transactionId: deposit!, date: '2025-02-20' }]);
   });
 });
 

@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Formatter } from '@/lib/format';
 import { rowsHeight } from '@/lib/reporting/board';
 import { cardFrame } from '@/lib/reporting/card';
+import type { ChartSource } from '@/lib/reporting/chart-data';
 import { checkCompleteness } from '@/server/services/completeness';
 import type { ServiceContext } from '@/server/services/context';
 import type { Widget } from '@/server/services/reporting';
@@ -73,11 +74,23 @@ export function StreamedBoard({ cards }: { cards: StreamedWidget[] }) {
   );
 }
 
-async function StreamedNetWorthAndInsight({ cards }: { cards: Promise<BoardCard>[] }) {
-  const loaded = await loadedCards(cards);
+/** The headline's Net worth trend; if it failed, the headline stands without it. */
+async function loadedTrend(trend: Promise<ChartSource | null>): Promise<ChartSource | null> {
+  const [result] = await Promise.allSettled([trend]);
+  return result.status === 'fulfilled' ? result.value : null;
+}
+
+async function StreamedNetWorthAndInsight({
+  cards,
+  trend,
+}: {
+  cards: Promise<BoardCard>[];
+  trend: Promise<ChartSource | null>;
+}) {
+  const [loaded, loadedTrendData] = await Promise.all([loadedCards(cards), loadedTrend(trend)]);
   return (
     <>
-      <NetWorthCard cards={loaded} />
+      <NetWorthCard cards={loaded} trend={loadedTrendData} />
       <InsightCard cards={loaded} />
     </>
   );
@@ -88,14 +101,17 @@ async function StreamedRecent({ recent }: { recent: Promise<RecentActivity[]> })
 }
 
 /**
- * The overview row's cards. The net worth and insight cards are worked out from every card,
- * so they wait for all of them; recent activity has a query of its own and arrives on its own.
+ * The overview row's cards. The net worth and insight cards are worked out from every card
+ * (and the headline's Net worth trend), so they wait for all of them; recent activity has a
+ * query of its own and arrives on its own.
  */
 export function StreamedOverview({
   cards,
+  trend,
   recent,
 }: {
   cards: Promise<BoardCard>[];
+  trend: Promise<ChartSource | null>;
   recent: Promise<RecentActivity[]>;
 }) {
   return (
@@ -108,7 +124,7 @@ export function StreamedOverview({
           </>
         }
       >
-        <StreamedNetWorthAndInsight cards={cards} />
+        <StreamedNetWorthAndInsight cards={cards} trend={trend} />
       </Suspense>
       <Suspense fallback={<TilePlaceholder label="Recent activity" className="lg:row-span-2" />}>
         <StreamedRecent recent={recent} />

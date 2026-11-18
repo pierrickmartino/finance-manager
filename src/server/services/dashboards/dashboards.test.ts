@@ -132,7 +132,7 @@ describe('Widgets on a Dashboard', () => {
     );
   });
 
-  it('adds Net worth over time (balances with a time axis) at the size of a chart card', async () => {
+  it('adds Net worth over time (balances with a time axis) tall enough for its facts', async () => {
     const dashboard = await createDashboard(t.ctx, { name: 'Home' });
 
     const netWorth = await addWidget(t.ctx, dashboard.id, {
@@ -144,7 +144,7 @@ describe('Widgets on a Dashboard', () => {
     expect(netWorth).toMatchObject({
       source: 'account_balances',
       query: { rows: 'month' },
-      layout: { x: 0, y: 0, w: 8, h: 6 },
+      layout: { x: 0, y: 0, w: 8, h: 9 },
     });
   });
 
