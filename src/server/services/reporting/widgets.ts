@@ -7,14 +7,14 @@ import {
   type Cell,
   type Size,
 } from '@/lib/reporting/board';
-import { cardFrame, type CardSource } from '@/lib/reporting/card';
+import { cardFrame, timeAxisOf, type CardSource } from '@/lib/reporting/card';
 import type { Queryable } from '@/server/db/client';
 import { mutate, type MutationScope, type ServiceContext } from '../context';
 import { NotFoundError, parseInput, ServiceError } from '../errors';
 import type { HistorySnapshot, JsonValue } from '../history';
 import { runAccountBalances } from './balances';
 import { runWidgetQuery, type ReportTable } from './engine';
-import { widgetQueryInput, type WidgetQuery } from './query';
+import { widgetQueryInput, type WidgetQuery, type WidgetQueryInput } from './query';
 
 /** The five ways to show a Widget (spec 104). The table is also the full-screen pivot. */
 export const VISUALISATIONS = ['table', 'line', 'stacked_bar', 'donut', 'number'] as const;
@@ -29,8 +29,9 @@ export const VISUALISATION_LABELS: Record<Visualisation, string> = {
 };
 
 /**
- * What a Widget shows: its Widget query, or the Account balances in CHF today (a stock, not a
- * flow, so not an engine query; its stored query is ignored).
+ * What a Widget shows: its Widget query, or the Account balances in CHF (a stock, not a flow,
+ * so not an engine query): today, or with a month, quarter or year row axis Net worth over its
+ * date range. Of a balances Widget's stored query only that axis and the date range are read.
  */
 export const WIDGET_SOURCES = ['query', 'account_balances'] as const;
 export type WidgetSource = (typeof WIDGET_SOURCES)[number];
@@ -121,7 +122,7 @@ export function widgetSnapshot(widget: Widget): HistorySnapshot {
     name: widget.name,
     dashboardId: widget.dashboardId,
     source: widget.source === 'query' ? undefined : widget.source,
-    query: widget.source === 'query' ? (widget.query as unknown as JsonValue) : undefined,
+    query: widget.query as unknown as JsonValue,
     visualisation: widget.visualisation,
   };
 }
@@ -162,10 +163,19 @@ export async function removeWidget(scope: MutationScope, id: string): Promise<vo
   await scope.history.record('widget', id, widgetSnapshot(before), null);
 }
 
-/** Saves a standalone Widget (not on a Dashboard). */
-export async function createWidget(ctx: ServiceContext, input: WidgetInput): Promise<Widget> {
+/** What a Widget shows, as callers name it: its query by default. */
+export const widgetSourceInput = z
+  .enum(WIDGET_SOURCES, { error: 'Unknown Widget source' })
+  .default('query');
+
+/** Saves a standalone Widget (not on a Dashboard), of its query by default. */
+export async function createWidget(
+  ctx: ServiceContext,
+  input: WidgetInput & { source?: WidgetSource },
+): Promise<Widget> {
   const values = parseInput(widgetInput, input);
-  return mutate(ctx, (scope) => insertWidget(scope, values));
+  const source = parseInput(widgetSourceInput, input.source);
+  return mutate(ctx, (scope) => insertWidget(scope, { ...values, source }));
 }
 
 /**
@@ -259,13 +269,16 @@ export async function listWidgets(ctx: ServiceContext): Promise<Widget[]> {
   return result.rows.map(readWidget);
 }
 
-/** Runs a Widget: its query, or the Account balances in CHF today. */
+/**
+ * Runs a Widget: its query, or the Account balances in CHF (today, or with a time axis Net
+ * worth over time). The query is validated, so the editor can run one it has not saved.
+ */
 export async function runSavedWidget(
   ctx: ServiceContext,
-  widget: Pick<Widget, 'source' | 'query'>,
+  widget: { source: WidgetSource; query: WidgetQueryInput },
 ): Promise<ReportTable> {
   return widget.source === 'account_balances'
-    ? runAccountBalances(ctx, widget.query)
+    ? runAccountBalances(ctx, parseInput(widgetQueryInput, widget.query))
     : runWidgetQuery(ctx, widget.query);
 }
 
@@ -279,14 +292,13 @@ export async function cardSourceOf(
   widget: Pick<Widget, 'source' | 'query' | 'visualisation'>,
 ): Promise<CardSource> {
   const { source, visualisation } = widget;
-  if (source !== 'query' || visualisation !== 'stacked_bar') {
-    return { source, visualisation, data: null };
-  }
+  const framed = { source, visualisation, timeAxis: timeAxisOf(widget.query) };
+  if (source !== 'query' || visualisation !== 'stacked_bar') return { ...framed, data: null };
   try {
     const report = await runSavedWidget(ctx, widget);
-    return { source, visualisation, data: { columns: report.columns } };
+    return { ...framed, data: { columns: report.columns } };
   } catch (error: unknown) {
-    if (error instanceof ServiceError) return { source, visualisation, data: null };
+    if (error instanceof ServiceError) return { ...framed, data: null };
     throw error;
   }
 }

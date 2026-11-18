@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { TimeAxis } from '@/server/services/reporting/query';
 import type {
   ReportAxis,
   ReportHeader,
@@ -79,6 +80,7 @@ function widget(overrides: Partial<CardWidget> & Pick<CardWidget, 'data'>): Card
     name: 'Widget',
     source: 'query',
     visualisation: 'line',
+    timeAxis: null,
     ...overrides,
   };
 }
@@ -139,9 +141,15 @@ const spending = widget({
 });
 
 /** Just what a card's frame is read from: its Widget and, once known, its series. */
-const framed = (source: WidgetSource, visualisation: Visualisation, seriesCount = 1) => ({
+const framed = (
+  source: WidgetSource,
+  visualisation: Visualisation,
+  seriesCount = 1,
+  timeAxis: TimeAxis | null = null,
+) => ({
   source,
   visualisation,
+  timeAxis,
   data: { columns: Array.from({ length: seriesCount }, (_, i) => header(`C${i}`)) },
 });
 
@@ -149,6 +157,9 @@ describe('cardFrame', () => {
   it.each([
     ['a number Widget', framed('query', 'number', 3), 'number'],
     ['Account balances', framed('account_balances', 'table'), 'share'],
+    ['Account balances by month', framed('account_balances', 'table', 1, 'month'), 'netWorthTrend'],
+    ['Account balances by year', framed('account_balances', 'number', 1, 'year'), 'netWorthTrend'],
+    ['a line by month', framed('query', 'line', 2, 'month'), 'trend'],
     ['a donut', framed('query', 'donut', 3), 'ring'],
     ['a table', framed('query', 'table', 6), 'grid'],
     ['a line', framed('query', 'line', 2), 'trend'],
@@ -188,7 +199,7 @@ describe('cardFrame', () => {
 
   it('hints at the mark the card will draw before its query has run', () => {
     const before = (source: WidgetSource, visualisation: Visualisation) =>
-      cardFrame({ source, visualisation, data: null }).placeholder;
+      cardFrame({ source, visualisation, timeAxis: null, data: null }).placeholder;
 
     expect(before('query', 'number')).toBe('number');
     expect(before('account_balances', 'table')).toBe('ticks');
@@ -584,6 +595,127 @@ describe('readCard: a number, no data and no rows', () => {
     const reading = read(widget({ data: source([], ['Net'], []) }));
 
     expect(reading).toMatchObject({ lead: null, facts: [], mark: { type: 'empty' } });
+  });
+});
+
+/**
+ * Net worth over time as the loader passes it: one row per period (key and label), one column,
+ * the total the latest point's, every point linking to the Accounts as of its last day.
+ */
+function netWorth(
+  points: [key: string, label: string, value: number][],
+  { lastIsPartial = false } = {},
+): CardWidget {
+  const values = points.map(([, , value]) => value);
+  const latest = values.at(-1) ?? null;
+  return widget({
+    id: 'net-worth',
+    name: 'Net worth',
+    source: 'account_balances',
+    visualisation: 'line',
+    timeAxis: 'month',
+    data: {
+      measure: 'sum',
+      rows: points.map(([key, label], r) => ({
+        key,
+        label,
+        isPartial: lastIsPartial && r === points.length - 1,
+      })),
+      columns: [{ key: null, label: 'Net worth in CHF', isPartial: false }],
+      cells: values.map((value) => [value]),
+      rowTotals: values,
+      columnTotals: [latest],
+      total: latest,
+      hrefs: {
+        cells: points.map(([key]) => [`accounts:${key}`]),
+        rowTotals: points.map(([key]) => `accounts:${key}`),
+        columnTotals: ['accounts:latest'],
+        total: 'accounts:latest',
+      },
+      drill: null,
+    },
+  });
+}
+
+describe('readCard: Net worth over time', () => {
+  const rising = netWorth([
+    ['2025-01', 'Jan 2025', 1000_00],
+    ['2025-02', 'Feb 2025', 1200_00],
+    ['2025-03', 'Mar 2025', 1500_00],
+  ]);
+
+  it('says what Net worth was at the end of the latest period and how far it rose', () => {
+    const reading = read(rising);
+
+    expect(reading.kind).toBe('netWorthTrend');
+    expect(reading.lead).toEqual({
+      headline:
+        'Net worth was CHF 1500 at the end of Mar 2025, up CHF 500 over Jan 2025 – Mar 2025.',
+      detail: 'CHF 1500',
+      href: 'accounts:2025-03',
+    });
+    expect(reading.facts).toEqual([
+      { label: 'Change over Jan 2025 – Mar 2025', value: '+CHF 500', href: 'accounts:2025-03' },
+    ]);
+  });
+
+  it('draws the line, each point opening the Accounts as of its period', () => {
+    expect(read(rising).mark).toEqual({
+      type: 'netWorthLine',
+      points: [
+        { label: 'Jan 2025', value: 1000_00, href: 'accounts:2025-01', isPartial: false },
+        { label: 'Feb 2025', value: 1200_00, href: 'accounts:2025-02', isPartial: false },
+        { label: 'Mar 2025', value: 1500_00, href: 'accounts:2025-03', isPartial: false },
+      ],
+    });
+  });
+
+  it('says how far it fell', () => {
+    const reading = read(
+      netWorth([
+        ['2025', '2025', 5000_00],
+        ['2026', '2026', 4200_00],
+      ]),
+    );
+
+    expect(reading.lead?.headline).toBe(
+      'Net worth was CHF 4200 at the end of 2026, down CHF 800 over 2025 – 2026.',
+    );
+    expect(reading.facts[0]).toMatchObject({ value: 'CHF -800' });
+  });
+
+  it('says when it is unchanged', () => {
+    const reading = read(
+      netWorth([
+        ['2025-Q1', 'Q1 2025', 300_00],
+        ['2025-Q2', 'Q2 2025', 300_00],
+      ]),
+    );
+
+    expect(reading.lead?.headline).toBe(
+      'Net worth was CHF 300 at the end of Q2 2025, unchanged over Q1 2025 – Q2 2025.',
+    );
+    expect(reading.facts[0]).toMatchObject({ value: 'CHF 0' });
+  });
+
+  it('speaks of the current period so far, not its end', () => {
+    const reading = read(
+      netWorth(
+        [
+          ['2025-02', 'Feb 2025', 1000_00],
+          ['2025-03', 'Mar 2025', 900_00],
+        ],
+        { lastIsPartial: true },
+      ),
+    );
+
+    expect(reading.lead?.headline).toBe(
+      'Net worth is CHF 900 so far in Mar 2025, down CHF 100 over Feb 2025 – Mar 2025.',
+    );
+  });
+
+  it('says there is no data yet when the range has no period', () => {
+    expect(read(netWorth([])).mark).toEqual({ type: 'empty' });
   });
 });
 

@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Formatter } from '@/lib/format';
 import { rowsHeight } from '@/lib/reporting/board';
-import { cardFrame } from '@/lib/reporting/card';
+import { cardFrame, timeAxisOf } from '@/lib/reporting/card';
 import { checkCompleteness } from '@/server/services/completeness';
 import type { ServiceContext } from '@/server/services/context';
 import type { Widget } from '@/server/services/reporting';
@@ -52,7 +52,11 @@ export function StreamedBoard({ cards }: { cards: StreamedWidget[] }) {
     <BoardGrid>
       {cards.map(({ widget, card }) => {
         // Before the query has run there is no data: the card is framed from the Widget alone.
-        const frame = cardFrame({ ...widget, data: null });
+        const frame = cardFrame({
+          ...widget,
+          timeAxis: timeAxisOf(widget.query),
+          data: null,
+        });
         const shape = frame.placeholder;
         const height = rowsHeight(widget.layout?.h ?? frame.sizes.initial.h);
         return (

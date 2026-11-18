@@ -29,6 +29,7 @@ const widget = (overrides: Partial<CardWidget> & Pick<CardWidget, 'data'>): Card
   name: 'Widget',
   source: 'query',
   visualisation: 'stacked_bar',
+  timeAxis: null,
   ...overrides,
 });
 
@@ -55,6 +56,22 @@ describe('headlineAmount', () => {
       value: 10000_00,
       href: 'total',
     });
+  });
+
+  it('never reads Net worth over time as net worth today', () => {
+    const overTime = widget({
+      name: 'Net worth',
+      source: 'account_balances',
+      visualisation: 'line',
+      timeAxis: 'month',
+      data: totalled(['2025-01', '2025-02'], [9000_00, 9500_00]),
+    });
+
+    expect(headlineAmount([overTime, balances])).toMatchObject({
+      label: 'Your net worth today',
+      value: 10000_00,
+    });
+    expect(headlineAmount([overTime])?.label).toBe('Net worth');
   });
 
   it('falls back to the first Widget with a total', () => {

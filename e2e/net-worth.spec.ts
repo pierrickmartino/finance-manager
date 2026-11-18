@@ -1,0 +1,82 @@
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { createAccount } from '../src/server/services/accounts';
+import { createBank } from '../src/server/services/banks';
+import {
+  addWidget,
+  createDashboard as createDashboardRecord,
+} from '../src/server/services/dashboards';
+import { withServices } from './support/services';
+
+/**
+ * A Widget's card on the board. Not `widgetCard`: on a Dashboard without Account balances the
+ * overview's headline is labelled with this Widget's name too.
+ */
+function boardCard(page: Page, name: string): Locator {
+  return page.locator('section[aria-labelledby^="card-"]', {
+    has: page.getByRole('heading', { name, exact: true }),
+  });
+}
+
+// The e2e database is shared by every spec, so totals include other specs' Accounts: these
+// tests check the wording, the dates and the links, not the amounts.
+
+test('a Net worth Widget tells its change, and a point opens the Accounts as of that date', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Net worth bank ${suffix}` });
+    await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'savings',
+      importFormat: null,
+      name: `Net worth savings ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 1000_00,
+      openingDate: '2025-02-10',
+    });
+    const dashboard = await createDashboardRecord(ctx, { name: `Net worth ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Wealth over time',
+      source: 'account_balances',
+      visualisation: 'line',
+      query: {
+        dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' },
+        rows: 'month',
+      },
+    });
+    return dashboard.id;
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const card = boardCard(page, 'Wealth over time');
+  await expect(card).toContainText(
+    /Net worth was CHF [^,]+ at the end of Mar 2025, (up CHF [^ ]+|down CHF [^ ]+|unchanged) over Jan 2025 – Mar 2025\./,
+  );
+  await expect(card.getByRole('link', { name: /^(Jan|Feb|Mar) 2025: CHF/ })).toHaveCount(3);
+
+  await card.getByText('Change over Jan 2025 – Mar 2025').locator('..').getByRole('link').click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-03-31$/);
+
+  await page.goBack();
+  await boardCard(page, 'Wealth over time')
+    .getByRole('link', { name: /^Feb 2025: CHF/ })
+    .click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-02-28$/);
+  await expect(page.getByLabel('Balances on')).toHaveValue('2025-02-28');
+});
+
+test('a new balances Widget in the editor is Net worth by month over the last 24 months', async ({
+  page,
+}) => {
+  await page.goto('/widgets/new');
+  await page
+    .getByRole('navigation', { name: 'Widget source' })
+    .getByText('Account balances')
+    .click();
+
+  await expect(page).toHaveURL(/source=account_balances/);
+  await expect(page.getByRole('combobox', { name: 'Time axis' })).toHaveValue('month');
+  await expect(page.getByRole('spinbutton', { name: 'Number of periods' })).toHaveValue('24');
+  await expect(page.getByText('as Net worth').first()).toBeVisible();
+});

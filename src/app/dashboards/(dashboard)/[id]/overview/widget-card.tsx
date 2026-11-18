@@ -7,7 +7,7 @@ import { useFormatter } from '@/components/formatter-provider';
 import { TILE_CLASS } from '@/components/surface';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
-import { DotMatrix, HeatmapGrid, MonthBars, TickList } from './marks';
+import { DotMatrix, HeatmapGrid, MonthBars, NetWorthLine, TickList } from './marks';
 import { DonutRing } from './ring';
 
 type Money = (minor: number) => string;
@@ -37,6 +37,8 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
       return <DotMatrix months={mark.months} />;
     case 'bars':
       return <MonthBars periods={mark.periods} />;
+    case 'netWorthLine':
+      return <NetWorthLine points={mark.points} />;
   }
 }
 

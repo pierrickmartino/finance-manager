@@ -17,6 +17,7 @@ export {
   type CellTransactionPage,
 } from './drill';
 export type { ReportHeader } from './headers';
+export { netWorthPointDate } from './balances';
 export {
   createWidget,
   deleteWidget,

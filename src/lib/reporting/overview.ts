@@ -13,12 +13,15 @@ export interface HeadlineAmount {
 }
 
 /**
- * The opening number: net worth from the Account balances when the Dashboard has them, else
- * the first Widget total.
+ * The opening number: net worth today from the Account balances when the Dashboard has them
+ * (not Net worth over time, whose total is its latest period's), else the first Widget total.
  */
 export function headlineAmount(widgets: CardWidget[]): HeadlineAmount | null {
   const balances = widgets.find(
-    (widget) => widget.source === 'account_balances' && widget.data?.total != null,
+    (widget) =>
+      widget.source === 'account_balances' &&
+      widget.timeAxis === null &&
+      widget.data?.total != null,
   );
   const lead = balances ?? widgets.find((widget) => widget.data?.total != null);
   if (!lead?.data || lead.data.total == null) return null;

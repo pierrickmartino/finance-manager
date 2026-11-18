@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  balancesQueryFromParams,
   cellFromParams,
   cellToParams,
   DEFAULT_WIDGET_QUERY,
@@ -66,6 +67,37 @@ describe('Widget query URL parameters', () => {
       kind: 'yearToDate',
       includeCurrent: false,
     });
+  });
+
+  it('starts a new balances Widget as Net worth over the last 24 months, by month', () => {
+    expect(balancesQueryFromParams({})).toEqual({
+      filters: {},
+      dateRange: { kind: 'last', count: 24, unit: 'month', includeCurrent: false },
+      rows: 'month',
+      columns: null,
+      measure: 'sum',
+      averagePer: 'month',
+      includeCapital: false,
+    });
+  });
+
+  it('reads a balances query: a time axis and a date range, or no axis as today', () => {
+    expect(
+      balancesQueryFromParams({ range: 'yearToDate', rows: 'quarter', columns: 'category' }),
+    ).toMatchObject({
+      dateRange: { kind: 'yearToDate', includeCurrent: false },
+      rows: 'quarter',
+      columns: null,
+    });
+    // An existing balances Widget (rows by Account), or "None" in the editor.
+    for (const rows of ['account', '']) {
+      expect(
+        balancesQueryFromParams({ range: 'last', count: '12', unit: 'month', rows }),
+      ).toMatchObject({
+        rows: 'account',
+        columns: null,
+      });
+    }
   });
 
   it('encodes a drill-down cell: absent means the whole axis, none the none bucket', () => {

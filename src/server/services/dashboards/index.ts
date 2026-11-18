@@ -11,6 +11,7 @@ import {
   insertWidget,
   removeWidget,
   widgetInput,
+  widgetSourceInput,
   writeLayouts,
   type Widget,
   type WidgetInput,
@@ -184,7 +185,7 @@ export async function addWidget(
   input: WidgetInput & { source?: Widget['source']; layout?: WidgetLayout },
 ): Promise<Widget> {
   const values = parseInput(widgetInput, input);
-  const source = parseInput(z.enum(['query', 'account_balances']).default('query'), input.source);
+  const source = parseInput(widgetSourceInput, input.source);
   const given = input.layout ? parseInput(widgetLayoutInput, input.layout) : null;
   const size = given ?? cardFrame(await cardSourceOf(ctx, { ...values, source })).sizes.initial;
   return mutate(ctx, async (scope) => {

@@ -106,7 +106,8 @@ function DataSection({ query }: { query: WidgetQueryInput }) {
   );
 }
 
-function PeriodSection({
+/** The date range: last N periods, year to date or fixed dates. */
+export function PeriodSection({
   query,
   shownRange,
 }: {

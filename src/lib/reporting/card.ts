@@ -1,4 +1,4 @@
-import type { TimeAxis } from '@/server/services/reporting/query';
+import { isTimeAxis, type ReportAxis, type TimeAxis } from '@/server/services/reporting/query';
 import type { ReportHeader, Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
 import type { Size } from './board';
@@ -17,6 +17,8 @@ export interface CardWidget {
   name: string;
   source: WidgetSource;
   visualisation: Visualisation;
+  /** The Widget query's row axis when it is a time axis (`timeAxisOf`), else null. */
+  timeAxis: TimeAxis | null;
   data: ChartSource | null;
 }
 
@@ -31,12 +33,13 @@ export interface WidgetCardData extends CardWidget {
  * What a card's frame is read from. Of its data only the series (columns) count, so the server
  * and a placeholder can tell a card's kind without the whole chart.
  */
-export type CardSource = Pick<CardWidget, 'source' | 'visualisation'> & {
+export type CardSource = Pick<CardWidget, 'source' | 'visualisation' | 'timeAxis'> & {
   data: Pick<ChartSource, 'columns'> | null;
 };
 
 /** How a card shows its Widget. */
-export type CardKind = 'trend' | 'bars' | 'ranking' | 'share' | 'grid' | 'ring' | 'number';
+export type CardKind =
+  'trend' | 'bars' | 'ranking' | 'share' | 'grid' | 'ring' | 'number' | 'netWorthTrend';
 
 /** The quiet mark a placeholder draws: a figure, tick rows, a ring, a grid of cells or bars. */
 export type PlaceholderShape = 'number' | 'ticks' | 'ring' | 'grid' | 'bars';
@@ -79,9 +82,17 @@ const KINDS: Record<CardKind, { sizes: CardSizes; placeholder: PlaceholderShape 
   grid: { sizes: SIZES.grid, placeholder: 'grid' },
   trend: { sizes: SIZES.chart, placeholder: 'bars' },
   bars: { sizes: SIZES.chart, placeholder: 'bars' },
+  netWorthTrend: { sizes: SIZES.chart, placeholder: 'bars' },
 };
 
+/** A Widget query's row axis when it is a time axis: what makes balances Net worth over time. */
+export function timeAxisOf(query: { rows: ReportAxis | null }): TimeAxis | null {
+  return isTimeAxis(query.rows) ? query.rows : null;
+}
+
 function kindOf(widget: CardSource): CardKind {
+  // Net worth over time is its own card, whatever the visualisation.
+  if (widget.source === 'account_balances' && widget.timeAxis) return 'netWorthTrend';
   if (widget.visualisation === 'number') return 'number';
   if (widget.source === 'account_balances') return 'share';
   if (widget.visualisation === 'table') return 'grid';
@@ -164,7 +175,8 @@ export type CardMark =
   | { type: 'ring'; data: ChartSource }
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
-  | { type: 'bars'; periods: PeriodValue[] };
+  | { type: 'bars'; periods: PeriodValue[] }
+  | { type: 'netWorthLine'; points: PeriodValue[] };
 
 /**
  * A card's figure. Each links to its Drill-down (GLOSSARY), whose working gives the same
@@ -454,6 +466,36 @@ function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardS
   return { lead: { headline: peak.label, detail: peak.value, href: peak.href }, facts };
 }
 
+/**
+ * Net worth over time: where it stood at the latest point and how far it moved since the first,
+ * every figure opening the Accounts as of its date.
+ */
+function netWorthSentences(points: PeriodValue[], money: Money): CardSentences {
+  const first = points[0]!;
+  const latest = points.at(-1)!;
+  const change = latest.value - first.value;
+  const range = first === latest ? latest.label : `${first.label} – ${latest.label}`;
+  const movement =
+    change === 0 ? 'unchanged' : `${change > 0 ? 'up' : 'down'} ${money(Math.abs(change))}`;
+  const standing = latest.isPartial
+    ? `Net worth is ${money(latest.value)} so far in ${latest.label}`
+    : `Net worth was ${money(latest.value)} at the end of ${latest.label}`;
+  return {
+    lead: {
+      headline: `${standing}, ${movement} over ${range}.`,
+      detail: money(latest.value),
+      href: latest.href,
+    },
+    facts: [
+      {
+        label: `Change over ${range}`,
+        value: `${change > 0 ? '+' : ''}${money(change)}`,
+        href: latest.href,
+      },
+    ],
+  };
+}
+
 /** What a card with rows says and draws; a flow is told as one whether bars or a line. */
 function readRows(
   kind: CardKind,
@@ -480,6 +522,13 @@ function readRows(
         ...periodSentences(kind, data, money),
         mark: { type: 'ticks', items: rankingItems(data, money) },
       };
+    case 'netWorthTrend': {
+      const points = periodValues(data);
+      return {
+        ...netWorthSentences(points, money),
+        mark: { type: 'netWorthLine', points },
+      };
+    }
     case 'trend':
     case 'bars':
       return slots

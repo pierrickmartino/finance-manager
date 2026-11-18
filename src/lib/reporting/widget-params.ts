@@ -1,8 +1,9 @@
 import { isExcept, type AxisSelector, type CellRef } from '@/server/services/reporting/cell-ref';
-import type {
-  ReportFilters,
-  WidgetQuery,
-  WidgetQueryInput,
+import {
+  isTimeAxis,
+  type ReportFilters,
+  type WidgetQuery,
+  type WidgetQueryInput,
 } from '@/server/services/reporting/query';
 
 /**
@@ -80,6 +81,30 @@ export function queryFromParams(params: UrlParams): WidgetQueryInput {
     measure: (first(params.measure) || 'sum') as WidgetQuery['measure'],
     averagePer: (first(params.per) || 'month') as WidgetQuery['averagePer'],
     includeCapital: first(params.capital) === '1',
+  };
+}
+
+/** What a new balances Widget starts from: Net worth month by month, last 24 months. */
+export const DEFAULT_NET_WORTH_QUERY: WidgetQuery = {
+  ...DEFAULT_WIDGET_QUERY,
+  dateRange: { kind: 'last', count: 24, unit: 'month', includeCurrent: false },
+  rows: 'month',
+  columns: null,
+};
+
+/**
+ * Reads a balances Widget's query from URL parameters: its time axis (`rows`) and date range.
+ * Any other `rows` is no axis, stored by Account as today; there are no columns. With no
+ * `range`, Net worth over the last 24 months.
+ */
+export function balancesQueryFromParams(params: UrlParams): WidgetQueryInput {
+  if (!first(params.range)) return DEFAULT_NET_WORTH_QUERY;
+  const query = queryFromParams(params);
+  return {
+    ...query,
+    rows: isTimeAxis(query.rows) ? query.rows : 'account',
+    columns: null,
+    measure: 'sum',
   };
 }
 
