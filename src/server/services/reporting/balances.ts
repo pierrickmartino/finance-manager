@@ -1,4 +1,5 @@
 import { listAccounts, type Account } from '../accounts';
+import { ACCOUNT_KIND_LABELS, ACCOUNT_KINDS, type AccountKind } from '../accounts/input';
 import {
   listAccountBalances,
   nativeBalancesAt,
@@ -17,13 +18,6 @@ import { isTimeAxis, type TimeAxis, type WidgetQuery } from './query';
 export const BALANCE_COLUMN: ReportHeader = {
   key: null,
   label: 'Balance in CHF',
-  isPartial: false,
-};
-
-/** The single column of Net worth over time. */
-export const NET_WORTH_COLUMN: ReportHeader = {
-  key: null,
-  label: 'Net worth in CHF',
   isPartial: false,
 };
 
@@ -82,10 +76,21 @@ function isOpenOn(account: Account, date: string): boolean {
   return account.openingDate === null || account.openingDate <= date;
 }
 
+/** One column per Account kind held, in the kinds' order (key = the kind). */
+function kindColumns(accounts: readonly Account[]): ReportHeader[] {
+  const held = new Set(accounts.map((account) => account.kind));
+  return ACCOUNT_KINDS.filter((kind) => held.has(kind)).map((kind) => ({
+    key: kind,
+    label: ACCOUNT_KIND_LABELS[kind],
+    isPartial: false,
+  }));
+}
+
 /**
  * Net worth over time (ADR-0014): per period, every Account's balance at the end of the
  * period's last day, as the Accounts page computes it, converted at that day's FX rate
- * (ADR-0002) and summed. The total is the latest point's: Net worth is a stock.
+ * (ADR-0002). Each period has one value per Account kind (loans below zero), and its row
+ * total is its Net worth. The range's values are its latest point's: Net worth is a stock.
  */
 async function runNetWorth(
   ctx: ServiceContext,
@@ -104,26 +109,28 @@ async function runNetWorth(
     nativeBalancesAt(ctx.db, asked),
     dates.length === 0 ? null : loadRateTable(ctx, { from: dates[0]!, to: dates.at(-1)! }),
   ]);
-  const values = new Map(dates.map((date) => [date, 0]));
+  const columns = kindColumns(asked.map(({ account }) => account));
+  const kinds = columns.map((column) => column.key as AccountKind);
+  const cells = dates.map(() => kinds.map(() => 0));
   const unconverted = new Set<string>();
   asked.forEach(({ account, date }, index) => {
     const balanceMinor = balances[index]!;
     if (balanceMinor === 0) return;
     const chf = rates?.toChf(balanceMinor, account.currency, date);
     if (!chf) unconverted.add(account.id);
-    else values.set(date, values.get(date)! + chf.amountMinor);
+    else cells[dates.indexOf(date)]![kinds.indexOf(account.kind)]! += chf.amountMinor;
   });
-  const points = dates.map((date) => values.get(date)!);
+  const points = cells.map((row) => row.reduce((sum, value) => sum + value, 0));
   const latest = points.at(-1) ?? null;
   return {
     query: { ...query, rows: axis, columns: null, measure: 'sum' },
     range,
     partialPeriod,
     rows,
-    columns: [NET_WORTH_COLUMN],
-    cells: points.map((value) => [value]),
+    columns,
+    cells,
     rowTotals: points,
-    columnTotals: [latest],
+    columnTotals: cells.at(-1) ?? kinds.map(() => null),
     total: latest,
     unconvertedCount: unconverted.size,
   };

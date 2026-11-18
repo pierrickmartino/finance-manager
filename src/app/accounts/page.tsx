@@ -6,6 +6,11 @@ import type { Formatter } from '@/lib/format';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { listAccountBalances, type AccountBalance } from '@/server/services/accounts/balances';
+import {
+  ACCOUNT_KIND_LABELS,
+  ACCOUNT_KINDS,
+  type AccountKind,
+} from '@/server/services/accounts/input';
 import { listSnapshotMismatches } from '@/server/services/balance-snapshots';
 import { listBanks } from '@/server/services/banks';
 import type { ServiceContext } from '@/server/services/context';
@@ -16,7 +21,15 @@ import { AccountList } from './account-list';
 import { NewAccountPanel } from './new-account-panel';
 import { RateStatusNotice } from './rate-status';
 import { SnapshotMismatches } from './snapshot-mismatches';
-import { accountsHref, balanceDates, NEW_ACCOUNT, selectAccount, totalChfMinor } from './view';
+import {
+  accountKindOf,
+  accountsHref,
+  balanceDates,
+  filterByKind,
+  NEW_ACCOUNT,
+  selectAccount,
+  totalChfMinor,
+} from './view';
 
 export const metadata: Metadata = { title: 'Accounts · Finance Manager' };
 
@@ -59,20 +72,22 @@ async function loadEarlier(
 /**
  * Accounts (story 95, spec 43) as master / detail: the Accounts grouped by Bank on the left,
  * the selected one (`?account=`, else the first; `new` for the New Account form) on the right.
- * Balances are on `?date=`, today by default.
+ * Balances are on `?date=`, today by default; `?kind=` narrows the list to one Account kind.
  */
 export default async function AccountsPage({ searchParams }: AccountsPageProps) {
   const ctx = await getServiceContext();
   const params = await searchParams;
   const requestedDate = param(params.date) ?? '';
-  const [{ balances, error }, rateStatus, banks, mismatches, fmt] = await Promise.all([
+  const kind = accountKindOf(param(params.kind));
+  const [{ balances: allBalances, error }, rateStatus, banks, mismatches, fmt] = await Promise.all([
     loadBalances(ctx, requestedDate),
     getRateStatus(ctx),
     listBanks(ctx),
     listSnapshotMismatches(ctx),
     getFormatter(),
   ]);
-  const shownDate = balances[0]?.date ?? requestedDate;
+  const shownDate = allBalances[0]?.date ?? requestedDate;
+  const balances = filterByKind(allBalances, kind);
   const selection = selectAccount(balances, param(params.account));
   const selected = selection.type === 'new' ? NEW_ACCOUNT : selection.row.account.id;
   const earlier = selection.type === 'account' ? await loadEarlier(ctx, selected, shownDate) : [];
@@ -88,6 +103,7 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
           shownDate={shownDate}
           requestedDate={requestedDate}
           selected={selection.type === 'account' ? selected : undefined}
+          kind={kind}
           error={error}
         />
       </header>
@@ -96,7 +112,7 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
 
       <SnapshotMismatches
         mismatches={mismatches}
-        accounts={balances.map((balance) => balance.account)}
+        accounts={allBalances.map((balance) => balance.account)}
         fmt={fmt}
         showAccountNames
       />
@@ -107,11 +123,14 @@ export default async function AccountsPage({ searchParams }: AccountsPageProps) 
             balances={balances}
             selected={selected}
             date={requestedDate}
+            kind={kind ?? undefined}
             mismatchedAccounts={new Set(mismatches.map((check) => check.accountId))}
             fmt={fmt}
           />
         ) : (
-          <p className="text-sm text-muted">No Accounts yet.</p>
+          <p className="text-sm text-muted">
+            {kind ? `No ${ACCOUNT_KIND_LABELS[kind]} Accounts.` : 'No Accounts yet.'}
+          </p>
         )}
         {selection.type === 'account' ? (
           <AccountDetail key={selected} balance={selection.row} earlier={earlier} fmt={fmt} />
@@ -150,11 +169,12 @@ interface DateFormProps {
   shownDate: string;
   requestedDate: string;
   selected: string | undefined;
+  kind: AccountKind | null;
   error: string | null;
 }
 
-/** The `?date=` picker; it keeps the selected Account. */
-function DateForm({ shownDate, requestedDate, selected, error }: DateFormProps) {
+/** The `?date=` picker and the `?kind=` filter; it keeps the selected Account. */
+function DateForm({ shownDate, requestedDate, selected, kind, error }: DateFormProps) {
   return (
     <form aria-label="Balance date" className="flex flex-wrap items-center gap-2 text-sm">
       {selected && <input type="hidden" name="account" value={selected} />}
@@ -162,11 +182,25 @@ function DateForm({ shownDate, requestedDate, selected, error }: DateFormProps) 
         <span className="text-muted">Balances on</span>
         <input type="date" name="date" defaultValue={shownDate} className={INPUT} />
       </label>
+      <label className="flex items-center gap-2">
+        <span className="text-muted">Kind</span>
+        <select name="kind" defaultValue={kind ?? ''} className={INPUT}>
+          <option value="">All kinds</option>
+          {ACCOUNT_KINDS.map((option) => (
+            <option key={option} value={option}>
+              {ACCOUNT_KIND_LABELS[option]}
+            </option>
+          ))}
+        </select>
+      </label>
       <button type="submit" className="rounded-md border border-rule-strong px-2 py-1">
         Show
       </button>
       {requestedDate && (
-        <Link href={accountsHref({ account: selected })} className="underline">
+        <Link
+          href={accountsHref({ account: selected, kind: kind ?? undefined })}
+          className="underline"
+        >
           Today
         </Link>
       )}

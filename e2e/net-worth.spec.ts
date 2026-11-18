@@ -66,6 +66,66 @@ test('a Net worth Widget tells its change, and a point opens the Accounts as of 
   await expect(page.getByLabel('Balances on')).toHaveValue('2025-02-28');
 });
 
+test("a Net worth band's point and its kind's share open that kind's Accounts as of the date", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { dashboardId, savingsName, loanName } = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Net worth bands bank ${suffix}` });
+    const base = { bankId: bank.id, importFormat: null, currency: 'CHF' } as const;
+    const savings = await createAccount(ctx, {
+      ...base,
+      kind: 'savings',
+      name: `Bands savings ${suffix}`,
+      openingBalanceMinor: 5000_00,
+      openingDate: '2025-01-05',
+    });
+    const loan = await createAccount(ctx, {
+      ...base,
+      kind: 'loan',
+      name: `Bands loan ${suffix}`,
+      openingBalanceMinor: -3000_00,
+      openingDate: '2025-01-05',
+    });
+    const dashboard = await createDashboardRecord(ctx, { name: `Net worth bands ${suffix}` });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Wealth by kind',
+      source: 'account_balances',
+      visualisation: 'line',
+      query: {
+        dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-03-31' },
+        rows: 'month',
+      },
+    });
+    return { dashboardId: dashboard.id, savingsName: savings.name, loanName: loan.name };
+  });
+
+  await page.goto(`/dashboards/${dashboardId}`);
+  const card = boardCard(page, 'Wealth by kind');
+  // Each kind's share at the latest point, as an amount and a percentage.
+  const share = (kind: string) =>
+    card
+      .locator('dt', { hasText: new RegExp(`^${kind}$`) })
+      .locator('..')
+      .getByRole('link');
+  await expect(share('Savings')).toHaveText(/^CHF .+ · \d+%$/);
+  await expect(share('Loan')).toHaveText(/^CHF .+ · \d+%$/);
+
+  await card.getByRole('link', { name: /^Loan, Feb 2025: CHF/ }).click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-02-28&kind=loan$/);
+  await expect(page.getByLabel('Balances on')).toHaveValue('2025-02-28');
+  await expect(page.getByLabel('Kind')).toHaveValue('loan');
+  const list = page.getByRole('navigation', { name: 'Account list' });
+  await expect(list.getByText(loanName)).toBeVisible();
+  await expect(list.getByText(savingsName)).toHaveCount(0);
+
+  await page.goBack();
+  await share('Savings').click();
+  await expect(page).toHaveURL(/\/accounts\?date=2025-03-31&kind=savings$/);
+  await expect(list.getByText(savingsName)).toBeVisible();
+  await expect(list.getByText(loanName)).toHaveCount(0);
+});
+
 test('a new balances Widget in the editor is Net worth by month over the last 24 months', async ({
   page,
 }) => {
