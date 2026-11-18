@@ -37,12 +37,6 @@ export interface NetWorthLineMark {
   markers?: LineMarker[];
 }
 
-/**
- * Net worth under the overview's headline: the line and its capital movements, no bands
- * (GLOSSARY: Dashboard Story).
- */
-export type HeadlineTrend = Pick<NetWorthLineMark, 'points'> & { markers: LineMarker[] };
-
 type Money = (minor: number) => string;
 
 /** What the Net worth card says and draws. */
@@ -169,11 +163,4 @@ export function readNetWorth(
       ...(capital && { markers: lineMarkers(data.rows, capital.markers, capital.axis, money) }),
     },
   };
-}
-
-/** The overview headline's trend from a monthly Net worth table: its line and markers. */
-export function readHeadlineTrend(data: ChartSource, money: Money): HeadlineTrend {
-  if (data.rows.length === 0) return { points: [], markers: [] };
-  const { points, markers = [] } = readNetWorth(data, 'month', money).mark;
-  return { points, markers };
 }

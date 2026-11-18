@@ -125,7 +125,6 @@ interface PointDotsProps {
   points: PeriodValue[];
   scale: Scale;
   money: Money;
-  isLatestLabelled: boolean;
 }
 
 /** Where a value label hangs from its dot, so it never runs past the plot's edge. */
@@ -135,12 +134,9 @@ const LABEL_SIDE_CLASS: Record<LabelSide, string> = {
   end: 'right-0',
 };
 
-/**
- * A dot per point opening the Accounts as of its date (hollow while running), the latest
- * labelled when asked.
- */
-function PointDots({ points, scale, money, isLatestLabelled }: PointDotsProps) {
-  const latest = isLatestLabelled ? points.length - 1 : -1;
+/** A dot per point opening the Accounts as of its date (hollow while running), the latest labelled. */
+function PointDots({ points, scale, money }: PointDotsProps) {
+  const latest = points.length - 1;
   return points.map((point, i) => (
     <Link
       key={point.label}
@@ -212,34 +208,10 @@ function NetWorthLegend({ points, bands }: Pick<PlotProps, 'points' | 'bands'>) 
   );
 }
 
-/**
- * How the line sits where it is drawn: a Widget's card gives the plot what its facts leave from
- * `lg` up, where the card's height is set (fixed below), and labels the latest point; under the
- * overview's headline, the plot is short and the amount above already says the latest point.
- */
-export type NetWorthLineFit = 'card' | 'compact';
-
-interface FitStyle {
-  figure: string;
-  /** The plot's height, and the room above it for the latest point's label. */
-  plot: string;
-  isLatestLabelled: boolean;
-}
-
-const FITS: Record<NetWorthLineFit, FitStyle> = {
-  card: {
-    figure: 'flex flex-col lg:flex-1',
-    plot: 'mt-8 h-40 lg:h-auto lg:min-h-24 lg:flex-1',
-    isLatestLabelled: true,
-  },
-  compact: { figure: '', plot: 'mt-3 h-24', isLatestLabelled: false },
-};
-
 interface NetWorthLineProps {
   points: PeriodValue[];
   bands: NetWorthBand[];
   markers?: LineMarker[];
-  fit?: NetWorthLineFit;
 }
 
 /**
@@ -247,7 +219,7 @@ interface NetWorthLineProps {
  * period that opens the Accounts as of its last day, a dot per band's point that opens that
  * kind's Accounts then, and a diamond per capital movement that opens its Transaction.
  */
-export function NetWorthLine({ points, bands, markers = [], fit = 'card' }: NetWorthLineProps) {
+export function NetWorthLine({ points, bands, markers = [] }: NetWorthLineProps) {
   const fmt = useFormatter();
   const money = (minor: number) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const stacks = stackBands(bands);
@@ -255,18 +227,13 @@ export function NetWorthLine({ points, bands, markers = [], fit = 'card' }: NetW
     ...points.map((point) => point.value),
     ...stacks.flat().flatMap((span) => [span.low, span.high]),
   ]);
-  const style = FITS[fit];
   return (
-    <figure className={style.figure}>
-      <div className={`relative mx-2 ${style.plot}`}>
+    // From `lg` up the card's height is set, and the plot takes what its facts leave.
+    <figure className="flex flex-col lg:flex-1">
+      <div className="relative mx-2 mt-8 h-40 lg:h-auto lg:min-h-24 lg:flex-1">
         <NetWorthPlot points={points} bands={bands} stacks={stacks} scale={scale} />
         <BandDots bands={bands} stacks={stacks} scale={scale} money={money} />
-        <PointDots
-          points={points}
-          scale={scale}
-          money={money}
-          isLatestLabelled={style.isLatestLabelled}
-        />
+        <PointDots points={points} scale={scale} money={money} />
         {markers.map((marker, i) => (
           <CapitalMarkerLink
             key={`${marker.href}-${i}`}

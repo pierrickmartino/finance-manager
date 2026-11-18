@@ -185,26 +185,26 @@ test('a balances Widget filters by Account, Bank and Account kind, and says when
   await expect(page.getByText("No Account matches this Widget's filters.")).toBeVisible();
 });
 
-/** The previous calendar month (Swiss time): its 10th, its last day and its label. */
-function previousMonth(): { tenth: string; end: string; label: string } {
+/** The calendar month `back` months before this one (Swiss time): its 10th, last day and label. */
+function monthBefore(back: number): { tenth: string; end: string; label: string } {
   const [year, month] = new Date()
     .toLocaleDateString('sv-SE', { timeZone: 'Europe/Zurich' })
     .split('-')
     .map(Number) as [number, number];
-  const start = new Date(Date.UTC(year, month - 2, 1));
-  const end = new Date(Date.UTC(year, month - 1, 0));
+  const start = new Date(Date.UTC(year, month - 1 - back, 1));
+  const end = new Date(Date.UTC(year, month - back, 0));
   const iso = (date: Date) => date.toISOString().slice(0, 10);
   const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
   const label = `${MONTHS[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
   return { tenth: iso(start).replace(/-01$/, '-10'), end: iso(end), label };
 }
 
-test("the headline's Net worth trend opens the Accounts as of a point, and a Capital marker its Transaction", async ({
+test("the headline's Net worth sparkline and its 1M, 1Y and 2Y changes open the Accounts as of their date", async ({
   page,
 }) => {
   const suffix = Date.now();
-  const month = previousMonth();
-  const { dashboardId, transactionId } = await withServices(async (ctx) => {
+  const lastMonth = monthBefore(1);
+  const dashboardId = await withServices(async (ctx) => {
     const bank = await createBank(ctx, { name: `Headline bank ${suffix}` });
     const account = await createAccount(ctx, {
       bankId: bank.id,
@@ -213,13 +213,13 @@ test("the headline's Net worth trend opens the Accounts as of a point, and a Cap
       name: `Headline current ${suffix}`,
       currency: 'CHF',
       openingBalanceMinor: 80_000_00,
-      openingDate: '2025-01-01',
+      openingDate: '2023-01-01',
     });
     const group = await createCategoryGroup(ctx, { name: `Assets ${suffix}`, type: 'capital' });
     const shares = await createCategory(ctx, { groupId: group.id, name: 'Shares' });
     const purchase = await createManualTransaction(ctx, {
       accountId: account.id,
-      bookingDate: month.tenth,
+      bookingDate: lastMonth.tenth,
       amountMinor: -20_000_00,
       description: `Share purchase ${suffix}`,
     });
@@ -239,26 +239,42 @@ test("the headline's Net worth trend opens the Accounts as of a point, and a Cap
         filters: { bankIds: [bank.id] },
       },
     });
-    return { dashboardId: dashboard.id, transactionId: purchase.id };
+    return dashboard.id;
   });
 
   await page.goto(`/dashboards/${dashboardId}`);
   const headline = page.locator('section[aria-labelledby="overview-headline"]');
   await expect(headline.getByRole('heading')).toHaveText('Your net worth today');
-  const trend = headline.getByRole('group', { name: 'Net worth over the last 24 months' });
-  await expect(trend.getByRole('link', { name: /^\w{3} \d{4}: CHF/ })).toHaveCount(24);
+  const sparkline = headline.getByRole('group', { name: 'Net worth over the last 24 months' });
+  // Today and the 24 month-ends before it.
+  await expect(sparkline.getByRole('link', { name: /^\w{3} \d{4}: CHF/ })).toHaveCount(25);
+  // Capital movements stay on the Net worth over time card, not in the headline.
+  await expect(headline.getByRole('link', { name: /^Capital movement/ })).toHaveCount(0);
 
-  await trend.getByRole('link', { name: new RegExp(`^${month.label}: CHF`) }).click();
-  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${month.end}$`));
+  const changes = headline.getByRole('list', { name: 'Change in Net worth' });
+  for (const [label, back] of [
+    ['1M', 1],
+    ['1Y', 12],
+    ['2Y', 24],
+  ] as const) {
+    const since = monthBefore(back);
+    await expect(
+      changes.getByRole('link', {
+        name: new RegExp(`^${label}: (up|down) CHF [\\d']+ since the end of ${since.label}$`),
+      }),
+    ).toHaveAttribute('href', `/accounts?date=${since.end}`);
+  }
+
+  await changes.getByRole('link', { name: /^1Y: / }).click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${monthBefore(12).end}$`));
 
   await page.goBack();
   await page
     .locator('section[aria-labelledby="overview-headline"]')
-    .getByRole('link', {
-      name: new RegExp(`^Capital movement on ${month.tenth}: Broker ${suffix}: CHF`),
-    })
+    .getByRole('group', { name: 'Net worth over the last 24 months' })
+    .getByRole('link', { name: new RegExp(`^${lastMonth.label}: CHF`) })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/transactions/${transactionId}$`));
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${lastMonth.end}$`));
 });
 
 test('a Net worth over time Widget never becomes the headline', async ({ page }) => {

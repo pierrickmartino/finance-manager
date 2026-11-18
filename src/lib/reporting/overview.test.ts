@@ -96,7 +96,9 @@ describe('headlineAmount', () => {
       { label: 'Jan 2025', value: 9000_00, href: 'accounts:2025-01', isPartial: false },
       { label: 'Feb 2025', value: 10250_00, href: 'accounts:2025-02', isPartial: true },
     ],
-    markers: [{ at: 0.5, date: '2025-01-20', title: 'Notary', href: '/transactions/t1' }],
+    changes: [
+      { label: '1M', months: 1, since: 'Jan 2025', change: 1250_00, href: 'accounts:2025-01' },
+    ],
   };
 
   it('carries the Net worth trend under net worth today, valued at its latest point', () => {
@@ -113,7 +115,7 @@ describe('headlineAmount', () => {
   });
 
   it('keeps the balances total when the trend has no point', () => {
-    expect(headlineAmount([balances], { points: [], markers: [] })).toMatchObject({
+    expect(headlineAmount([balances], { points: [], changes: [] })).toMatchObject({
       value: 10000_00,
       trend: null,
     });

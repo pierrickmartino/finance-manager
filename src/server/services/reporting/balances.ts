@@ -244,11 +244,12 @@ async function runNetWorth(
 }
 
 /**
- * The query of the overview headline's Net worth trend: every Account, no filters, by month
- * over the last 24 months, the running one at today, so its latest point is net worth today.
+ * The query of the overview headline's Net worth trend: every Account, no filters, by month:
+ * the running month at today, so its latest point is net worth today, and the 24 full months
+ * before it, so the change over two years has its point.
  */
 export const NET_WORTH_TREND_QUERY: WidgetQuery = {
-  dateRange: { kind: 'last', count: 23, unit: 'month', includeCurrent: true },
+  dateRange: { kind: 'last', count: 24, unit: 'month', includeCurrent: true },
   rows: 'month',
   columns: null,
   measure: 'sum',

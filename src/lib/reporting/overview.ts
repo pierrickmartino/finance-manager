@@ -1,5 +1,5 @@
 import { timeAxisOf, type CardWidget, type MonthFlow } from './card';
-import type { HeadlineTrend } from './net-worth-card';
+import type { HeadlineTrend } from './net-worth-headline';
 
 export type { HeadlineTrend };
 

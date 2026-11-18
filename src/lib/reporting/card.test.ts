@@ -15,7 +15,6 @@ import {
   type MonthFlow,
 } from './card';
 import type { ChartSource } from './chart-data';
-import { readHeadlineTrend } from './net-worth-card';
 import { cellFromParams, DEFAULT_WIDGET_QUERY } from './widget-params';
 
 const header = (label: string, isPartial = false): ReportHeader => ({
@@ -891,48 +890,6 @@ describe('readCard: Net worth over time', () => {
           },
         ],
       });
-    });
-  });
-
-  describe("the overview headline's trend", () => {
-    it('draws the Net worth line and its Capital movements, without the bands', () => {
-      const data = netWorth([
-        ['2025-01', 'Jan 2025', { current: 400_00, savings: 600_00 }],
-        ['2025-02', 'Feb 2025', { current: 500_00, savings: 700_00, loan: -100_00 }],
-      ]).data!;
-      const capital = {
-        markers: [
-          {
-            transactionId: 'tx-1',
-            lineId: null,
-            date: '2025-02-14',
-            amountMinor: -50_00,
-            label: 'Notary',
-            href: '/transactions/tx-1',
-          },
-        ],
-        href: '/transactions?groupType=capital',
-      };
-
-      expect(readHeadlineTrend({ ...data, capital }, money)).toEqual({
-        points: [
-          { label: 'Jan 2025', value: 1000_00, href: 'accounts:2025-01', isPartial: false },
-          { label: 'Feb 2025', value: 1100_00, href: 'accounts:2025-02', isPartial: false },
-        ],
-        markers: [
-          { at: 0.5, date: '2025-02-14', title: 'Notary: CHF -50', href: '/transactions/tx-1' },
-        ],
-      });
-    });
-
-    it('has no markers without Capital movements', () => {
-      const data = netWorth([['2025-01', 'Jan 2025', 1000_00]]).data!;
-
-      expect(readHeadlineTrend(data, money).markers).toEqual([]);
-    });
-
-    it('is empty without an Account', () => {
-      expect(readHeadlineTrend(netWorth([]).data!, money)).toEqual({ points: [], markers: [] });
     });
   });
 

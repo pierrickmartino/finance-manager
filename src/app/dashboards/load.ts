@@ -109,9 +109,8 @@ export async function loadWidgetCard(ctx: ServiceContext, widget: Widget): Promi
 
 /**
  * The overview headline's Net worth trend, when the headline can be net worth today (the
- * Dashboard holds Account balances on a date): every Account by month over the last 24
- * months, its points opening the Accounts as of their date and its capital movements their
- * Transaction. Null otherwise.
+ * Dashboard holds Account balances on a date): every Account by month, today and the 24
+ * month-ends before it, each point opening the Accounts as of its date. Null otherwise.
  */
 export async function loadNetWorthTrend(
   ctx: ServiceContext,
