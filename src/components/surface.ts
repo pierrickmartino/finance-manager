@@ -41,6 +41,13 @@ export const DOCK_BUTTON_CLASS =
   'flex items-center gap-2 rounded-md px-3 py-1.5 font-medium hover:bg-paper/10 aria-expanded:bg-paper/15 focus-visible:outline-accent disabled:opacity-50';
 /** A popover over the page: a menu or picker opened from a toolbar or the dock. */
 export const POPOVER_CLASS = 'rounded-xl border border-rule bg-surface p-2 text-ink shadow-xl';
+/**
+ * One tile of a row of exclusive choices (the Widget editor's source and visualisation): a
+ * bordered surface, the chosen one ringed in ink. A link tile is chosen by
+ * `aria-current="page"`, a `<label>` tile by its checked radio, which shows its focus ring.
+ */
+export const CHOICE_TILE_CLASS =
+  'rounded-md border border-rule-strong bg-surface hover:border-faint aria-[current=page]:border-ink aria-[current=page]:ring-2 aria-[current=page]:ring-ink has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-info';
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 

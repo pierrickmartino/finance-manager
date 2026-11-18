@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { CHOICE_TILE_CLASS } from '@/components/surface';
 import { STORY_SHOWN_AS } from '@/lib/reporting/card';
 import {
   VISUALISATION_LABELS,
@@ -102,7 +103,7 @@ export function VisualisationPicker({
           <label
             key={visualisation}
             title={(alwaysShownAs ?? STORY_SHOWN_AS[visualisation]).full}
-            className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-rule-strong bg-surface px-1 py-2 text-center text-[11px] leading-tight hover:border-faint has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-info"
+            className={`${CHOICE_TILE_CLASS} flex cursor-pointer flex-col items-center gap-1 px-1 py-2 text-center text-[11px] leading-tight`}
           >
             <input
               type="radio"

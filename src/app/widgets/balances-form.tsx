@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { CHOICE_TILE_CLASS } from '@/components/surface';
 import { balanceFilterLists, type BalanceFilterChoices } from '@/lib/reporting/query-filters';
 import {
   AXIS_LABELS,
@@ -17,17 +18,17 @@ const SOURCE_LABELS: Record<WidgetSource, string> = {
   account_balances: 'Account balances',
 };
 
+interface SourcePickerProps {
+  value: WidgetSource;
+  /** The editor on each source, starting from its own defaults. */
+  hrefs: Record<WidgetSource, string>;
+}
+
 /**
  * What a new Widget shows, as two links (each starting from its own defaults): a query over
  * the Transactions, or the Account balances.
  */
-export function SourcePicker({
-  value,
-  hrefs,
-}: {
-  value: WidgetSource;
-  hrefs: Record<WidgetSource, string>;
-}) {
+export function SourcePicker({ value, hrefs }: SourcePickerProps) {
   return (
     <PanelSection title="Source">
       <nav aria-label="Widget source" className="grid grid-cols-2 gap-1.5">
@@ -36,7 +37,7 @@ export function SourcePicker({
             key={source}
             href={hrefs[source]}
             aria-current={source === value ? 'page' : undefined}
-            className="rounded-md border border-rule-strong bg-surface px-2 py-1.5 text-center text-sm hover:border-faint aria-[current=page]:border-ink aria-[current=page]:ring-2 aria-[current=page]:ring-ink"
+            className={`${CHOICE_TILE_CLASS} px-2 py-1.5 text-center text-sm`}
           >
             {SOURCE_LABELS[source]}
           </Link>
