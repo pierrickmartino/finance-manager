@@ -5,6 +5,7 @@ import { AppShell } from '@/components/app-shell/app-shell';
 import { FormatterProvider } from '@/components/formatter-provider';
 import { getCurrentSession } from '@/server/app-context';
 import { getRequestDisplaySettings } from '@/server/formatter';
+import { cookieVariant } from '@/server/prototype-variant';
 import './globals.css';
 
 /** The design system's type (docs/design-system.md): Inter, and Inter Tight for display. */
@@ -28,7 +29,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en" className={`${inter.variable} ${interTight.variable}`}>
       <body>
         <FormatterProvider settings={settings}>
-          <AppShell showNavigation={isSignedIn}>{children}</AppShell>
+          <AppShell showNavigation={isSignedIn} prototypeVariant={await cookieVariant()}>
+            {children}
+          </AppShell>
         </FormatterProvider>
       </body>
     </html>

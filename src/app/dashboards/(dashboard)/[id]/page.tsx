@@ -9,6 +9,11 @@ import { findDashboard, loadNetWorthTrend, loadRecentActivity, loadWidgetCard } 
 import { DashboardTabs } from '../../tabs';
 import { DashboardChrome, DashboardOverview } from './overview/dashboard-overview';
 import { StreamedBoard, StreamedCompleteness, StreamedOverview } from './streamed';
+import { loadProtoDashboard } from '@/server/prototype-tremor-data';
+import { readVariant } from '@/server/prototype-variant';
+import { DashboardA } from './prototype-tremor/dashboard-a';
+import { DashboardB } from './prototype-tremor/dashboard-b';
+import { DashboardC } from './prototype-tremor/dashboard-c';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 
@@ -21,9 +26,21 @@ export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
  * The page shell (tabs, name, actions) renders as soon as the Dashboard is found; each part that
  * waits on a query streams in behind its own placeholder (./streamed).
  */
-export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await getServiceContext();
   const dashboard = await findDashboard(ctx, (await params).id);
+  // PROTOTYPE (Tremor redesign): ?variant= A, B or C draws a Tremor take on the page.
+  const variant = await readVariant(await searchParams);
+  if (variant !== 'current') {
+    const Variant = { A: DashboardA, B: DashboardB, C: DashboardC }[variant];
+    return <Variant data={await loadProtoDashboard(ctx.db)} name={dashboard.name} />;
+  }
   // Started now, awaited by the parts that show them: each Widget's query runs once.
   const cards = dashboard.widgets.map((widget) => ({
     widget,

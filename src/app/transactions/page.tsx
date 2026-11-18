@@ -25,6 +25,11 @@ import {
 import { TransactionList } from './transaction-list';
 import { TransactionPreview } from './transaction-preview';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
+import { loadProtoTransactions } from '@/server/prototype-tremor-data';
+import { readVariant } from '@/server/prototype-variant';
+import { TransactionsA } from './prototype-tremor/transactions-a';
+import { TransactionsB } from './prototype-tremor/transactions-b';
+import { TransactionsC } from './prototype-tremor/transactions-c';
 
 export const metadata: Metadata = { title: 'Transactions · Finance Manager' };
 
@@ -49,8 +54,25 @@ async function loadPage(
  * preview of the selected one, so reviewing many Transactions never leaves the page.
  */
 export default async function TransactionsPage({ searchParams }: TransactionsPageProps) {
+  // PROTOTYPE (Tremor redesign): ?variant= A, B or C draws a Tremor take on the list.
+  const raw = await searchParams;
+  const variant = await readVariant(raw);
+  if (variant !== 'current') {
+    const one = (key: string) =>
+      typeof raw[key] === 'string' && raw[key] ? (raw[key] as string) : undefined;
+    const filter = {
+      q: one('q'),
+      account: one('account'),
+      category: one('category'),
+      page: Number(one('page') ?? 1),
+    };
+    const data = await loadProtoTransactions((await getServiceContext()).db, filter);
+    if (variant === 'A') return <TransactionsA data={data} filter={filter} />;
+    if (variant === 'B') return <TransactionsB data={data} filter={filter} />;
+    return <TransactionsC data={data} filter={filter} selectedId={one('tx') ?? null} />;
+  }
   const fmt = await getFormatter();
-  const search = readTransactionSearch(await searchParams, fmt.settings.numberFormat);
+  const search = readTransactionSearch(raw, fmt.settings.numberFormat);
   const ctx = await getServiceContext();
   const [{ page, error: queryError }, accounts, groups, payees, tags] = await Promise.all([
     loadPage(search.query),

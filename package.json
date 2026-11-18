@@ -26,10 +26,18 @@
     "auth:reset": "tsx --env-file-if-exists=.env.local scripts/reset-credentials.ts",
     "fx:fetch": "tsx --env-file-if-exists=.env.local scripts/fx-rates.ts fetch",
     "fx:backfill": "tsx --env-file-if-exists=.env.local scripts/fx-rates.ts backfill",
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
+    "prototype:seed": "tsx --env-file-if-exists=.env.local scripts/prototype-tremor-seed.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
+    "@radix-ui/react-hover-card": "^1.2.1",
+    "@radix-ui/react-navigation-menu": "^1.4.1",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-tabs": "^1.2.1",
+    "@radix-ui/react-tooltip": "^1.4.1",
+    "@remixicon/react": "^4.9.0",
+    "clsx": "^2.1.1",
     "motion": "14.10.0",
     "next": "16.4.3",
     "node-pg-migrate": "^9.0.0",
@@ -41,6 +49,8 @@
     "react-grid-layout": "2.3.0",
     "recharts": "3.10.1",
     "server-only": "^0.0.1",
+    "tailwind-merge": "^3.7.0",
+    "tailwind-variants": "^4.0.2",
     "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },

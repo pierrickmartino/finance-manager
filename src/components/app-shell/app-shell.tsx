@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { logoutAction } from '@/app/login/actions';
 import { greetingFor } from './greeting';
@@ -17,6 +17,11 @@ import { Icon } from './icon';
 import { MobileDrawer } from './mobile-drawer';
 import { MoreMenu } from './more-menu';
 import { PRIMARY_LINKS, findCurrentPage, isActive } from './navigation';
+import { PrototypeSwitcher } from '@/components/prototype-switcher/prototype-switcher';
+import { parseVariant, type PrototypeVariant } from '@/components/prototype-switcher/variants';
+import { ShellA } from './prototype-tremor/shell-a';
+import { ShellB } from './prototype-tremor/shell-b';
+import { ShellC } from './prototype-tremor/shell-c';
 
 const subscribeToNothing = () => () => {};
 
@@ -95,6 +100,8 @@ function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => 
 interface AppShellProps {
   /** Signed out (login, setup), only the page renders: no hero, top bar or drawer. */
   showNavigation: boolean;
+  /** PROTOTYPE (Tremor redesign): the variant from the cookie; ?variant= overrides it. */
+  prototypeVariant?: PrototypeVariant;
   children: ReactNode;
 }
 
@@ -108,9 +115,24 @@ interface AppShellProps {
  * whose action signs the user in (first-run setup shows its recovery codes afterwards) is not
  * remounted, and loses no state, when the navigation appears.
  */
-export function AppShell({ showNavigation, children }: AppShellProps) {
+export function AppShell({
+  showNavigation,
+  prototypeVariant = 'current',
+  children,
+}: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // PROTOTYPE (Tremor redesign): swap the whole shell per ?variant=.
+  const variant = parseVariant(useSearchParams().get('variant')) ?? prototypeVariant;
+  if (showNavigation && variant !== 'current') {
+    const Shell = { A: ShellA, B: ShellB, C: ShellC }[variant];
+    return (
+      <>
+        <Shell pathname={pathname}>{children}</Shell>
+        <PrototypeSwitcher current={variant} />
+      </>
+    );
+  }
 
   // Nothing clips the page: a menu that drops past the end of a page must still be reachable,
   // and sticky columns must stick.
@@ -148,6 +170,7 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
       </div>
 
       {showNavigation && isMenuOpen && <MobileDrawer onClose={() => setIsMenuOpen(false)} />}
+      {showNavigation && <PrototypeSwitcher current={variant} />}
     </div>
   );
 }
