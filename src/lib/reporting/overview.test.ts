@@ -6,6 +6,7 @@ import {
   headlineAmount,
   type HeadlineTrend,
   litTicks,
+  periodCount,
   spendingBars,
   spendingInsight,
 } from './overview';
@@ -172,6 +173,15 @@ describe('spendingInsight', () => {
     expect(insight?.detail.join('')).toMatch(/^Feb came in 20% below/);
   });
 
+  it('compares yearly rows with the yearly average', () => {
+    const insight = spendingInsight(
+      [month('2024', 1000_00, 500_00), month('2025', 1000_00, 750_00)],
+      'year',
+    );
+
+    expect(insight?.detail.join('')).toMatch(/^2025 came in 50% above your yearly average/);
+  });
+
   it('is null with fewer than two full months to compare', () => {
     expect(spendingInsight([month('Jan', 1000_00, 500_00), month('Feb', 0, 0, true)])).toBeNull();
   });
@@ -196,7 +206,7 @@ describe('flowSummary', () => {
       month('Mar', 900_00, 0, true),
     ]);
 
-    expect(summary.keptPerMonth).toBe(100_00);
+    expect(summary.keptPerPeriod).toBe(100_00);
     expect(summary.best?.label).toBe('Jan');
     expect(summary.leanest?.label).toBe('Feb');
   });
@@ -208,13 +218,21 @@ describe('flowSummary', () => {
   it('has no best or leanest month with fewer than two full months', () => {
     const summary = flowSummary([month('Jan', 1000_00, 600_00), month('Feb', 0, 10_00, true)]);
 
-    expect(summary.keptPerMonth).toBe(400_00);
+    expect(summary.keptPerPeriod).toBe(400_00);
     expect(summary.best).toBeNull();
     expect(summary.leanest).toBeNull();
   });
 
   it('has no monthly average without a full month', () => {
-    expect(flowSummary([month('Jan', 100_00, 10_00, true)]).keptPerMonth).toBeNull();
+    expect(flowSummary([month('Jan', 100_00, 10_00, true)]).keptPerPeriod).toBeNull();
+  });
+});
+
+describe('periodCount', () => {
+  it('counts the periods in their own unit', () => {
+    expect(periodCount(3, 'month')).toBe('3 months');
+    expect(periodCount(2, 'year')).toBe('2 years');
+    expect(periodCount(1, 'quarter')).toBe('1 quarter');
   });
 });
 

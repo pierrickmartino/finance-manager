@@ -352,6 +352,11 @@ describe('readCard: income vs. expense', () => {
       label: 'Kept per year, on average',
       value: 'CHF 400',
     });
+    expect(read(yearly).flow?.period).toBe('year');
+  });
+
+  it('tells monthly income vs. expense flows as months', () => {
+    expect(read(incomeVsExpense).flow?.period).toBe('month');
   });
 });
 

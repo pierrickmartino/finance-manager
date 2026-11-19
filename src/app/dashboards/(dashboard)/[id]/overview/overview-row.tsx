@@ -7,9 +7,11 @@ import { BADGE_CLASS, HEADLINE_AMOUNT_CLASS, TILE_CLASS } from '@/components/sur
 import { readCard, type CardFlow, type MonthFlow, type WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { readHeadlineTrend } from '@/lib/reporting/net-worth-headline';
+import type { TimeAxis } from '@/server/services/reporting/query';
 import {
   flowSummary,
   headlineAmount,
+  periodCount,
   spendingBars,
   spendingInsight,
   type FlowSummary,
@@ -78,9 +80,16 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 const shortMonth = (label: string): string => label.split(' ')[0] ?? label;
 
-/** What came in, went out and was kept, then the monthly average, rate, best and leanest month. */
-function FlowBreakdown({ summary, money }: { summary: FlowSummary; money: Money }) {
-  const { income, expense, kept, savingsRate, keptPerMonth, best, leanest } = summary;
+interface FlowBreakdownProps {
+  summary: FlowSummary;
+  /** The period of the Widget's rows, which the labels name. */
+  period: TimeAxis;
+  money: Money;
+}
+
+/** What came in, went out and was kept, then the average per period, rate, best and leanest. */
+function FlowBreakdown({ summary, period, money }: FlowBreakdownProps) {
+  const { income, expense, kept, savingsRate, keptPerPeriod, best, leanest } = summary;
   const top = Math.max(1, income, expense);
   return (
     <>
@@ -95,9 +104,9 @@ function FlowBreakdown({ summary, money }: { summary: FlowSummary; money: Money 
         />
       </div>
       <dl className="mt-auto grid grid-cols-2 gap-3 pt-6 text-sm">
-        {keptPerMonth !== null && (
-          <Fact label="Kept per month">
-            <span className="font-display text-xl">{money(Math.round(keptPerMonth))}</span>
+        {keptPerPeriod !== null && (
+          <Fact label={`Kept per ${period}`}>
+            <span className="font-display text-xl">{money(Math.round(keptPerPeriod))}</span>
           </Fact>
         )}
         {savingsRate !== null && (
@@ -106,7 +115,7 @@ function FlowBreakdown({ summary, money }: { summary: FlowSummary; money: Money 
           </Fact>
         )}
         {best && (
-          <Fact label="Best month">
+          <Fact label={`Best ${period}`}>
             {shortMonth(best.label)} ·{' '}
             <span className={best.net < 0 ? 'text-negative' : 'text-positive'}>
               {money(best.net)}
@@ -114,7 +123,7 @@ function FlowBreakdown({ summary, money }: { summary: FlowSummary; money: Money 
           </Fact>
         )}
         {leanest && (
-          <Fact label="Leanest month">
+          <Fact label={`Leanest ${period}`}>
             {shortMonth(leanest.label)} ·{' '}
             <span className={leanest.net < 0 ? 'text-negative' : ''}>{money(leanest.net)}</span>
           </Fact>
@@ -167,9 +176,9 @@ export function NetWorthCard({ cards, trend }: NetWorthCardProps) {
             >
               <span aria-hidden>{summary.kept >= 0 ? '↗' : '↘'}</span> {money(summary.kept)}
             </FigureLink>{' '}
-            kept over {flow.months.length} months
+            kept over {periodCount(flow.months.length, flow.period)}
           </p>
-          <FlowBreakdown summary={summary} money={money} />
+          <FlowBreakdown summary={summary} period={flow.period} money={money} />
         </>
       )}
     </section>
@@ -179,19 +188,27 @@ export function NetWorthCard({ cards, trend }: NetWorthCardProps) {
 /** A month label's first three letters, to fit under its bar ("Oct 2026" → "Oct"). */
 const barMonth = (label: string): string => shortMonth(label).slice(0, 3);
 
+interface SpendingChartProps {
+  months: MonthFlow[];
+  /** The period of the Widget's rows, which the caption names. */
+  period: TimeAxis;
+  money: Money;
+}
+
 /**
- * Each full month's spending as a bar against the dashed average line, the latest lit. It fills
+ * Each full period's spending as a bar against the dashed average line, the latest lit. It fills
  * the card's height from `lg` up; below, the card has no set height, so the bars get one.
  */
-function SpendingChart({ months, money }: { months: MonthFlow[]; money: Money }) {
+function SpendingChart({ months, period, money }: SpendingChartProps) {
   const chart = spendingBars(months);
   if (!chart) return null;
   const { bars, average, averageShare } = chart;
-  const label = `Spent per month: ${bars.map((bar) => `${bar.label} ${money(bar.expense)}`).join(', ')}. Average ${money(Math.round(average))}.`;
+  const caption = `Spent per ${period}`;
+  const label = `${caption}: ${bars.map((bar) => `${bar.label} ${money(bar.expense)}`).join(', ')}. Average ${money(Math.round(average))}.`;
   return (
     <figure className="mt-6 flex min-h-40 flex-1 flex-col">
       <figcaption className="flex items-baseline justify-between text-xs text-on-hero/70">
-        <span>Spent per month</span>
+        <span>{caption}</span>
         <span>
           Average <span className="tabular-nums">{money(Math.round(average))}</span>
         </span>
@@ -238,7 +255,7 @@ export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const flow = overviewFlow(cards, (minor) => fmt.amount(minor, { currency: 'CHF' }));
-  const insight = flow ? spendingInsight(flow.months) : null;
+  const insight = flow ? spendingInsight(flow.months, flow.period) : null;
   if (!flow || !insight) return null;
   const [before, change, after] = insight.detail;
   return (
@@ -259,7 +276,7 @@ export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
         </FigureLink>
         {after}
       </p>
-      <SpendingChart months={flow.months} money={money} />
+      <SpendingChart months={flow.months} period={flow.period} money={money} />
       {flow.latestHref && (
         <Link
           href={flow.latestHref}

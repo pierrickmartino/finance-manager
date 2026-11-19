@@ -164,6 +164,8 @@ export interface TickItem {
 /** The income and expense of a Widget that holds both, and where its figures drill down. */
 export interface CardFlow {
   months: MonthFlow[];
+  /** The period each of its rows spans (`month`, `quarter` or `year`), read from the row keys. */
+  period: TimeAxis;
   /** All its Transactions: income and expense net to what was kept over the months. */
   href: string;
   /** The latest full month's Transactions (null when every month is still running). */
@@ -275,6 +277,7 @@ function flowOf(data: ChartSource, slots: FlowSlots): CardFlow {
   const latest = latestFullIndex(data.rows);
   return {
     months: monthsOf(data, slots),
+    period: periodWords(data).noun,
     href: data.hrefs.total,
     latestHref: latest === -1 ? null : (data.hrefs.rowTotals[latest] ?? null),
     changeHref: changeHref(data, slots.expenseSlot),
