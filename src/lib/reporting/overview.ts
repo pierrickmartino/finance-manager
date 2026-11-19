@@ -1,3 +1,4 @@
+import type { TimeAxis } from '@/server/services/reporting/query';
 import { timeAxisOf, type CardWidget, type MonthFlow } from './card';
 import type { HeadlineTrend } from './net-worth-headline';
 
@@ -56,6 +57,17 @@ export function changeOverAverage(latest: number, before: number[]): number {
   return average === 0 ? 0 : (latest - average) / average;
 }
 
+const ADJECTIVES = {
+  month: 'monthly',
+  quarter: 'quarterly',
+  year: 'yearly',
+} as const satisfies Record<TimeAxis, string>;
+
+/** How many periods, in their unit: "3 months", "1 year". */
+export function periodCount(count: number, period: TimeAxis): string {
+  return `${count} ${period}${count === 1 ? '' : 's'}`;
+}
+
 /**
  * The insight callout: how the latest full month's spending compares with the full months
  * before it, and the share of income kept over them all. Null without two full months. Its
@@ -63,6 +75,7 @@ export function changeOverAverage(latest: number, before: number[]): number {
  */
 export function spendingInsight(
   months: MonthFlow[],
+  period: TimeAxis = 'month',
 ): { headline: string; detail: [before: string, change: string, after: string] } | null {
   const full = months.filter((month) => !month.isPartial);
   const latest = full.at(-1);
@@ -80,7 +93,7 @@ export function spendingInsight(
     detail: [
       `${latest.label} came in `,
       `${percent(change)} ${isEasing ? 'below' : 'above'}`,
-      ` your monthly average, and you kept ${percent(kept)} of everything that came in.`,
+      ` your ${ADJECTIVES[period]} average, and you kept ${percent(kept)} of everything that came in.`,
     ],
   };
 }
@@ -128,8 +141,8 @@ export interface FlowSummary {
   kept: number;
   /** The share of income kept; null without income. */
   savingsRate: number | null;
-  /** The average kept over the full months; null without one. */
-  keptPerMonth: number | null;
+  /** The average kept over the full periods (months, quarters or years); null without one. */
+  keptPerPeriod: number | null;
   /** The full months that kept the most and the least; null with fewer than two to compare. */
   best: MonthFlow | null;
   leanest: MonthFlow | null;
@@ -147,7 +160,7 @@ export function flowSummary(months: MonthFlow[]): FlowSummary {
     expense,
     kept,
     savingsRate: income === 0 ? null : kept / income,
-    keptPerMonth: full.length === 0 ? null : sum(full.map((month) => month.net)) / full.length,
+    keptPerPeriod: full.length === 0 ? null : sum(full.map((month) => month.net)) / full.length,
     best: hasPair ? byNet[0]! : null,
     leanest: hasPair ? byNet.at(-1)! : null,
   };
