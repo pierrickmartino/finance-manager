@@ -171,3 +171,13 @@ export function litTicks(share: number, ticks: number): number {
   if (share <= 0) return 0;
   return Math.min(ticks, Math.max(1, Math.round(share * ticks)));
 }
+
+/**
+ * A period label short enough to fit under its bar: a month's first three letters
+ * ("October 2026" → "Oct"), a quarter's number ("Q3 2025" → "Q3"), a year whole ("2025").
+ */
+export function barLabel(label: string, period: TimeAxis): string {
+  if (period === 'year') return label;
+  const first = label.split(' ')[0] ?? label;
+  return period === 'month' ? first.slice(0, 3) : first;
+}
