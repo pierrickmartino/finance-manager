@@ -9,6 +9,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { readHeadlineTrend } from '@/lib/reporting/net-worth-headline';
 import type { TimeAxis } from '@/server/services/reporting/query';
 import {
+  barLabel,
   flowSummary,
   headlineAmount,
   periodCount,
@@ -185,9 +186,6 @@ export function NetWorthCard({ cards, trend }: NetWorthCardProps) {
   );
 }
 
-/** A month label's first three letters, to fit under its bar ("Oct 2026" → "Oct"). */
-const barMonth = (label: string): string => shortMonth(label).slice(0, 3);
-
 interface SpendingChartProps {
   months: MonthFlow[];
   /** The period of the Widget's rows, which the caption names. */
@@ -238,7 +236,7 @@ function SpendingChart({ months, period, money }: SpendingChartProps) {
             key={bar.label}
             className={`flex-1 truncate text-center ${bar.isLatest ? 'font-medium text-on-hero' : ''}`}
           >
-            {barMonth(bar.label)}
+            {barLabel(bar.label, period)}
           </span>
         ))}
       </div>

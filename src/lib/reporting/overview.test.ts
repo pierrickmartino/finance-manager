@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CardWidget, MonthFlow } from './card';
 import type { ChartSource } from './chart-data';
 import {
+  barLabel,
   flowSummary,
   headlineAmount,
   type HeadlineTrend,
@@ -276,5 +277,19 @@ describe('spendingBars', () => {
     const bars = spendingBars([month('Sep 2026', 5000, 0), month('Oct 2026', 5000, 0)]);
     expect(bars?.bars.map((bar) => bar.share)).toEqual([0, 0]);
     expect(bars?.averageShare).toBe(0);
+  });
+});
+
+describe('barLabel', () => {
+  it('shortens a month to its first three letters', () => {
+    expect(barLabel('October 2026', 'month')).toBe('Oct');
+  });
+
+  it('keeps a quarter as its quarter number', () => {
+    expect(barLabel('Q3 2025', 'quarter')).toBe('Q3');
+  });
+
+  it('keeps a year whole', () => {
+    expect(barLabel('2025', 'year')).toBe('2025');
   });
 });
