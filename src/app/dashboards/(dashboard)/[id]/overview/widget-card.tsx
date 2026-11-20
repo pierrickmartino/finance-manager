@@ -7,7 +7,8 @@ import { useFormatter } from '@/components/formatter-provider';
 import { TILE_CLASS } from '@/components/surface';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
-import { DotMatrix, EmptyChart, HeatmapGrid, MonthBars, TickList } from './marks';
+import { HeatmapGrid } from './heatmap-grid';
+import { DotMatrix, EmptyChart, MonthBars, TickList } from './marks';
 import { NetWorthLine } from './net-worth-mark';
 import { DonutRing } from './ring';
 

@@ -1,5 +1,5 @@
 import type { Measure, ReportHeader } from '@/server/services/reporting';
-import type { ChartSource } from './chart-data';
+import type { ChartSource, RowTree } from './chart-data';
 
 /**
  * A table Widget on its Dashboard card: the engine's rows × columns grid as a heatmap, each
@@ -69,29 +69,101 @@ export function heatLevel(share: number): number {
   return Math.min(last, Math.max(0, Math.ceil(share * HEAT_LEVELS.length) - 1));
 }
 
-export function toHeatmap(data: ChartSource): Heatmap {
-  const values = data.cells.flat().filter((value): value is number => value !== null);
-  const largest = Math.max(0, ...values.map(Math.abs));
-  const order = data.rows
-    .map((_, r) => r)
-    .sort((a, b) => Math.abs(data.rowTotals[b] ?? 0) - Math.abs(data.rowTotals[a] ?? 0));
+/** The size every cell is shaded against: the largest of `rows` by magnitude. */
+function largestCell(data: ChartSource, rows: readonly number[]): number {
+  const values = rows.flatMap((r) => data.cells[r] ?? []);
+  return Math.max(0, ...values.map((value) => Math.abs(value ?? 0)));
+}
 
+/** Row `r` of the source as a heatmap row, its cells shaded against `largest`. */
+function heatRow(data: ChartSource, r: number, largest: number): HeatmapRow {
+  return {
+    key: data.rows[r]!.key ?? 'none',
+    label: data.rows[r]!.label,
+    cells: data.columns.map((_, c) => {
+      const value = data.cells[r]?.[c] ?? null;
+      if (value === null) return null;
+      const share = largest === 0 ? 0 : Math.abs(value) / largest;
+      return { value, href: data.hrefs.cells[r]![c]!, level: heatLevel(share) };
+    }),
+    total: data.rowTotals[r] ?? null,
+    totalHref: data.hrefs.rowTotals[r]!,
+  };
+}
+
+function isSignedSource(data: ChartSource): boolean {
+  const values = data.cells.flat().filter((value): value is number => value !== null);
+  return values.some((value) => value > 0) && values.some((value) => value < 0);
+}
+
+export function toHeatmap(data: ChartSource): Heatmap {
+  const all = data.rows.map((_, r) => r);
+  const largest = largestCell(data, all);
+  const order = all.sort(
+    (a, b) => Math.abs(data.rowTotals[b] ?? 0) - Math.abs(data.rowTotals[a] ?? 0),
+  );
   return {
     columns: data.columns.map(column),
-    rows: order.map((r) => ({
-      key: data.rows[r]!.key ?? 'none',
-      label: data.rows[r]!.label,
-      cells: data.columns.map((_, c) => {
-        const value = data.cells[r]?.[c] ?? null;
-        if (value === null) return null;
-        const share = largest === 0 ? 0 : Math.abs(value) / largest;
-        return { value, href: data.hrefs.cells[r]![c]!, level: heatLevel(share) };
-      }),
-      total: data.rowTotals[r] ?? null,
-      totalHref: data.hrefs.rowTotals[r]!,
-    })),
+    rows: order.map((r) => heatRow(data, r, largest)),
     hasTotal: data.columns.length > 1,
-    isSigned: values.some((value) => value > 0) && values.some((value) => value < 0),
+    isSigned: isSignedSource(data),
+  };
+}
+
+/** A child row of a tree heatmap: its own name to show, its whole label to be named by. */
+export interface TreeHeatmapRow extends HeatmapRow {
+  name: string;
+}
+
+export interface TreeHeatmapGroup {
+  /** The group's subtotal: drawn plain, so it never drowns its children. */
+  subtotal: HeatmapRow;
+  children: TreeHeatmapRow[];
+}
+
+export interface TreeHeatmapSection {
+  label: string;
+  /** The sum of its group subtotals; null when none has a value. */
+  total: number | null;
+  groups: TreeHeatmapGroup[];
+}
+
+export interface TreeHeatmap {
+  columns: HeatmapColumn[];
+  sections: TreeHeatmapSection[];
+  hasTotal: boolean;
+  isSigned: boolean;
+}
+
+/**
+ * A heatmap whose rows form a tree (Categories per period): the tree's order, not the largest
+ * first, each child shaded against the largest child cell of its own section, so Expense is not
+ * washed out by Income and no subtotal outweighs the Categories it adds up.
+ */
+export function toTreeHeatmap(data: ChartSource, tree: RowTree): TreeHeatmap {
+  const sections = tree.sections.map((section) => {
+    const children = section.groups.flatMap((group) => group.children.map((child) => child.row));
+    const largest = largestCell(data, children);
+    const totals = section.groups
+      .map((group) => data.rowTotals[group.row] ?? null)
+      .filter((total): total is number => total !== null);
+    return {
+      label: section.label,
+      total: totals.length === 0 ? null : totals.reduce((sum, total) => sum + total, 0),
+      groups: section.groups.map((group) => ({
+        subtotal: heatRow(data, group.row, largest),
+        children: group.children.map((child) => ({
+          ...heatRow(data, child.row, largest),
+          name: child.label,
+        })),
+      })),
+    };
+  });
+  return {
+    columns: data.columns.map(column),
+    sections,
+    hasTotal: data.columns.length > 1,
+    isSigned: isSignedSource(data),
   };
 }
 

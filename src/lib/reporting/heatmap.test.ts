@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ReportHeader } from '@/server/services/reporting';
-import type { ChartSource } from './chart-data';
-import { compactValue, HEAT_LEVELS, heatLevel, toHeatmap } from './heatmap';
+import type { ChartSource, RowTree } from './chart-data';
+import { compactValue, HEAT_LEVELS, heatLevel, toHeatmap, toTreeHeatmap } from './heatmap';
 
 const header = (label: string, isPartial = false): ReportHeader => ({
   key: label,
@@ -126,5 +126,112 @@ describe('compactValue', () => {
   it('counts Transactions, not minor units', () => {
     expect(compactValue(42, 'count', false)).toBe('42');
     expect(compactValue(1500, 'count', false)).toBe('1.5k');
+  });
+});
+
+/**
+ * Categories per period's tree: Income (Salary, Side gigs) then Expense (Housing: Rent; Food:
+ * Groceries), each group's subtotal row before its Categories, whatever their sizes.
+ */
+const grouped = source(
+  [
+    'Income',
+    'Income › Salary',
+    'Income › Side gigs',
+    'Housing',
+    'Housing › Rent',
+    'Food',
+    'Food › Groceries',
+  ],
+  months,
+  [
+    [8400_00, 8400_00, 8300_00],
+    [8000_00, 8000_00, 8000_00],
+    [400_00, 400_00, 300_00],
+    [-2000_00, -2000_00, -2000_00],
+    [-2000_00, -2000_00, -2000_00],
+    [-600_00, null, -300_00],
+    [-600_00, null, -300_00],
+  ],
+);
+const tree: RowTree = {
+  sections: [
+    {
+      label: 'Income',
+      groups: [
+        {
+          row: 0,
+          children: [
+            { row: 1, label: 'Salary' },
+            { row: 2, label: 'Side gigs' },
+          ],
+        },
+      ],
+    },
+    {
+      label: 'Expense',
+      groups: [
+        { row: 3, children: [{ row: 4, label: 'Rent' }] },
+        { row: 5, children: [{ row: 6, label: 'Groceries' }] },
+      ],
+    },
+  ],
+};
+
+describe('toTreeHeatmap', () => {
+  it('keeps the tree’s order instead of ranking the rows, each Category under its group', () => {
+    const map = toTreeHeatmap(grouped, tree);
+
+    expect(
+      map.sections.map((section) => [
+        section.label,
+        section.groups.map((group) => [
+          group.subtotal.label,
+          group.children.map((child) => child.name),
+        ]),
+      ]),
+    ).toEqual([
+      ['Income', [['Income', ['Salary', 'Side gigs']]]],
+      [
+        'Expense',
+        [
+          ['Housing', ['Rent']],
+          ['Food', ['Groceries']],
+        ],
+      ],
+    ]);
+    // A Category keeps its whole label (for its accessible name) and its own links.
+    expect(map.sections[0]!.groups[0]!.children[0]).toMatchObject({
+      label: 'Income › Salary',
+      total: 24000_00,
+      totalHref: 'row:Income › Salary',
+    });
+    expect(map.sections[0]!.groups[0]!.subtotal.cells[0]).toMatchObject({
+      value: 8400_00,
+      href: 'cell:Income/Sep 2026',
+    });
+  });
+
+  it('shades each Category against the largest Category cell of its own section, never the subtotals', () => {
+    const map = toTreeHeatmap(grouped, tree);
+    const levels = (section: number, group: number, child: number) =>
+      map.sections[section]!.groups[group]!.children[child]!.cells.map(
+        (cell) => cell?.level ?? null,
+      );
+
+    // Income: Salary is its largest, Side gigs a twentieth of it.
+    expect(levels(0, 0, 0)).toEqual([5, 5, 5]);
+    expect(levels(0, 0, 1)).toEqual([0, 0, 0]);
+    // Expense is shaded on its own: Rent is darkest though smaller than Salary.
+    expect(levels(1, 0, 0)).toEqual([5, 5, 5]);
+    expect(levels(1, 1, 0)).toEqual([1, null, 0]);
+  });
+
+  it('totals each section from its group subtotals', () => {
+    const map = toTreeHeatmap(grouped, tree);
+
+    expect(map.sections.map((section) => section.total)).toEqual([25100_00, -6900_00]);
+    expect(map.hasTotal).toBe(true);
+    expect(map.isSigned).toBe(true);
   });
 });
