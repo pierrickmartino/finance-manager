@@ -5,6 +5,7 @@ import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { loadAnalytics } from '@/server/services/analytics';
 import { swissToday } from '@/server/services/fx/dates';
+import { CATEGORIES_PER_PERIOD, CategoriesPerPeriodSection } from './categories-per-period';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { INCOME_VS_EXPENSE, IncomeVsExpenseSection } from './income-vs-expense';
 import { PeriodSwitch } from './period-switch';
@@ -49,6 +50,9 @@ export default async function AnalyticsPage({
       <div className="grid min-w-0 grid-cols-1 gap-5">
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
           <IncomeVsExpenseSection table={sections.incomeVsExpense} view={view} fmt={fmt} />
+        </StreamedSection>
+        <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref}>
+          <CategoriesPerPeriodSection table={sections.categoriesPerPeriod} view={view} fmt={fmt} />
         </StreamedSection>
       </div>
     </section>
