@@ -168,3 +168,52 @@ body {
 .dashboard-board .react-grid-item > .react-resizable-handle::after {
   border-color: var(--color-ink-soft);
 }
+
+/*
+ * PROTOTYPE ONLY: denser shells (?shell=B…D, src/components/app-shell/shell-prototype.tsx).
+ * Unlayered, so these beat the Tailwind utilities on every page's titles. Delete with the
+ * prototype.
+ */
+[data-shell='B'] main h1 {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+[data-shell='B'] main h2.font-display {
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+}
+[data-shell='B'] main .font-display:is(.text-4xl, .text-5xl):not(h1, h2) {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+}
+[data-shell='C'] main h1 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+[data-shell='C'] main h2.font-display {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+}
+[data-shell='C'] main .font-display:is(.text-3xl, .text-4xl, .text-5xl):not(h1, h2) {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+[data-shell='D'] main h1 {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+[data-shell='D'] main h2.font-display {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+[data-shell='D'] main .font-display:is(.text-3xl, .text-4xl, .text-5xl):not(h1, h2) {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}

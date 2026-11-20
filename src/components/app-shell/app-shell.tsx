@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Suspense, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { logoutAction } from '@/app/login/actions';
 import { greetingFor } from './greeting';
 import {
@@ -17,6 +17,8 @@ import { Icon } from './icon';
 import { MobileDrawer } from './mobile-drawer';
 import { MoreMenu } from './more-menu';
 import { PRIMARY_LINKS, findCurrentPage, isActive } from './navigation';
+import { ShellPrototypeSwitcher, useShellVariant } from './shell-prototype'; // PROTOTYPE
+import { RailShell, SidebarShell, SlimBarShell } from './shell-variants-prototype'; // PROTOTYPE
 
 const subscribeToNothing = () => () => {};
 
@@ -111,6 +113,23 @@ interface AppShellProps {
 export function AppShell({ showNavigation, children }: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const shellVariant = useShellVariant(); // PROTOTYPE
+
+  // PROTOTYPE: denser shells, ?shell=A…D (see shell-prototype.tsx).
+  const switcher = (
+    <Suspense fallback={null}>
+      <ShellPrototypeSwitcher />
+    </Suspense>
+  );
+  if (showNavigation && shellVariant !== 'A') {
+    const Variant = { B: SlimBarShell, C: SidebarShell, D: RailShell }[shellVariant];
+    return (
+      <>
+        <Variant pathname={pathname}>{children}</Variant>
+        {switcher}
+      </>
+    );
+  }
 
   // Nothing clips the page: a menu that drops past the end of a page must still be reachable,
   // and sticky columns must stick.
@@ -148,6 +167,7 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
       </div>
 
       {showNavigation && isMenuOpen && <MobileDrawer onClose={() => setIsMenuOpen(false)} />}
+      {showNavigation && switcher}
     </div>
   );
 }
