@@ -11,7 +11,6 @@ import {
   netWorthPointDate,
   runNetWorthTrend,
   runSavedWidget,
-  type CellRef,
   type ReportTable,
   type Widget,
 } from '@/server/services/reporting';
@@ -21,7 +20,8 @@ import { isAccountKind } from '@/server/services/accounts/input';
 import { accountsHref } from '../accounts/view';
 import { listTransactions } from '@/server/services/transactions';
 import { categoryText, transactionName } from '../transactions/transaction-display';
-import { drillLinks, toPivotData, type PivotLinks } from '../widgets/pivot-data';
+import { BALANCE_LINKS, drillLinks, type PivotLinks } from '@/lib/reporting/pivot-source';
+import { toPivotData } from '../widgets/pivot-data';
 import type { RecentActivity } from './(dashboard)/[id]/overview/overview-row';
 import type { BoardCard } from './(dashboard)/[id]/overview/widget-board';
 
@@ -31,14 +31,6 @@ export interface WidgetView {
   unconvertedCount: number;
   error: string | null;
 }
-
-/** An Account balance links to its Account, the total to the Accounts page. */
-export function balanceHref(cell: CellRef): string {
-  return typeof cell.row === 'string' ? `/accounts/${cell.row}` : '/accounts';
-}
-
-/** Account balances aren't Transactions: no Drill-down, only their Accounts. */
-export const BALANCE_LINKS: PivotLinks = { hrefOf: balanceHref, drill: null };
 
 /**
  * Net worth over time links each point to the Accounts as they stood on its date, a band's

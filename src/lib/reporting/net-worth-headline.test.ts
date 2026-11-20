@@ -55,6 +55,30 @@ describe("the headline's Net worth trend", () => {
     ]);
   });
 
+  it('changes since the end of the previous quarter or year when its points are quarters or years', () => {
+    const quarters: ChartSource = {
+      ...monthly('2024-01', [100_00, 200_00, 300_00, 400_00, 500_00, 650_00]),
+      rows: ['2025-Q2', '2025-Q3', '2025-Q4', '2026-Q1', '2026-Q2', '2026-Q3'].map((key) => ({
+        key,
+        label: key,
+        isPartial: key === '2026-Q3',
+      })),
+    };
+    const years: ChartSource = {
+      ...monthly('2024-01', [100_00, 300_00, 350_00]),
+      rows: ['2024', '2025', '2026'].map((key) => ({ key, label: key, isPartial: key === '2026' })),
+    };
+
+    expect(readHeadlineTrend(quarters, 'quarter').changes).toEqual([
+      { label: '1Q', months: 3, since: '2026-Q2', change: 150_00, href: 'accounts:2024-05' },
+      { label: '1Y', months: 12, since: '2025-Q3', change: 450_00, href: 'accounts:2024-02' },
+    ]);
+    expect(readHeadlineTrend(years, 'year').changes).toEqual([
+      { label: '1Y', months: 12, since: '2025', change: 50_00, href: 'accounts:2024-02' },
+      { label: '2Y', months: 24, since: '2024', change: 250_00, href: 'accounts:2024-01' },
+    ]);
+  });
+
   it('says a fall as a negative change', () => {
     const falling = monthly('2026-09', [50_000_00, 48_000_00, 45_500_00]);
 

@@ -9,13 +9,21 @@ import { createManualTransaction } from '../src/server/services/transactions/man
 import { withServices } from './support/services';
 
 /**
- * Analytics (spec #170): the Period view switch, Net worth, Recent transactions, Net cash
- * flow, Account balances in CHF, Spending by Category, the Income vs. expense table and the
- * Categories per period table.
+ * Analytics (spec #170): the Period view switch, and each section drawn as the Dashboard's own
+ * card: Net worth, Spending Insights, Recent transactions, Net cash flow, Account balances in
+ * CHF, Spending by Category, and the Income vs. expense and Categories per period heatmaps.
  */
 
-/** A salary booked today, so it falls in the current period of every Period view. */
-async function seedSalary(suffix: number): Promise<string> {
+interface Seeded {
+  description: string;
+  account: string;
+}
+
+/**
+ * A salary booked today, so it falls in the current period of every Period view, on an Account
+ * holding money since 2021, so Net worth has a value at every period end of every window.
+ */
+async function seedSalary(suffix: number): Promise<Seeded> {
   const description = `Analytics salary ${suffix}`;
   await withServices(async (ctx) => {
     const bank = await createBank(ctx, { name: `Analytics bank ${suffix}` });
@@ -25,7 +33,7 @@ async function seedSalary(suffix: number): Promise<string> {
       importFormat: null,
       name: `Analytics account ${suffix}`,
       currency: 'CHF',
-      openingBalanceMinor: 0,
+      openingBalanceMinor: 1_000_00,
       openingDate: '2021-01-01',
     });
     const group = await createCategoryGroup(ctx, { name: `Pay ${suffix}`, type: 'income' });
@@ -38,19 +46,34 @@ async function seedSalary(suffix: number): Promise<string> {
     });
     await editClassification(ctx, transaction.id, { categoryId: salary.id });
   });
-  return description;
+  return { description, account: `Analytics bank ${suffix} · Analytics account ${suffix}` };
 }
 
 const [YEAR, MONTH] = swissToday().split('-') as [string, string];
 const QUARTER = `${YEAR}-Q${Math.ceil(Number(MONTH) / 3)}`;
+const CURRENT_MONTH = formatPeriod(`${YEAR}-${MONTH}`);
 
-const table = (page: Page) => page.getByRole('table', { name: 'Income vs. expense' });
-
-/** The table's column headers: the periods, then Total and Average. */
-async function columns(page: Page): Promise<string[]> {
-  const headers = await table(page).getByRole('columnheader').allInnerTexts();
-  return headers.slice(1).map((header) => header.replace(/\s+/g, ' ').trim());
+/** A day `count` months before today's month, mid-month. */
+function monthsAgo(count: number): string {
+  const date = new Date(Date.UTC(Number(YEAR), Number(MONTH) - 1 - count, 15));
+  return date.toISOString().slice(0, 10);
 }
+
+const region = (page: Page, name: string) => page.getByRole('region', { name, exact: true });
+
+const heatmap = (page: Page, name: string) =>
+  region(page, name).getByRole('table', { name: 'Heatmap' });
+
+/** A heatmap's column headers: the periods (the running one starred), then Total. */
+async function columns(page: Page, name: string): Promise<string[]> {
+  return heatmap(page, name).getByRole('columnheader').allInnerTexts();
+}
+
+/** A heatmap's row by its header. */
+const heatmapRow = (page: Page, name: string, row: string) =>
+  heatmap(page, name)
+    .getByRole('row')
+    .filter({ has: page.getByRole('rowheader', { name: row, exact: true }) });
 
 test('/ lands on Analytics in Month', async ({ page }) => {
   await page.goto('/');
@@ -61,27 +84,24 @@ test('/ lands on Analytics in Month', async ({ page }) => {
   ).toHaveAttribute('aria-current', 'page');
 });
 
-test('the Period view switches the Income vs. expense table and a cell opens its Drill-down', async ({
+test('the Period view switches the Income vs. expense heatmap and a cell opens its Drill-down', async ({
   page,
 }) => {
-  const description = await seedSalary(Date.now());
+  const { description } = await seedSalary(Date.now());
   const periodSwitch = page.getByRole('navigation', { name: 'Period view' });
+  const name = 'Income vs. expense';
 
-  // Month is the default: 12 months, the current one to date.
+  // Month is the default: 12 months, the current one starred as running, then Total.
   await page.goto('/analytics');
   await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
   await expect(periodSwitch.getByRole('link', { name: 'Month' })).toHaveAttribute(
     'aria-current',
     'page',
   );
-  await expect(table(page)).toBeVisible();
-  let headers = await columns(page);
-  expect(headers).toHaveLength(12 + 2);
-  expect(headers.slice(-3)).toEqual([
-    `${formatPeriod(`${YEAR}-${MONTH}`)} to date`,
-    'Total',
-    'Average',
-  ]);
+  await expect(heatmap(page, name)).toBeVisible();
+  let headers = await columns(page, name);
+  expect(headers).toHaveLength(12 + 1);
+  expect(headers.slice(-2)).toEqual([`${CURRENT_MONTH.split(' ')[0]}*`, 'Total']);
   for (const row of [
     'Income',
     'Expense',
@@ -89,7 +109,9 @@ test('the Period view switches the Income vs. expense table and a cell opens its
     'Net (income − expense)',
     'Net incl. Capital',
   ]) {
-    await expect(table(page).getByRole('rowheader', { name: row, exact: true })).toBeVisible();
+    await expect(
+      heatmap(page, name).getByRole('rowheader', { name: row, exact: true }),
+    ).toBeVisible();
   }
 
   await periodSwitch.getByRole('link', { name: 'Quarter' }).click();
@@ -98,19 +120,17 @@ test('the Period view switches the Income vs. expense table and a cell opens its
     'aria-current',
     'page',
   );
-  await expect(table(page).getByRole('columnheader').nth(8)).toHaveText(
-    new RegExp(`^${formatPeriod(QUARTER)}\\s*to date$`),
+  await expect(heatmap(page, name).getByRole('columnheader').nth(7)).toHaveText(
+    `${formatPeriod(QUARTER)}*`,
   );
-  headers = await columns(page);
-  expect(headers).toHaveLength(8 + 2);
+  headers = await columns(page, name);
+  expect(headers).toHaveLength(8 + 1);
 
   await periodSwitch.getByRole('link', { name: 'Year' }).click();
   await expect(page).toHaveURL(/\/analytics\?period=year$/);
-  await expect(table(page).getByRole('columnheader').nth(6)).toHaveText(
-    new RegExp(`^${YEAR}\\s*to date$`),
-  );
-  headers = await columns(page);
-  expect(headers).toHaveLength(6 + 2);
+  await expect(heatmap(page, name).getByRole('columnheader').nth(5)).toHaveText(`${YEAR}*`);
+  headers = await columns(page, name);
+  expect(headers).toHaveLength(6 + 1);
   expect(headers[0]).toBe(String(Number(YEAR) - 5));
 
   // A reload keeps the Period view.
@@ -121,8 +141,8 @@ test('the Period view switches the Income vs. expense table and a cell opens its
   );
 
   // The current year's income opens the Transactions behind it, with a way back.
-  await table(page)
-    .getByRole('link', { name: new RegExp(`^Income, ${YEAR} to date: `) })
+  await heatmap(page, name)
+    .getByRole('link', { name: new RegExp(`^Income, ${YEAR} \\(partial\\): `) })
     .click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   await expect(
@@ -132,7 +152,7 @@ test('the Period view switches the Income vs. expense table and a cell opens its
   await expect(page).toHaveURL(/\/analytics\?period=year$/);
 });
 
-test('Spending Insights draws the current period to date and a bar opens its Drill-down', async ({
+test("Spending Insights is the Dashboard's insight card and opens the latest complete month's Transactions", async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -150,48 +170,43 @@ test('Spending Insights draws the current period to date and a bar opens its Dri
     });
     const group = await createCategoryGroup(ctx, { name: `Living ${suffix}`, type: 'expense' });
     const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
-    const transaction = await createManualTransaction(ctx, {
-      accountId: account.id,
-      bookingDate: swissToday(),
-      amountMinor: -12_34,
-      description,
-    });
-    await editClassification(ctx, transaction.id, { categoryId: groceries.id });
+    // Two complete months with spending: the insight compares the latest with the one before.
+    for (const [bookingDate, label] of [
+      [monthsAgo(2), `${description} before`],
+      [monthsAgo(1), description],
+    ] as const) {
+      const transaction = await createManualTransaction(ctx, {
+        accountId: account.id,
+        bookingDate,
+        amountMinor: -12_34,
+        description: label,
+      });
+      await editClassification(ctx, transaction.id, { categoryId: groceries.id });
+    }
   });
-  const insights = page.getByRole('region', { name: 'Spending Insights' });
 
   await page.goto('/analytics');
-  await expect(
-    insights.getByRole('link', {
-      name: new RegExp(`^${formatPeriod(`${YEAR}-${MONTH}`)} to date: `),
-    }),
-  ).toBeVisible();
-
-  await page
-    .getByRole('navigation', { name: 'Period view' })
-    .getByRole('link', { name: 'Quarter' })
-    .click();
-  await expect(page).toHaveURL(/\/analytics\?period=quarter$/);
-  const current = insights.getByRole('link', {
-    name: new RegExp(`^${formatPeriod(QUARTER)} to date: `),
-  });
-  await expect(current).toBeVisible();
-
-  await current.click();
+  const latest = page.getByRole('link', { name: 'See the Transactions' });
+  await expect(page.getByRole('heading', { name: /^Spending is / })).toBeVisible();
+  await latest.click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   await expect(
-    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description, {
+      exact: true,
+    }),
   ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=month$/);
 });
 
-test('on a phone the switch stays at the top and the table scrolls inside its card', async ({
+test('on a phone the switch stays at the top and the heatmap scrolls inside its card', async ({
   page,
 }) => {
   await seedSalary(Date.now());
   // Short, so the page scrolls past the switch with one section.
   await page.setViewportSize({ width: 390, height: 420 });
   await page.goto('/analytics');
-  await expect(table(page)).toBeVisible();
+  await expect(heatmap(page, 'Income vs. expense')).toBeVisible();
 
   const periodSwitch = page.getByRole('navigation', { name: 'Period view' });
   const top = (await periodSwitch.boundingBox())!.y;
@@ -199,68 +214,64 @@ test('on a phone the switch stays at the top and the table scrolls inside its ca
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(top);
   await expect.poll(async () => (await periodSwitch.boundingBox())?.y).toBe(0);
 
-  // The page never scrolls sideways: the table does, inside its card.
+  // The page never scrolls sideways: the heatmap does, inside its card.
   const pageOverflows = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(pageOverflows).toBe(false);
-  const scroller = page
-    .getByRole('region', { name: 'Income vs. expense' })
-    .getByTestId('period-table-scroll');
-  const tableOverflows = await scroller.evaluate(
-    (element) => element.scrollWidth > element.clientWidth,
-  );
-  expect(tableOverflows).toBe(true);
+  for (const name of ['Income vs. expense', 'Categories per period']) {
+    const scroller = region(page, name).locator('figure');
+    expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+      true,
+    );
+  }
 });
 
-test('Net worth reads today, with a point per period end of the window and its change', async ({
+test('Net worth reads today, with a point per period end of the window and its change since the previous one', async ({
   page,
 }) => {
   await seedSalary(Date.now());
-  const netWorth = page.getByRole('region', { name: 'Net worth' });
-  const today = netWorth.getByRole('link', { name: /^Net worth today: / });
+  const netWorth = region(page, 'Your net worth today');
 
-  for (const [view, length, words] of [
-    ['month', 12, 'months'],
-    ['quarter', 8, 'quarters'],
-    ['year', 6, 'years'],
+  for (const [view, length, words, current, change] of [
+    ['month', 12, 'months', CURRENT_MONTH, '1M'],
+    ['quarter', 8, 'quarters', formatPeriod(QUARTER), '1Q'],
+    ['year', 6, 'years', YEAR, '1Y'],
   ] as const) {
     await page.goto(`/analytics?period=${view}`);
-    await expect(today).toBeVisible();
     const trend = netWorth.getByRole('group', {
       name: `Net worth over the last ${length} ${words}`,
     });
     await expect(trend.getByRole('link')).toHaveCount(length);
-    await expect(trend.getByRole('link').last()).toHaveAccessibleName(/^Today: /);
-    await expect(netWorth.getByText(/since the end of /)).toBeVisible();
+    await expect(trend.getByRole('link').last()).toHaveAccessibleName(new RegExp(`^${current}: `));
+    await expect(
+      netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
+    ).toHaveAccessibleName(new RegExp(`^${change}: .* since the end of `));
+    await expect(netWorth.getByText('Came in')).toBeVisible();
   }
 
-  // Today's amount opens the Accounts as they stand today.
-  await today.click();
-  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
+  // Today's amount opens the Accounts.
+  await netWorth.getByRole('link', { name: /^CHF / }).first().click();
+  await expect(page).toHaveURL(/\/accounts$/);
 });
 
-const categories = (page: Page) => page.getByRole('table', { name: 'Categories per period' });
-
-test('Categories per period lists each Category under its group subtotal, and both open their Drill-down', async ({
+test('Categories per period lists each Category beside its group subtotal, and both open their Drill-down', async ({
   page,
 }) => {
   const suffix = Date.now();
-  const description = await seedSalary(suffix);
-  const current = `${formatPeriod(`${YEAR}-${MONTH}`)} to date`;
+  const { description } = await seedSalary(suffix);
+  const name = 'Categories per period';
 
   await page.goto('/analytics');
-  const group = categories(page)
-    .getByRole('row')
-    .filter({
-      has: page.getByRole('rowheader', { name: `Pay ${suffix}`, exact: true }),
-    });
+  const group = heatmapRow(page, name, `Pay ${suffix}`);
+  const category = heatmapRow(page, name, `Pay ${suffix} › Salary`);
   await expect(group).toBeVisible();
-  const category = group.locator('xpath=following-sibling::tr[1]');
-  await expect(category.getByRole('rowheader')).toHaveText('Salary');
+  await expect(category).toBeVisible();
 
   // The group's subtotal for the current month opens the Transactions behind it.
-  await group.getByRole('link', { name: new RegExp(`^Pay ${suffix}, ${current}: `) }).click();
+  await group
+    .getByRole('link', { name: new RegExp(`^Pay ${suffix}, ${CURRENT_MONTH} \\(partial\\): `) })
+    .click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   await expect(
     page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
@@ -268,58 +279,41 @@ test('Categories per period lists each Category under its group subtotal, and bo
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
   await expect(page).toHaveURL(/\/analytics\?period=month$/);
 
-  // So does the Category's Total.
-  await category.getByRole('link', { name: /^Salary, Total: / }).click();
+  // So does the Category's Total, the row's last figure.
+  await category.getByRole('link').last().click();
   await expect(
     page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
   ).toBeVisible();
 });
 
-test('on a phone Categories per period scrolls sideways inside its card', async ({ page }) => {
-  await seedSalary(Date.now());
-  await page.setViewportSize({ width: 390, height: 800 });
-  await page.goto('/analytics');
-  await expect(categories(page)).toBeVisible();
-
-  const pageOverflows = await page.evaluate(
-    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-  );
-  expect(pageOverflows).toBe(false);
-  const scroller = page
-    .getByRole('region', { name: 'Categories per period' })
-    .getByTestId('period-table-scroll');
-  expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
-    true,
-  );
-});
-
 test('Recent transactions and Account balances stay the same in every Period view and open their pages', async ({
   page,
 }) => {
-  const suffix = Date.now();
-  const description = await seedSalary(suffix);
-  const account = `Analytics bank ${suffix} · Analytics account ${suffix}`;
-  const recent = page.getByRole('region', { name: 'Recent transactions' });
-  const balances = page.getByRole('table', { name: 'Account balances in CHF' });
+  const { description, account } = await seedSalary(Date.now());
+  const recent = region(page, 'Recent transactions');
+  const balances = region(page, 'Account balances in CHF');
+  // The opening 1'000.00 and today's salary of 4'321.00.
+  const balance = balances.getByRole('link', { name: new RegExp(`^${account}.*5\\D?321`) });
 
   for (const view of ['month', 'quarter', 'year']) {
     await page.goto(`/analytics?period=${view}`);
     await expect(recent.getByRole('link', { name: new RegExp(description) })).toBeVisible();
-    await expect(balances.getByRole('row', { name: new RegExp(account) })).toContainText(
-      /4\D?321\.00/,
-    );
+    await expect(balance).toBeVisible();
   }
 
   await recent.getByRole('link', { name: new RegExp(description) }).click();
   await expect(page).toHaveURL(/\/transactions\/[0-9a-f-]{36}/);
 
   await page.goto('/analytics');
-  await balances.getByRole('link', { name: account }).click();
+  await balance.click();
   await expect(page).toHaveURL(/\/accounts\/[0-9a-f-]{36}/);
 });
 
-/** A purchase booked today, large enough to rank among the 8 named Categories in a shared DB. */
-async function seedPurchase(suffix: number): Promise<{ description: string; label: string }> {
+/**
+ * Purchases booked today in three Categories, so the section is a ranking (as a stacked bar
+ * Widget's card is from three series on), the first large enough to lead it in a shared DB.
+ */
+async function seedPurchase(suffix: number): Promise<{ description: string; group: string }> {
   const description = `Analytics purchase ${suffix}`;
   const groupName = `Spend ${suffix}`;
   await withServices(async (ctx) => {
@@ -334,65 +328,73 @@ async function seedPurchase(suffix: number): Promise<{ description: string; labe
       openingDate: '2021-01-01',
     });
     const group = await createCategoryGroup(ctx, { name: groupName, type: 'expense' });
-    const category = await createCategory(ctx, { groupId: group.id, name: 'Furniture' });
-    const transaction = await createManualTransaction(ctx, {
-      accountId: account.id,
-      bookingDate: swissToday(),
-      amountMinor: -987_654_32,
-      description,
-    });
-    await editClassification(ctx, transaction.id, { categoryId: category.id });
+    for (const [name, amountMinor, label] of [
+      ['Furniture', -987_654_32, description],
+      ['Lamps', -300_00, `${description} lamp`],
+      ['Rugs', -200_00, `${description} rug`],
+    ] as const) {
+      const category = await createCategory(ctx, { groupId: group.id, name });
+      const transaction = await createManualTransaction(ctx, {
+        accountId: account.id,
+        bookingDate: swissToday(),
+        amountMinor,
+        description: label,
+      });
+      await editClassification(ctx, transaction.id, { categoryId: category.id });
+    }
   });
-  return { description, label: `${groupName} › Furniture` };
+  return { description, group: groupName };
 }
 
-test('Spending by Category draws the current period to date and a Category opens its Drill-down', async ({
+test('Spending by Category ranks the largest Categories and a Category opens its Drill-down', async ({
   page,
 }) => {
-  const { description, label } = await seedPurchase(Date.now());
+  const { description, group } = await seedPurchase(Date.now());
 
   await page.goto('/analytics?period=quarter');
-  const section = page.getByRole('region', { name: 'Spending by Category' });
-  await expect(section.getByRole('figure', { name: /stacked bar chart$/ })).toBeVisible();
-  await expect(section.getByText(`${formatPeriod(QUARTER)} to date`)).toBeVisible();
+  const section = region(page, 'Spending by Category');
+  await expect(section.getByText('Furniture leads')).toBeVisible();
+  await expect(section.getByText(/^Heaviest quarter: /)).toBeVisible();
+  await expect(section.getByText(/^Quarterly average$/)).toBeVisible();
 
-  const legend = section.getByRole('list', { name: 'Spending by Category legend' });
-  await legend.getByRole('link', { name: new RegExp(`^${label}, Total: `) }).click();
+  await section.getByRole('link', { name: new RegExp(`^Furniture\\s*${group}`) }).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   await expect(
-    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+    page
+      .getByRole('table', { name: 'Drill-down Transactions' })
+      .getByText(description, { exact: true }),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
   await expect(page).toHaveURL(/\/analytics\?period=quarter$/);
 });
 
-test('Net cash flow has a point per period, the current one to date, each opening its Drill-down', async ({
+test('Net cash flow has a bar per period, the current one partial, each opening its Drill-down', async ({
   page,
 }) => {
-  const description = await seedSalary(Date.now());
-  const line = page.getByRole('figure', { name: 'Net cash flow line chart' });
-  const toDate = (label: string) =>
-    line.getByRole('link', { name: new RegExp(`^Net cash flow, ${label} to date: `) });
+  const { description } = await seedSalary(Date.now());
+  const flow = region(page, 'Net cash flow');
+  const partial = (label: string) =>
+    flow.getByRole('link', { name: new RegExp(`^${label} \\(partial\\): `) });
 
   await page.goto('/analytics?period=quarter');
-  await expect(toDate(formatPeriod(QUARTER))).toBeVisible();
+  await expect(partial(formatPeriod(QUARTER))).toBeVisible();
+  // Its best and weakest quarters, or heaviest and lightest when every quarter loses money.
+  await expect(flow.getByText(/^(Weakest|Lightest) quarter: /)).toBeVisible();
 
   await page.goto('/analytics?period=year');
-  await expect(toDate(YEAR)).toBeVisible();
-  // At most one point per period: the window's 6 years.
-  expect(await line.getByRole('link').count()).toBeLessThanOrEqual(6);
+  await expect(partial(YEAR)).toBeVisible();
+  // At most one bar per period: the window's 6 years.
+  expect(await flow.getByRole('link', { name: /^\d{4}( \(partial\))?: / }).count()).toBe(6);
 
   // On a wide screen it sits beside Account balances, on the left.
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
-  const flowBox = (await page.getByRole('region', { name: 'Net cash flow' }).boundingBox())!;
-  const balancesBox = (await page
-    .getByRole('region', { name: 'Account balances in CHF' })
-    .boundingBox())!;
+  const flowBox = (await flow.boundingBox())!;
+  const balancesBox = (await region(page, 'Account balances in CHF').boundingBox())!;
   expect(flowBox.y).toBe(balancesBox.y);
   expect(flowBox.x + flowBox.width).toBeLessThan(balancesBox.x);
 
-  await toDate(formatPeriod(`${YEAR}-${MONTH}`)).click();
+  await partial(CURRENT_MONTH).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   await expect(
     page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
@@ -405,25 +407,27 @@ test('on a wide screen Net worth, Spending Insights and Recent transactions shar
   page,
 }) => {
   await seedSalary(Date.now());
-  // Each section's box once it has loaded (its placeholder has the same name).
-  const boxOf = async (name: string) => {
-    const region = page.getByRole('region', { name });
-    await expect(region).not.toHaveAttribute('aria-busy', 'true');
-    return (await region.boundingBox())!;
+  // The overview row's three cards, once each has loaded.
+  const recent = region(page, 'Recent transactions');
+  const cards = recent.locator('xpath=..').locator(':scope > section');
+  const boxes = async () => {
+    await expect(cards).toHaveCount(3);
+    await expect(cards.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
+    return Promise.all([0, 1, 2].map(async (i) => (await cards.nth(i).boundingBox())!));
   };
-  const overview = ['Net worth', 'Spending Insights', 'Recent transactions'];
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
-  const [netWorth, insights, recent] = await Promise.all(overview.map(boxOf));
+  await expect(cards.first()).toHaveAccessibleName('Your net worth today');
+  const [netWorth, insights, recentBox] = await boxes();
   expect(insights!.y).toBe(netWorth!.y);
-  expect(recent!.y).toBe(netWorth!.y);
+  expect(recentBox!.y).toBe(netWorth!.y);
   expect(netWorth!.x + netWorth!.width).toBeLessThan(insights!.x);
-  expect(insights!.x + insights!.width).toBeLessThan(recent!.x);
+  expect(insights!.x + insights!.width).toBeLessThan(recentBox!.x);
 
   // One column on a phone, in the same order.
   await page.setViewportSize({ width: 390, height: 900 });
-  const [narrowWorth, narrowInsights, narrowRecent] = await Promise.all(overview.map(boxOf));
+  const [narrowWorth, narrowInsights, narrowRecent] = await boxes();
   expect(narrowWorth!.x).toBe(narrowInsights!.x);
   expect(narrowWorth!.y + narrowWorth!.height).toBeLessThan(narrowInsights!.y);
   expect(narrowInsights!.y + narrowInsights!.height).toBeLessThan(narrowRecent!.y);
@@ -457,17 +461,17 @@ async function seedUnconverted(suffix: number): Promise<void> {
 test('every section with figures left out for want of an FX rate says so', async ({ page }) => {
   await seedUnconverted(Date.now());
   await page.goto('/analytics');
+  const notes = page.getByText(/left out: no FX rate yet\./);
   for (const name of [
-    'Net worth',
-    'Spending Insights',
+    'Your net worth today',
     'Net cash flow',
     'Account balances in CHF',
     'Spending by Category',
     'Income vs. expense',
     'Categories per period',
   ]) {
-    await expect(
-      page.getByRole('region', { name }).getByText(/left out: no FX rate yet\./),
-    ).toBeVisible();
+    await expect(region(page, name).getByText(/left out: no FX rate yet\./)).toBeVisible();
   }
+  // Spending Insights too, whether it draws its insight or says why it can't yet.
+  await expect(notes).toHaveCount(7);
 });

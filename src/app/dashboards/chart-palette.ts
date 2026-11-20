@@ -1,15 +1,11 @@
 /**
  * Chart colours. The eight categorical hues are a validated colour-blind-safe order (adjacent
  * pairs clear ΔE 8 under simulated CVD). Assign slots in order; a ninth series folds into
- * "Other" (`MAX_SERIES` in chart-data). Where a chart names eight series and folds the rest
- * into a ninth "Other" (Analytics' Spending by Category), Other takes `other`, the design
- * system's `rule-strong`, a muted grey that never reads as a ninth hue. Text never takes a series colour. Text, grid and
- * surface are the design system's muted, rule and surface tokens (globals.css); the app is
+ * "Other" (`MAX_SERIES` in chart-data). Text never takes a series colour. Text, grid and surface are the design system's muted, rule and surface tokens (globals.css); the app is
  * light only, so there is one palette.
  */
 export const CHART_PALETTE = {
   series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
-  other: '#cdd3dd',
   text: '#66708a',
   grid: '#e1e5ec',
   surface: '#ffffff',
