@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, loadSection, seedAccount, seedClassified } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
+import { readCard } from '@/lib/reporting/card';
 
-/** Analytics' Account balances in CHF (spec #170, user stories 25-26). */
+/** Analytics' Account balances in CHF, the Dashboard's share card (spec #170). */
 
 const t = setupTestDatabase();
 
@@ -31,20 +32,44 @@ async function dataset(): Promise<{ ubs: string; ca: string }> {
   return { ubs: ubs.id, ca: ca.id };
 }
 
+const money = String;
+
 describe('Account balances in CHF', () => {
-  it("lists each Account's balance today, converted to CHF at today's rate, and their total", async () => {
+  it("is a share card of each Account's balance today, converted to CHF at today's rate", async () => {
     fixToday('2025-03-20');
     const { ubs, ca } = await dataset();
 
-    const balances = await loadSection(t.ctx, 'month', 'accountBalances');
+    const card = await loadSection(t.ctx, 'month', 'accountBalances');
+    const reading = readCard(card, money);
 
-    expect(balances.date).toBe('2025-03-20');
-    expect(balances.rows).toEqual([
-      { accountId: ca, label: 'Bank CA · CA', chfMinor: 18_800 },
-      { accountId: ubs, label: 'Bank UBS · UBS', chfMinor: 100_000 },
-    ]);
-    expect(balances.totalChfMinor).toBe(118_800);
-    expect(balances.unconvertedCount).toBe(0);
+    expect(card.name).toBe('Account balances in CHF');
+    expect(card.source).toBe('account_balances');
+    expect(reading.kind).toBe('share');
+    expect(card.data!.rowTotals).toEqual([18_800, 100_000]);
+    expect(card.data!.total).toBe(118_800);
+    expect(card.unconvertedCount).toBe(0);
+    expect(reading.lead).toEqual({
+      headline: '84% sits in Bank UBS · UBS',
+      detail: '100000 of 118800',
+      href: `/accounts/${ubs}`,
+    });
+    expect(reading.mark).toMatchObject({
+      type: 'ticks',
+      items: [
+        {
+          title: 'Bank UBS · UBS',
+          detail: '100000',
+          share: 100_000 / 118_800,
+          href: `/accounts/${ubs}`,
+        },
+        {
+          title: 'Bank CA · CA',
+          detail: '18800',
+          share: 18_800 / 118_800,
+          href: `/accounts/${ca}`,
+        },
+      ],
+    });
   });
 
   it('is identical whatever the Period view', async () => {
@@ -55,7 +80,7 @@ describe('Account balances in CHF', () => {
     const quarter = await loadSection(t.ctx, 'quarter', 'accountBalances');
     const month = await loadSection(t.ctx, 'month', 'accountBalances');
 
-    expect(month.rows).toHaveLength(2);
+    expect(month.data!.rows).toHaveLength(2);
     expect(quarter).toEqual(month);
     expect(year).toEqual(month);
   });
@@ -67,20 +92,20 @@ describe('Account balances in CHF', () => {
     await seedClassified(t.ctx, ubs, [{ bookingDate: '2025-03-01', amountMinor: 5_000 }]);
     await seedClassified(t.ctx, ca, [{ bookingDate: '2025-03-01', amountMinor: 7_000 }]);
 
-    const balances = await loadSection(t.ctx, 'month', 'accountBalances');
+    const card = await loadSection(t.ctx, 'month', 'accountBalances');
 
-    expect(balances.rows.map((row) => row.chfMinor)).toEqual([null, 5_000]);
-    expect(balances.totalChfMinor).toBe(5_000);
-    expect(balances.unconvertedCount).toBe(1);
+    expect(card.data!.rowTotals).toEqual([null, 5_000]);
+    expect(card.data!.total).toBe(5_000);
+    expect(card.unconvertedCount).toBe(1);
   });
 
   it('is empty with no Accounts yet', async () => {
     fixToday('2025-03-20');
 
-    const balances = await loadSection(t.ctx, 'month', 'accountBalances');
+    const card = await loadSection(t.ctx, 'month', 'accountBalances');
 
-    expect(balances.rows).toEqual([]);
-    expect(balances.totalChfMinor).toBeNull();
-    expect(balances.isEmpty).toBe(true);
+    expect(card.data!.rows).toEqual([]);
+    expect(card.data!.total).toBeNull();
+    expect(card.isEmpty).toBe(true);
   });
 });

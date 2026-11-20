@@ -1,18 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  cellValues,
   fixToday,
+  labels,
+  linkedValues,
   loadSection,
+  openDrill,
+  originOf,
   seedAccount,
   seedClassified,
 } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
-import { listCellTransactions } from '../reporting';
 import { splitTransaction } from '../transactions';
 import { linkTransfer, transactionSide } from '../transfers';
-import type { CategoriesPerPeriod } from '.';
+import { readCard } from '@/lib/reporting/card';
 
 /** Analytics' Categories per period table (spec #170, ticket #172). */
 
@@ -71,94 +73,91 @@ async function dataset(): Promise<void> {
   });
 }
 
-const figuresOf = (table: CategoriesPerPeriod) =>
-  table.groups.flatMap((group) =>
-    [group.subtotal, ...group.categories].flatMap((row) => [...row.cells, row.total, row.average]),
-  );
+const money = String;
 
 describe('Categories per period', () => {
-  it('groups the Categories with an amount under their group, Income then Expense then Capital, each with a subtotal', async () => {
+  it('is a heatmap card of each group subtotal then its Categories with an amount, Income then Expense then Capital', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const table = await loadSection(t.ctx, 'month', 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, 'month', 'categoriesPerPeriod');
+    const data = card.data!;
 
-    expect(table.periods).toHaveLength(12);
-    expect(table.periods.at(-1)?.isToDate).toBe(true);
-    expect(table.isEmpty).toBe(false);
+    expect(card.name).toBe('Categories per period');
+    expect(card.isEmpty).toBe(false);
+    expect(readCard(card, money).kind).toBe('grid');
+    expect(data.columns).toHaveLength(12);
+    expect(data.columns.at(-1)).toMatchObject({ label: 'Mar 2025', isPartial: true });
     // Bonus and Hotels have nothing booked, so they are hidden, and so is the Travel group.
-    expect(
-      table.groups.map((group) => [
-        group.name,
-        group.type,
-        group.categories.map((row) => row.label),
-      ]),
-    ).toEqual([
-      ['Income', 'income', ['Salary']],
-      ['Food', 'expense', ['Groceries', 'Restaurants']],
-      ['Capital', 'capital', ['Property']],
+    expect(labels(data.rows)).toEqual([
+      'Income',
+      'Income › Salary',
+      'Food',
+      'Food › Groceries',
+      'Food › Restaurants',
+      'Capital',
+      'Capital › Property',
     ]);
     const empty = Array<null>(9).fill(null);
     // Groceries in January: -120.00 + 20.00 refund + EUR -100.00 at 0.94 = -194.00. The split
     // purchase counts -200.00 under Groceries and -100.00 under Property; the Transfer counts
-    // nowhere. Average divides the 11 complete months only, rounding half away from zero.
-    const food = table.groups[1]!;
-    expect(
-      [...food.categories, food.subtotal].map((row) => [
-        row.label,
-        cellValues(row),
-        row.total.value,
-        row.average.value,
-      ]),
-    ).toEqual([
-      ['Groceries', [...empty, -19_400, -20_000, null], -39_400, -3_582],
-      ['Restaurants', [...empty, null, null, -4_500], -4_500, null],
-      ['Food', [...empty, -19_400, -20_000, -4_500], -43_900, -3_582],
-    ]);
-    expect(table.groups[0]!.subtotal.total.value).toBe(900_000);
-    expect(table.groups[2]!.subtotal.total.value).toBe(-10_000);
+    // nowhere.
+    expect(data.rows.slice(2, 5).map((_, r) => [data.cells[r + 2], data.rowTotals[r + 2]])).toEqual(
+      [
+        [[...empty, -19_400, -20_000, -4_500], -43_900],
+        [[...empty, -19_400, -20_000, null], -39_400],
+        [[...empty, null, null, -4_500], -4_500],
+      ],
+    );
+    expect(data.rowTotals[0]).toBe(900_000);
+    expect(data.rowTotals[5]).toBe(-10_000);
+    expect(data.total).toBe(846_100);
+  });
+
+  it('leads with its largest row, as a Dashboard heatmap does', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, 'month', 'categoriesPerPeriod');
+
+    // Income is 900'000 of the rows' 1'907'800 in all, by magnitude: 47%.
+    expect(readCard(card, money).lead).toMatchObject({
+      headline: '47% sits in Income',
+      detail: '900000 of 846100',
+    });
   });
 
   it('reads the window of the Period view: Quarter and Year', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = await loadSection(t.ctx, 'quarter', 'categoriesPerPeriod');
-    const years = await loadSection(t.ctx, 'year', 'categoriesPerPeriod');
+    const quarters = (await loadSection(t.ctx, 'quarter', 'categoriesPerPeriod')).data!;
+    const years = (await loadSection(t.ctx, 'year', 'categoriesPerPeriod')).data!;
 
-    const groceries = (table: CategoriesPerPeriod) => table.groups[1]!.categories[0]!;
+    const groceries = 3;
     // February 2024 is in the Quarter and Year windows; the current period is to date.
-    expect(cellValues(groceries(quarters))).toEqual([
-      null,
-      null,
-      null,
-      -999,
-      null,
-      null,
-      null,
-      -39_400,
-    ]);
-    expect(groceries(quarters).total.value).toBe(-40_399);
-    // -9.99 over 7 complete quarters: -1.427, rounded to -1.43.
-    expect(groceries(quarters).average.value).toBe(-143);
-    expect(cellValues(groceries(years))).toEqual([null, null, null, null, -999, -39_400]);
-    expect(years.groups[1]!.subtotal.total.value).toBe(-44_899);
+    expect(quarters.cells[groceries]).toEqual([null, null, null, -999, null, null, null, -39_400]);
+    expect(quarters.rowTotals[groceries]).toBe(-40_399);
+    expect(years.cells[groceries]).toEqual([null, null, null, null, -999, -39_400]);
+    expect(years.rowTotals[2]).toBe(-44_899);
   });
 
   it.each(['month', 'quarter', 'year'] as const)(
-    'opens a Drill-down behind every cell, subtotal, Total and Average that sums to it (%s)',
+    'opens a Drill-down behind every cell, subtotal and Total that sums to it (%s)',
     async (view) => {
       fixToday('2025-03-20');
       await dataset();
 
-      const table = await loadSection(t.ctx, view, 'categoriesPerPeriod');
+      const data = (await loadSection(t.ctx, view, 'categoriesPerPeriod')).data!;
 
-      const figures = figuresOf(table);
-      // 3 subtotals and 4 Categories, each with a cell per period then Total and Average.
-      expect(figures).toHaveLength(7 * (table.periods.length + 2));
-      for (const figure of figures) {
-        const page = await listCellTransactions(t.ctx, figure.drill.query, figure.drill.cell);
-        expect(page.value).toBe(figure.value);
+      const values = linkedValues(data);
+      // 3 subtotals and 4 Categories, each with a cell per period then Total; then the column
+      // totals and the total.
+      const periods = data.columns.length;
+      expect(values).toHaveLength(7 * (periods + 1) + periods + 1);
+      for (const { value, href } of values) {
+        expect(originOf(href)).toEqual({ kind: 'analytics', period: view });
+        expect((await openDrill(t.ctx, href)).value).toBe(value);
       }
     },
   );
@@ -168,9 +167,9 @@ describe('Categories per period', () => {
     await dataset();
     vi.setSystemTime(new Date('2035-03-20T09:00:00Z'));
 
-    const table = await loadSection(t.ctx, 'year', 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, 'year', 'categoriesPerPeriod');
 
-    expect(table.isEmpty).toBe(true);
-    expect(table.groups).toEqual([]);
+    expect(card.isEmpty).toBe(true);
+    expect(card.data!.rows).toEqual([]);
   });
 });

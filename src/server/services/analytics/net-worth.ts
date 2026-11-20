@@ -1,70 +1,51 @@
+import { accountsHref } from '@/lib/accounts/links';
 import { windowSpan, type PeriodView } from '@/lib/analytics/period-view';
+import type { ChartSource } from '@/lib/reporting/chart-data';
+import { toChartSource } from '@/lib/reporting/pivot-source';
 import type { ServiceContext } from '../context';
 import { netWorthPointDate, runNetWorthTrend } from '../reporting';
-import type { SectionStatus } from './figures';
-import type { AnalyticsPeriod } from './window';
-
-/** One point of the Net worth trend: a period's end, or today for the current period. */
-export interface NetWorthPoint extends AnalyticsPeriod {
-  /** The day the point stands for. */
-  date: string;
-  /** Net worth in CHF minor units on `date`. */
-  value: number;
-}
-
-/** The period end a change is measured from. */
-export interface NetWorthSince {
-  key: string;
-  label: string;
-  date: string;
-}
+import type { AnalyticsCard, SectionStatus } from './figures';
 
 /**
- * Analytics' Net worth (GLOSSARY: Net worth, ADR-0014): every Account's computed balance, loans
- * counting against it, converted to CHF at each date's FX rate (ADR-0002).
+ * Analytics' Net worth (GLOSSARY: Net worth, ADR-0014), drawn as the Dashboard's Net worth card:
+ * every Account's computed balance, loans counting against it, converted to CHF at each date's
+ * FX rate (ADR-0002); beside it a trend with a point per period end of the Period window and
+ * today, and its change since the end of the previous period; under it what came in, went out
+ * and was kept over the window.
  */
 export interface AnalyticsNetWorth extends SectionStatus {
-  /** Net worth today; null without an Account (the section is then empty). */
-  today: { date: string; value: number } | null;
-  /** One point per period end of the Period window, then today, oldest first. */
-  points: NetWorthPoint[];
-  /** Today's Net worth against the end of the previous period; null without both. */
-  change: { since: NetWorthSince; value: number } | null;
+  /** What the card reads as it reads a Dashboard's Widgets: today's balances, and the flows. */
+  cards: AnalyticsCard[];
+  /** Net worth at each period end of the window, then today, each opening the Accounts then. */
+  trend: ChartSource;
 }
 
 /**
- * Net worth at a Period view: the Net worth trend over the Period window, its current point at
- * `today`. Its `unconvertedCount` counts Accounts left out of some point for want of an FX rate.
+ * Net worth at a Period view, from the Account balances and the window's income and expense
+ * (the Account balances and Spending Insights sections). Its `unconvertedCount` counts Accounts
+ * left out of some point for want of an FX rate.
  */
 export async function netWorth(
   ctx: ServiceContext,
   view: PeriodView,
-  window: readonly AnalyticsPeriod[],
   today: string,
+  sections: { balances: Promise<AnalyticsCard>; flow: Promise<AnalyticsCard> },
 ): Promise<AnalyticsNetWorth> {
-  const report = await runNetWorthTrend(ctx, { unit: view, count: windowSpan(view) });
-  const byKey = new Map(report.rows.map((row, r) => [row.key, report.rowTotals[r] ?? 0]));
-  // No Account: the trend has no rows, and there is nothing to show.
-  const points: NetWorthPoint[] = window
-    .filter((period) => byKey.has(period.key))
-    .map((period) => ({
-      ...period,
-      date: netWorthPointDate(period.key, view, today),
-      value: byKey.get(period.key)!,
-    }));
-  const latest = points.at(-1);
-  const previous = points.at(-2);
+  const [report, balances, flow] = await Promise.all([
+    runNetWorthTrend(ctx, { unit: view, count: windowSpan(view) }),
+    sections.balances,
+    sections.flow,
+  ]);
+  const dateOf = (key: unknown) =>
+    typeof key === 'string' ? netWorthPointDate(key, view, today) : today;
+  const trend = toChartSource(report, {
+    hrefOf: (cell) => accountsHref({ date: dateOf(cell.row) }),
+    drill: null,
+  });
   return {
-    today: latest ? { date: latest.date, value: latest.value } : null,
-    points,
-    change:
-      latest && previous
-        ? {
-            since: { key: previous.key, label: previous.label, date: previous.date },
-            value: latest.value - previous.value,
-          }
-        : null,
-    isEmpty: latest === undefined,
+    cards: [balances, flow],
+    trend,
+    isEmpty: balances.isEmpty,
     unconvertedCount: report.unconvertedCount,
   };
 }

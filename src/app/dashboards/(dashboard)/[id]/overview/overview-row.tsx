@@ -6,6 +6,7 @@ import { useFormatter } from '@/components/formatter-provider';
 import { BADGE_CLASS, HEADLINE_AMOUNT_CLASS, TILE_CLASS } from '@/components/surface';
 import { readCard, type CardFlow, type MonthFlow, type WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
+import { plural } from '@/lib/reporting/drill-summary';
 import { readHeadlineTrend } from '@/lib/reporting/net-worth-headline';
 import type { TimeAxis } from '@/server/services/reporting/query';
 import {
@@ -134,10 +135,22 @@ function FlowBreakdown({ summary, period, money }: FlowBreakdownProps) {
   );
 }
 
+/** What a card's figures leave out for want of an FX rate, when anything: as a Widget's card says. */
+function Unconverted({ count, of, className }: { count: number; of: string; className: string }) {
+  if (count <= 0) return null;
+  return <p className={`text-sm ${className}`}>{plural(count, of)} left out: no FX rate yet.</p>;
+}
+
 interface NetWorthCardProps {
   cards: WidgetCardData[];
-  /** Every Account's Net worth by month: today and the 24 month-ends before; null when not loaded. */
+  /** Every Account's Net worth by period: today and the period ends before; null when not loaded. */
   trend: ChartSource | null;
+  /** The period of the trend's points, which its change chips count in; months by default. */
+  period?: TimeAxis;
+  /** What the trend spans, for assistive technology; the last 24 months by default. */
+  trendLabel?: string;
+  /** Accounts left out of the trend for want of an FX rate. */
+  unconvertedCount?: number;
 }
 
 /**
@@ -146,10 +159,16 @@ interface NetWorthCardProps {
  * Widget, what came in, went out and was kept over its periods. With that breakdown it stands as tall as Recent activity (both span the overview
  * row's two rows from `lg` up).
  */
-export function NetWorthCard({ cards, trend }: NetWorthCardProps) {
+export function NetWorthCard({
+  cards,
+  trend,
+  period = 'month',
+  trendLabel,
+  unconvertedCount = 0,
+}: NetWorthCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const hero = headlineAmount(cards, trend && readHeadlineTrend(trend));
+  const hero = headlineAmount(cards, trend && readHeadlineTrend(trend, period));
   if (!hero) return null;
   const flow = overviewFlow(cards, money);
   const summary = flow ? flowSummary(flow.months) : null;
@@ -165,9 +184,12 @@ export function NetWorthCard({ cards, trend }: NetWorthCardProps) {
         <Link href={hero.href} className={`${HEADLINE_AMOUNT_CLASS} shrink-0 hover:underline`}>
           {money(hero.value)}
         </Link>
-        {hero.trend && <NetWorthSparkline points={hero.trend.points} money={money} />}
+        {hero.trend && (
+          <NetWorthSparkline points={hero.trend.points} money={money} label={trendLabel} />
+        )}
       </div>
       {hero.trend && <ChangeChips changes={hero.trend.changes} />}
+      <Unconverted count={unconvertedCount} of="Account" className="mt-2 text-warning" />
       {flow && summary && (
         <>
           <p className="mt-2 text-sm text-muted">
@@ -249,7 +271,14 @@ function SpendingChart({ months, period, money }: SpendingChartProps) {
  * spending against the average. As tall as Recent activity (both span the overview row's two
  * rows from `lg` up).
  */
-export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
+export function InsightCard({
+  cards,
+  unconvertedCount = 0,
+}: {
+  cards: WidgetCardData[];
+  /** Transactions left out of its figures for want of an FX rate. */
+  unconvertedCount?: number;
+}) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const flow = overviewFlow(cards, (minor) => fmt.amount(minor, { currency: 'CHF' }));
@@ -274,6 +303,7 @@ export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
         </FigureLink>
         {after}
       </p>
+      <Unconverted count={unconvertedCount} of="Transaction" className="mt-2 text-on-hero/80" />
       <SpendingChart months={flow.months} period={flow.period} money={money} />
       {flow.latestHref && (
         <Link
@@ -292,12 +322,19 @@ export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
  * navy, then the rest on a timeline with their Category and how long ago they were booked.
  * Each opens its page.
  */
-export function RecentActivityCard({ recent }: { recent: RecentActivity[] }) {
+export function RecentActivityCard({
+  recent,
+  title = 'Recent activity',
+}: {
+  recent: RecentActivity[];
+  /** The card's name: Analytics calls it Recent transactions. */
+  title?: string;
+}) {
   return (
     <section aria-labelledby="overview-recent" className={`${TILE_CLASS} lg:row-span-2`}>
       <div className="flex items-center justify-between">
         <h2 id="overview-recent" className="font-medium">
-          Recent activity
+          {title}
         </h2>
         <Link href="/transactions" className="text-sm text-muted hover:text-ink">
           View all
@@ -310,9 +347,9 @@ export function RecentActivityCard({ recent }: { recent: RecentActivity[] }) {
 
 /**
  * The body of Recent activity: the spotlight and the timeline, or a line saying there are no
- * Transactions yet. Analytics' Recent transactions shows it in its own card.
+ * Transactions yet.
  */
-export function RecentActivityList({ recent }: { recent: RecentActivity[] }) {
+function RecentActivityList({ recent }: { recent: RecentActivity[] }) {
   const fmt = useFormatter();
   const lit = spotlight(recent);
   const signed = (transaction: RecentActivity) =>

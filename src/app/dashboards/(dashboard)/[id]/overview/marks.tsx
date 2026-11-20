@@ -4,12 +4,7 @@ import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { compactValue, HEAT_LEVELS, toHeatmap } from '@/lib/reporting/heatmap';
-import {
-  latestFullIndex,
-  type MonthFlow,
-  type PeriodValue,
-  type TickItem,
-} from '@/lib/reporting/card';
+import type { MonthFlow, PeriodValue, TickItem } from '@/lib/reporting/card';
 import { litTicks } from '@/lib/reporting/overview';
 
 /**
@@ -89,11 +84,14 @@ function barTone(period: PeriodValue, index: number, isMarked: boolean): string 
   return index % 2 ? 'bg-hero-mist/50' : 'bg-sunken';
 }
 
-/** The latest periods as rounded bars, the latest full one hatched and labelled. */
+/**
+ * The latest periods as rounded bars, the latest one hatched and labelled: the latest full one,
+ * or the running one when the range reaches today.
+ */
 export function MonthBars({ periods }: { periods: PeriodValue[] }) {
   const money = useMoney();
   const shown = periods.slice(-BAR_PERIODS);
-  const marked = latestFullIndex(shown);
+  const marked = shown.length - 1;
   const max = Math.max(1, ...shown.map((period) => Math.abs(period.value)));
   return (
     <div className="flex h-52 items-end gap-3 pt-8">
@@ -101,7 +99,7 @@ export function MonthBars({ periods }: { periods: PeriodValue[] }) {
         <Link
           key={period.label}
           href={period.href}
-          aria-label={`${period.label}: ${money(period.value)}`}
+          aria-label={`${period.label}${period.isPartial ? ' (partial)' : ''}: ${money(period.value)}`}
           className="group flex h-full flex-1 flex-col items-center justify-end gap-2"
         >
           <span className="relative flex w-full flex-1 items-end">

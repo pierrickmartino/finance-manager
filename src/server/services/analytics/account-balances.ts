@@ -1,33 +1,18 @@
+import { BALANCE_LINKS, toChartSource } from '@/lib/reporting/pivot-source';
 import type { ServiceContext } from '../context';
 import { runAccountBalances } from '../reporting/balances';
 import { widgetQueryInput, type WidgetQuery } from '../reporting/query';
-import type { SectionStatus } from './figures';
+import { analyticsCard, type AnalyticsCard } from './figures';
 
 /**
- * Analytics' Account balances in CHF: each Account's balance today, converted to the Base
- * currency at today's FX rate, as the Dashboard's starter balances Widget shows it (an archived
- * Account only while it still holds money). It doesn't depend on the Period view.
- */
-
-export interface AccountBalanceRow {
-  accountId: string;
-  /** "Bank · Account". */
-  label: string;
-  /** The balance in CHF minor units; null with no FX rate for its Currency yet. */
-  chfMinor: number | null;
-}
-
-/**
- * Empty without an Account; its `unconvertedCount` counts Accounts left out of the total for
+ * Analytics' Account balances in CHF, drawn as the Dashboard's card for the starter balances
+ * Widget: each Account's balance today, converted to the Base currency at today's FX rate (an
+ * archived Account only while it still holds money), each opening its Account. It doesn't
+ * depend on the Period view. Its `unconvertedCount` counts Accounts left out of the total for
  * want of an FX rate.
  */
-export interface AccountBalances extends SectionStatus {
-  /** The day the balances stand at: today. */
-  date: string;
-  rows: AccountBalanceRow[];
-  /** The converted balances added up; null with none. */
-  totalChfMinor: number | null;
-}
+
+export const ACCOUNT_BALANCES = 'Account balances in CHF';
 
 /** One row per Account and no time axis: the balances on a day (the date range goes unused). */
 const BALANCES_QUERY: WidgetQuery = widgetQueryInput.parse({
@@ -36,20 +21,15 @@ const BALANCES_QUERY: WidgetQuery = widgetQueryInput.parse({
   columns: null,
 });
 
-export async function accountBalances(
-  ctx: ServiceContext,
-  today: string,
-): Promise<AccountBalances> {
+export async function accountBalances(ctx: ServiceContext, today: string): Promise<AnalyticsCard> {
   const report = await runAccountBalances(ctx, BALANCES_QUERY, { date: today });
-  return {
-    date: today,
-    rows: report.rows.map((row, index) => ({
-      accountId: row.key!,
-      label: row.label,
-      chfMinor: report.rowTotals[index] ?? null,
-    })),
-    totalChfMinor: report.total,
-    isEmpty: report.rows.length === 0,
-    unconvertedCount: report.unconvertedCount,
-  };
+  return analyticsCard({
+    id: 'account-balances',
+    name: ACCOUNT_BALANCES,
+    source: 'account_balances',
+    visualisation: 'table',
+    rows: 'account',
+    data: toChartSource(report, BALANCE_LINKS),
+    status: { isEmpty: report.rows.length === 0, unconvertedCount: report.unconvertedCount },
+  });
 }

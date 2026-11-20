@@ -1,9 +1,13 @@
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
+import { originFromParams } from '@/lib/reporting/drill-origin';
+import type { ChartSource } from '@/lib/reporting/chart-data';
+import { cellFromParams, queryFromParams } from '@/lib/reporting/widget-params';
 import { createAccount, type Account } from '@/server/services/accounts';
 import { createBank } from '@/server/services/banks';
 import type { PeriodView } from '@/lib/analytics/period-view';
 import { loadAnalytics, type AnalyticsSections } from '@/server/services/analytics';
 import type { ServiceContext } from '@/server/services/context';
+import { listCellTransactions, type CellTransactionPage } from '@/server/services/reporting';
 import { editClassification, type ClassificationChanges } from '@/server/services/transactions';
 import { seedTransactions, type SeedTransaction } from './transactions';
 
@@ -67,6 +71,42 @@ export async function loadSection<Name extends keyof AnalyticsSections>(
   return await sections[name];
 }
 
-/** A row's (or series') figure per period of the window, oldest first. */
-export const cellValues = (row: { cells: readonly { value: number | null }[] }) =>
-  row.cells.map((cell) => cell.value);
+/** A URL's parameters as the page reads them: a repeated one as a list. */
+function paramsOf(href: string): Record<string, string | string[]> {
+  const url = new URL(href, 'http://localhost');
+  const params: Record<string, string | string[]> = {};
+  for (const name of new Set(url.searchParams.keys())) {
+    const values = url.searchParams.getAll(name);
+    params[name] = values.length === 1 ? values[0]! : values;
+  }
+  return params;
+}
+
+/** Opens a Drill-down link as its page does: its query and its cell, read from the URL. */
+export async function openDrill(
+  ctx: ServiceContext,
+  href: string | null | undefined,
+): Promise<CellTransactionPage> {
+  expect(href).toMatch(/^\/widgets\/drill\?/);
+  const params = paramsOf(href!);
+  return listCellTransactions(ctx, queryFromParams(params), cellFromParams(params));
+}
+
+/** Where a Drill-down link leads back to. */
+export const originOf = (href: string) => originFromParams(paramsOf(href));
+
+/** Every value a card's data holds with its link: cells, row and column totals, the total. */
+export function linkedValues(data: ChartSource): { value: number | null; href: string }[] {
+  return [
+    ...data.cells.flatMap((row, r) =>
+      row.map((value, c) => ({ value, href: data.hrefs.cells[r]![c]! })),
+    ),
+    ...data.rowTotals.map((value, r) => ({ value, href: data.hrefs.rowTotals[r]! })),
+    ...data.columnTotals.map((value, c) => ({ value, href: data.hrefs.columnTotals[c]! })),
+    { value: data.total, href: data.hrefs.total },
+  ];
+}
+
+/** A card's labels, one per row or column header. */
+export const labels = (headers: readonly { label: string }[]) =>
+  headers.map((header) => header.label);

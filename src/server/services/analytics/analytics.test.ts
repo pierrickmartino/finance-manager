@@ -23,7 +23,7 @@ async function settled(
 
 type Loaded = { [Name in keyof AnalyticsSections]: Awaited<AnalyticsSections[Name]> };
 
-const keys = (periods: { key: string }[]) => periods.map((period) => period.key);
+const keys = (periods: { key: string | null }[]) => periods.map((period) => period.key);
 
 describe('the Period window', () => {
   it('is the last 12 calendar months in Month, ending with the current one to date', async () => {
@@ -48,7 +48,8 @@ describe('the Period window', () => {
     ]);
     expect(window.at(-1)).toEqual({ key: '2025-03', label: 'Mar 2025', isToDate: true });
     expect(window.slice(0, -1).every((period) => !period.isToDate)).toBe(true);
-    expect(sections.incomeVsExpense.periods).toEqual(window);
+    expect(keys(sections.incomeVsExpense.data!.columns)).toEqual(keys(window));
+    expect(keys(sections.netCashFlow.data!.rows)).toEqual(keys(window));
   });
 
   it('is the last 8 calendar quarters in Quarter and the last 6 years in Year', async () => {

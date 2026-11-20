@@ -1,18 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  cellValues,
   fixToday,
+  labels,
+  linkedValues,
   loadSection,
+  openDrill,
+  originOf,
   seedAccount,
   seedClassified,
 } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
-import { listCellTransactions } from '../reporting';
 import { splitTransaction } from '../transactions';
 import { linkTransfer, transactionSide } from '../transfers';
-import type { FigureRow } from '.';
+import { readCard } from '@/lib/reporting/card';
+import type { ChartSource } from '@/lib/reporting/chart-data';
 
 /** Analytics' Income vs. expense table (spec #170, user stories 34-37, 39, 41-44). */
 
@@ -67,48 +70,69 @@ async function dataset(): Promise<void> {
   });
 }
 
+const money = String;
+
 describe('Income vs. expense', () => {
-  it('has a row per type, then Net and Net incl. Capital, with Total and complete-period Average', async () => {
+  it('is a heatmap card: a row per type, then Net and Net incl. Capital, per period and in Total', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const table = await loadSection(t.ctx, 'month', 'incomeVsExpense');
+    const card = await loadSection(t.ctx, 'month', 'incomeVsExpense');
+    const data = card.data!;
 
-    expect(table.periods.map((period) => period.key)).toEqual([
-      ...['2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09'],
-      ...['2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03'],
+    expect(card.name).toBe('Income vs. expense');
+    expect(card.isEmpty).toBe(false);
+    expect(readCard(card, money).kind).toBe('grid');
+    expect(labels(data.columns)).toEqual([
+      ...['Apr 2024', 'May 2024', 'Jun 2024', 'Jul 2024', 'Aug 2024', 'Sep 2024'],
+      ...['Oct 2024', 'Nov 2024', 'Dec 2024', 'Jan 2025', 'Feb 2025', 'Mar 2025'],
     ]);
-    expect(table.periods.at(-1)?.isToDate).toBe(true);
-    expect(table.isEmpty).toBe(false);
+    // The current month is still running: drawn as the Dashboard draws a partial period.
+    expect(data.columns.map((column) => column.isPartial)).toEqual([
+      ...Array<boolean>(11).fill(false),
+      true,
+    ]);
     const empty = Array<null>(9).fill(null);
     // Groceries in January: -120.00 + 20.00 refund + EUR -100.00 at 0.94 = -194.00. The split
     // purchase counts -200.00 under Groceries and -100.00 under Property. The Transfer counts
-    // nowhere. Average divides the 11 complete months only, rounding half away from zero.
-    expect(
-      table.rows.map((row) => [row.label, cellValues(row), row.total.value, row.average.value]),
-    ).toEqual([
-      ['Income', [...empty, 600_000, 600_000, 300_000], 1_500_000, 109_091],
-      ['Expense', [...empty, -19_400, -20_000, -5_000], -44_400, -3_582],
-      ['Capital', [...empty, null, -510_000, null], -510_000, -46_364],
-      ['Net (income − expense)', [...empty, 580_600, 580_000, 295_000], 1_455_600, 105_509],
-      ['Net incl. Capital', [...empty, 580_600, 70_000, 295_000], 945_600, 59_145],
+    // nowhere.
+    expect(data.rows.map((row, r) => [row.label, data.cells[r], data.rowTotals[r]])).toEqual([
+      ['Income', [...empty, 600_000, 600_000, 300_000], 1_500_000],
+      ['Expense', [...empty, -19_400, -20_000, -5_000], -44_400],
+      ['Capital', [...empty, null, -510_000, null], -510_000],
+      ['Net (income − expense)', [...empty, 580_600, 580_000, 295_000], 1_455_600],
+      ['Net incl. Capital', [...empty, 580_600, 70_000, 295_000], 945_600],
     ]);
+    expect(data.total).toBe(945_600);
+  });
+
+  it('leads with its largest row, as a Dashboard heatmap does', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, 'month', 'incomeVsExpense');
+
+    // Income is 1'500'000 of the rows' 4'455'600 in all, by magnitude: 34%.
+    expect(readCard(card, money).lead).toMatchObject({
+      headline: '34% sits in Income',
+      detail: '1500000 of 945600',
+    });
   });
 
   it('reads the window of the Period view: Quarter and Year', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = await loadSection(t.ctx, 'quarter', 'incomeVsExpense');
-    const years = await loadSection(t.ctx, 'year', 'incomeVsExpense');
+    const quarters = (await loadSection(t.ctx, 'quarter', 'incomeVsExpense')).data!;
+    const years = (await loadSection(t.ctx, 'year', 'incomeVsExpense')).data!;
 
-    const expense = (rows: FigureRow[]) => rows.find((row) => row.key === 'expense')!;
-    expect(quarters.periods.map((period) => period.key)).toEqual([
-      ...['2023-Q2', '2023-Q3', '2023-Q4', '2024-Q1'],
-      ...['2024-Q2', '2024-Q3', '2024-Q4', '2025-Q1'],
+    const expense = (data: ChartSource) => data.rows.findIndex((row) => row.key === 'expense');
+    expect(labels(quarters.columns)).toEqual([
+      ...['Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024'],
+      ...['Q2 2024', 'Q3 2024', 'Q4 2024', 'Q1 2025'],
     ]);
     // February 2024 is in the Quarter and Year windows; the current period is to date.
-    expect(cellValues(expense(quarters.rows))).toEqual([
+    expect(quarters.cells[expense(quarters)]).toEqual([
       null,
       null,
       null,
@@ -118,42 +142,32 @@ describe('Income vs. expense', () => {
       null,
       -44_400,
     ]);
-    expect(expense(quarters.rows).total.value).toBe(-45_399);
-    // -9.99 over 7 complete quarters: -1.427, rounded to -1.43.
-    expect(expense(quarters.rows).average.value).toBe(-143);
-    expect(years.periods.map((period) => period.label)).toEqual([
-      '2020',
-      '2021',
-      '2022',
-      '2023',
-      '2024',
-      '2025',
-    ]);
-    expect(cellValues(expense(years.rows))).toEqual([null, null, null, null, -999, -44_400]);
-    // -9.99 over 5 complete years: -1.998, rounded to -2.00.
-    expect(expense(years.rows).average.value).toBe(-200);
+    expect(quarters.rowTotals[expense(quarters)]).toBe(-45_399);
+    expect(labels(years.columns)).toEqual(['2020', '2021', '2022', '2023', '2024', '2025']);
+    expect(years.cells[expense(years)]).toEqual([null, null, null, null, -999, -44_400]);
   });
 
-  it('opens a Drill-down behind every figure whose Transactions work out to it', async () => {
+  it('opens a Drill-down behind every value whose Transactions work out to it, back to Analytics', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const table = await loadSection(t.ctx, 'month', 'incomeVsExpense');
+    const card = await loadSection(t.ctx, 'quarter', 'incomeVsExpense');
 
-    const figures = table.rows.flatMap((row) => [...row.cells, row.total, row.average]);
-    expect(figures).toHaveLength(5 * 14);
-    for (const figure of figures) {
-      const page = await listCellTransactions(t.ctx, figure.drill.query, figure.drill.cell);
-      expect(page.value).toBe(figure.value);
+    const values = linkedValues(card.data!);
+    // 5 rows of 8 quarters, 5 row totals, 8 column totals and the total.
+    expect(values).toHaveLength(5 * 8 + 5 + 8 + 1);
+    for (const { value, href } of values) {
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: 'quarter' });
+      expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });
 
   it('is empty when no Transaction falls in the window', async () => {
     fixToday('2025-03-20');
 
-    const table = await loadSection(t.ctx, 'year', 'incomeVsExpense');
+    const card = await loadSection(t.ctx, 'year', 'incomeVsExpense');
 
-    expect(table.isEmpty).toBe(true);
-    expect(table.rows.every((row) => row.total.value === null)).toBe(true);
+    expect(card.isEmpty).toBe(true);
+    expect(card.data!.rowTotals.every((total) => total === null)).toBe(true);
   });
 });

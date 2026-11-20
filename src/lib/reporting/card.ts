@@ -371,20 +371,27 @@ const PERIOD_WORDS = {
 } as const satisfies Record<TimeAxis, PeriodWords>;
 
 /**
- * The average of the row totals over the rows, rounded as the engine rounds, and its
- * Drill-down: the whole range as an average per row period. The link is there only where the
- * Drill-down works out that same number: a sum whose rows are those periods.
+ * The average of the complete periods' totals, rounded as the engine rounds, and its
+ * Drill-down: the complete periods as an average per row period. A running period is left out
+ * (unless every period is still running), as its numbers will still change. The link is there
+ * only where the Drill-down works out that same number: a sum whose rows are those periods.
  */
 function periodAverage(
   data: ChartSource,
   period: TimeAxis,
 ): { value: number; href: string | null } {
-  const value = divideRounded(sum(data.rowTotals.map((total) => total ?? 0)), data.rows.length);
+  const partial = data.rows.filter((row) => row.isPartial).map((row) => row.key);
+  const isLeftOut = partial.length > 0 && partial.length < data.rows.length;
+  const counted = data.rows.flatMap((row, r) =>
+    isLeftOut && row.isPartial ? [] : [data.rowTotals[r] ?? 0],
+  );
+  const value = divideRounded(sum(counted), counted.length);
   const byPeriod = periodSumDrill(data);
   const isAverageOfRange = byPeriod?.period === period;
+  const cell = isLeftOut ? { row: { except: partial } } : {};
   return {
     value,
-    href: byPeriod && isAverageOfRange ? drillUrl(averaged(byPeriod.drill, period), {}) : null,
+    href: byPeriod && isAverageOfRange ? drillUrl(averaged(byPeriod.drill, period), cell) : null,
   };
 }
 

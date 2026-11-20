@@ -440,6 +440,25 @@ describe('readCard: periods', () => {
     });
   });
 
+  it('leaves a running period out of the average, opening the complete periods only', () => {
+    const toDate = drillable(
+      source(['2025-01', '2025-02', '2025-03'], ['Rent'], [[-500_00], [-900_00], [-100_00]], {
+        lastIsPartial: true,
+      }),
+      'month',
+      'category',
+    );
+
+    const average = read(widget({ data: toDate })).facts.at(-1)!;
+
+    expect(average.value).toBe('CHF -700');
+    expect(drillOf(average.href)).toMatchObject({
+      cell: { row: { except: ['2025-03'] } },
+      measure: 'average',
+      per: 'month',
+    });
+  });
+
   it('rounds the average half away from zero, as the Drill-down does', () => {
     // -5 over 2 months is -2.5: the engine's average is -3.
     const odd = widget({ data: source(['2025-01', '2025-02'], ['Net'], [[-2], [-3]]) });

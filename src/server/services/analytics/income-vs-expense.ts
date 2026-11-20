@@ -2,18 +2,28 @@ import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
 import type { AxisSelector } from '../reporting/cell-ref';
-import { cellOf, periodRow, statusOf, sumOf, type PeriodTable } from './figures';
+import {
+  analyticsCard,
+  cellOf,
+  periodRow,
+  periodRowsSource,
+  statusOf,
+  sumOf,
+  type AnalyticsCard,
+} from './figures';
 import type { AnalyticsPeriod } from './window';
 
 /**
- * Analytics' Income vs. expense table: Income, Expense and Capital per period of the window,
- * then Net (income − expense) and Net incl. Capital. Signed CHF amounts, as booked: expense is
- * negative and a refund nets within it. Transfers are left out and Split lines count by their
- * own Category (the reporting engine's base rows).
+ * Analytics' Income vs. expense, drawn as the Dashboard's heatmap card: Income, Expense and
+ * Capital per period of the window, then Net (income − expense) and Net incl. Capital, each with
+ * its Total. Signed CHF amounts, as booked: expense is negative and a refund nets within it.
+ * Transfers are left out and Split lines count by their own Category (the reporting engine's
+ * base rows).
  */
 
+export const INCOME_VS_EXPENSE = 'Income vs. expense';
+
 export type IncomeVsExpenseRow = 'income' | 'expense' | 'capital' | 'net' | 'netInclCapital';
-export type IncomeVsExpense = PeriodTable<IncomeVsExpenseRow>;
 
 const TYPES = ['income', 'expense', 'capital'] as const;
 
@@ -44,7 +54,7 @@ export async function incomeVsExpense(
   ctx: ServiceContext,
   view: PeriodView,
   window: readonly AnalyticsPeriod[],
-): Promise<IncomeVsExpense> {
+): Promise<AnalyticsCard> {
   const report = await runWidgetQuery(ctx, {
     filters: { categoryGroupTypes: [...TYPES] },
     dateRange: windowRange(view),
@@ -52,17 +62,21 @@ export async function incomeVsExpense(
     columns: view,
   });
   const cell = cellOf(report);
-  return {
-    periods: [...window],
-    rows: ROWS.map(({ key, label, types, selector }) =>
-      periodRow(view, window, {
-        key,
-        label,
-        query: report.query,
-        selector,
-        valueAt: (period) => sumOf(types.map((type) => cell(type, period))),
-      }),
-    ),
-    ...statusOf(report),
-  };
+  const rows = ROWS.map(({ key, label, types, selector }) =>
+    periodRow(window, {
+      key,
+      label,
+      query: report.query,
+      selector,
+      valueAt: (period) => sumOf(types.map((type) => cell(type, period))),
+    }),
+  );
+  return analyticsCard({
+    id: 'income-vs-expense',
+    name: INCOME_VS_EXPENSE,
+    visualisation: 'table',
+    rows: 'categoryGroupType',
+    data: periodRowsSource(view, window, rows, report),
+    status: statusOf(report),
+  });
 }

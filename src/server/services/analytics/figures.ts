@@ -1,13 +1,19 @@
-import { divideRounded } from '@/lib/reporting/average';
+import { analyticsDrillUrl, analyticsOrigin } from '@/lib/analytics/links';
 import type { PeriodView } from '@/lib/analytics/period-view';
+import type { WidgetCardData } from '@/lib/reporting/card';
+import type { ChartSource } from '@/lib/reporting/chart-data';
+import { drillLinks, toChartSource } from '@/lib/reporting/pivot-source';
 import type { ReportTable } from '../reporting';
+import type { ReportHeader } from '../reporting/headers';
 import type { AxisSelector, CellRef } from '../reporting/cell-ref';
 import type { WidgetQuery } from '../reporting/query';
-import { currentKeys, type AnalyticsPeriod } from './window';
+import type { Visualisation, WidgetSource } from '../reporting/widgets';
+import type { AnalyticsPeriod } from './window';
 
 /**
- * The building blocks of Analytics' per-period sections: a figure with the Drill-down behind
- * it, and a table row of figures per period of the Period window with its Total and Average.
+ * The building blocks of Analytics' sections. Each section is drawn by the Dashboard's own
+ * cards (GLOSSARY: Card), so it hands them what they read from a Widget: its data as a chart
+ * source, every value linked to its Drill-down back to Analytics at the same Period view.
  */
 
 /** A figure's Drill-down (GLOSSARY): the query and cell `listCellTransactions` reads. */
@@ -20,17 +26,6 @@ export interface DrillRef {
 export interface Figure {
   value: number | null;
   drill: DrillRef;
-}
-
-/** A table row: a figure per period of the window, then Total and Average. */
-export interface FigureRow<Key extends string = string> {
-  key: Key;
-  label: string;
-  cells: Figure[];
-  /** The whole window, the current period included. */
-  total: Figure;
-  /** The complete periods' sum over their count: the current period is left out. */
-  average: Figure;
 }
 
 /** What every section says besides its figures. */
@@ -46,10 +41,39 @@ export function statusOf(report: ReportTable): SectionStatus {
   return { isEmpty: report.total === null, unconvertedCount: report.unconvertedCount };
 }
 
-/** A section's table: periods as columns, oldest first, then Total and Average. */
-export interface PeriodTable<Key extends string = string> extends SectionStatus {
-  periods: AnalyticsPeriod[];
-  rows: FigureRow<Key>[];
+/** A section drawn as a Dashboard card: what the card reads, and whether it has anything. */
+export interface AnalyticsCard extends WidgetCardData {
+  isEmpty: boolean;
+}
+
+export interface AnalyticsCardSpec {
+  id: string;
+  name: string;
+  source?: WidgetSource;
+  visualisation: Visualisation;
+  /** The data's row axis, as a Widget query's (a time axis makes balances Net worth). */
+  rows: WidgetQuery['rows'];
+  data: ChartSource;
+  status: SectionStatus;
+}
+
+/** A section's card, as a Widget's on the Dashboard Story. */
+export function analyticsCard(spec: AnalyticsCardSpec): AnalyticsCard {
+  return {
+    id: `analytics-${spec.id}`,
+    name: spec.name,
+    source: spec.source ?? 'query',
+    visualisation: spec.visualisation,
+    query: { rows: spec.rows },
+    data: spec.data,
+    error: null,
+    ...spec.status,
+  };
+}
+
+/** A report's values, each opening its Drill-down from Analytics at a Period view. */
+export function reportSource(report: ReportTable, view: PeriodView): ChartSource {
+  return toChartSource(report, drillLinks(report, analyticsOrigin(view)));
 }
 
 /** The sum of some figures; null when every one is null. */
@@ -69,57 +93,83 @@ export function cellOf(report: ReportTable) {
   };
 }
 
-export interface PeriodRowSpec<Key extends string> {
-  key: Key;
+/** A row worked out by Analytics itself: a figure per period of the window, then its Total. */
+export interface PeriodRow {
+  key: string;
   label: string;
-  /** The query behind the row; one of its axes is the view's periods. */
+  cells: Figure[];
+  /** The whole window, the current period included. */
+  total: Figure;
+}
+
+export interface PeriodRowSpec {
+  key: string;
+  label: string;
+  /** The query behind the row; its columns are the view's periods. */
   query: WidgetQuery;
-  /** The axis holding the periods: columns unless said. */
-  periodAxis?: 'rows' | 'columns';
-  /** The row's selector on the query's other axis; absent for the whole of it. */
+  /** The row's selector on the query's rows; absent for the whole of them. */
   selector?: AxisSelector;
   /** The row's value in one period of the window. */
   valueAt: (periodKey: string) => number | null;
 }
 
-/** The cell of a row selector and a column selector, leaving out an absent row. */
-function cellRef(row: AxisSelector | undefined, column?: AxisSelector): CellRef {
-  return {
-    ...(row === undefined ? {} : { row }),
-    ...(column === undefined ? {} : { column }),
-  };
-}
-
-/**
- * A row of figures over the window, each with its Drill-down: a cell per period, the Total
- * (the whole period axis) and the Average, drilled as the `average` measure over every period
- * but the current one, which divides by the same count of complete periods.
- */
-export function periodRow<Key extends string>(
-  view: PeriodView,
-  window: readonly AnalyticsPeriod[],
-  spec: PeriodRowSpec<Key>,
-): FigureRow<Key> {
+/** A row of figures over the window, each with its Drill-down: a cell per period, and the Total. */
+export function periodRow(window: readonly AnalyticsPeriod[], spec: PeriodRowSpec): PeriodRow {
   const { query, selector } = spec;
-  const at = (periods?: AxisSelector): CellRef =>
-    spec.periodAxis === 'rows' ? cellRef(periods, selector) : cellRef(selector, periods);
+  const at = (period?: string): CellRef => ({
+    ...(selector === undefined ? {} : { row: selector }),
+    ...(period === undefined ? {} : { column: period }),
+  });
   const cells = window.map((period) => ({
     value: spec.valueAt(period.key),
     drill: { query, cell: at(period.key) },
   }));
-  const complete = window.flatMap((period, index) => (period.isToDate ? [] : [cells[index]!]));
-  const completeSum = sumOf(complete.map((cell) => cell.value));
   return {
     key: spec.key,
     label: spec.label,
     cells,
     total: { value: sumOf(cells.map((cell) => cell.value)), drill: { query, cell: at() } },
-    average: {
-      value: completeSum === null ? null : divideRounded(completeSum, complete.length),
-      drill: {
-        query: { ...query, measure: 'average', averagePer: view },
-        cell: at({ except: currentKeys(window) }),
-      },
+  };
+}
+
+/** A window's periods as a card's column headers, the current one partial ("to date"). */
+function periodHeaders(window: readonly AnalyticsPeriod[]): ReportHeader[] {
+  return window.map((period) => ({
+    key: period.key,
+    label: period.label,
+    isPartial: period.isToDate,
+  }));
+}
+
+/**
+ * Rows Analytics works out itself (a net, a subtotal) as a card's data, periods across. Each
+ * column total and the total are the report's own: every row's Transactions in that period.
+ */
+export function periodRowsSource(
+  view: PeriodView,
+  window: readonly AnalyticsPeriod[],
+  rows: readonly PeriodRow[],
+  report: ReportTable,
+): ChartSource {
+  const href = ({ query, cell }: DrillRef) => analyticsDrillUrl(view, query, cell);
+  const totals = new Map(report.columns.map((column, c) => [column.key, report.columnTotals[c]]));
+  return {
+    measure: 'sum',
+    rows: rows.map((row) => ({ key: row.key, label: row.label, isPartial: false })),
+    columns: periodHeaders(window),
+    cells: rows.map((row) => row.cells.map((cell) => cell.value)),
+    rowTotals: rows.map((row) => row.total.value),
+    columnTotals: window.map((period) => totals.get(period.key) ?? null),
+    total: report.total,
+    hrefs: {
+      cells: rows.map((row) => row.cells.map((cell) => href(cell.drill))),
+      rowTotals: rows.map((row) => href(row.total.drill)),
+      columnTotals: window.map((period) =>
+        href({ query: report.query, cell: { column: period.key } }),
+      ),
+      total: href({ query: report.query, cell: {} }),
     },
+    // Its rows are no single axis of one query: nothing a card works out itself can drill.
+    drill: null,
   };
 }

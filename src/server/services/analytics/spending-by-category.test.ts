@@ -1,17 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  cellValues,
   fixToday,
+  labels,
+  linkedValues,
   loadSection,
+  openDrill,
+  originOf,
   seedAccount,
   seedClassified,
   type ClassifiedRow,
 } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
-import { listCellTransactions } from '../reporting';
+import { readCard } from '@/lib/reporting/card';
 
-/** Analytics' Spending by Category stacked bar (spec #170, user stories 30-33; ticket #174). */
+/** Analytics' Spending by Category, the Dashboard's ranking card (spec #170, ticket #174). */
 
 const t = setupTestDatabase();
 
@@ -72,82 +75,109 @@ async function dataset(names = Object.keys(SPENDING)): Promise<void> {
   await seedClassified(t.ctx, ubs, rows);
 }
 
+const money = String;
+
 const empty = Array<null>(9).fill(null);
 
 describe('Spending by Category', () => {
-  it('stacks the 8 largest Expense Categories over the window by name and folds the rest into Other', async () => {
+  it('is a ranking card of the 6 largest Expense Categories over the window, with their share of all spending', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const chart = await loadSection(t.ctx, 'month', 'spendingByCategory');
+    const card = await loadSection(t.ctx, 'month', 'spendingByCategory');
+    const reading = readCard(card, money);
 
-    expect(chart.isEmpty).toBe(false);
-    expect(chart.periods).toHaveLength(12);
-    expect(chart.periods.at(-1)).toMatchObject({ key: '2025-03', isToDate: true });
-    expect(
-      chart.series.map((series) => [series.label, series.isOther, series.total.value]),
-    ).toEqual([
-      ['Living › Rent', false, -100_000],
-      ['Living › Groceries', false, -90_000],
-      ['Living › Travel', false, -80_000],
-      ['Living › Health', false, -70_000],
-      ['Living › Insurance', false, -60_000],
-      ['Living › Dining', false, -50_000],
-      ['Living › Phone', false, -40_000],
-      ['Living › Books', false, -30_000],
-      ['Other', true, -45_000],
-    ]);
-    const rent = chart.series[0]!;
-    expect(cellValues(rent)).toEqual([...empty, -50_000, null, -50_000]);
-    // Gifts and Hobbies, folded: January -250.00 and -120.00, March -80.00.
-    const other = chart.series.at(-1)!;
-    expect(cellValues(other)).toEqual([...empty, -37_000, null, -8_000]);
+    expect(card.name).toBe('Spending by Category');
+    expect(card.isEmpty).toBe(false);
+    expect(reading.kind).toBe('ranking');
+    // All spending: -5'650.00. As on the Dashboard, a chart names its 7 largest series and
+    // folds the rest into Other, which ranks too: Books (-300.00 net of its refund), Gifts and
+    // Hobbies.
+    expect(reading.mark).toMatchObject({
+      type: 'ticks',
+      items: [
+        { title: 'Rent', detail: 'Living · -100000', share: 100_000 / 565_000 },
+        { title: 'Groceries', detail: 'Living · -90000', share: 90_000 / 565_000 },
+        { title: 'Travel', detail: 'Living · -80000', share: 80_000 / 565_000 },
+        { title: 'Other', detail: '-75000', share: 75_000 / 565_000 },
+        { title: 'Health', detail: 'Living · -70000', share: 70_000 / 565_000 },
+        { title: 'Insurance', detail: 'Living · -60000', share: 60_000 / 565_000 },
+      ],
+    });
+    expect(reading.lead).toMatchObject({ headline: 'Rent leads', detail: '-100000' });
   });
 
-  it("opens a Drill-down behind every segment, Other's covering every folded Category", async () => {
+  it('names the heaviest and lightest periods and the average of the complete ones', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const chart = await loadSection(t.ctx, 'month', 'spendingByCategory');
+    const card = await loadSection(t.ctx, 'month', 'spendingByCategory');
 
-    const figures = chart.series.flatMap((series) => [...series.cells, series.total]);
-    expect(figures).toHaveLength(9 * 13);
-    for (const figure of figures) {
-      const page = await listCellTransactions(t.ctx, figure.drill.query, figure.drill.cell);
-      expect(page.value).toBe(figure.value);
+    // January -2'270.00, February -2'400.00, March to date -980.00; the months before, nothing.
+    // The average leaves March out: -4'670.00 over 11 months, rounded half away from zero.
+    expect(readCard(card, money).facts.map(({ label, value }) => [label, value])).toEqual([
+      ['Heaviest month: Feb 2025', '-240000'],
+      ['Lightest month: Mar 2025 (partial)', '-98000'],
+      ['Monthly average', '-42455'],
+    ]);
+    expect(card.data!.rows).toHaveLength(12);
+    expect(card.data!.rows.at(-1)).toMatchObject({ key: '2025-03', isPartial: true });
+  });
+
+  it('opens a Drill-down behind every Category, period and fact, back to Analytics', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, 'month', 'spendingByCategory');
+    const reading = readCard(card, money);
+
+    for (const { value, href } of linkedValues(card.data!)) {
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: 'month' });
+      expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
-    const other = chart.series.at(-1)!;
-    const page = await listCellTransactions(t.ctx, other.total.drill.query, other.total.drill.cell);
-    expect(page.sumChfMinor).toBe(-45_000);
-    expect(page.transactions.map((row) => row.rawDescription).sort()).toEqual([
-      'Gifts 2025-01-25',
-      'Hobbies 2025-01-28',
-      'Hobbies 2025-03-08',
+    const items = reading.mark.type === 'ticks' ? reading.mark.items : [];
+    const ranked = await Promise.all(items.map((item) => openDrill(t.ctx, item.href)));
+    expect(ranked.map((page) => page.value)).toEqual([
+      -100_000, -90_000, -80_000, -75_000, -70_000, -60_000,
     ]);
+    const facts = await Promise.all(reading.facts.map((fact) => openDrill(t.ctx, fact.href)));
+    expect(facts.map((page) => page.value)).toEqual([-240_000, -98_000, -42_455]);
   });
 
-  it('has no Other with 8 Expense Categories or fewer', async () => {
+  it('reads the window of the Period view, the current period to date', async () => {
     fixToday('2025-03-20');
     await dataset(['Rent', 'Groceries', 'Books']);
 
-    const chart = await loadSection(t.ctx, 'quarter', 'spendingByCategory');
+    const card = await loadSection(t.ctx, 'quarter', 'spendingByCategory');
+    const data = card.data!;
 
-    expect(chart.periods.at(-1)).toMatchObject({ key: '2025-Q1', isToDate: true });
-    expect(chart.series.map((series) => series.label)).toEqual([
-      'Living › Rent',
-      'Living › Groceries',
-      'Living › Books',
+    expect(readCard(card, money).kind).toBe('ranking');
+    expect(data.rows.map((row) => row.key)).toEqual([
+      ...['2023-Q2', '2023-Q3', '2023-Q4', '2024-Q1'],
+      ...['2024-Q2', '2024-Q3', '2024-Q4', '2025-Q1'],
     ]);
-    expect(cellValues(chart.series[0]!)).toEqual([...Array<null>(7).fill(null), -100_000]);
+    expect(data.rows.at(-1)?.isPartial).toBe(true);
+    expect(labels(data.columns)).toEqual(['Living › Rent', 'Living › Groceries', 'Living › Books']);
+    expect(data.cells.map((row) => row[0])).toEqual([...Array<null>(7).fill(null), -100_000]);
+  });
+
+  it('is drawn as bars per period, as on the Dashboard, with fewer than 3 Expense Categories', async () => {
+    fixToday('2025-03-20');
+    await dataset(['Rent', 'Groceries']);
+
+    const card = await loadSection(t.ctx, 'month', 'spendingByCategory');
+
+    expect(readCard(card, money).kind).toBe('bars');
+    expect(card.data!.cells.map((row) => row[0])).toEqual([...empty, -50_000, null, -50_000]);
   });
 
   it('is empty when no expense falls in the window', async () => {
     fixToday('2025-03-20');
 
-    const chart = await loadSection(t.ctx, 'year', 'spendingByCategory');
+    const card = await loadSection(t.ctx, 'year', 'spendingByCategory');
 
-    expect(chart.isEmpty).toBe(true);
-    expect(chart.series).toEqual([]);
-    expect(chart.periods).toHaveLength(6);
+    expect(card.isEmpty).toBe(true);
+    expect(card.data!.columns).toEqual([]);
+    expect(card.data!.rows).toHaveLength(6);
   });
 });

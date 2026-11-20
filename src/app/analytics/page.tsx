@@ -3,28 +3,33 @@ import { PAGE_TITLE_CLASS } from '@/components/surface';
 import { analyticsHref, parsePeriodView, windowPhrase } from '@/lib/analytics/period-view';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
-import { loadAnalytics } from '@/server/services/analytics';
-import { ACCOUNT_BALANCES, AccountBalancesSection } from './account-balances';
-import { CATEGORIES_PER_PERIOD, CategoriesPerPeriodSection } from './categories-per-period';
+import {
+  ACCOUNT_BALANCES,
+  CATEGORIES_PER_PERIOD,
+  INCOME_VS_EXPENSE,
+  loadAnalytics,
+  NET_CASH_FLOW,
+  SPENDING_BY_CATEGORY,
+  SPENDING_INSIGHTS,
+} from '@/server/services/analytics';
+import { CardSection } from './card-section';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
-import { INCOME_VS_EXPENSE, IncomeVsExpenseSection } from './income-vs-expense';
 import { NET_WORTH, NetWorthSection } from './net-worth';
-import { NET_CASH_FLOW, NetCashFlowSection } from './net-cash-flow';
 import { PeriodSwitch } from './period-switch';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
-import { SPENDING_INSIGHTS, SpendingInsightsSection } from './spending-insights';
-import { SPENDING_BY_CATEGORY, SpendingByCategorySection } from './spending-by-category';
+import { SpendingInsightsSection } from './spending-insights';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 
 /**
  * Analytics (GLOSSARY, ADR-0015): one fixed page of reports read through the Period view in the
  * `period` URL parameter (Month when missing or unknown). The shell and the switch render at
- * once; each section streams in behind its own placeholder and error boundary (./section).
+ * once; each section streams in behind its own placeholder and error boundary (./section), and
+ * is drawn by the Dashboard's own cards (GLOSSARY: Card).
  *
- * Adding a section: its service module (src/server/services/analytics), a component here that
- * awaits its promise and renders a `SectionCard`, and a `StreamedSection` below.
+ * Adding a section: its service module (src/server/services/analytics), and a `StreamedSection`
+ * below drawing it (a `CardSection` for one drawn as a Widget's card).
  */
 export default async function AnalyticsPage({
   searchParams,
@@ -52,10 +57,10 @@ export default async function AnalyticsPage({
         {/* The overview: three side by side on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_WORTH} retryHref={retryHref}>
-            <NetWorthSection netWorth={sections.netWorth} view={view} fmt={fmt} />
+            <NetWorthSection netWorth={sections.netWorth} view={view} />
           </StreamedSection>
           <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
-            <SpendingInsightsSection section={sections.spendingInsights} view={view} fmt={fmt} />
+            <SpendingInsightsSection flow={sections.spendingInsights} />
           </StreamedSection>
           <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
             <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
@@ -64,20 +69,35 @@ export default async function AnalyticsPage({
         {/* Net cash flow beside Account balances on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref}>
-            <NetCashFlowSection line={sections.netCashFlow} view={view} fmt={fmt} />
+            <CardSection
+              card={sections.netCashFlow}
+              empty="Nothing to show yet: no Transactions in these periods."
+            />
           </StreamedSection>
           <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref}>
-            <AccountBalancesSection balances={sections.accountBalances} fmt={fmt} />
+            <CardSection
+              card={sections.accountBalances}
+              empty="Nothing to show yet: no Accounts."
+            />
           </StreamedSection>
         </div>
         <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref}>
-          <SpendingByCategorySection chart={sections.spendingByCategory} view={view} fmt={fmt} />
+          <CardSection
+            card={sections.spendingByCategory}
+            empty="Nothing to show yet: no expense in these periods."
+          />
         </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
-          <IncomeVsExpenseSection table={sections.incomeVsExpense} view={view} fmt={fmt} />
+          <CardSection
+            card={sections.incomeVsExpense}
+            empty="Nothing to show yet: no income, expense or Capital in these periods."
+          />
         </StreamedSection>
         <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref}>
-          <CategoriesPerPeriodSection table={sections.categoriesPerPeriod} view={view} fmt={fmt} />
+          <CardSection
+            card={sections.categoriesPerPeriod}
+            empty="Nothing to show yet: no classified Transactions in these periods."
+          />
         </StreamedSection>
       </div>
     </section>
