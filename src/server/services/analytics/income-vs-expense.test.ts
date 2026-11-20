@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fixToday, seedAccount, seedClassified } from '@test/support/analytics';
+import {
+  cellValues,
+  fixToday,
+  loadSection,
+  seedAccount,
+  seedClassified,
+} from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { listCellTransactions } from '../reporting';
 import { splitTransaction } from '../transactions';
 import { linkTransfer, transactionSide } from '../transfers';
-import type { PeriodView } from '@/lib/analytics/period-view';
-import { loadAnalytics, type FigureRow, type IncomeVsExpense } from '.';
+import type { FigureRow } from '.';
 
 /** Analytics' Income vs. expense table (spec #170, user stories 34-37, 39, 41-44). */
 
@@ -62,21 +67,12 @@ async function dataset(): Promise<void> {
   });
 }
 
-/** The section at a view, once every section has loaded so no query outlives the test. */
-async function incomeVsExpenseAt(view: PeriodView): Promise<IncomeVsExpense> {
-  const { sections } = loadAnalytics(t.ctx, view);
-  await Promise.allSettled(Object.values(sections));
-  return sections.incomeVsExpense;
-}
-
-const values = (row: FigureRow) => row.cells.map((cell) => cell.value);
-
 describe('Income vs. expense', () => {
   it('has a row per type, then Net and Net incl. Capital, with Total and complete-period Average', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const table = await incomeVsExpenseAt('month');
+    const table = await loadSection(t.ctx, 'month', 'incomeVsExpense');
 
     expect(table.periods.map((period) => period.key)).toEqual([
       ...['2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09'],
@@ -89,7 +85,7 @@ describe('Income vs. expense', () => {
     // purchase counts -200.00 under Groceries and -100.00 under Property. The Transfer counts
     // nowhere. Average divides the 11 complete months only, rounding half away from zero.
     expect(
-      table.rows.map((row) => [row.label, values(row), row.total.value, row.average.value]),
+      table.rows.map((row) => [row.label, cellValues(row), row.total.value, row.average.value]),
     ).toEqual([
       ['Income', [...empty, 600_000, 600_000, 300_000], 1_500_000, 109_091],
       ['Expense', [...empty, -19_400, -20_000, -5_000], -44_400, -3_582],
@@ -103,8 +99,8 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = await incomeVsExpenseAt('quarter');
-    const years = await incomeVsExpenseAt('year');
+    const quarters = await loadSection(t.ctx, 'quarter', 'incomeVsExpense');
+    const years = await loadSection(t.ctx, 'year', 'incomeVsExpense');
 
     const expense = (rows: FigureRow[]) => rows.find((row) => row.key === 'expense')!;
     expect(quarters.periods.map((period) => period.key)).toEqual([
@@ -112,7 +108,7 @@ describe('Income vs. expense', () => {
       ...['2024-Q2', '2024-Q3', '2024-Q4', '2025-Q1'],
     ]);
     // February 2024 is in the Quarter and Year windows; the current period is to date.
-    expect(values(expense(quarters.rows))).toEqual([
+    expect(cellValues(expense(quarters.rows))).toEqual([
       null,
       null,
       null,
@@ -133,7 +129,7 @@ describe('Income vs. expense', () => {
       '2024',
       '2025',
     ]);
-    expect(values(expense(years.rows))).toEqual([null, null, null, null, -999, -44_400]);
+    expect(cellValues(expense(years.rows))).toEqual([null, null, null, null, -999, -44_400]);
     // -9.99 over 5 complete years: -1.998, rounded to -2.00.
     expect(expense(years.rows).average.value).toBe(-200);
   });
@@ -142,7 +138,7 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const table = await incomeVsExpenseAt('month');
+    const table = await loadSection(t.ctx, 'month', 'incomeVsExpense');
 
     const figures = table.rows.flatMap((row) => [...row.cells, row.total, row.average]);
     expect(figures).toHaveLength(5 * 14);
@@ -155,7 +151,7 @@ describe('Income vs. expense', () => {
   it('is empty when no Transaction falls in the window', async () => {
     fixToday('2025-03-20');
 
-    const table = await incomeVsExpenseAt('year');
+    const table = await loadSection(t.ctx, 'year', 'incomeVsExpense');
 
     expect(table.isEmpty).toBe(true);
     expect(table.rows.every((row) => row.total.value === null)).toBe(true);

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Formatter } from '@/lib/format';
 import type { AccountBalances } from '@/server/services/analytics';
-import { SectionCard } from './section';
+import { SectionCard, SectionEmpty } from './section';
 
 export const ACCOUNT_BALANCES = 'Account balances in CHF';
 
@@ -24,9 +24,13 @@ export async function AccountBalancesSection({
 }: AccountBalancesSectionProps) {
   const loaded = await balances;
   return (
-    <SectionCard name={ACCOUNT_BALANCES} className={className}>
-      {loaded.rows.length === 0 ? (
-        <p className="py-8 text-sm text-muted">Nothing to show yet: no Accounts.</p>
+    <SectionCard
+      name={ACCOUNT_BALANCES}
+      className={className}
+      unconverted={{ count: loaded.unconvertedCount, of: 'Account' }}
+    >
+      {loaded.isEmpty ? (
+        <SectionEmpty>Nothing to show yet: no Accounts.</SectionEmpty>
       ) : (
         <BalancesTable balances={loaded} fmt={fmt} />
       )}
@@ -37,58 +41,49 @@ export async function AccountBalancesSection({
 function BalancesTable({ balances, fmt }: { balances: AccountBalances; fmt: Formatter }) {
   const chf = (minor: number) => fmt.amount(minor, { currency: 'CHF' });
   return (
-    <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto">
-        <table aria-label={ACCOUNT_BALANCES} className="w-full text-sm">
-          <thead className="border-b border-rule text-muted">
-            <tr>
-              <th scope="col" className={`${CELL} text-left font-medium`}>
-                Account
+    <div className="overflow-x-auto">
+      <table aria-label={ACCOUNT_BALANCES} className="w-full text-sm">
+        <thead className="border-b border-rule text-muted">
+          <tr>
+            <th scope="col" className={`${CELL} text-left font-medium`}>
+              Account
+            </th>
+            <th scope="col" className={`${CELL} text-right font-medium`}>
+              Balance on {fmt.date(balances.date)}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-rule">
+          {balances.rows.map((row) => (
+            <tr key={row.accountId}>
+              <th scope="row" className={`${CELL} text-left font-normal`}>
+                <Link href={`/accounts/${row.accountId}`} className="hover:underline">
+                  {row.label}
+                </Link>
               </th>
-              <th scope="col" className={`${CELL} text-right font-medium`}>
-                Balance on {fmt.date(balances.date)}
-              </th>
+              <td className={`${CELL} text-right tabular-nums`}>
+                {row.chfMinor === null ? (
+                  <span className="text-muted">No FX rate yet</span>
+                ) : (
+                  <span className={row.chfMinor < 0 ? 'text-negative' : ''}>
+                    {chf(row.chfMinor)}
+                  </span>
+                )}
+              </td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-rule">
-            {balances.rows.map((row) => (
-              <tr key={row.accountId}>
-                <th scope="row" className={`${CELL} text-left font-normal`}>
-                  <Link href={`/accounts/${row.accountId}`} className="hover:underline">
-                    {row.label}
-                  </Link>
-                </th>
-                <td className={`${CELL} text-right tabular-nums`}>
-                  {row.chfMinor === null ? (
-                    <span className="text-muted">No FX rate yet</span>
-                  ) : (
-                    <span className={row.chfMinor < 0 ? 'text-negative' : ''}>
-                      {chf(row.chfMinor)}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          {balances.totalChfMinor !== null && (
-            <tfoot className="border-t border-rule-strong font-semibold">
-              <tr>
-                <th scope="row" className={`${CELL} text-left`}>
-                  Total
-                </th>
-                <td className={`${CELL} text-right tabular-nums`}>{chf(balances.totalChfMinor)}</td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-      {balances.unconvertedCount > 0 && (
-        <p className="text-xs text-muted">
-          {balances.unconvertedCount === 1
-            ? '1 Account is left out of the total: no FX rate for its Currency yet.'
-            : `${balances.unconvertedCount} Accounts are left out of the total: no FX rate for their Currency yet.`}
-        </p>
-      )}
+          ))}
+        </tbody>
+        {balances.totalChfMinor !== null && (
+          <tfoot className="border-t border-rule-strong font-semibold">
+            <tr>
+              <th scope="row" className={`${CELL} text-left`}>
+                Total
+              </th>
+              <td className={`${CELL} text-right tabular-nums`}>{chf(balances.totalChfMinor)}</td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
     </div>
   );
 }

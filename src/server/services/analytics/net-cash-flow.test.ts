@@ -1,11 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { PeriodView } from '@/lib/analytics/period-view';
-import { fixToday, seedAccount, seedClassified } from '@test/support/analytics';
+import { fixToday, loadSection, seedAccount, seedClassified } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { listCellTransactions } from '../reporting';
 import { linkTransfer, transactionSide } from '../transfers';
-import { loadAnalytics } from '.';
 
 /** Analytics' Net cash flow line (spec #170, user stories 27-29; ticket #173). */
 
@@ -47,19 +45,12 @@ async function dataset(): Promise<void> {
   });
 }
 
-/** The section at a view, once every section has settled, so no query outlives the test. */
-async function flow(view: PeriodView) {
-  const { sections } = loadAnalytics(t.ctx, view);
-  await Promise.allSettled(Object.values(sections));
-  return sections.netCashFlow;
-}
-
 describe('Net cash flow', () => {
   it('has one point per month of the window, Capital included and the Transfer left out', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const line = await flow('month');
+    const line = await loadSection(t.ctx, 'month', 'netCashFlow');
 
     expect(line.isEmpty).toBe(false);
     expect(line.points.map((point) => point.key)).toEqual([
@@ -84,8 +75,8 @@ describe('Net cash flow', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = await flow('quarter');
-    const years = await flow('year');
+    const quarters = await loadSection(t.ctx, 'quarter', 'netCashFlow');
+    const years = await loadSection(t.ctx, 'year', 'netCashFlow');
 
     expect(quarters.points.map((point) => point.label)).toEqual([
       ...['Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024'],
@@ -111,7 +102,7 @@ describe('Net cash flow', () => {
     await dataset();
 
     for (const view of ['month', 'quarter', 'year'] as const) {
-      const line = await flow(view);
+      const line = await loadSection(t.ctx, view, 'netCashFlow');
       for (const point of line.points) {
         const page = await listCellTransactions(t.ctx, point.drill.query, point.drill.cell);
         expect(page.value).toBe(point.value);
@@ -122,7 +113,7 @@ describe('Net cash flow', () => {
   it('is empty when no Transaction falls in the window', async () => {
     fixToday('2025-03-20');
 
-    const line = await flow('month');
+    const line = await loadSection(t.ctx, 'month', 'netCashFlow');
 
     expect(line.isEmpty).toBe(true);
     expect(line.points).toHaveLength(12);

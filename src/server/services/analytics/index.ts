@@ -56,7 +56,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
       incomeVsExpense: incomeVsExpense(ctx, view, window),
       spendingInsights: spendingInsights(ctx, view, window),
       spendingByCategory: spendingByCategory(ctx, view, window),
-      netWorth: netWorth(ctx, view, window),
+      netWorth: netWorth(ctx, view, window, today),
       categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
       recentTransactions: recentTransactions(ctx),
       accountBalances: accountBalances(ctx, today),
@@ -66,7 +66,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
 }
 
 export type { AnalyticsPeriod } from './window';
-export type { DrillRef, Figure, FigureRow, PeriodTable } from './figures';
+export type { DrillRef, Figure, FigureRow, PeriodTable, SectionStatus } from './figures';
 export type { IncomeVsExpense, IncomeVsExpenseRow } from './income-vs-expense';
 export type { SpendingInsight, SpendingInsightBar, SpendingInsights } from './spending-insights';
 export type { SpendingByCategory, SpendingSeries } from './spending-by-category';

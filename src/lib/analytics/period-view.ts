@@ -31,6 +31,16 @@ export function parsePeriodView(value: string | string[] | undefined): PeriodVie
   return isPeriodView(first) ? first : DEFAULT_PERIOD_VIEW;
 }
 
+/** The window in words: "the last 12 months". */
+export function windowPhrase(view: PeriodView): string {
+  return `the last ${WINDOW_LENGTHS[view]} ${view}s`;
+}
+
+/** How many complete periods come before the current one in the window. */
+export function windowSpan(view: PeriodView): number {
+  return WINDOW_LENGTHS[view] - 1;
+}
+
 /** Analytics at a Period view. */
 export function analyticsHref(view: PeriodView): string {
   return `/analytics?period=${view}`;
@@ -41,5 +51,5 @@ export function analyticsHref(view: PeriodView): string {
  * current one, to today.
  */
 export function windowRange(view: PeriodView): DateRange {
-  return { kind: 'last', count: WINDOW_LENGTHS[view] - 1, unit: view, includeCurrent: true };
+  return { kind: 'last', count: windowSpan(view), unit: view, includeCurrent: true };
 }

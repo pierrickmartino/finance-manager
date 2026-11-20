@@ -4,7 +4,7 @@ import type { PeriodView } from '@/lib/analytics/period-view';
 import { barLabel } from '@/lib/reporting/overview';
 import type { SpendingInsightBar, SpendingInsights } from '@/server/services/analytics';
 import { drillHref } from './links';
-import { SectionCard } from './section';
+import { SectionCard, SectionEmpty } from './section';
 
 export const SPENDING_INSIGHTS = 'Spending Insights';
 
@@ -79,17 +79,18 @@ export async function SpendingInsightsSection({
   fmt,
   className,
 }: SpendingInsightsSectionProps) {
-  const { insight, bars, isEmpty } = await section;
+  const { insight, bars, isEmpty, unconvertedCount } = await section;
+  const unconverted = { count: unconvertedCount };
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   if (isEmpty) {
     return (
-      <SectionCard name={SPENDING_INSIGHTS} className={className}>
-        <p className="py-8 text-sm text-muted">Nothing to show yet: no income or expense.</p>
+      <SectionCard name={SPENDING_INSIGHTS} className={className} unconverted={unconverted}>
+        <SectionEmpty>Nothing to show yet: no income or expense.</SectionEmpty>
       </SectionCard>
     );
   }
   return (
-    <SectionCard name={SPENDING_INSIGHTS} className={className}>
+    <SectionCard name={SPENDING_INSIGHTS} className={className} unconverted={unconverted}>
       {insight ? (
         <div className="flex flex-col gap-2">
           <p className="font-display text-2xl leading-tight tracking-tight">{insight.headline}</p>

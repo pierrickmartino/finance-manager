@@ -81,5 +81,6 @@ describe('Account balances in CHF', () => {
 
     expect(balances.rows).toEqual([]);
     expect(balances.totalChfMinor).toBeNull();
+    expect(balances.isEmpty).toBe(true);
   });
 });

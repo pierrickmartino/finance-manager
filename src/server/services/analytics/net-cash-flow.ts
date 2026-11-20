@@ -1,7 +1,7 @@
 import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
-import { cellOf, type Figure } from './figures';
+import { cellOf, statusOf, type Figure, type SectionStatus } from './figures';
 import type { AnalyticsPeriod } from './window';
 
 /**
@@ -13,13 +13,10 @@ import type { AnalyticsPeriod } from './window';
 /** One point of the line: a period of the window and its net flow. */
 export interface NetCashFlowPoint extends AnalyticsPeriod, Figure {}
 
-export interface NetCashFlow {
+/** Empty when no Transaction falls in the window. */
+export interface NetCashFlow extends SectionStatus {
   /** One per period of the window, oldest first; the last is the current one, to date. */
   points: NetCashFlowPoint[];
-  /** No Transaction falls in the window. */
-  isEmpty: boolean;
-  /** Transactions left out for want of an FX rate. */
-  unconvertedCount: number;
 }
 
 export async function netCashFlow(
@@ -41,7 +38,6 @@ export async function netCashFlow(
       value: cell(period.key, column),
       drill: { query: report.query, cell: { row: period.key } },
     })),
-    isEmpty: report.total === null,
-    unconvertedCount: report.unconvertedCount,
+    ...statusOf(report),
   };
 }

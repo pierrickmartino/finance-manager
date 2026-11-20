@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fixToday } from '@test/support/analytics';
+import { fixToday, loadSection } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { seedTransactions } from '@test/support/transactions';
 import { archiveAccount, createAccount } from '../accounts';
 import { recordBalanceSnapshot } from '../balance-snapshots';
 import { createBank } from '../banks';
-import { loadAnalytics, type AnalyticsNetWorth } from '.';
-import type { PeriodView } from '@/lib/analytics/period-view';
+import type { AnalyticsNetWorth } from '.';
 
 /** Analytics' Net worth (spec #170, user stories 14-17): today, its trend and its change. */
 
@@ -72,13 +71,6 @@ const TODAY = 115_000 + 95_000 - 250_000;
 // The end of 2024: only Euros, at 0.94.
 const END_OF_2024 = 94_000;
 
-/** Net worth at a Period view, once every section has settled (so no query outlives the test). */
-async function netWorthAt(view: PeriodView): Promise<AnalyticsNetWorth> {
-  const { sections } = loadAnalytics(t.ctx, view);
-  await Promise.allSettled(Object.values(sections));
-  return sections.netWorth;
-}
-
 const dated = (netWorth: AnalyticsNetWorth) =>
   netWorth.points.map((point) => [point.date, point.value]);
 
@@ -87,7 +79,7 @@ describe('Net worth', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const netWorth = await netWorthAt('month');
+    const netWorth = await loadSection(t.ctx, 'month', 'netWorth');
 
     expect(netWorth.today).toEqual({ date: '2025-03-20', value: TODAY });
     expect(dated(netWorth)).toEqual([
@@ -113,7 +105,7 @@ describe('Net worth', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const netWorth = await netWorthAt('quarter');
+    const netWorth = await loadSection(t.ctx, 'quarter', 'netWorth');
 
     expect(netWorth.today).toEqual({ date: '2025-03-20', value: TODAY });
     expect(dated(netWorth)).toEqual([
@@ -132,7 +124,7 @@ describe('Net worth', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const netWorth = await netWorthAt('year');
+    const netWorth = await loadSection(t.ctx, 'year', 'netWorth');
 
     expect(netWorth.today).toEqual({ date: '2025-03-20', value: TODAY });
     expect(dated(netWorth)).toEqual([
@@ -149,8 +141,14 @@ describe('Net worth', () => {
   it('has nothing to show without an Account', async () => {
     fixToday('2025-03-20');
 
-    const netWorth = await netWorthAt('month');
+    const netWorth = await loadSection(t.ctx, 'month', 'netWorth');
 
-    expect(netWorth).toEqual({ today: null, points: [], change: null, unconvertedCount: 0 });
+    expect(netWorth).toEqual({
+      today: null,
+      points: [],
+      change: null,
+      isEmpty: true,
+      unconvertedCount: 0,
+    });
   });
 });

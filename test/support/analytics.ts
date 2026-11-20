@@ -66,3 +66,7 @@ export async function loadSection<Name extends keyof AnalyticsSections>(
   await Promise.allSettled(Object.values(sections));
   return await sections[name];
 }
+
+/** A row's (or series') figure per period of the window, oldest first. */
+export const cellValues = (row: { cells: readonly { value: number | null }[] }) =>
+  row.cells.map((cell) => cell.value);

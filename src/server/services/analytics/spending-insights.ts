@@ -3,8 +3,8 @@ import { spendingInsight } from '@/lib/reporting/overview';
 import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
-import { cellOf, type DrillRef, type Figure } from './figures';
-import type { AnalyticsPeriod } from './window';
+import { cellOf, statusOf, sumOf, type DrillRef, type Figure, type SectionStatus } from './figures';
+import { currentKeys, type AnalyticsPeriod } from './window';
 
 /**
  * Analytics' Spending Insights: how the latest complete period's spending compares with the
@@ -42,14 +42,12 @@ export interface SpendingInsightBar {
   drill: DrillRef;
 }
 
-export interface SpendingInsights {
+/** Empty with no income or expense in the window. */
+export interface SpendingInsights extends SectionStatus {
   /** Null with fewer than two complete periods with data. */
   insight: SpendingInsight | null;
   /** Every period of the window, oldest first. */
   bars: SpendingInsightBar[];
-  /** No income or expense in the window. */
-  isEmpty: boolean;
-  unconvertedCount: number;
 }
 
 const TYPES = ['income', 'expense'] as const;
@@ -58,7 +56,8 @@ type Cell = (row: string, column: string) => number | null;
 
 type KeyedFlow = MonthFlow & { key: string };
 
-const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
+/** Spending: the expense, negated (expense is booked negative); 0 with none booked. */
+const spendingOf = (expense: number | null): number => (expense === null ? 0 : -expense);
 
 /**
  * The window's flows from the first period with income or expense on: periods before the data
@@ -70,16 +69,23 @@ function flowsWithData(window: readonly AnalyticsPeriod[], cell: Cell): KeyedFlo
   if (first === -1) return [];
   return window.slice(first).map((period) => {
     const income = cell(period.key, 'income') ?? 0;
-    const expense = 0 - (cell(period.key, 'expense') ?? 0);
-    const { key, label, isToDate: isPartial } = period;
-    return { key, label, isPartial, income, expense, net: income - expense };
+    const expense = spendingOf(cell(period.key, 'expense'));
+    // MonthFlow's `isPartial` is the Period window's "to date".
+    return {
+      key: period.key,
+      label: period.label,
+      isPartial: period.isToDate,
+      income,
+      expense,
+      net: income - expense,
+    };
   });
 }
 
 /** The average spending of the complete periods before the latest; 0 without any. */
 function averageBefore(complete: readonly KeyedFlow[]): number {
   const before = complete.slice(0, -1);
-  return before.length === 0 ? 0 : sum(before.map((flow) => flow.expense)) / before.length;
+  return before.length === 0 ? 0 : (sumOf(before.map((flow) => flow.expense)) ?? 0) / before.length;
 }
 
 export async function spendingInsights(
@@ -97,7 +103,7 @@ export async function spendingInsights(
   const flows = flowsWithData(window, cell);
   const latest = flows.filter((flow) => !flow.isPartial).at(-1);
   const average = averageBefore(flows.filter((flow) => !flow.isPartial));
-  const spent = (key: string) => 0 - (cell(key, 'expense') ?? 0);
+  const spent = (key: string) => spendingOf(cell(key, 'expense'));
   const top = Math.max(average, ...window.map((period) => spent(period.key)));
   const shareOf = (value: number): number => (top <= 0 ? 0 : Math.max(0, value) / top);
   const expenseOf = (row: string): DrillRef => ({
@@ -105,7 +111,6 @@ export async function spendingInsights(
     cell: { row, column: 'expense' },
   });
   const reading = spendingInsight(flows, view);
-  const current = window.filter((period) => period.isToDate).map((period) => period.key);
 
   return {
     insight:
@@ -115,7 +120,11 @@ export async function spendingInsights(
             latest: { value: latest.expense, drill: expenseOf(latest.key) },
             change: {
               query: report.query,
-              cell: { row: { except: current }, column: 'expense', withPeriodSubtotals: true },
+              cell: {
+                row: { except: currentKeys(window) },
+                column: 'expense',
+                withPeriodSubtotals: true,
+              },
             },
             average: Math.round(average),
             averageShare: shareOf(average),
@@ -128,7 +137,6 @@ export async function spendingInsights(
       isLatest: period.key === latest?.key,
       drill: expenseOf(period.key),
     })),
-    isEmpty: report.total === null,
-    unconvertedCount: report.unconvertedCount,
+    ...statusOf(report),
   };
 }

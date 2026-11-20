@@ -8,7 +8,7 @@ import {
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { WidgetQuery } from '../reporting/query';
-import { cellOf, periodRow, sumOf, type FigureRow } from './figures';
+import { cellOf, periodRow, statusOf, sumOf, type FigureRow, type SectionStatus } from './figures';
 import type { AnalyticsPeriod } from './window';
 
 /**
@@ -30,13 +30,10 @@ export interface CategoryGroupRows {
   subtotal: FigureRow;
 }
 
-export interface CategoriesPerPeriod {
+/** Empty when no classified Transaction falls in the window. */
+export interface CategoriesPerPeriod extends SectionStatus {
   periods: AnalyticsPeriod[];
   groups: CategoryGroupRows[];
-  /** No classified Transaction falls in the window. */
-  isEmpty: boolean;
-  /** Transactions left out for want of an FX rate. */
-  unconvertedCount: number;
 }
 
 /** A group's rows, or null when none of its Categories has anything in the window. */
@@ -55,7 +52,7 @@ function groupRows(
       key: category.id,
       label: category.name,
       query: report.query,
-      row: category.id,
+      selector: category.id,
       valueAt: (period) => cell(category.id, period),
     }),
   );
@@ -92,7 +89,6 @@ export async function categoriesPerPeriod(
   return {
     periods: [...window],
     groups: ordered.flatMap((group) => groupRows(view, window, report, group) ?? []),
-    isEmpty: report.total === null,
-    unconvertedCount: report.unconvertedCount,
+    ...statusOf(report),
   };
 }

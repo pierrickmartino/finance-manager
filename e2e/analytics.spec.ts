@@ -400,3 +400,74 @@ test('Net cash flow has a point per period, the current one to date, each openin
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
   await expect(page).toHaveURL(/\/analytics\?period=month$/);
 });
+
+test('on a wide screen Net worth, Spending Insights and Recent transactions share the first row', async ({
+  page,
+}) => {
+  await seedSalary(Date.now());
+  // Each section's box once it has loaded (its placeholder has the same name).
+  const boxOf = async (name: string) => {
+    const region = page.getByRole('region', { name });
+    await expect(region).not.toHaveAttribute('aria-busy', 'true');
+    return (await region.boundingBox())!;
+  };
+  const overview = ['Net worth', 'Spending Insights', 'Recent transactions'];
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/analytics');
+  const [netWorth, insights, recent] = await Promise.all(overview.map(boxOf));
+  expect(insights!.y).toBe(netWorth!.y);
+  expect(recent!.y).toBe(netWorth!.y);
+  expect(netWorth!.x + netWorth!.width).toBeLessThan(insights!.x);
+  expect(insights!.x + insights!.width).toBeLessThan(recent!.x);
+
+  // One column on a phone, in the same order.
+  await page.setViewportSize({ width: 390, height: 900 });
+  const [narrowWorth, narrowInsights, narrowRecent] = await Promise.all(overview.map(boxOf));
+  expect(narrowWorth!.x).toBe(narrowInsights!.x);
+  expect(narrowWorth!.y + narrowWorth!.height).toBeLessThan(narrowInsights!.y);
+  expect(narrowInsights!.y + narrowInsights!.height).toBeLessThan(narrowRecent!.y);
+});
+
+/** An Account in a Currency the E2E database has no FX rate for, with an expense booked today. */
+async function seedUnconverted(suffix: number): Promise<void> {
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Unconverted bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Unconverted account ${suffix}`,
+      currency: 'ISK',
+      openingBalanceMinor: 50_000_00,
+      openingDate: '2021-01-01',
+    });
+    const group = await createCategoryGroup(ctx, { name: `Abroad ${suffix}`, type: 'expense' });
+    const category = await createCategory(ctx, { groupId: group.id, name: 'Travel' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: swissToday(),
+      amountMinor: -1_234_00,
+      description: `Unconverted purchase ${suffix}`,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: category.id });
+  });
+}
+
+test('every section with figures left out for want of an FX rate says so', async ({ page }) => {
+  await seedUnconverted(Date.now());
+  await page.goto('/analytics');
+  for (const name of [
+    'Net worth',
+    'Spending Insights',
+    'Net cash flow',
+    'Account balances in CHF',
+    'Spending by Category',
+    'Income vs. expense',
+    'Categories per period',
+  ]) {
+    await expect(
+      page.getByRole('region', { name }).getByText(/left out: no FX rate yet\./),
+    ).toBeVisible();
+  }
+});

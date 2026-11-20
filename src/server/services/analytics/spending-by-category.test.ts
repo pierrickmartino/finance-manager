@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  cellValues,
   fixToday,
   loadSection,
   seedAccount,
@@ -9,7 +10,6 @@ import {
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 import { listCellTransactions } from '../reporting';
-import type { SpendingSeries } from '.';
 
 /** Analytics' Spending by Category stacked bar (spec #170, user stories 30-33; ticket #174). */
 
@@ -72,7 +72,6 @@ async function dataset(names = Object.keys(SPENDING)): Promise<void> {
   await seedClassified(t.ctx, ubs, rows);
 }
 
-const values = (series: SpendingSeries) => series.cells.map((cell) => cell.value);
 const empty = Array<null>(9).fill(null);
 
 describe('Spending by Category', () => {
@@ -99,10 +98,10 @@ describe('Spending by Category', () => {
       ['Other', true, -45_000],
     ]);
     const rent = chart.series[0]!;
-    expect(values(rent)).toEqual([...empty, -50_000, null, -50_000]);
+    expect(cellValues(rent)).toEqual([...empty, -50_000, null, -50_000]);
     // Gifts and Hobbies, folded: January -250.00 and -120.00, March -80.00.
     const other = chart.series.at(-1)!;
-    expect(values(other)).toEqual([...empty, -37_000, null, -8_000]);
+    expect(cellValues(other)).toEqual([...empty, -37_000, null, -8_000]);
   });
 
   it("opens a Drill-down behind every segment, Other's covering every folded Category", async () => {
@@ -139,7 +138,7 @@ describe('Spending by Category', () => {
       'Living › Groceries',
       'Living › Books',
     ]);
-    expect(values(chart.series[0]!)).toEqual([...Array<null>(7).fill(null), -100_000]);
+    expect(cellValues(chart.series[0]!)).toEqual([...Array<null>(7).fill(null), -100_000]);
   });
 
   it('is empty when no expense falls in the window', async () => {

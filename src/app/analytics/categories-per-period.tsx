@@ -2,7 +2,7 @@ import type { Formatter } from '@/lib/format';
 import type { PeriodView } from '@/lib/analytics/period-view';
 import type { CategoriesPerPeriod, PeriodTable } from '@/server/services/analytics';
 import { PeriodTableView } from './period-table';
-import { SectionCard } from './section';
+import { SectionCard, SectionEmpty } from './section';
 
 export const CATEGORIES_PER_PERIOD = 'Categories per period';
 
@@ -36,11 +36,15 @@ export async function CategoriesPerPeriodSection({
   const loaded = await table;
   const { table: rows, subtotals, categories } = flattened(loaded);
   return (
-    <SectionCard name={CATEGORIES_PER_PERIOD} className={className}>
+    <SectionCard
+      name={CATEGORIES_PER_PERIOD}
+      className={className}
+      unconverted={{ count: loaded.unconvertedCount }}
+    >
       {loaded.isEmpty ? (
-        <p className="py-8 text-sm text-muted">
+        <SectionEmpty>
           Nothing to show yet: no classified Transaction in these periods.
-        </p>
+        </SectionEmpty>
       ) : (
         <PeriodTableView
           label={CATEGORIES_PER_PERIOD}

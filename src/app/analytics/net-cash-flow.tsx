@@ -3,7 +3,7 @@ import type { Formatter } from '@/lib/format';
 import type { PeriodView } from '@/lib/analytics/period-view';
 import type { NetCashFlow, NetCashFlowPoint } from '@/server/services/analytics';
 import { drillHref } from './links';
-import { SectionCard } from './section';
+import { SectionCard, SectionEmpty } from './section';
 
 export const NET_CASH_FLOW = 'Net cash flow';
 
@@ -56,11 +56,11 @@ interface NetCashFlowSectionProps {
 export async function NetCashFlowSection({ line, view, fmt }: NetCashFlowSectionProps) {
   const loaded = await line;
   return (
-    <SectionCard name={NET_CASH_FLOW}>
+    <SectionCard name={NET_CASH_FLOW} unconverted={{ count: loaded.unconvertedCount }}>
       {loaded.isEmpty ? (
-        <p className="py-8 text-sm text-muted">
+        <SectionEmpty>
           Nothing to show yet: no money came in or went out in these periods.
-        </p>
+        </SectionEmpty>
       ) : (
         <NetCashFlowChart points={loaded.points} view={view} fmt={fmt} />
       )}

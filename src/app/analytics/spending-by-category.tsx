@@ -4,7 +4,7 @@ import type { PeriodView } from '@/lib/analytics/period-view';
 import type { SpendingByCategory, SpendingSeries } from '@/server/services/analytics';
 import { CHART_PALETTE } from '../dashboards/chart-palette';
 import { drillHref } from './links';
-import { SectionCard } from './section';
+import { SectionCard, SectionEmpty } from './section';
 import { SpendingChart, type SpendingChartSeries } from './spending-chart';
 
 export const SPENDING_BY_CATEGORY = 'Spending by Category';
@@ -71,11 +71,9 @@ export async function SpendingByCategorySection({
     cells: entry.cells.map((cell) => ({ value: cell.value, href: drillHref(view, cell.drill) })),
   }));
   return (
-    <SectionCard name={SPENDING_BY_CATEGORY}>
+    <SectionCard name={SPENDING_BY_CATEGORY} unconverted={{ count: loaded.unconvertedCount }}>
       {loaded.isEmpty ? (
-        <p className="py-8 text-sm text-muted">
-          Nothing to show yet: no spending in these periods.
-        </p>
+        <SectionEmpty>Nothing to show yet: no spending in these periods.</SectionEmpty>
       ) : (
         <>
           <SpendingChart name={SPENDING_BY_CATEGORY} periods={loaded.periods} series={series} />

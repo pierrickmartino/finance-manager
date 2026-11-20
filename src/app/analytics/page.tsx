@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
-import { analyticsHref, parsePeriodView, type PeriodView } from '@/lib/analytics/period-view';
+import { analyticsHref, parsePeriodView, windowPhrase } from '@/lib/analytics/period-view';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { loadAnalytics } from '@/server/services/analytics';
-import { swissToday } from '@/server/services/fx/dates';
 import { ACCOUNT_BALANCES, AccountBalancesSection } from './account-balances';
 import { CATEGORIES_PER_PERIOD, CategoriesPerPeriodSection } from './categories-per-period';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
@@ -18,12 +17,6 @@ import { SPENDING_INSIGHTS, SpendingInsightsSection } from './spending-insights'
 import { SPENDING_BY_CATEGORY, SpendingByCategorySection } from './spending-by-category';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
-
-const GRAINS: Record<PeriodView, string> = {
-  year: 'the last 6 years',
-  quarter: 'the last 8 quarters',
-  month: 'the last 12 months',
-};
 
 /**
  * Analytics (GLOSSARY, ADR-0015): one fixed page of reports read through the Period view in the
@@ -49,20 +42,25 @@ export default async function AnalyticsPage({
     <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
-        <p className="text-muted">Your finances over {GRAINS[view]}, the current one to date.</p>
+        <p className="text-muted">
+          Your finances over {windowPhrase(view)}, the current one to date.
+        </p>
       </header>
-      <StreamedCompleteness ctx={ctx} fmt={fmt} today={swissToday()} />
+      <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
       <PeriodSwitch view={view} />
       <div className="grid min-w-0 grid-cols-1 gap-5">
-        <StreamedSection name={NET_WORTH} retryHref={retryHref}>
-          <NetWorthSection netWorth={sections.netWorth} view={view} fmt={fmt} />
-        </StreamedSection>
-        <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
-          <SpendingInsightsSection section={sections.spendingInsights} view={view} fmt={fmt} />
-        </StreamedSection>
-        <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
-          <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
-        </StreamedSection>
+        {/* The overview: three side by side on wide screens, one after the other below. */}
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
+          <StreamedSection name={NET_WORTH} retryHref={retryHref}>
+            <NetWorthSection netWorth={sections.netWorth} view={view} fmt={fmt} />
+          </StreamedSection>
+          <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
+            <SpendingInsightsSection section={sections.spendingInsights} view={view} fmt={fmt} />
+          </StreamedSection>
+          <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
+            <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
+          </StreamedSection>
+        </div>
         {/* Net cash flow beside Account balances on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref}>

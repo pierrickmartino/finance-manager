@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fixToday, seedAccount, seedClassified } from '@test/support/analytics';
+import {
+  cellValues,
+  fixToday,
+  loadSection,
+  seedAccount,
+  seedClassified,
+} from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { listCellTransactions } from '../reporting';
 import { splitTransaction } from '../transactions';
 import { linkTransfer, transactionSide } from '../transfers';
-import { loadAnalytics, type CategoriesPerPeriod, type FigureRow } from '.';
-import type { PeriodView } from '@/lib/analytics/period-view';
+import type { CategoriesPerPeriod } from '.';
 
 /** Analytics' Categories per period table (spec #170, ticket #172). */
 
@@ -66,14 +71,6 @@ async function dataset(): Promise<void> {
   });
 }
 
-/** The section at a view, once every section has loaded so no query outlives the test. */
-async function categoriesAt(view: PeriodView): Promise<CategoriesPerPeriod> {
-  const { sections } = loadAnalytics(t.ctx, view);
-  await Promise.allSettled(Object.values(sections));
-  return sections.categoriesPerPeriod;
-}
-
-const values = (row: FigureRow) => row.cells.map((cell) => cell.value);
 const figuresOf = (table: CategoriesPerPeriod) =>
   table.groups.flatMap((group) =>
     [group.subtotal, ...group.categories].flatMap((row) => [...row.cells, row.total, row.average]),
@@ -84,7 +81,7 @@ describe('Categories per period', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const table = await categoriesAt('month');
+    const table = await loadSection(t.ctx, 'month', 'categoriesPerPeriod');
 
     expect(table.periods).toHaveLength(12);
     expect(table.periods.at(-1)?.isToDate).toBe(true);
@@ -109,7 +106,7 @@ describe('Categories per period', () => {
     expect(
       [...food.categories, food.subtotal].map((row) => [
         row.label,
-        values(row),
+        cellValues(row),
         row.total.value,
         row.average.value,
       ]),
@@ -126,12 +123,12 @@ describe('Categories per period', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = await categoriesAt('quarter');
-    const years = await categoriesAt('year');
+    const quarters = await loadSection(t.ctx, 'quarter', 'categoriesPerPeriod');
+    const years = await loadSection(t.ctx, 'year', 'categoriesPerPeriod');
 
     const groceries = (table: CategoriesPerPeriod) => table.groups[1]!.categories[0]!;
     // February 2024 is in the Quarter and Year windows; the current period is to date.
-    expect(values(groceries(quarters))).toEqual([
+    expect(cellValues(groceries(quarters))).toEqual([
       null,
       null,
       null,
@@ -144,7 +141,7 @@ describe('Categories per period', () => {
     expect(groceries(quarters).total.value).toBe(-40_399);
     // -9.99 over 7 complete quarters: -1.427, rounded to -1.43.
     expect(groceries(quarters).average.value).toBe(-143);
-    expect(values(groceries(years))).toEqual([null, null, null, null, -999, -39_400]);
+    expect(cellValues(groceries(years))).toEqual([null, null, null, null, -999, -39_400]);
     expect(years.groups[1]!.subtotal.total.value).toBe(-44_899);
   });
 
@@ -154,7 +151,7 @@ describe('Categories per period', () => {
       fixToday('2025-03-20');
       await dataset();
 
-      const table = await categoriesAt(view);
+      const table = await loadSection(t.ctx, view, 'categoriesPerPeriod');
 
       const figures = figuresOf(table);
       // 3 subtotals and 4 Categories, each with a cell per period then Total and Average.
@@ -171,7 +168,7 @@ describe('Categories per period', () => {
     await dataset();
     vi.setSystemTime(new Date('2035-03-20T09:00:00Z'));
 
-    const table = await categoriesAt('year');
+    const table = await loadSection(t.ctx, 'year', 'categoriesPerPeriod');
 
     expect(table.isEmpty).toBe(true);
     expect(table.groups).toEqual([]);

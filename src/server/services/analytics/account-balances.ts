@@ -1,6 +1,7 @@
 import type { ServiceContext } from '../context';
 import { runAccountBalances } from '../reporting/balances';
 import { widgetQueryInput, type WidgetQuery } from '../reporting/query';
+import type { SectionStatus } from './figures';
 
 /**
  * Analytics' Account balances in CHF: each Account's balance today, converted to the Base
@@ -16,14 +17,16 @@ export interface AccountBalanceRow {
   chfMinor: number | null;
 }
 
-export interface AccountBalances {
+/**
+ * Empty without an Account; its `unconvertedCount` counts Accounts left out of the total for
+ * want of an FX rate.
+ */
+export interface AccountBalances extends SectionStatus {
   /** The day the balances stand at: today. */
   date: string;
   rows: AccountBalanceRow[];
   /** The converted balances added up; null with none. */
   totalChfMinor: number | null;
-  /** Accounts left out of the total for want of an FX rate. */
-  unconvertedCount: number;
 }
 
 /** One row per Account and no time axis: the balances on a day (the date range goes unused). */
@@ -46,6 +49,7 @@ export async function accountBalances(
       chfMinor: report.rowTotals[index] ?? null,
     })),
     totalChfMinor: report.total,
+    isEmpty: report.rows.length === 0,
     unconvertedCount: report.unconvertedCount,
   };
 }

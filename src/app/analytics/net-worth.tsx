@@ -1,20 +1,14 @@
 import Link from 'next/link';
 import { HEADLINE_AMOUNT_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
-import { WINDOW_LENGTHS, type PeriodView } from '@/lib/analytics/period-view';
+import { windowPhrase, type PeriodView } from '@/lib/analytics/period-view';
 import type { PeriodValue } from '@/lib/reporting/period-values';
 import type { AnalyticsNetWorth } from '@/server/services/analytics';
 import { accountsHref } from '../accounts/view';
 import { NetWorthTrend } from './net-worth-trend';
-import { SectionCard } from './section';
+import { SectionCard, SectionEmpty } from './section';
 
 export const NET_WORTH = 'Net worth';
-
-const WINDOW_WORDS: Record<PeriodView, string> = {
-  year: 'years',
-  quarter: 'quarters',
-  month: 'months',
-};
 
 interface NetWorthSectionProps {
   netWorth: Promise<AnalyticsNetWorth>;
@@ -62,10 +56,11 @@ function NetWorthChange({
 export async function NetWorthSection({ netWorth, view, fmt }: NetWorthSectionProps) {
   const loaded = await netWorth;
   const money = (minor: number) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
+  const unconverted = { count: loaded.unconvertedCount, of: 'Account' } as const;
   if (!loaded.today) {
     return (
-      <SectionCard name={NET_WORTH}>
-        <p className="py-8 text-sm text-muted">Nothing to show yet: no Account holds money.</p>
+      <SectionCard name={NET_WORTH} unconverted={unconverted}>
+        <SectionEmpty>Nothing to show yet: no Account holds money.</SectionEmpty>
       </SectionCard>
     );
   }
@@ -76,7 +71,7 @@ export async function NetWorthSection({ netWorth, view, fmt }: NetWorthSectionPr
     isPartial: point.isToDate,
   }));
   return (
-    <SectionCard name={NET_WORTH}>
+    <SectionCard name={NET_WORTH} unconverted={unconverted}>
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <Link
           href={accountsHref({ date: loaded.today.date })}
@@ -85,10 +80,7 @@ export async function NetWorthSection({ netWorth, view, fmt }: NetWorthSectionPr
         >
           {money(loaded.today.value)}
         </Link>
-        <NetWorthTrend
-          points={points}
-          label={`Net worth over the last ${WINDOW_LENGTHS[view]} ${WINDOW_WORDS[view]}`}
-        />
+        <NetWorthTrend points={points} label={`Net worth over ${windowPhrase(view)}`} />
       </div>
       {loaded.change && <NetWorthChange change={loaded.change} fmt={fmt} />}
     </SectionCard>

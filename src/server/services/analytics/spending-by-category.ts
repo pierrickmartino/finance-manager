@@ -1,10 +1,16 @@
 import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
-import type { AxisSelector } from '../reporting/cell-ref';
 import type { ReportHeader } from '../reporting/headers';
-import type { WidgetQuery } from '../reporting/query';
-import { cellOf, sumOf, type Figure } from './figures';
+import {
+  cellOf,
+  periodRow,
+  statusOf,
+  sumOf,
+  type FigureRow,
+  type PeriodRowSpec,
+  type SectionStatus,
+} from './figures';
 import type { AnalyticsPeriod } from './window';
 
 /**
@@ -20,26 +26,19 @@ export const NAMED_CATEGORIES = 8;
 export const OTHER_KEY = 'other';
 export const OTHER_LABEL = 'Other';
 
-/** One stacked series: a named Expense Category, or "Other". */
-export interface SpendingSeries {
-  /** The Category's id, or `OTHER_KEY`. */
-  key: string;
-  label: string;
+/**
+ * One stacked series: a named Expense Category (keyed by its id), or "Other" (`OTHER_KEY`),
+ * with a segment per period of the window, oldest first.
+ */
+export interface SpendingSeries extends FigureRow {
   isOther: boolean;
-  /** A segment per period of the window, oldest first. */
-  cells: Figure[];
-  /** The whole window, the current period included. */
-  total: Figure;
 }
 
-export interface SpendingByCategory {
+/** Empty when no expense falls in the window. */
+export interface SpendingByCategory extends SectionStatus {
   periods: AnalyticsPeriod[];
   /** The named Categories, largest spending first, then "Other" when anything folds. */
   series: SpendingSeries[];
-  /** No expense falls in the window. */
-  isEmpty: boolean;
-  /** Transactions left out for want of an FX rate. */
-  unconvertedCount: number;
 }
 
 /** Largest spending first: the most negative total. Ties keep the Categories' own order. */
@@ -50,34 +49,14 @@ function rank(categories: readonly ReportHeader[], totalOf: (key: string) => num
     .map(({ header }) => header);
 }
 
-interface SeriesSpec {
-  key: string;
-  label: string;
-  isOther: boolean;
-  /** The series' selector on the query's Category columns. */
-  column: AxisSelector;
-  valueAt: (periodKey: string) => number | null;
-}
-
+/** A series: the Category columns it selects, against the periods on the query's rows. */
 function series(
-  query: WidgetQuery,
+  view: PeriodView,
   window: readonly AnalyticsPeriod[],
-  spec: SeriesSpec,
+  isOther: boolean,
+  spec: PeriodRowSpec<string>,
 ): SpendingSeries {
-  const cells = window.map((period) => ({
-    value: spec.valueAt(period.key),
-    drill: { query, cell: { row: period.key, column: spec.column } },
-  }));
-  return {
-    key: spec.key,
-    label: spec.label,
-    isOther: spec.isOther,
-    cells,
-    total: {
-      value: sumOf(cells.map((cell) => cell.value)),
-      drill: { query, cell: { column: spec.column } },
-    },
-  };
+  return { ...periodRow(view, window, { ...spec, periodAxis: 'rows' }), isOther };
 }
 
 export async function spendingByCategory(
@@ -102,27 +81,26 @@ export async function spendingByCategory(
     periods: [...window],
     series: [
       ...named.map((header) =>
-        series(report.query, window, {
+        series(view, window, false, {
           key: header.key!,
           label: header.label,
-          isOther: false,
-          column: header.key!,
+          query: report.query,
+          selector: header.key!,
           valueAt: (period) => cell(period, header.key),
         }),
       ),
       ...(folded.length === 0
         ? []
         : [
-            series(report.query, window, {
+            series(view, window, true, {
               key: OTHER_KEY,
               label: OTHER_LABEL,
-              isOther: true,
-              column: { except: namedKeys },
+              query: report.query,
+              selector: { except: namedKeys },
               valueAt: (period) => sumOf(folded.map((header) => cell(period, header.key))),
             }),
           ]),
     ],
-    isEmpty: report.total === null,
-    unconvertedCount: report.unconvertedCount,
+    ...statusOf(report),
   };
 }

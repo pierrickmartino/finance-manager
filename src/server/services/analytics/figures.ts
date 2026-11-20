@@ -3,7 +3,7 @@ import type { PeriodView } from '@/lib/analytics/period-view';
 import type { ReportTable } from '../reporting';
 import type { AxisSelector, CellRef } from '../reporting/cell-ref';
 import type { WidgetQuery } from '../reporting/query';
-import type { AnalyticsPeriod } from './window';
+import { currentKeys, type AnalyticsPeriod } from './window';
 
 /**
  * The building blocks of Analytics' per-period sections: a figure with the Drill-down behind
@@ -33,14 +33,23 @@ export interface FigureRow<Key extends string = string> {
   average: Figure;
 }
 
+/** What every section says besides its figures. */
+export interface SectionStatus {
+  /** Nothing the section reports falls in the window. */
+  isEmpty: boolean;
+  /** Transactions (Accounts, for balances) left out for want of an FX rate. */
+  unconvertedCount: number;
+}
+
+/** A report's status: empty without a total, and what it left out. */
+export function statusOf(report: ReportTable): SectionStatus {
+  return { isEmpty: report.total === null, unconvertedCount: report.unconvertedCount };
+}
+
 /** A section's table: periods as columns, oldest first, then Total and Average. */
-export interface PeriodTable<Key extends string = string> {
+export interface PeriodTable<Key extends string = string> extends SectionStatus {
   periods: AnalyticsPeriod[];
   rows: FigureRow<Key>[];
-  /** No Transaction falls in the window. */
-  isEmpty: boolean;
-  /** Transactions left out for want of an FX rate. */
-  unconvertedCount: number;
 }
 
 /** The sum of some figures; null when every one is null. */
@@ -63,10 +72,12 @@ export function cellOf(report: ReportTable) {
 export interface PeriodRowSpec<Key extends string> {
   key: Key;
   label: string;
-  /** The query behind the row; its columns are the view's periods. */
+  /** The query behind the row; one of its axes is the view's periods. */
   query: WidgetQuery;
-  /** The row's selector on the query's rows axis; absent for the whole column. */
-  row?: AxisSelector;
+  /** The axis holding the periods: columns unless said. */
+  periodAxis?: 'rows' | 'columns';
+  /** The row's selector on the query's other axis; absent for the whole of it. */
+  selector?: AxisSelector;
   /** The row's value in one period of the window. */
   valueAt: (periodKey: string) => number | null;
 }
@@ -81,7 +92,7 @@ function cellRef(row: AxisSelector | undefined, column?: AxisSelector): CellRef 
 
 /**
  * A row of figures over the window, each with its Drill-down: a cell per period, the Total
- * (the whole column axis) and the Average, drilled as the `average` measure over every period
+ * (the whole period axis) and the Average, drilled as the `average` measure over every period
  * but the current one, which divides by the same count of complete periods.
  */
 export function periodRow<Key extends string>(
@@ -89,24 +100,25 @@ export function periodRow<Key extends string>(
   window: readonly AnalyticsPeriod[],
   spec: PeriodRowSpec<Key>,
 ): FigureRow<Key> {
-  const { query, row } = spec;
+  const { query, selector } = spec;
+  const at = (periods?: AxisSelector): CellRef =>
+    spec.periodAxis === 'rows' ? cellRef(periods, selector) : cellRef(selector, periods);
   const cells = window.map((period) => ({
     value: spec.valueAt(period.key),
-    drill: { query, cell: cellRef(row, period.key) },
+    drill: { query, cell: at(period.key) },
   }));
   const complete = window.flatMap((period, index) => (period.isToDate ? [] : [cells[index]!]));
   const completeSum = sumOf(complete.map((cell) => cell.value));
-  const current = window.filter((period) => period.isToDate).map((period) => period.key);
   return {
     key: spec.key,
     label: spec.label,
     cells,
-    total: { value: sumOf(cells.map((cell) => cell.value)), drill: { query, cell: cellRef(row) } },
+    total: { value: sumOf(cells.map((cell) => cell.value)), drill: { query, cell: at() } },
     average: {
       value: completeSum === null ? null : divideRounded(completeSum, complete.length),
       drill: {
         query: { ...query, measure: 'average', averagePer: view },
-        cell: cellRef(row, { except: current }),
+        cell: at({ except: currentKeys(window) }),
       },
     },
   };

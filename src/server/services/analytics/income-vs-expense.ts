@@ -2,7 +2,7 @@ import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
 import type { AxisSelector } from '../reporting/cell-ref';
-import { cellOf, periodRow, sumOf, type PeriodTable } from './figures';
+import { cellOf, periodRow, statusOf, sumOf, type PeriodTable } from './figures';
 import type { AnalyticsPeriod } from './window';
 
 /**
@@ -23,19 +23,19 @@ interface RowDefinition {
   /** The Category group types the row adds up. */
   types: readonly (typeof TYPES)[number][];
   /** The same types as a selector on the report's Category group type rows. */
-  row?: AxisSelector;
+  selector?: AxisSelector;
 }
 
 const ROWS: readonly RowDefinition[] = [
-  { key: 'income', label: 'Income', types: ['income'], row: 'income' },
-  { key: 'expense', label: 'Expense', types: ['expense'], row: 'expense' },
-  { key: 'capital', label: 'Capital', types: ['capital'], row: 'capital' },
+  { key: 'income', label: 'Income', types: ['income'], selector: 'income' },
+  { key: 'expense', label: 'Expense', types: ['expense'], selector: 'expense' },
+  { key: 'capital', label: 'Capital', types: ['capital'], selector: 'capital' },
   // The type filter leaves no Unclassified bucket, so "every type but Capital" is exactly these.
   {
     key: 'net',
     label: 'Net (income − expense)',
     types: ['income', 'expense'],
-    row: { except: ['capital'] },
+    selector: { except: ['capital'] },
   },
   { key: 'netInclCapital', label: 'Net incl. Capital', types: TYPES },
 ];
@@ -54,16 +54,15 @@ export async function incomeVsExpense(
   const cell = cellOf(report);
   return {
     periods: [...window],
-    rows: ROWS.map(({ key, label, types, row }) =>
+    rows: ROWS.map(({ key, label, types, selector }) =>
       periodRow(view, window, {
         key,
         label,
         query: report.query,
-        row,
+        selector,
         valueAt: (period) => sumOf(types.map((type) => cell(type, period))),
       }),
     ),
-    isEmpty: report.total === null,
-    unconvertedCount: report.unconvertedCount,
+    ...statusOf(report),
   };
 }

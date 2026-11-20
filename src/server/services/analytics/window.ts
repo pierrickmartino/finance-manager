@@ -22,7 +22,7 @@ export function periodWindow(view: PeriodView, today: string): AnalyticsPeriod[]
   }));
 }
 
-/** The keys of the window's complete periods: every one but the current. */
-export function completeKeys(window: readonly AnalyticsPeriod[]): string[] {
-  return window.filter((period) => !period.isToDate).map((period) => period.key);
+/** The key of the window's current period, as a list for an `except` selector. */
+export function currentKeys(window: readonly AnalyticsPeriod[]): string[] {
+  return window.filter((period) => period.isToDate).map((period) => period.key);
 }
