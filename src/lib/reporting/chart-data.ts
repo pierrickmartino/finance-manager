@@ -32,6 +32,33 @@ export interface ChartSource {
   drill: DrillTarget | null;
   /** Net worth over time only: its capital movements. */
   capital?: ChartCapital;
+  /** Analytics' Categories per period only: its rows as a tree of groups and their Categories. */
+  rowTree?: RowTree;
+}
+
+/**
+ * Rows that form a tree, in display order: sections (a Category group type), each of groups
+ * whose subtotal row comes before its child rows. Rows are indexes into the source's rows.
+ */
+export interface RowTree {
+  sections: RowTreeSection[];
+}
+
+export interface RowTreeSection {
+  label: string;
+  groups: RowTreeGroup[];
+}
+
+export interface RowTreeGroup {
+  /** The group's subtotal row. */
+  row: number;
+  children: RowTreeChild[];
+}
+
+export interface RowTreeChild {
+  row: number;
+  /** The child's own name ("Salary"); its row keeps the whole label ("Income › Salary"). */
+  label: string;
 }
 
 /** The capital movements on the Net worth line: each opens its Transaction, `href` all of them. */

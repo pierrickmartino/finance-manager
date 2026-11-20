@@ -114,6 +114,33 @@ describe('Categories per period', () => {
     expect(data.total).toBe(846_100);
   });
 
+  it('outlines its rows as a tree: a section per type, each group subtotal over its Categories', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const data = (await loadSection(t.ctx, 'month', 'categoriesPerPeriod')).data!;
+
+    // Row indexes into data.rows; a Category keeps its whole label there and its own name here.
+    expect(data.rowTree).toEqual({
+      sections: [
+        { label: 'Income', groups: [{ row: 0, children: [{ row: 1, label: 'Salary' }] }] },
+        {
+          label: 'Expense',
+          groups: [
+            {
+              row: 2,
+              children: [
+                { row: 3, label: 'Groceries' },
+                { row: 4, label: 'Restaurants' },
+              ],
+            },
+          ],
+        },
+        { label: 'Capital', groups: [{ row: 5, children: [{ row: 6, label: 'Property' }] }] },
+      ],
+    });
+  });
+
   it('leads with its largest row, as a Dashboard heatmap does', async () => {
     fixToday('2025-03-20');
     await dataset();
