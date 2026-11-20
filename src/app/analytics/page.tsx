@@ -12,6 +12,7 @@ import { NET_CASH_FLOW, NetCashFlowSection } from './net-cash-flow';
 import { PeriodSwitch } from './period-switch';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
+import { SPENDING_INSIGHTS, SpendingInsightsSection } from './spending-insights';
 import { SPENDING_BY_CATEGORY, SpendingByCategorySection } from './spending-by-category';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
@@ -52,6 +53,9 @@ export default async function AnalyticsPage({
       <div className="grid min-w-0 grid-cols-1 gap-5">
         <StreamedSection name={NET_WORTH} retryHref={retryHref}>
           <NetWorthSection netWorth={sections.netWorth} view={view} fmt={fmt} />
+        </StreamedSection>
+        <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
+          <SpendingInsightsSection section={sections.spendingInsights} view={view} fmt={fmt} />
         </StreamedSection>
         <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
           <RecentTransactionsSection recent={sections.recentTransactions} today={today} />

@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fixToday, seedAccount, seedClassified, type ClassifiedRow } from '@test/support/analytics';
+import {
+  fixToday,
+  loadSection,
+  seedAccount,
+  seedClassified,
+  type ClassifiedRow,
+} from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 import { listCellTransactions } from '../reporting';
-import { loadAnalytics, type SpendingSeries } from '.';
+import type { SpendingSeries } from '.';
 
 /** Analytics' Spending by Category stacked bar (spec #170, user stories 30-33; ticket #174). */
 
@@ -74,7 +80,7 @@ describe('Spending by Category', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const chart = await loadAnalytics(t.ctx, 'month').sections.spendingByCategory;
+    const chart = await loadSection(t.ctx, 'month', 'spendingByCategory');
 
     expect(chart.isEmpty).toBe(false);
     expect(chart.periods).toHaveLength(12);
@@ -103,7 +109,7 @@ describe('Spending by Category', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const chart = await loadAnalytics(t.ctx, 'month').sections.spendingByCategory;
+    const chart = await loadSection(t.ctx, 'month', 'spendingByCategory');
 
     const figures = chart.series.flatMap((series) => [...series.cells, series.total]);
     expect(figures).toHaveLength(9 * 13);
@@ -125,7 +131,7 @@ describe('Spending by Category', () => {
     fixToday('2025-03-20');
     await dataset(['Rent', 'Groceries', 'Books']);
 
-    const chart = await loadAnalytics(t.ctx, 'quarter').sections.spendingByCategory;
+    const chart = await loadSection(t.ctx, 'quarter', 'spendingByCategory');
 
     expect(chart.periods.at(-1)).toMatchObject({ key: '2025-Q1', isToDate: true });
     expect(chart.series.map((series) => series.label)).toEqual([
@@ -139,7 +145,7 @@ describe('Spending by Category', () => {
   it('is empty when no expense falls in the window', async () => {
     fixToday('2025-03-20');
 
-    const chart = await loadAnalytics(t.ctx, 'year').sections.spendingByCategory;
+    const chart = await loadSection(t.ctx, 'year', 'spendingByCategory');
 
     expect(chart.isEmpty).toBe(true);
     expect(chart.series).toEqual([]);

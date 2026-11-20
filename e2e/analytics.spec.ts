@@ -123,6 +123,58 @@ test('the Period view switches the Income vs. expense table and a cell opens its
   await expect(page).toHaveURL(/\/analytics\?period=year$/);
 });
 
+test('Spending Insights draws the current period to date and a bar opens its Drill-down', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const description = `Analytics groceries ${suffix}`;
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Insights bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Insights account ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 0,
+      openingDate: '2021-01-01',
+    });
+    const group = await createCategoryGroup(ctx, { name: `Living ${suffix}`, type: 'expense' });
+    const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: swissToday(),
+      amountMinor: -12_34,
+      description,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: groceries.id });
+  });
+  const insights = page.getByRole('region', { name: 'Spending Insights' });
+
+  await page.goto('/analytics');
+  await expect(
+    insights.getByRole('link', {
+      name: new RegExp(`^${formatPeriod(`${YEAR}-${MONTH}`)} to date: `),
+    }),
+  ).toBeVisible();
+
+  await page
+    .getByRole('navigation', { name: 'Period view' })
+    .getByRole('link', { name: 'Quarter' })
+    .click();
+  await expect(page).toHaveURL(/\/analytics\?period=quarter$/);
+  const current = insights.getByRole('link', {
+    name: new RegExp(`^${formatPeriod(QUARTER)} to date: `),
+  });
+  await expect(current).toBeVisible();
+
+  await current.click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+});
+
 test('on a phone the switch stays at the top and the table scrolls inside its card', async ({
   page,
 }) => {
