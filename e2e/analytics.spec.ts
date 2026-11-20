@@ -8,7 +8,10 @@ import { editClassification } from '../src/server/services/transactions';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { withServices } from './support/services';
 
-/** Analytics (spec #170): the Period view switch and the Income vs. expense table. */
+/**
+ * Analytics (spec #170): the Period view switch, the Income vs. expense table, Recent
+ * transactions and Account balances in CHF.
+ */
 
 /** A salary booked today, so it falls in the current period of every Period view. */
 async function seedSalary(suffix: number): Promise<string> {
@@ -144,4 +147,29 @@ test('on a phone the switch stays at the top and the table scrolls inside its ca
     (element) => element.scrollWidth > element.clientWidth,
   );
   expect(tableOverflows).toBe(true);
+});
+
+test('Recent transactions and Account balances stay the same in every Period view and open their pages', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const description = await seedSalary(suffix);
+  const account = `Analytics bank ${suffix} · Analytics account ${suffix}`;
+  const recent = page.getByRole('region', { name: 'Recent transactions' });
+  const balances = page.getByRole('table', { name: 'Account balances in CHF' });
+
+  for (const view of ['month', 'quarter', 'year']) {
+    await page.goto(`/analytics?period=${view}`);
+    await expect(recent.getByRole('link', { name: new RegExp(description) })).toBeVisible();
+    await expect(balances.getByRole('row', { name: new RegExp(account) })).toContainText(
+      /4\D?321\.00/,
+    );
+  }
+
+  await recent.getByRole('link', { name: new RegExp(description) }).click();
+  await expect(page).toHaveURL(/\/transactions\/[0-9a-f-]{36}/);
+
+  await page.goto('/analytics');
+  await balances.getByRole('link', { name: account }).click();
+  await expect(page).toHaveURL(/\/accounts\/[0-9a-f-]{36}/);
 });
