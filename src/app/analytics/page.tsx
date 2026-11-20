@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
 import { analyticsHref, parsePeriodView, windowPhrase } from '@/lib/analytics/period-view';
 import { getServiceContext } from '@/server/app-context';
@@ -13,6 +15,13 @@ import {
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
 import { CardSection } from './card-section';
+import {
+  DENSITY_VARIANTS,
+  DensityLayout,
+  densityVariant,
+  type DensitySlots,
+} from './density.prototype';
+import { FiguresBand } from './figures-band.prototype';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { NET_WORTH, NetWorthSection } from './net-worth';
 import { PeriodSwitch } from './period-switch';
@@ -34,14 +43,83 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string | string[] }>;
+  searchParams: Promise<{ period?: string | string[]; variant?: string | string[] }>;
 }) {
-  const view = parsePeriodView((await searchParams).period);
+  const params = await searchParams;
+  const view = parsePeriodView(params.period);
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
   const { sections, today } = loadAnalytics(ctx, view);
   const retryHref = analyticsHref(view);
+
+  // PROTOTYPE (throwaway): ?variant= swaps the arrangement below, see ./density.prototype.tsx.
+  const variant = densityVariant(params.variant);
+  if (variant !== 'current') {
+    const slot = (name: string, node: ReactNode) => (
+      <StreamedSection name={name} retryHref={retryHref}>
+        {node}
+      </StreamedSection>
+    );
+    const slots: DensitySlots = {
+      netWorth: slot(NET_WORTH, <NetWorthSection netWorth={sections.netWorth} view={view} />),
+      insights: slot(
+        SPENDING_INSIGHTS,
+        <SpendingInsightsSection flow={sections.spendingInsights} />,
+      ),
+      recent: slot(
+        RECENT_TRANSACTIONS,
+        <RecentTransactionsSection recent={sections.recentTransactions} today={today} />,
+      ),
+      netCashFlow: slot(
+        NET_CASH_FLOW,
+        <CardSection card={sections.netCashFlow} empty="No Transactions in these periods." />,
+      ),
+      balances: slot(
+        ACCOUNT_BALANCES,
+        <CardSection card={sections.accountBalances} empty="No Accounts." />,
+      ),
+      spendingByCategory: slot(
+        SPENDING_BY_CATEGORY,
+        <CardSection card={sections.spendingByCategory} empty="No expense in these periods." />,
+      ),
+      incomeVsExpense: slot(
+        INCOME_VS_EXPENSE,
+        <CardSection card={sections.incomeVsExpense} empty="Nothing in these periods." />,
+      ),
+      categoriesPerPeriod: slot(
+        CATEGORIES_PER_PERIOD,
+        <CardSection card={sections.categoriesPerPeriod} empty="Nothing classified yet." />,
+      ),
+      figures: slot(
+        'Key figures',
+        <FiguresBand
+          netWorth={sections.netWorth}
+          cards={[
+            sections.spendingInsights,
+            sections.netCashFlow,
+            sections.spendingByCategory,
+            sections.incomeVsExpense,
+            sections.categoriesPerPeriod,
+          ]}
+        />,
+      ),
+    };
+    return (
+      <section className="flex flex-col gap-3">
+        <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
+          <p className="text-muted">
+            Your finances over {windowPhrase(view)}, the current one to date.
+          </p>
+        </header>
+        <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
+        <PeriodSwitch view={view} />
+        <DensityLayout variant={variant} slots={slots} />
+        <PrototypeSwitcher variants={DENSITY_VARIANTS} />
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col gap-5">
@@ -100,6 +178,7 @@ export default async function AnalyticsPage({
           />
         </StreamedSection>
       </div>
+      <PrototypeSwitcher variants={DENSITY_VARIANTS} />
     </section>
   );
 }
