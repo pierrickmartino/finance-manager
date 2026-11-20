@@ -3,6 +3,7 @@ import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { categoriesPerPeriod, type CategoriesPerPeriod } from './categories-per-period';
 import { incomeVsExpense, type IncomeVsExpense } from './income-vs-expense';
+import { spendingByCategory, type SpendingByCategory } from './spending-by-category';
 import { netWorth, type AnalyticsNetWorth } from './net-worth';
 import { periodWindow, type AnalyticsPeriod } from './window';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
@@ -21,6 +22,7 @@ import { accountBalances, type AccountBalances } from './account-balances';
 /** Each section's promise, by name. */
 export interface AnalyticsSections {
   incomeVsExpense: Promise<IncomeVsExpense>;
+  spendingByCategory: Promise<SpendingByCategory>;
   netWorth: Promise<AnalyticsNetWorth>;
   categoriesPerPeriod: Promise<CategoriesPerPeriod>;
   recentTransactions: Promise<RecentTransactions>;
@@ -48,6 +50,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
     window,
     sections: {
       incomeVsExpense: incomeVsExpense(ctx, view, window),
+      spendingByCategory: spendingByCategory(ctx, view, window),
       netWorth: netWorth(ctx, view, window),
       categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
       recentTransactions: recentTransactions(ctx),
@@ -59,6 +62,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
 export type { AnalyticsPeriod } from './window';
 export type { DrillRef, Figure, FigureRow, PeriodTable } from './figures';
 export type { IncomeVsExpense, IncomeVsExpenseRow } from './income-vs-expense';
+export type { SpendingByCategory, SpendingSeries } from './spending-by-category';
 export type { AnalyticsNetWorth, NetWorthPoint, NetWorthSince } from './net-worth';
 export type { CategoriesPerPeriod, CategoryGroupRows } from './categories-per-period';
 export type { RecentTransactions } from './recent-transactions';

@@ -11,6 +11,7 @@ import { NET_WORTH, NetWorthSection } from './net-worth';
 import { PeriodSwitch } from './period-switch';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
+import { SPENDING_BY_CATEGORY, SpendingByCategorySection } from './spending-by-category';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 
@@ -56,6 +57,9 @@ export default async function AnalyticsPage({
         </StreamedSection>
         <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref}>
           <AccountBalancesSection balances={sections.accountBalances} fmt={fmt} />
+        </StreamedSection>
+        <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref}>
+          <SpendingByCategorySection chart={sections.spendingByCategory} view={view} fmt={fmt} />
         </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
           <IncomeVsExpenseSection table={sections.incomeVsExpense} view={view} fmt={fmt} />
