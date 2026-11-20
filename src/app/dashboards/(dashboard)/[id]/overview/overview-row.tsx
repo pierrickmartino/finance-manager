@@ -290,7 +290,7 @@ export function InsightCard({
       aria-labelledby="overview-insight"
       className="flex flex-col rounded-3xl bg-insight p-6 text-on-hero shadow-lg lg:row-span-2 lg:self-stretch"
     >
-      <h2 id="overview-insight" className="font-display text-3xl leading-tight tracking-tight">
+      <h2 id="overview-insight" className="font-display text-lg leading-snug tracking-tight">
         {insight.headline}
       </h2>
       <p className="mt-3 max-w-sm text-on-hero/80">

@@ -36,7 +36,7 @@ export function TagDetail({ tag, tags, activity, recent, fmt }: TagDetailProps) 
     <section aria-label={`Tag ${name}`} className={`${CARD_CLASS} flex min-w-0 flex-col`}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="truncate font-display text-2xl tracking-tight">{name}</h2>
+          <h2 className="truncate font-display text-lg tracking-tight">{name}</h2>
           <Link href={transactionsHref} className="text-sm text-faint hover:underline">
             {transactionCountLabel(transactionCount)}
           </Link>

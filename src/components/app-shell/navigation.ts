@@ -11,11 +11,6 @@ export interface NavGroup {
   links: NavLink[];
 }
 
-export interface CurrentPage {
-  group: NavGroup;
-  link: NavLink;
-}
-
 /** Every signed-in destination, grouped as the sidebar shows them. */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -57,15 +52,6 @@ export const NAV_GROUPS: NavGroup[] = [
 /** True when `pathname` is the link's page or a page nested under it. */
 export function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-/** The sidebar entry (and its group) that `pathname` belongs to, if any. */
-export function findCurrentPage(pathname: string): CurrentPage | null {
-  for (const group of NAV_GROUPS) {
-    const link = group.links.find((candidate) => isActive(pathname, candidate.href));
-    if (link) return { group, link };
-  }
-  return null;
 }
 
 /** The top bar's pills: the pages used most. Every other page sits in the More menu. */

@@ -64,7 +64,7 @@ Form fields come from `src/components/form.tsx` (`TextField`, `SubmitButton`, `F
 
 ## The app shell
 
-Signed in, the app runs full width. A navy hero carries the brand, the most used pages as pills (every other page under More), a greeting with where you are, and the quick actions; the page sits on a `paper` panel that rises out of the hero's fade. Below `lg` the pills give way to a drawer. The hero's controls take their look from `src/components/app-shell/hero-styles.ts`.
+Signed in, the app runs full width and dense. One slim navy bar (48px) carries the brand, the most used pages as pills (every other page under More), the quick actions, settings and sign out; there is no greeting or breadcrumb, as the page's own title says where you are. The page sits on a `paper` panel that rises out of the navy just below the bar, close to the screen's edges. Below `lg` the pills give way to a drawer. The bar's controls take their look from `src/components/app-shell/hero-styles.ts`. Titles stay compact for the same reason (`PAGE_TITLE_CLASS` 24px, `SECTION_TITLE_CLASS` 18px, `HEADLINE_AMOUNT_CLASS` 30px): the page's content, not its heading, comes first.
 
 ## Rules
 
