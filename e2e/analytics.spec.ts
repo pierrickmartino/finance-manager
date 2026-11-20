@@ -9,8 +9,8 @@ import { createManualTransaction } from '../src/server/services/transactions/man
 import { withServices } from './support/services';
 
 /**
- * Analytics (spec #170): the Period view switch, the Income vs. expense table, Recent
- * transactions and Account balances in CHF.
+ * Analytics (spec #170): the Period view switch, Net worth, Recent transactions, Account
+ * balances in CHF, the Income vs. expense table and the Categories per period table.
  */
 
 /** A salary booked today, so it falls in the current period of every Period view. */
@@ -142,11 +142,93 @@ test('on a phone the switch stays at the top and the table scrolls inside its ca
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(pageOverflows).toBe(false);
-  const scroller = page.getByTestId('period-table-scroll');
+  const scroller = page
+    .getByRole('region', { name: 'Income vs. expense' })
+    .getByTestId('period-table-scroll');
   const tableOverflows = await scroller.evaluate(
     (element) => element.scrollWidth > element.clientWidth,
   );
   expect(tableOverflows).toBe(true);
+});
+
+test('Net worth reads today, with a point per period end of the window and its change', async ({
+  page,
+}) => {
+  await seedSalary(Date.now());
+  const netWorth = page.getByRole('region', { name: 'Net worth' });
+  const today = netWorth.getByRole('link', { name: /^Net worth today: / });
+
+  for (const [view, length, words] of [
+    ['month', 12, 'months'],
+    ['quarter', 8, 'quarters'],
+    ['year', 6, 'years'],
+  ] as const) {
+    await page.goto(`/analytics?period=${view}`);
+    await expect(today).toBeVisible();
+    const trend = netWorth.getByRole('group', {
+      name: `Net worth over the last ${length} ${words}`,
+    });
+    await expect(trend.getByRole('link')).toHaveCount(length);
+    await expect(trend.getByRole('link').last()).toHaveAccessibleName(/^Today: /);
+    await expect(netWorth.getByText(/since the end of /)).toBeVisible();
+  }
+
+  // Today's amount opens the Accounts as they stand today.
+  await today.click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
+});
+
+const categories = (page: Page) => page.getByRole('table', { name: 'Categories per period' });
+
+test('Categories per period lists each Category under its group subtotal, and both open their Drill-down', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const description = await seedSalary(suffix);
+  const current = `${formatPeriod(`${YEAR}-${MONTH}`)} to date`;
+
+  await page.goto('/analytics');
+  const group = categories(page)
+    .getByRole('row')
+    .filter({
+      has: page.getByRole('rowheader', { name: `Pay ${suffix}`, exact: true }),
+    });
+  await expect(group).toBeVisible();
+  const category = group.locator('xpath=following-sibling::tr[1]');
+  await expect(category.getByRole('rowheader')).toHaveText('Salary');
+
+  // The group's subtotal for the current month opens the Transactions behind it.
+  await group.getByRole('link', { name: new RegExp(`^Pay ${suffix}, ${current}: `) }).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=month$/);
+
+  // So does the Category's Total.
+  await category.getByRole('link', { name: /^Salary, Total: / }).click();
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+});
+
+test('on a phone Categories per period scrolls sideways inside its card', async ({ page }) => {
+  await seedSalary(Date.now());
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/analytics');
+  await expect(categories(page)).toBeVisible();
+
+  const pageOverflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(pageOverflows).toBe(false);
+  const scroller = page
+    .getByRole('region', { name: 'Categories per period' })
+    .getByTestId('period-table-scroll');
+  expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+    true,
+  );
 });
 
 test('Recent transactions and Account balances stay the same in every Period view and open their pages', async ({
