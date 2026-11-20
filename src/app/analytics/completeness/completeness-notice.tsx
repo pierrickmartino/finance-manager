@@ -197,7 +197,7 @@ function Axis({ today, fmt }: { today: string; fmt: Formatter }) {
 }
 
 /**
- * The Completeness check's notice above the home Dashboard's grid of cards (ADR-0008): a card
+ * The Completeness check's notice above Analytics' reports (ADR-0008, ADR-0015): a card
  * with one row per checked Account, each a coverage track over the last 120 days (`TIMELINE_DAYS`) beside its
  * words. One neutral line when every Account is current, its list collapsed; open, announced as
  * an alert, with a warning headline and only the problem rows in the warning token when any

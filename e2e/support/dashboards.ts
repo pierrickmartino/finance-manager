@@ -3,11 +3,19 @@
  * it in Edit mode at `lg` and above. Steps are whole grid cells, measured from the board.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
+import { homeDashboard, listDashboards } from '../../src/server/services/dashboards';
+import { withServices } from './services';
 
 /** Mirrors the board's gap and row height (BOARD_GAP_PX, BOARD_ROW_HEIGHT_PX). */
 const GAP_PX = 20;
 const ROW_HEIGHT_PX = 40;
 const COLUMNS = 12;
+
+/** Opens the home Dashboard (the first in the user's order): `/` opens Analytics instead. */
+export async function openHomeDashboard(page: Page): Promise<void> {
+  const home = await withServices(async (ctx) => homeDashboard(await listDashboards(ctx)));
+  await page.goto(`/dashboards/${home!.id}`);
+}
 
 /** A Widget's card: the region labelled by its name. */
 export function widgetCard(page: Page, name: string): Locator {

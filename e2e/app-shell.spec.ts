@@ -6,7 +6,7 @@ test('the top bar marks the current page among its pills, and the hero says wher
   await page.goto('/transactions');
 
   const nav = page.getByRole('navigation', { name: 'Main' });
-  for (const name of ['Dashboards', 'Transactions', 'Accounts', 'Categories']) {
+  for (const name of ['Analytics', 'Dashboards', 'Transactions', 'Accounts', 'Categories']) {
     await expect(nav.getByRole('link', { name })).toBeVisible();
   }
   await expect(nav.getByRole('link', { name: 'Transactions' })).toHaveAttribute(

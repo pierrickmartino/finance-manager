@@ -1,19 +1,22 @@
 import { z } from 'zod';
+import { analyticsHref, parsePeriodView, type PeriodView } from '@/lib/analytics/period-view';
 import type { WidgetQueryInput } from '@/server/services/reporting/query';
 import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-params';
 
 /**
  * Where a Drill-down was opened from, so it can link back there: a Dashboard (its Story), a
- * saved Widget, the Widget editor (with the query in the URL), or the Recurring payments page (a
- * Recurring payment's charges). It travels in the URL as a type and an id
- * (`origin=dashboard&originId=<uuid>`), never as a path, so a forged value can only ever fall
- * back to the editor.
+ * saved Widget, the Widget editor (with the query in the URL), the Recurring payments page (a
+ * Recurring payment's charges), or Analytics at a Period view. It travels in the URL as a type
+ * and an id (`origin=dashboard&originId=<uuid>`) or a Period view
+ * (`origin=analytics&originPeriod=quarter`), never as a path, so a forged value can only ever
+ * fall back to the editor (or to Analytics in Month).
  */
 export type DrillOrigin =
   | { kind: 'dashboard'; id: string }
   | { kind: 'widget'; id: string }
   | { kind: 'editor' }
-  | { kind: 'recurringPayment' };
+  | { kind: 'recurringPayment' }
+  | { kind: 'analytics'; period: PeriodView };
 
 /** A Recurring payment's charges, opened from the Recurring payments page. */
 export const RECURRING_PAYMENT: DrillOrigin = { kind: 'recurringPayment' };
@@ -32,6 +35,10 @@ export function originToParams(origin: DrillOrigin): URLSearchParams {
   if (origin.kind === 'editor') return params;
   params.set('origin', origin.kind);
   if (origin.kind === 'recurringPayment') return params;
+  if (origin.kind === 'analytics') {
+    params.set('originPeriod', origin.period);
+    return params;
+  }
   params.set('originId', origin.id);
   return params;
 }
@@ -41,6 +48,7 @@ export function originFromParams(params: UrlParams): DrillOrigin {
   const kind = first(params.origin);
   const id = first(params.originId);
   if (kind === 'recurringPayment') return RECURRING_PAYMENT;
+  if (kind === 'analytics') return { kind, period: parsePeriodView(first(params.originPeriod)) };
   if ((kind !== 'dashboard' && kind !== 'widget') || !UUID.safeParse(id).success) return EDITOR;
   return { kind, id };
 }
@@ -67,5 +75,7 @@ export function backLink(
       return { href: `/widgets/new?${queryToParams(query)}`, label: 'Back to the editor' };
     case 'recurringPayment':
       return { href: '/recurring-payments', label: 'Back to Recurring payments' };
+    case 'analytics':
+      return { href: analyticsHref(origin.period), label: 'Back to Analytics' };
   }
 }

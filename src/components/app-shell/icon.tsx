@@ -1,5 +1,6 @@
 /** Minimal inline stroke icons for the app shell (24×24 grid, currentColor). */
 const PATHS = {
+  analytics: 'M4 4v16h16M8 15l3-4 3 2 5-6',
   dashboard: 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z',
   widgets: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   transactions: 'M7 7h13l-4-4M17 17H4l4 4',

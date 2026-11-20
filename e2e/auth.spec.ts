@@ -40,8 +40,8 @@ test.describe('signed out', () => {
 
     await signIn(page, code);
 
-    // The landing page is the first Dashboard.
-    await expect(page).toHaveURL(/\/dashboards\//);
+    // The landing page is Analytics.
+    await expect(page).toHaveURL(/\/analytics/);
   });
 });
 

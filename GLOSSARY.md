@@ -193,6 +193,18 @@ _Avoid_: Report, overview page, presentation
 How one Widget is drawn on the Dashboard Story: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per period, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data. A bars or line Widget whose two columns are its income and its expense is read as a flow.
 _Avoid_: Chapter, tile
 
+**Analytics**:
+The landing page: a single fixed page of reports, read through one Period view at a time: Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Period window. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+_Avoid_: Analysis page, reports page, dashboard
+
+**Period view**:
+The grain Analytics is read at: Year, Quarter or Month. Changing it refreshes every figure that is reported per period.
+_Avoid_: Granularity, zoom, time scale
+
+**Period window**:
+The periods a Period view shows: the last 6 years, 8 quarters or 12 months, always ending with the current period, which is shown "to date" and set apart from complete ones. A judgement such as the spending insight speaks only of complete periods.
+_Avoid_: Date range, lookback
+
 **Edit mode**:
 The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History. On narrow screens the board is one column in reading order, with no dragging or resizing: a card moves up or down instead, swapping places with its neighbour. From the keyboard, a focused card moves one cell with the arrow keys and resizes one cell with Shift+arrows.
 _Avoid_: Layout editor, design mode

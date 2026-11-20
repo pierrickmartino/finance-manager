@@ -27,15 +27,15 @@ setup('first-run setup with TOTP, sign out, then sign in', async ({ page }) => {
   saveOwnerCredentials({ password: OWNER_PASSWORD, totpSecret, recoveryCodes, lastTotpStep });
 
   await page.getByRole('link', { name: 'I have saved them, continue' }).click();
-  // Setup seeded the starter Dashboard, which is the landing page.
-  await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
+  // The landing page is Analytics.
+  await expect(page.getByRole('heading', { name: 'Analytics', level: 1 })).toBeVisible();
 
   await signOut(page);
   await page.goto('/banks');
   await expect(page).toHaveURL(/\/login$/);
 
   await signIn(page);
-  await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Analytics', level: 1 })).toBeVisible();
 
   await page.context().storageState({ path: OWNER_STORAGE_STATE });
 });

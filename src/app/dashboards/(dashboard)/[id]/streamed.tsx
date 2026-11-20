@@ -1,17 +1,10 @@
 import { Suspense } from 'react';
-import type { Formatter } from '@/lib/format';
 import { rowsHeight } from '@/lib/reporting/board';
 import { cardFrame } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
-import { checkCompleteness } from '@/server/services/completeness';
-import type { ServiceContext } from '@/server/services/context';
 import type { Widget } from '@/server/services/reporting';
 import { CardErrorBoundary } from './overview/card-error-boundary';
-import {
-  NoticePlaceholder,
-  TilePlaceholder,
-  WidgetCardPlaceholder,
-} from './overview/card-placeholder';
+import { TilePlaceholder, WidgetCardPlaceholder } from './overview/card-placeholder';
 import {
   InsightCard,
   NetWorthCard,
@@ -20,7 +13,6 @@ import {
 } from './overview/overview-row';
 import { BOARD_CARD_CLASS, BoardCell, BoardGrid, type BoardCard } from './overview/widget-board';
 import { WidgetCard } from './overview/widget-card';
-import { CompletenessNotice } from './completeness-notice';
 
 /*
  * The Dashboard Story's parts that wait on a query, each streamed in behind its own Suspense
@@ -130,31 +122,5 @@ export function StreamedOverview({
         <StreamedRecent recent={recent} />
       </Suspense>
     </>
-  );
-}
-
-async function StreamedCompletenessNotice({
-  ctx,
-  fmt,
-  today,
-}: {
-  ctx: ServiceContext;
-  fmt: Formatter;
-  today: string;
-}) {
-  const entries = await checkCompleteness(ctx, { today });
-  return <CompletenessNotice entries={entries} fmt={fmt} today={today} />;
-}
-
-/** The home Dashboard's Completeness check (ADR-0008), streamed in behind one notice line. */
-export function StreamedCompleteness(props: {
-  ctx: ServiceContext;
-  fmt: Formatter;
-  today: string;
-}) {
-  return (
-    <Suspense fallback={<NoticePlaceholder />}>
-      <StreamedCompletenessNotice {...props} />
-    </Suspense>
   );
 }
