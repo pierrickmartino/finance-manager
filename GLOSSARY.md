@@ -194,7 +194,7 @@ How one Widget is drawn on the Dashboard Story: a sentence saying what its chart
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The single fixed page of reports, read through one Period view at a time: Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Period window. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read through one Period view at a time: Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Period window. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
 **Period view**:
