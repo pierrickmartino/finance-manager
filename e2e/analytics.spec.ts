@@ -145,3 +145,51 @@ test('on a phone the switch stays at the top and the table scrolls inside its ca
   );
   expect(tableOverflows).toBe(true);
 });
+
+/** A purchase booked today, large enough to rank among the 8 named Categories in a shared DB. */
+async function seedPurchase(suffix: number): Promise<{ description: string; label: string }> {
+  const description = `Analytics purchase ${suffix}`;
+  const groupName = `Spend ${suffix}`;
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Spending bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Spending account ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 0,
+      openingDate: '2021-01-01',
+    });
+    const group = await createCategoryGroup(ctx, { name: groupName, type: 'expense' });
+    const category = await createCategory(ctx, { groupId: group.id, name: 'Furniture' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: swissToday(),
+      amountMinor: -987_654_32,
+      description,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: category.id });
+  });
+  return { description, label: `${groupName} › Furniture` };
+}
+
+test('Spending by Category draws the current period to date and a Category opens its Drill-down', async ({
+  page,
+}) => {
+  const { description, label } = await seedPurchase(Date.now());
+
+  await page.goto('/analytics?period=quarter');
+  const section = page.getByRole('region', { name: 'Spending by Category' });
+  await expect(section.getByRole('figure', { name: /stacked bar chart$/ })).toBeVisible();
+  await expect(section.getByText(`${formatPeriod(QUARTER)} to date`)).toBeVisible();
+
+  const legend = section.getByRole('list', { name: 'Spending by Category legend' });
+  await legend.getByRole('link', { name: new RegExp(`^${label}, Total: `) }).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=quarter$/);
+});
