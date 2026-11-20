@@ -2,21 +2,18 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PILL_BUTTON_CLASS } from '@/components/surface';
 import { getServiceContext } from '@/server/app-context';
-import { getFormatter } from '@/server/formatter';
-import { homeDashboard, listDashboards } from '@/server/services/dashboards';
-import { swissToday } from '@/server/services/fx/dates';
+import { listDashboards } from '@/server/services/dashboards';
 import { findDashboard, loadNetWorthTrend, loadRecentActivity, loadWidgetCard } from '../../load';
 import { DashboardTabs } from '../../tabs';
 import { DashboardChrome, DashboardOverview } from './overview/dashboard-overview';
-import { StreamedBoard, StreamedCompleteness, StreamedOverview } from './streamed';
+import { StreamedBoard, StreamedOverview } from './streamed';
 
 export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 
 /**
  * A Dashboard, read as a grid of cards: an overview row, then the board, one card per Widget at
  * its place and size (GLOSSARY: Dashboard Story, ADR-0009, ADR-0010). Values in CHF. Changing the Widgets
- * happens in Edit mode (./edit). The home Dashboard (the one the home page opens) also shows the
- * Completeness check (ADR-0008).
+ * happens in Edit mode (./edit). The Completeness check sits above Analytics instead (ADR-0015).
  *
  * The page shell (tabs, name, actions) renders as soon as the Dashboard is found; each part that
  * waits on a query streams in behind its own placeholder (./streamed).
@@ -31,8 +28,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
   }));
   const trend = loadNetWorthTrend(ctx, dashboard.widgets);
   const recent = loadRecentActivity(ctx);
-  const [dashboards, fmt] = await Promise.all([listDashboards(ctx), getFormatter()]);
-  const isHome = homeDashboard(dashboards)?.id === dashboard.id;
+  const dashboards = await listDashboards(ctx);
 
   const editHref = `/dashboards/${dashboard.id}/edit`;
 
@@ -51,7 +47,6 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
           </Link>
         }
         isEmpty={dashboard.widgets.length === 0}
-        notice={isHome && <StreamedCompleteness ctx={ctx} fmt={fmt} today={swissToday()} />}
         overview={
           <StreamedOverview cards={cards.map(({ card }) => card)} trend={trend} recent={recent} />
         }

@@ -4,6 +4,8 @@ import { analyticsHref, parsePeriodView, type PeriodView } from '@/lib/analytics
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { loadAnalytics } from '@/server/services/analytics';
+import { swissToday } from '@/server/services/fx/dates';
+import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { INCOME_VS_EXPENSE, IncomeVsExpenseSection } from './income-vs-expense';
 import { PeriodSwitch } from './period-switch';
 import { StreamedSection } from './section';
@@ -42,6 +44,7 @@ export default async function AnalyticsPage({
         <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
         <p className="text-muted">Your finances over {GRAINS[view]}, the current one to date.</p>
       </header>
+      <StreamedCompleteness ctx={ctx} fmt={fmt} today={swissToday()} />
       <PeriodSwitch view={view} />
       <div className="grid min-w-0 grid-cols-1 gap-5">
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>

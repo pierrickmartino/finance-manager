@@ -12,6 +12,7 @@ import {
   cardBox,
   dragCard,
   nextAction,
+  openHomeDashboard,
   resizeCard,
   stepWithKey,
   widgetCard,
@@ -40,12 +41,9 @@ async function createDashboard(page: Page, name: string): Promise<void> {
   await expect(page.getByText('No Widgets yet')).toBeVisible();
 }
 
-test('the starter Dashboard is the landing page: an overview row, then a card per Widget', async ({
-  page,
-}) => {
-  await page.goto('/');
+test('the starter Dashboard shows an overview row, then a card per Widget', async ({ page }) => {
+  await openHomeDashboard(page);
 
-  await expect(page).toHaveURL(/\/dashboards\//);
   await expect(page.getByRole('heading', { name: 'Recent activity', level: 2 })).toBeVisible();
   for (const name of [
     'Income vs. expense',
@@ -60,7 +58,7 @@ test('the starter Dashboard is the landing page: an overview row, then a card pe
 test('a Dashboard opens as its Story; Edit mode lists the same Widgets in order, and Done returns', async ({
   page,
 }) => {
-  await page.goto('/');
+  await openHomeDashboard(page);
   await expect(page.getByRole('heading', { name: 'Overview', level: 1 })).toBeVisible();
   const storyOrder = await cardTitles(page).allTextContents();
   await expect(page.getByRole('button', { name: 'Add Widget' })).toHaveCount(0);
@@ -111,7 +109,7 @@ async function storyShown(page: Page): Promise<void> {
  * once, without a view transition, so they never animate, whatever the motion setting.
  */
 async function switchStoryAndEditMode(page: Page): Promise<StoryEditMotion> {
-  await page.goto('/');
+  await openHomeDashboard(page);
   await storyShown(page);
   const toEdit = await viewTransitionMotionDuring(page, async () => {
     await page.getByRole('link', { name: 'Edit Dashboard' }).click();
@@ -157,7 +155,7 @@ test('switching to another Dashboard by its tab swaps with no animation', async 
       query: { dateRange: { kind: 'last', count: 3, unit: 'month' }, rows: null, columns: null },
     });
   });
-  await page.goto('/');
+  await openHomeDashboard(page);
   await storyShown(page);
   const tabs = page.getByRole('navigation', { name: 'Dashboards' });
 
@@ -600,7 +598,7 @@ function placeholders(page: Page) {
 test('the Story streams its parts in: once loaded, every Widget has its card and no placeholder is left', async ({
   page,
 }) => {
-  await page.goto('/');
+  await openHomeDashboard(page);
 
   await expect(page.getByRole('heading', { name: 'Recent activity', level: 2 })).toBeVisible();
   for (const name of ['Income vs. expense', 'Net cash flow', 'Spending by Category']) {

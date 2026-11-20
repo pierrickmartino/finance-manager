@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { CARD_CLASS, PLACEHOLDER_CLASS, TILE_CLASS } from '@/components/surface';
+import { PLACEHOLDER_CLASS, TILE_CLASS } from '@/components/surface';
 import type { PlaceholderShape } from '@/lib/reporting/card';
 
 /** The quiet mark standing in for a card's chart, shaped like the one it will draw. */
@@ -95,20 +95,6 @@ export function TilePlaceholder({ label, className = '' }: { label: string; clas
       <div className={`${PLACEHOLDER_CLASS} h-4 w-2/5`} />
       <div className={`${PLACEHOLDER_CLASS} h-10 w-3/5`} />
       <div className={`${PLACEHOLDER_CLASS} mt-auto h-16`} />
-    </section>
-  );
-}
-
-/** The Completeness check while it runs: one notice line, as tall as its closed headline. */
-export function NoticePlaceholder() {
-  return (
-    <section
-      aria-label="Completeness check"
-      aria-busy="true"
-      className={`${CARD_CLASS} px-5 py-2.5 text-sm`}
-    >
-      <span className="sr-only">Loading</span>
-      <div className={`${PLACEHOLDER_CLASS} h-5 w-1/2`} />
     </section>
   );
 }

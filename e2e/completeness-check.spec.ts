@@ -4,10 +4,10 @@ import { createBank } from '../src/server/services/banks';
 import { recordBalanceSnapshot } from '../src/server/services/balance-snapshots';
 import { checkCompleteness } from '../src/server/services/completeness';
 import type { ServiceContext } from '../src/server/services/context';
-import { createDashboard, deleteDashboard } from '../src/server/services/dashboards';
 import { addDays, swissToday } from '../src/server/services/fx/dates';
 import { commitImport, previewImport } from '../src/server/services/imports';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
+import { openHomeDashboard } from './support/dashboards';
 import { withServices } from './support/services';
 
 /** A CHF CAMT.053 statement with no IBAN, one booked entry, covering `from` to `to`. */
@@ -62,7 +62,7 @@ function importedAccount(ctx: ServiceContext, bankId: string, name: string) {
   });
 }
 
-test('the home Dashboard shows the Completeness check: one line when current, open on a problem', async ({
+test('Analytics shows the Completeness check above its reports: one line when current, open on a problem', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -81,8 +81,11 @@ test('the home Dashboard shows the Completeness check: one line when current, op
     });
 
     await page.goto('/');
+    await expect(page).toHaveURL(/\/analytics$/);
     const notice = page.getByRole('region', { name: 'Completeness check' });
     await expect(notice).toContainText(/^1 Account current to \d{2}\.\d{2}\.\d{4}/);
+    const periodSwitch = page.getByRole('navigation', { name: 'Period view' });
+    expect((await notice.boundingBox())!.y).toBeLessThan((await periodSwitch.boundingBox())!.y);
     await expect(page.getByRole('alert', { name: 'Completeness check' })).toHaveCount(0);
     // Collapsed: the per-Account list is there, but closed.
     await expect(notice.getByRole('link', { name: new RegExp(`Current ${suffix}`) })).toBeHidden();
@@ -133,23 +136,18 @@ test('the home Dashboard shows the Completeness check: one line when current, op
   }
 });
 
-test('a Dashboard other than the home one shows no Completeness check', async ({ page }) => {
+test('the home Dashboard no longer shows the Completeness check', async ({ page }) => {
   const suffix = Date.now();
-  const other = await withServices(async (ctx) => {
-    // An Account with no Import yet, so the home Dashboard has something to show.
-    const bank = await createBank(ctx, { name: `Completeness other ${suffix}` });
+  await withServices(async (ctx) => {
+    // An Account with no Import yet, so the check has something to show.
+    const bank = await createBank(ctx, { name: `Completeness home ${suffix}` });
     await importedAccount(ctx, bank.id, `Unimported ${suffix}`);
-    return createDashboard(ctx, { name: `Other ${suffix}` });
   });
-  try {
-    await page.goto('/');
-    // An alert when it lists a problem, a region otherwise: find it by its name alone.
-    await expect(page.getByLabel('Completeness check')).toBeVisible();
+  await page.goto('/');
+  // An alert when it lists a problem, a region otherwise: find it by its name alone.
+  await expect(page.getByLabel('Completeness check')).toBeVisible();
 
-    await page.goto(`/dashboards/${other.id}`);
-    await expect(page.getByRole('heading', { name: `Other ${suffix}`, level: 1 })).toBeVisible();
-    await expect(page.getByLabel('Completeness check')).toHaveCount(0);
-  } finally {
-    await withServices((ctx) => deleteDashboard(ctx, other.id));
-  }
+  await openHomeDashboard(page);
+  await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
+  await expect(page.getByLabel('Completeness check')).toHaveCount(0);
 });

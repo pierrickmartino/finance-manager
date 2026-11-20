@@ -12,11 +12,6 @@ interface DashboardOverviewProps {
   actions: ReactNode;
   /** Whether the Dashboard has no Widgets: known from the Dashboard itself, before any query. */
   isEmpty: boolean;
-  /**
-   * Shown between the title and the grid, outside the Story itself: the home Dashboard's
-   * Completeness check (ADR-0008). A server component, so it stays server-rendered.
-   */
-  notice?: ReactNode;
   /** The overview row's cards: drawn as they are (`OverviewCards`), or streamed in by the Story. */
   overview: ReactNode;
   /** The Widgets' board: drawn as it is, streamed in card by card, or Edit mode's (ADR-0010). */
@@ -44,7 +39,6 @@ export function DashboardOverview({
   subtitle,
   actions,
   isEmpty,
-  notice,
   overview,
   board,
   empty,
@@ -60,7 +54,6 @@ export function DashboardOverview({
           <div className="flex flex-wrap items-center gap-2">{actions}</div>
         </header>
       </DashboardChrome>
-      {notice}
       {!isEmpty && (
         <DashboardChrome part="dashboard-overview" dashboardId={dashboardId}>
           <OverviewRow>{overview}</OverviewRow>

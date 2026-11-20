@@ -1,11 +1,9 @@
 import { redirect } from 'next/navigation';
-import { getServiceContext } from '@/server/app-context';
-import { homeDashboard, listDashboards, seedStarterDashboard } from '@/server/services/dashboards';
 
-/** The landing page is the home Dashboard (the starter one, unless the user reordered). */
-export default async function HomePage() {
-  const ctx = await getServiceContext();
-  await seedStarterDashboard(ctx);
-  const home = homeDashboard(await listDashboards(ctx));
-  redirect(home ? `/dashboards/${home.id}` : '/dashboards');
+/**
+ * The landing page is Analytics, in its default Period view (Month; ADR-0015). It no longer seeds
+ * the starter Dashboard: setup and the Dashboards page still do.
+ */
+export default function HomePage() {
+  redirect('/analytics');
 }

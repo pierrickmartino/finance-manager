@@ -48,6 +48,15 @@ async function columns(page: Page): Promise<string[]> {
   return headers.slice(1).map((header) => header.replace(/\s+/g, ' ').trim());
 }
 
+test('/ lands on Analytics in Month', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/analytics$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Period view' }).getByRole('link', { name: 'Month' }),
+  ).toHaveAttribute('aria-current', 'page');
+});
+
 test('the Period view switches the Income vs. expense table and a cell opens its Drill-down', async ({
   page,
 }) => {
