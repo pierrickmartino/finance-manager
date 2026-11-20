@@ -1,6 +1,7 @@
 import type { PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
+import { categoriesPerPeriod, type CategoriesPerPeriod } from './categories-per-period';
 import { incomeVsExpense, type IncomeVsExpense } from './income-vs-expense';
 import { netCashFlow, type NetCashFlow } from './net-cash-flow';
 import { periodWindow, type AnalyticsPeriod } from './window';
@@ -18,6 +19,7 @@ import { periodWindow, type AnalyticsPeriod } from './window';
 /** Each section's promise, by name. */
 export interface AnalyticsSections {
   incomeVsExpense: Promise<IncomeVsExpense>;
+  categoriesPerPeriod: Promise<CategoriesPerPeriod>;
   netCashFlow: Promise<NetCashFlow>;
 }
 
@@ -42,6 +44,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
     window,
     sections: {
       incomeVsExpense: incomeVsExpense(ctx, view, window),
+      categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
       netCashFlow: netCashFlow(ctx, view, window),
     },
   };
@@ -50,4 +53,5 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
 export type { AnalyticsPeriod } from './window';
 export type { DrillRef, Figure, FigureRow, PeriodTable } from './figures';
 export type { IncomeVsExpense, IncomeVsExpenseRow } from './income-vs-expense';
+export type { CategoriesPerPeriod, CategoryGroupRows } from './categories-per-period';
 export type { NetCashFlow, NetCashFlowPoint } from './net-cash-flow';
