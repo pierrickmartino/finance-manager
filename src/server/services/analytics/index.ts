@@ -2,6 +2,7 @@ import type { PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { incomeVsExpense, type IncomeVsExpense } from './income-vs-expense';
+import { spendingInsights, type SpendingInsights } from './spending-insights';
 import { periodWindow, type AnalyticsPeriod } from './window';
 
 /**
@@ -17,6 +18,7 @@ import { periodWindow, type AnalyticsPeriod } from './window';
 /** Each section's promise, by name. */
 export interface AnalyticsSections {
   incomeVsExpense: Promise<IncomeVsExpense>;
+  spendingInsights: Promise<SpendingInsights>;
 }
 
 export interface AnalyticsView {
@@ -40,6 +42,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
     window,
     sections: {
       incomeVsExpense: incomeVsExpense(ctx, view, window),
+      spendingInsights: spendingInsights(ctx, view, window),
     },
   };
 }
@@ -47,3 +50,4 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
 export type { AnalyticsPeriod } from './window';
 export type { DrillRef, Figure, FigureRow, PeriodTable } from './figures';
 export type { IncomeVsExpense, IncomeVsExpenseRow } from './income-vs-expense';
+export type { SpendingInsight, SpendingInsightBar, SpendingInsights } from './spending-insights';
