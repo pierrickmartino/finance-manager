@@ -145,3 +145,30 @@ test('on a phone the switch stays at the top and the table scrolls inside its ca
   );
   expect(tableOverflows).toBe(true);
 });
+
+test('Net worth reads today, with a point per period end of the window and its change', async ({
+  page,
+}) => {
+  await seedSalary(Date.now());
+  const netWorth = page.getByRole('region', { name: 'Net worth' });
+  const today = netWorth.getByRole('link', { name: /^Net worth today: / });
+
+  for (const [view, length, words] of [
+    ['month', 12, 'months'],
+    ['quarter', 8, 'quarters'],
+    ['year', 6, 'years'],
+  ] as const) {
+    await page.goto(`/analytics?period=${view}`);
+    await expect(today).toBeVisible();
+    const trend = netWorth.getByRole('group', {
+      name: `Net worth over the last ${length} ${words}`,
+    });
+    await expect(trend.getByRole('link')).toHaveCount(length);
+    await expect(trend.getByRole('link').last()).toHaveAccessibleName(/^Today: /);
+    await expect(netWorth.getByText(/since the end of /)).toBeVisible();
+  }
+
+  // Today's amount opens the Accounts as they stand today.
+  await today.click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
+});

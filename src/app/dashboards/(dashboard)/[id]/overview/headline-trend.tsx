@@ -17,7 +17,16 @@ type Money = (minor: number) => string;
  * The line filled down to its foot, the latest point a dot (hollow while its month runs), and
  * a strip per point that opens the Accounts as of its date, its dot shown on hover or focus.
  */
-export function NetWorthSparkline({ points, money }: { points: PeriodValue[]; money: Money }) {
+export function NetWorthSparkline({
+  points,
+  money,
+  label = 'Net worth over the last 24 months',
+}: {
+  points: PeriodValue[];
+  money: Money;
+  /** What the points span, for assistive technology. */
+  label?: string;
+}) {
   const shape = sparkline(points.map((point) => point.value));
   if (!shape) return null;
   const latest = shape.spots.at(-1)!;
@@ -25,7 +34,7 @@ export function NetWorthSparkline({ points, money }: { points: PeriodValue[]; mo
   return (
     <div
       role="group"
-      aria-label="Net worth over the last 24 months"
+      aria-label={label}
       className="relative mr-1.5 mb-1.5 h-12 min-w-32 grow basis-32 max-sm:basis-full"
     >
       <svg
