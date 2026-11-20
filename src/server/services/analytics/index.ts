@@ -3,8 +3,10 @@ import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { categoriesPerPeriod, type CategoriesPerPeriod } from './categories-per-period';
 import { incomeVsExpense, type IncomeVsExpense } from './income-vs-expense';
+import { spendingInsights, type SpendingInsights } from './spending-insights';
 import { spendingByCategory, type SpendingByCategory } from './spending-by-category';
 import { netWorth, type AnalyticsNetWorth } from './net-worth';
+import { netCashFlow, type NetCashFlow } from './net-cash-flow';
 import { periodWindow, type AnalyticsPeriod } from './window';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { accountBalances, type AccountBalances } from './account-balances';
@@ -22,11 +24,13 @@ import { accountBalances, type AccountBalances } from './account-balances';
 /** Each section's promise, by name. */
 export interface AnalyticsSections {
   incomeVsExpense: Promise<IncomeVsExpense>;
+  spendingInsights: Promise<SpendingInsights>;
   spendingByCategory: Promise<SpendingByCategory>;
   netWorth: Promise<AnalyticsNetWorth>;
   categoriesPerPeriod: Promise<CategoriesPerPeriod>;
   recentTransactions: Promise<RecentTransactions>;
   accountBalances: Promise<AccountBalances>;
+  netCashFlow: Promise<NetCashFlow>;
 }
 
 export interface AnalyticsView {
@@ -50,11 +54,13 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
     window,
     sections: {
       incomeVsExpense: incomeVsExpense(ctx, view, window),
+      spendingInsights: spendingInsights(ctx, view, window),
       spendingByCategory: spendingByCategory(ctx, view, window),
       netWorth: netWorth(ctx, view, window),
       categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
       recentTransactions: recentTransactions(ctx),
       accountBalances: accountBalances(ctx, today),
+      netCashFlow: netCashFlow(ctx, view, window),
     },
   };
 }
@@ -62,8 +68,10 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
 export type { AnalyticsPeriod } from './window';
 export type { DrillRef, Figure, FigureRow, PeriodTable } from './figures';
 export type { IncomeVsExpense, IncomeVsExpenseRow } from './income-vs-expense';
+export type { SpendingInsight, SpendingInsightBar, SpendingInsights } from './spending-insights';
 export type { SpendingByCategory, SpendingSeries } from './spending-by-category';
 export type { AnalyticsNetWorth, NetWorthPoint, NetWorthSince } from './net-worth';
 export type { CategoriesPerPeriod, CategoryGroupRows } from './categories-per-period';
 export type { RecentTransactions } from './recent-transactions';
 export type { AccountBalanceRow, AccountBalances } from './account-balances';
+export type { NetCashFlow, NetCashFlowPoint } from './net-cash-flow';
