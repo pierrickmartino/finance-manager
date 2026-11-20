@@ -26,8 +26,7 @@
     "auth:reset": "tsx --env-file-if-exists=.env.local scripts/reset-credentials.ts",
     "fx:fetch": "tsx --env-file-if-exists=.env.local scripts/fx-rates.ts fetch",
     "fx:backfill": "tsx --env-file-if-exists=.env.local scripts/fx-rates.ts backfill",
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
-    "prototype:categories": "tsx scripts/prototype-seed.ts && DATABASE_URL=postgresql://postgres:postgres@localhost:5432/proto_wipe_me next dev"
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
