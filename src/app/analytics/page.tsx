@@ -4,11 +4,13 @@ import { analyticsHref, parsePeriodView, type PeriodView } from '@/lib/analytics
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { loadAnalytics } from '@/server/services/analytics';
+import { ACCOUNT_BALANCES, AccountBalancesSection } from './account-balances';
 import { CATEGORIES_PER_PERIOD, CategoriesPerPeriodSection } from './categories-per-period';
 import { INCOME_VS_EXPENSE, IncomeVsExpenseSection } from './income-vs-expense';
 import { NET_WORTH, NetWorthSection } from './net-worth';
 import { NET_CASH_FLOW, NetCashFlowSection } from './net-cash-flow';
 import { PeriodSwitch } from './period-switch';
+import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
@@ -36,7 +38,7 @@ export default async function AnalyticsPage({
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
-  const { sections } = loadAnalytics(ctx, view);
+  const { sections, today } = loadAnalytics(ctx, view);
   const retryHref = analyticsHref(view);
 
   return (
@@ -50,10 +52,16 @@ export default async function AnalyticsPage({
         <StreamedSection name={NET_WORTH} retryHref={retryHref}>
           <NetWorthSection netWorth={sections.netWorth} view={view} fmt={fmt} />
         </StreamedSection>
+        <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
+          <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
+        </StreamedSection>
         {/* Net cash flow beside Account balances on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref}>
             <NetCashFlowSection line={sections.netCashFlow} view={view} fmt={fmt} />
+          </StreamedSection>
+          <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref}>
+            <AccountBalancesSection balances={sections.accountBalances} fmt={fmt} />
           </StreamedSection>
         </div>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>

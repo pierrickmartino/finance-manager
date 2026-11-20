@@ -293,12 +293,6 @@ export function InsightCard({ cards }: { cards: WidgetCardData[] }) {
  * Each opens its page.
  */
 export function RecentActivityCard({ recent }: { recent: RecentActivity[] }) {
-  const fmt = useFormatter();
-  const lit = spotlight(recent);
-  const signed = (transaction: RecentActivity) =>
-    `${transaction.amountMinor > 0 ? '+' : ''}${fmt.amount(transaction.amountMinor, { currency: transaction.currency })}`;
-  const when = (transaction: RecentActivity) =>
-    relativeDay(transaction.daysAgo) ?? fmt.date(transaction.bookingDate);
   return (
     <section aria-labelledby="overview-recent" className={`${TILE_CLASS} lg:row-span-2`}>
       <div className="flex items-center justify-between">
@@ -309,59 +303,69 @@ export function RecentActivityCard({ recent }: { recent: RecentActivity[] }) {
           View all
         </Link>
       </div>
-      {!lit ? (
-        <p className="mt-3 text-sm text-muted">No Transactions yet.</p>
-      ) : (
-        <>
-          <Link
-            href={`/transactions/${lit.spotlit.id}`}
-            className="mt-3 block rounded-2xl bg-hero-deep p-4 text-on-hero hover:bg-hero"
-          >
-            <span className="block text-xs text-on-hero/75">
-              Largest lately · {when(lit.spotlit)}
-            </span>
-            <span className="mt-1 block font-display text-3xl tracking-tight tabular-nums">
-              {signed(lit.spotlit)}
-            </span>
-            <span className="mt-1 block truncate text-sm text-on-hero/85">
-              {lit.spotlit.name} · {lit.spotlit.category}
-            </span>
-          </Link>
-          {lit.rest.length > 0 && (
-            <ol aria-label="Other recent Transactions" className="mt-4 ml-1.5 border-l border-rule">
-              {lit.rest.map((transaction) => (
-                <li key={transaction.id} className="relative pb-3 pl-4 last:pb-0">
-                  <span
-                    aria-hidden
-                    className="absolute top-2 -left-[5px] h-2.5 w-2.5 rounded-full border-2 border-surface bg-hero-mid"
-                  />
-                  <Link
-                    href={`/transactions/${transaction.id}`}
-                    className="-mx-2 block rounded-lg px-2 py-1 hover:bg-sunken"
-                  >
-                    <span className="flex items-baseline gap-3">
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {transaction.name}
-                      </span>
-                      <span
-                        className={`text-sm whitespace-nowrap tabular-nums ${transaction.amountMinor > 0 ? 'text-positive' : 'text-negative'}`}
-                      >
-                        {signed(transaction)}
-                      </span>
-                    </span>
-                    <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted">
-                      <span className={`${BADGE_CLASS.neutral} truncate`}>
-                        {transaction.category}
-                      </span>
-                      <span className="whitespace-nowrap">{when(transaction)}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </>
-      )}
+      <RecentActivityList recent={recent} />
     </section>
+  );
+}
+
+/**
+ * The body of Recent activity: the spotlight and the timeline, or a line saying there are no
+ * Transactions yet. Analytics' Recent transactions shows it in its own card.
+ */
+export function RecentActivityList({ recent }: { recent: RecentActivity[] }) {
+  const fmt = useFormatter();
+  const lit = spotlight(recent);
+  const signed = (transaction: RecentActivity) =>
+    `${transaction.amountMinor > 0 ? '+' : ''}${fmt.amount(transaction.amountMinor, { currency: transaction.currency })}`;
+  const when = (transaction: RecentActivity) =>
+    relativeDay(transaction.daysAgo) ?? fmt.date(transaction.bookingDate);
+  return !lit ? (
+    <p className="mt-3 text-sm text-muted">No Transactions yet.</p>
+  ) : (
+    <>
+      <Link
+        href={`/transactions/${lit.spotlit.id}`}
+        className="mt-3 block rounded-2xl bg-hero-deep p-4 text-on-hero hover:bg-hero"
+      >
+        <span className="block text-xs text-on-hero/75">Largest lately · {when(lit.spotlit)}</span>
+        <span className="mt-1 block font-display text-3xl tracking-tight tabular-nums">
+          {signed(lit.spotlit)}
+        </span>
+        <span className="mt-1 block truncate text-sm text-on-hero/85">
+          {lit.spotlit.name} · {lit.spotlit.category}
+        </span>
+      </Link>
+      {lit.rest.length > 0 && (
+        <ol aria-label="Other recent Transactions" className="mt-4 ml-1.5 border-l border-rule">
+          {lit.rest.map((transaction) => (
+            <li key={transaction.id} className="relative pb-3 pl-4 last:pb-0">
+              <span
+                aria-hidden
+                className="absolute top-2 -left-[5px] h-2.5 w-2.5 rounded-full border-2 border-surface bg-hero-mid"
+              />
+              <Link
+                href={`/transactions/${transaction.id}`}
+                className="-mx-2 block rounded-lg px-2 py-1 hover:bg-sunken"
+              >
+                <span className="flex items-baseline gap-3">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {transaction.name}
+                  </span>
+                  <span
+                    className={`text-sm whitespace-nowrap tabular-nums ${transaction.amountMinor > 0 ? 'text-positive' : 'text-negative'}`}
+                  >
+                    {signed(transaction)}
+                  </span>
+                </span>
+                <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted">
+                  <span className={`${BADGE_CLASS.neutral} truncate`}>{transaction.category}</span>
+                  <span className="whitespace-nowrap">{when(transaction)}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </>
   );
 }

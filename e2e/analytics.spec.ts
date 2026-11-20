@@ -9,8 +9,9 @@ import { createManualTransaction } from '../src/server/services/transactions/man
 import { withServices } from './support/services';
 
 /**
- * Analytics (spec #170): the Period view switch, the Income vs. expense and Categories per
- * period tables, and the Net cash flow line.
+ * Analytics (spec #170): the Period view switch, Net worth, Recent transactions, Net cash
+ * flow, Account balances in CHF, the Income vs. expense table and the Categories per period
+ * table.
  */
 
 /** A salary booked today, so it falls in the current period of every Period view. */
@@ -231,6 +232,31 @@ test('on a phone Categories per period scrolls sideways inside its card', async 
   );
 });
 
+test('Recent transactions and Account balances stay the same in every Period view and open their pages', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const description = await seedSalary(suffix);
+  const account = `Analytics bank ${suffix} · Analytics account ${suffix}`;
+  const recent = page.getByRole('region', { name: 'Recent transactions' });
+  const balances = page.getByRole('table', { name: 'Account balances in CHF' });
+
+  for (const view of ['month', 'quarter', 'year']) {
+    await page.goto(`/analytics?period=${view}`);
+    await expect(recent.getByRole('link', { name: new RegExp(description) })).toBeVisible();
+    await expect(balances.getByRole('row', { name: new RegExp(account) })).toContainText(
+      /4\D?321\.00/,
+    );
+  }
+
+  await recent.getByRole('link', { name: new RegExp(description) }).click();
+  await expect(page).toHaveURL(/\/transactions\/[0-9a-f-]{36}/);
+
+  await page.goto('/analytics');
+  await balances.getByRole('link', { name: account }).click();
+  await expect(page).toHaveURL(/\/accounts\/[0-9a-f-]{36}/);
+});
+
 test('Net cash flow has a point per period, the current one to date, each opening its Drill-down', async ({
   page,
 }) => {
@@ -247,7 +273,16 @@ test('Net cash flow has a point per period, the current one to date, each openin
   // At most one point per period: the window's 6 years.
   expect(await line.getByRole('link').count()).toBeLessThanOrEqual(6);
 
+  // On a wide screen it sits beside Account balances, on the left.
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
+  const flowBox = (await page.getByRole('region', { name: 'Net cash flow' }).boundingBox())!;
+  const balancesBox = (await page
+    .getByRole('region', { name: 'Account balances in CHF' })
+    .boundingBox())!;
+  expect(flowBox.y).toBe(balancesBox.y);
+  expect(flowBox.x + flowBox.width).toBeLessThan(balancesBox.x);
+
   await toDate(formatPeriod(`${YEAR}-${MONTH}`)).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   await expect(
