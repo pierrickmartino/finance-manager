@@ -1,6 +1,7 @@
 import type { PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
+import { categoriesPerPeriod, type CategoriesPerPeriod } from './categories-per-period';
 import { incomeVsExpense, type IncomeVsExpense } from './income-vs-expense';
 import { netWorth, type AnalyticsNetWorth } from './net-worth';
 import { periodWindow, type AnalyticsPeriod } from './window';
@@ -19,6 +20,7 @@ import { periodWindow, type AnalyticsPeriod } from './window';
 export interface AnalyticsSections {
   incomeVsExpense: Promise<IncomeVsExpense>;
   netWorth: Promise<AnalyticsNetWorth>;
+  categoriesPerPeriod: Promise<CategoriesPerPeriod>;
 }
 
 export interface AnalyticsView {
@@ -43,6 +45,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
     sections: {
       incomeVsExpense: incomeVsExpense(ctx, view, window),
       netWorth: netWorth(ctx, view, window),
+      categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
     },
   };
 }
@@ -51,3 +54,4 @@ export type { AnalyticsPeriod } from './window';
 export type { DrillRef, Figure, FigureRow, PeriodTable } from './figures';
 export type { IncomeVsExpense, IncomeVsExpenseRow } from './income-vs-expense';
 export type { AnalyticsNetWorth, NetWorthPoint, NetWorthSince } from './net-worth';
+export type { CategoriesPerPeriod, CategoryGroupRows } from './categories-per-period';

@@ -4,6 +4,7 @@ import { analyticsHref, parsePeriodView, type PeriodView } from '@/lib/analytics
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { loadAnalytics } from '@/server/services/analytics';
+import { CATEGORIES_PER_PERIOD, CategoriesPerPeriodSection } from './categories-per-period';
 import { INCOME_VS_EXPENSE, IncomeVsExpenseSection } from './income-vs-expense';
 import { NET_WORTH, NetWorthSection } from './net-worth';
 import { PeriodSwitch } from './period-switch';
@@ -50,6 +51,9 @@ export default async function AnalyticsPage({
         </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
           <IncomeVsExpenseSection table={sections.incomeVsExpense} view={view} fmt={fmt} />
+        </StreamedSection>
+        <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref}>
+          <CategoriesPerPeriodSection table={sections.categoriesPerPeriod} view={view} fmt={fmt} />
         </StreamedSection>
       </div>
     </section>

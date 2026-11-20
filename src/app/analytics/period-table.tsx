@@ -24,6 +24,8 @@ interface PeriodTableViewProps {
   fmt: Formatter;
   /** The keys of rows that add up others (Net, a subtotal): set apart in bold. */
   emphasised?: readonly string[];
+  /** The keys of rows nested under the row above them (a Category under its group). */
+  indented?: readonly string[];
 }
 
 export function PeriodTableView({
@@ -32,6 +34,7 @@ export function PeriodTableView({
   view,
   fmt,
   emphasised = [],
+  indented = [],
 }: PeriodTableViewProps) {
   return (
     <div className="overflow-x-auto" data-testid="period-table-scroll">
@@ -61,6 +64,7 @@ export function PeriodTableView({
               view={view}
               fmt={fmt}
               isEmphasised={emphasised.includes(row.key)}
+              isIndented={indented.includes(row.key)}
             />
           ))}
         </tbody>
@@ -84,13 +88,17 @@ interface RowProps {
   view: PeriodView;
   fmt: Formatter;
   isEmphasised: boolean;
+  isIndented: boolean;
 }
 
-function Row({ row, periods, view, fmt, isEmphasised }: RowProps) {
+function Row({ row, periods, view, fmt, isEmphasised, isIndented }: RowProps) {
   const shared = { view, fmt };
   return (
     <tr className={isEmphasised ? 'font-semibold' : ''}>
-      <th scope="row" className={`${HEAD} sticky left-0 bg-surface text-left`}>
+      <th
+        scope="row"
+        className={`${HEAD} sticky left-0 bg-surface text-left ${isIndented ? 'pl-7' : ''}`}
+      >
         {row.label}
       </th>
       {row.cells.map((figure, index) => {
