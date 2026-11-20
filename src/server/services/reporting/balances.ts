@@ -243,26 +243,45 @@ async function runNetWorth(
   return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
 }
 
-/**
- * The query of the overview headline's Net worth trend: every Account, no filters, by month:
- * the running month at today, so its latest point is net worth today, and the 24 full months
- * before it, so the change over two years has its point.
- */
-export const NET_WORTH_TREND_QUERY: WidgetQuery = {
-  dateRange: { kind: 'last', count: 24, unit: 'month', includeCurrent: true },
-  rows: 'month',
-  columns: null,
-  measure: 'sum',
-  averagePer: 'month',
-  filters: {},
-  includeCapital: false,
-};
+/** How far back a Net worth trend reaches: `count` complete periods before the running one. */
+export interface NetWorthTrendSpan {
+  unit: TimeAxis;
+  count: number;
+}
 
 /**
- * The overview headline's Net worth trend (GLOSSARY: Dashboard Story): Net worth over time on
- * every Account, valued as a Net worth Widget's points are (ADR-0014), whatever any Widget's
- * filters.
+ * A Net worth trend's query: every Account, no filters, by `unit`: the running period at
+ * today, so its latest point is net worth today, and the `count` complete periods before it.
  */
-export function runNetWorthTrend(ctx: ServiceContext): Promise<ReportTable> {
-  return runNetWorth(ctx, NET_WORTH_TREND_QUERY, 'month');
+function netWorthTrendQuery({ unit, count }: NetWorthTrendSpan): WidgetQuery {
+  return {
+    dateRange: { kind: 'last', count, unit, includeCurrent: true },
+    rows: unit,
+    columns: null,
+    measure: 'sum',
+    averagePer: unit,
+    filters: {},
+    includeCapital: false,
+  };
+}
+
+/**
+ * The overview headline's span: by month, the 24 full months before the running one, so the
+ * change over two years has its point.
+ */
+const HEADLINE_SPAN: NetWorthTrendSpan = { unit: 'month', count: 24 };
+
+/** The query of the overview headline's Net worth trend. */
+export const NET_WORTH_TREND_QUERY: WidgetQuery = netWorthTrendQuery(HEADLINE_SPAN);
+
+/**
+ * A Net worth trend: Net worth over time on every Account, valued as a Net worth Widget's
+ * points are (ADR-0014), whatever any Widget's filters. By default the overview headline's
+ * (GLOSSARY: Dashboard Story); Analytics reads one per Period view.
+ */
+export function runNetWorthTrend(
+  ctx: ServiceContext,
+  span: NetWorthTrendSpan = HEADLINE_SPAN,
+): Promise<ReportTable> {
+  return runNetWorth(ctx, netWorthTrendQuery(span), span.unit);
 }
