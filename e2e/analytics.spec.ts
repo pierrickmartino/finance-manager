@@ -8,7 +8,10 @@ import { editClassification } from '../src/server/services/transactions';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { withServices } from './support/services';
 
-/** Analytics (spec #170): the Period view switch and the Income vs. expense table. */
+/**
+ * Analytics (spec #170): the Period view switch, the Income vs. expense table and the
+ * Categories per period table.
+ */
 
 /** A salary booked today, so it falls in the current period of every Period view. */
 async function seedSalary(suffix: number): Promise<string> {
@@ -139,9 +142,64 @@ test('on a phone the switch stays at the top and the table scrolls inside its ca
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(pageOverflows).toBe(false);
-  const scroller = page.getByTestId('period-table-scroll');
+  const scroller = page
+    .getByRole('region', { name: 'Income vs. expense' })
+    .getByTestId('period-table-scroll');
   const tableOverflows = await scroller.evaluate(
     (element) => element.scrollWidth > element.clientWidth,
   );
   expect(tableOverflows).toBe(true);
+});
+
+const categories = (page: Page) => page.getByRole('table', { name: 'Categories per period' });
+
+test('Categories per period lists each Category under its group subtotal, and both open their Drill-down', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const description = await seedSalary(suffix);
+  const current = `${formatPeriod(`${YEAR}-${MONTH}`)} to date`;
+
+  await page.goto('/analytics');
+  const group = categories(page)
+    .getByRole('row')
+    .filter({
+      has: page.getByRole('rowheader', { name: `Pay ${suffix}`, exact: true }),
+    });
+  await expect(group).toBeVisible();
+  const category = group.locator('xpath=following-sibling::tr[1]');
+  await expect(category.getByRole('rowheader')).toHaveText('Salary');
+
+  // The group's subtotal for the current month opens the Transactions behind it.
+  await group.getByRole('link', { name: new RegExp(`^Pay ${suffix}, ${current}: `) }).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=month$/);
+
+  // So does the Category's Total.
+  await category.getByRole('link', { name: /^Salary, Total: / }).click();
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+});
+
+test('on a phone Categories per period scrolls sideways inside its card', async ({ page }) => {
+  await seedSalary(Date.now());
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/analytics');
+  await expect(categories(page)).toBeVisible();
+
+  const pageOverflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(pageOverflows).toBe(false);
+  const scroller = page
+    .getByRole('region', { name: 'Categories per period' })
+    .getByTestId('period-table-scroll');
+  expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+    true,
+  );
 });
