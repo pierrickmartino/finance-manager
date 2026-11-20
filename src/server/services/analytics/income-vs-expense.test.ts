@@ -112,10 +112,10 @@ describe('Income vs. expense', () => {
 
     const card = await loadSection(t.ctx, 'month', 'incomeVsExpense');
 
-    // Income is 1'500'000 of the rows' 4'455'600 in all, by magnitude: 34%.
+    // Income and Expense net to a total Income isn't a share of: the card names the largest row.
     expect(readCard(card, money).lead).toMatchObject({
-      headline: '34% sits in Income',
-      detail: '1500000 of 945600',
+      headline: 'Income leads',
+      detail: '1500000',
     });
   });
 

@@ -347,6 +347,13 @@ function shareSentences(data: ChartSource, money: Money): CardSentences {
   const parts = shareParts(data);
   const [top] = parts;
   if (!top) return { lead: null, facts: [] };
+  // Money in and out together net to a total no part is a share of: name the largest instead.
+  if (parts.some((part) => part.value < 0) && parts.some((part) => part.value > 0)) {
+    return {
+      lead: { headline: `${top.label} leads`, detail: money(top.value), href: top.href },
+      facts: [],
+    };
+  }
   const whole = data.total ?? sum(parts.map((part) => part.value));
   return {
     lead: {

@@ -593,6 +593,23 @@ describe('readCard: parts', () => {
     expect(reading.mark.items[0]).toMatchObject({ detail: 'CHF 6000', href: 'row:UBS · Savings' });
   });
 
+  it('names the largest row of a table mixing money in and out, with no share of its net', () => {
+    const data = source(
+      ['Income', 'Expense'],
+      ['Jan', 'Feb'],
+      [
+        [500_00, 400_00],
+        [-300_00, -200_00],
+      ],
+    );
+
+    expect(read(widget({ visualisation: 'table', data })).lead).toEqual({
+      headline: 'Income leads',
+      detail: 'CHF 900',
+      href: 'row:Income',
+    });
+  });
+
   it('draws a donut as a ring and a table as a heatmap, both from the data', () => {
     const data = spending.data!;
 

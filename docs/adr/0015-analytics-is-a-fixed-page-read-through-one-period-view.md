@@ -13,7 +13,7 @@ Analytics replaces the user-built Dashboard as the landing page. It is one hand-
 
 ## Consequences
 
-- The Dashboard stays reachable for now. Once it is removed, Widgets, Standalone Widgets, Dashboards, the Dashboard Story, Cards and Edit mode go with it (ADR-0007, ADR-0009 and ADR-0010 become superseded).
+- The Dashboard stays reachable for now. Once it is removed, Widgets, Standalone Widgets, Dashboards, the Dashboard Story and Edit mode go with it (ADR-0007, ADR-0009 and ADR-0010 become superseded), but not the Cards (see below).
 - Every figure in the Period window includes the current partial period, set apart visibly. Averages and the spending insight use complete periods only, so a partial period never reads as a weak one.
 - The Completeness check notice moves with the landing page and sits above Analytics (ADR-0008).
 - Analytics draws its sections with the Dashboard's own Cards (its overview row and its Widget cards), so removing the Dashboard later must keep the Cards for Analytics.

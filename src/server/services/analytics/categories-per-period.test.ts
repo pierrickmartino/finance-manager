@@ -119,11 +119,11 @@ describe('Categories per period', () => {
     await dataset();
 
     const card = await loadSection(t.ctx, 'month', 'categoriesPerPeriod');
-
+    // Income and Expense net to a total Income isn't a share of: the card names the largest row.
     // Income is 900'000 of the rows' 1'907'800 in all, by magnitude: 47%.
     expect(readCard(card, money).lead).toMatchObject({
-      headline: '47% sits in Income',
-      detail: '900000 of 846100',
+      headline: 'Income leads',
+      detail: '900000',
     });
   });
 
