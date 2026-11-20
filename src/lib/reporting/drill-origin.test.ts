@@ -70,4 +70,22 @@ describe('Drill-down origin', () => {
       label: 'Back to Recurring payments',
     });
   });
+
+  it('round-trips Analytics with its Period view, and links back to it', () => {
+    for (const period of ['year', 'quarter', 'month'] as const) {
+      const params = Object.fromEntries(originToParams({ kind: 'analytics', period }));
+      expect(params).toEqual({ origin: 'analytics', originPeriod: period });
+      expect(originFromParams(params)).toEqual({ kind: 'analytics', period });
+    }
+    expect(backLink({ kind: 'analytics', period: 'quarter' })).toEqual({
+      href: '/analytics?period=quarter',
+      label: 'Back to Analytics',
+    });
+  });
+
+  it('reads Analytics with a missing or unknown Period view as Month', () => {
+    for (const params of [{ origin: 'analytics' }, { origin: 'analytics', originPeriod: 'week' }]) {
+      expect(originFromParams(params)).toEqual({ kind: 'analytics', period: 'month' });
+    }
+  });
 });

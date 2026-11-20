@@ -36,12 +36,21 @@ describe('findCurrentPage', () => {
 });
 
 describe('NAV_GROUPS', () => {
+  test('lists Analytics first, then Dashboards, under Overview', () => {
+    expect(NAV_GROUPS[0]?.label).toBe('Overview');
+    expect(NAV_GROUPS[0]?.links.map((link) => link.label).slice(0, 2)).toEqual([
+      'Analytics',
+      'Dashboards',
+    ]);
+  });
+
   test('lists every destination exactly once', () => {
     const hrefs = NAV_GROUPS.flatMap((group) => group.links.map((link) => link.href));
 
     expect(new Set(hrefs).size).toBe(hrefs.length);
     expect(hrefs).toEqual(
       expect.arrayContaining([
+        '/analytics',
         '/dashboards',
         '/widgets',
         '/transactions',
@@ -57,13 +66,14 @@ describe('NAV_GROUPS', () => {
         '/settings',
       ]),
     );
-    expect(hrefs).toHaveLength(13);
+    expect(hrefs).toHaveLength(14);
   });
 });
 
 describe('PRIMARY_LINKS', () => {
-  test('are the four pills of the top bar, in order', () => {
+  test('are the five pills of the top bar, Analytics first', () => {
     expect(PRIMARY_LINKS.map((link) => link.href)).toEqual([
+      '/analytics',
       '/dashboards',
       '/transactions',
       '/accounts',

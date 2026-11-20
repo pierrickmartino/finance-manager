@@ -21,6 +21,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Overview',
     links: [
+      { href: '/analytics', label: 'Analytics', icon: 'analytics' },
       { href: '/dashboards', label: 'Dashboards', icon: 'dashboard' },
       { href: '/widgets', label: 'Widgets', icon: 'widgets' },
     ],
@@ -68,7 +69,7 @@ export function findCurrentPage(pathname: string): CurrentPage | null {
 }
 
 /** The top bar's pills: the pages used most. Every other page sits in the More menu. */
-const PRIMARY_HREFS = ['/dashboards', '/transactions', '/accounts', '/categories'];
+const PRIMARY_HREFS = ['/analytics', '/dashboards', '/transactions', '/accounts', '/categories'];
 
 const ALL_LINKS = NAV_GROUPS.flatMap((group) => group.links);
 
