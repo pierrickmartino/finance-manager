@@ -5,6 +5,7 @@ import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { loadAnalytics } from '@/server/services/analytics';
 import { INCOME_VS_EXPENSE, IncomeVsExpenseSection } from './income-vs-expense';
+import { NET_CASH_FLOW, NetCashFlowSection } from './net-cash-flow';
 import { PeriodSwitch } from './period-switch';
 import { StreamedSection } from './section';
 
@@ -44,6 +45,12 @@ export default async function AnalyticsPage({
       </header>
       <PeriodSwitch view={view} />
       <div className="grid min-w-0 grid-cols-1 gap-5">
+        {/* Net cash flow beside Account balances on wide screens, one after the other below. */}
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
+          <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref}>
+            <NetCashFlowSection line={sections.netCashFlow} view={view} fmt={fmt} />
+          </StreamedSection>
+        </div>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
           <IncomeVsExpenseSection table={sections.incomeVsExpense} view={view} fmt={fmt} />
         </StreamedSection>

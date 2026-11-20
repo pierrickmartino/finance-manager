@@ -8,7 +8,7 @@ import { editClassification } from '../src/server/services/transactions';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { withServices } from './support/services';
 
-/** Analytics (spec #170): the Period view switch and the Income vs. expense table. */
+/** Analytics (spec #170): the Period view switch, Income vs. expense and Net cash flow. */
 
 /** A salary booked today, so it falls in the current period of every Period view. */
 async function seedSalary(suffix: number): Promise<string> {
@@ -144,4 +144,30 @@ test('on a phone the switch stays at the top and the table scrolls inside its ca
     (element) => element.scrollWidth > element.clientWidth,
   );
   expect(tableOverflows).toBe(true);
+});
+
+test('Net cash flow has a point per period, the current one to date, each opening its Drill-down', async ({
+  page,
+}) => {
+  const description = await seedSalary(Date.now());
+  const line = page.getByRole('figure', { name: 'Net cash flow line chart' });
+  const toDate = (label: string) =>
+    line.getByRole('link', { name: new RegExp(`^Net cash flow, ${label} to date: `) });
+
+  await page.goto('/analytics?period=quarter');
+  await expect(toDate(formatPeriod(QUARTER))).toBeVisible();
+
+  await page.goto('/analytics?period=year');
+  await expect(toDate(YEAR)).toBeVisible();
+  // At most one point per period: the window's 6 years.
+  expect(await line.getByRole('link').count()).toBeLessThanOrEqual(6);
+
+  await page.goto('/analytics');
+  await toDate(formatPeriod(`${YEAR}-${MONTH}`)).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=month$/);
 });
