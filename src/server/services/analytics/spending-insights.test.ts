@@ -3,7 +3,8 @@ import { fixToday, seedAccount, seedClassified } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 import { listCellTransactions } from '../reporting';
-import { loadAnalytics } from '.';
+import type { PeriodView } from '@/lib/analytics/period-view';
+import { loadAnalytics, type SpendingInsights } from '.';
 
 /** Analytics' Spending Insights (spec #170, user stories 18-22; ticket #176). */
 
@@ -12,6 +13,13 @@ const t = setupTestDatabase();
 afterEach(() => {
   vi.useRealTimers();
 });
+
+/** The section at a view, once every section has loaded so no query outlives the test. */
+async function spendingInsightsAt(view: PeriodView): Promise<SpendingInsights> {
+  const { sections } = loadAnalytics(t.ctx, view);
+  await Promise.allSettled(Object.values(sections));
+  return sections.spendingInsights;
+}
 
 interface Booking {
   date: string;
@@ -62,7 +70,7 @@ describe('Spending Insights', () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    const { insight } = await loadAnalytics(t.ctx, 'month').sections.spendingInsights;
+    const { insight } = await spendingInsightsAt('month');
 
     // The months with data start in August: 200, 0, 0, 0, 100 and 300 average 100.00, so
     // February's 400.00 is 300% above. Income 2,500.00 against spending 1,000.00 from August to
@@ -83,8 +91,8 @@ describe('Spending Insights', () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    const quarters = await loadAnalytics(t.ctx, 'quarter').sections.spendingInsights;
-    const years = await loadAnalytics(t.ctx, 'year').sections.spendingInsights;
+    const quarters = await spendingInsightsAt('quarter');
+    const years = await spendingInsightsAt('year');
 
     // Quarters from Q2 2023: 600, 0, 0, 0, 0 and 200 average 133.33, so Q4 2024's 100.00 is 25%
     // below. Income 2,000.00 against spending 900.00 over them: 55% kept.
@@ -115,7 +123,7 @@ describe('Spending Insights', () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    const { bars, insight } = await loadAnalytics(t.ctx, 'month').sections.spendingInsights;
+    const { bars, insight } = await spendingInsightsAt('month');
 
     expect(bars.map((bar) => [bar.label, bar.expense, bar.isLatest, bar.isToDate])).toEqual([
       ['Apr 2024', 0, false, false],
@@ -146,7 +154,7 @@ describe('Spending Insights', () => {
     ]);
 
     for (const view of ['month', 'quarter', 'year'] as const) {
-      const section = await loadAnalytics(t.ctx, view).sections.spendingInsights;
+      const section = await spendingInsightsAt(view);
       expect(section.insight, view).toBeNull();
       expect(section.isEmpty).toBe(false);
       expect(section.bars.at(-1)).toMatchObject({
@@ -159,7 +167,7 @@ describe('Spending Insights', () => {
   it('is empty with no income or expense in the window', async () => {
     fixToday('2025-03-20');
 
-    const section = await loadAnalytics(t.ctx, 'quarter').sections.spendingInsights;
+    const section = await spendingInsightsAt('quarter');
 
     expect(section).toMatchObject({ insight: null, isEmpty: true });
     expect(section.bars).toHaveLength(8);
@@ -170,7 +178,7 @@ describe('Spending Insights', () => {
     await seed(DATASET);
 
     for (const view of ['month', 'quarter', 'year'] as const) {
-      const { bars, insight } = await loadAnalytics(t.ctx, view).sections.spendingInsights;
+      const { bars, insight } = await spendingInsightsAt(view);
       for (const bar of bars) {
         const page = await listCellTransactions(t.ctx, bar.drill.query, bar.drill.cell);
         expect(page.value ?? 0, `${view} ${bar.label}`).toBe(0 - bar.expense);
