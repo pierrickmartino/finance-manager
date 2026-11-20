@@ -144,8 +144,8 @@ test('the home Dashboard no longer shows the Completeness check', async ({ page 
     await importedAccount(ctx, bank.id, `Unimported ${suffix}`);
   });
   await page.goto('/');
-  // An alert when it lists a problem, a region otherwise: find it by its name alone.
-  await expect(page.getByLabel('Completeness check')).toBeVisible();
+  // The problem this test seeded makes it an alert (once streamed in, past its placeholder).
+  await expect(page.getByRole('alert', { name: 'Completeness check' })).toBeVisible();
 
   await openHomeDashboard(page);
   await expect(page.getByRole('link', { name: 'Edit Dashboard' })).toBeVisible();
