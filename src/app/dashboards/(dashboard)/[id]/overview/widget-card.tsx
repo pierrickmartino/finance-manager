@@ -25,9 +25,9 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
       return <EmptyChart sentence={mark.sentence} />;
     case 'number':
       return mark.total === null ? (
-        <p className="font-display text-5xl text-muted">—</p>
+        <p className="font-display text-3xl text-muted">—</p>
       ) : (
-        <Link href={mark.href} className="font-display text-5xl tabular-nums hover:underline">
+        <Link href={mark.href} className="font-display text-3xl tabular-nums hover:underline">
           {money(mark.total)}
         </Link>
       );

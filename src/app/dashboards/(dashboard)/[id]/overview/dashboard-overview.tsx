@@ -1,5 +1,6 @@
 import { ViewTransition, type ReactElement, type ReactNode } from 'react';
 import { InsightCard, NetWorthCard, RecentActivityCard, type RecentActivity } from './overview-row';
+import { PAGE_TITLE_CLASS } from '@/components/surface';
 import type { WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 
@@ -48,7 +49,7 @@ export function DashboardOverview({
       <DashboardChrome part="dashboard-header" dashboardId={dashboardId}>
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl tracking-tight">{dashboardName}</h1>
+            <h1 className={PAGE_TITLE_CLASS}>{dashboardName}</h1>
             <div className="mt-1 text-muted">{subtitle}</div>
           </div>
           <div className="flex flex-wrap items-center gap-2">{actions}</div>

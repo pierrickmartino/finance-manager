@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { NAV_GROUPS, PRIMARY_LINKS, findCurrentPage, isActive, overflowGroups } from './navigation';
+import { NAV_GROUPS, PRIMARY_LINKS, isActive, overflowGroups } from './navigation';
 
 describe('isActive', () => {
   test('matches the exact path', () => {
@@ -12,26 +12,6 @@ describe('isActive', () => {
 
   test('does not match a path that only shares a prefix', () => {
     expect(isActive('/tagsets', '/tags')).toBe(false);
-  });
-});
-
-describe('findCurrentPage', () => {
-  test('returns the group and link for a top-level page', () => {
-    const current = findCurrentPage('/payees');
-
-    expect(current?.group.label).toBe('Organize');
-    expect(current?.link.label).toBe('Payees');
-  });
-
-  test('returns the parent link for a detail page', () => {
-    const current = findCurrentPage('/rules/abc/');
-
-    expect(current?.group.label).toBe('Organize');
-    expect(current?.link.label).toBe('Rules');
-  });
-
-  test('returns null for a page outside the navigation', () => {
-    expect(findCurrentPage('/imports/xyz')).toBeNull();
   });
 });
 

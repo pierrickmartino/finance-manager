@@ -6,12 +6,12 @@
 
 // Type -----------------------------------------------------------------------------------------
 
-/** The page's one h1: the display face, set large, as the Dashboard Story's titles. */
-export const PAGE_TITLE_CLASS = 'font-display text-4xl leading-tight tracking-tight text-pretty';
-/** A section within a page (h2): the display face, one step down. */
-export const SECTION_TITLE_CLASS = 'font-display text-2xl leading-snug tracking-tight';
+/** The page's one h1: the display face, kept compact so the page's content comes first. */
+export const PAGE_TITLE_CLASS = 'font-display text-2xl leading-tight tracking-tight text-pretty';
+/** A section within a page (h2), and the title of a detail panel: the display face, one step down. */
+export const SECTION_TITLE_CLASS = 'font-display text-lg leading-snug tracking-tight';
 /** A number that is the point of its page (a balance, a total), in the display face. */
-export const HEADLINE_AMOUNT_CLASS = 'font-display text-4xl tracking-tight tabular-nums';
+export const HEADLINE_AMOUNT_CLASS = 'font-display text-3xl tracking-tight tabular-nums';
 
 // Surfaces -------------------------------------------------------------------------------------
 

@@ -46,7 +46,7 @@ export function RuleDetail({ rule, position, total, isPending, moveBy }: RuleDet
           <p className="text-xs font-medium uppercase tracking-wide text-muted">
             Rule {position + 1} of {total}
           </p>
-          <h2 className="break-words font-display text-2xl tracking-tight">{rule.name}</h2>
+          <h2 className="break-words font-display text-lg tracking-tight">{rule.name}</h2>
         </div>
         <EnabledSwitch rule={rule} />
       </header>
