@@ -6,6 +6,8 @@ import { incomeVsExpense, type IncomeVsExpense } from './income-vs-expense';
 import { spendingInsights, type SpendingInsights } from './spending-insights';
 import { netWorth, type AnalyticsNetWorth } from './net-worth';
 import { periodWindow, type AnalyticsPeriod } from './window';
+import { recentTransactions, type RecentTransactions } from './recent-transactions';
+import { accountBalances, type AccountBalances } from './account-balances';
 
 /**
  * The Analytics reporting service (GLOSSARY: Analytics, ADR-0015): the page's only data source.
@@ -23,6 +25,8 @@ export interface AnalyticsSections {
   spendingInsights: Promise<SpendingInsights>;
   netWorth: Promise<AnalyticsNetWorth>;
   categoriesPerPeriod: Promise<CategoriesPerPeriod>;
+  recentTransactions: Promise<RecentTransactions>;
+  accountBalances: Promise<AccountBalances>;
 }
 
 export interface AnalyticsView {
@@ -49,6 +53,8 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
       spendingInsights: spendingInsights(ctx, view, window),
       netWorth: netWorth(ctx, view, window),
       categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
+      recentTransactions: recentTransactions(ctx),
+      accountBalances: accountBalances(ctx, today),
     },
   };
 }
@@ -59,3 +65,5 @@ export type { IncomeVsExpense, IncomeVsExpenseRow } from './income-vs-expense';
 export type { SpendingInsight, SpendingInsightBar, SpendingInsights } from './spending-insights';
 export type { AnalyticsNetWorth, NetWorthPoint, NetWorthSince } from './net-worth';
 export type { CategoriesPerPeriod, CategoryGroupRows } from './categories-per-period';
+export type { RecentTransactions } from './recent-transactions';
+export type { AccountBalanceRow, AccountBalances } from './account-balances';

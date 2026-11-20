@@ -1,6 +1,8 @@
 import { vi } from 'vitest';
 import { createAccount, type Account } from '@/server/services/accounts';
 import { createBank } from '@/server/services/banks';
+import type { PeriodView } from '@/lib/analytics/period-view';
+import { loadAnalytics, type AnalyticsSections } from '@/server/services/analytics';
 import type { ServiceContext } from '@/server/services/context';
 import { editClassification, type ClassificationChanges } from '@/server/services/transactions';
 import { seedTransactions, type SeedTransaction } from './transactions';
@@ -49,4 +51,18 @@ export async function seedClassified(
     if (row.classify) await editClassification(ctx, ids[index]!, row.classify);
   }
   return ids;
+}
+
+/**
+ * One section of Analytics at a Period view, once every section has loaded: the page starts
+ * them all, and none may outlive the test (its database is dropped after it).
+ */
+export async function loadSection<Name extends keyof AnalyticsSections>(
+  ctx: ServiceContext,
+  view: PeriodView,
+  name: Name,
+): Promise<Awaited<AnalyticsSections[Name]>> {
+  const { sections } = loadAnalytics(ctx, view);
+  await Promise.allSettled(Object.values(sections));
+  return await sections[name];
 }
