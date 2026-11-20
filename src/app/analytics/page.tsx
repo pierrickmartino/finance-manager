@@ -13,6 +13,8 @@ import {
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
 import { CardSection } from './card-section';
+import { CategoriesPerPeriodPrototype } from './categories-per-period.prototype'; // PROTOTYPE
+import { listCategoryGroups } from '@/server/services/categories'; // PROTOTYPE
 import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { NET_WORTH, NetWorthSection } from './net-worth';
 import { PeriodSwitch } from './period-switch';
@@ -34,9 +36,13 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string | string[] }>;
+  searchParams: Promise<{ period?: string | string[]; variant?: string | string[] }>; // PROTOTYPE: variant
 }) {
-  const view = parsePeriodView((await searchParams).period);
+  const params = await searchParams;
+  const view = parsePeriodView(params.period);
+  // PROTOTYPE: ?variant= for Categories per period (dev only).
+  const variant =
+    process.env.NODE_ENV === 'production' ? null : String(params.variant ?? 'current');
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
@@ -94,10 +100,18 @@ export default async function AnalyticsPage({
           />
         </StreamedSection>
         <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref}>
-          <CardSection
-            card={sections.categoriesPerPeriod}
-            empty="Nothing to show yet: no classified Transactions in these periods."
-          />
+          {variant ? (
+            <CategoriesPerPeriodPrototype
+              variant={variant}
+              card={sections.categoriesPerPeriod}
+              groups={listCategoryGroups(ctx)}
+            />
+          ) : (
+            <CardSection
+              card={sections.categoriesPerPeriod}
+              empty="Nothing to show yet: no classified Transactions in these periods."
+            />
+          )}
         </StreamedSection>
       </div>
     </section>
