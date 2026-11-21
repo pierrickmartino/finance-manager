@@ -168,3 +168,105 @@ body {
 .dashboard-board .react-grid-item > .react-resizable-handle::after {
   border-color: var(--color-ink-soft);
 }
+
+/* PROTOTYPE ONLY (src/app/analytics/analytics-variants.tsx): denser Analytics cards for
+   variants B–D, reached through the cards' own utilities. Delete with the prototype. */
+[data-analytics] :is([class~='p-5'][class~='rounded-3xl'], [class~='bg-insight']) {
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.5rem;
+}
+[data-analytics] :is(section, aside) h2 {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+[data-analytics] :is([class~='text-3xl'], [class~='font-display'][class~='text-xl']) {
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+}
+[data-analytics] [class~='gap-4'] {
+  gap: 0.5rem;
+}
+[data-analytics] :is([class~='mt-6'], [class~='pt-6']) {
+  margin-top: 0.75rem;
+  padding-top: 0;
+}
+[data-analytics] [class~='mt-4'] {
+  margin-top: 0.5rem;
+}
+/* Bars, the cash-flow chart and the insight's chart: shorter. */
+[data-analytics] [class~='h-52'] {
+  height: 8rem;
+  padding-top: 1.25rem;
+}
+[data-analytics] [class~='min-h-40'] {
+  min-height: 6rem;
+}
+[data-analytics] [class~='h-32'] {
+  height: 5rem;
+}
+/* Tick lists (Account balances, Spending by Category): one tight line each. */
+[data-analytics] [class~='rounded-2xl'][class~='px-4'][class~='py-3'] {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+}
+[data-analytics] ul[class~='gap-2'] {
+  gap: 0.125rem;
+}
+[data-analytics] [class~='rounded-2xl'][class~='bg-paper'][class~='p-3'] {
+  padding: 0.375rem 0.5rem;
+}
+/* Facts under a chart: as many to a row as fit. */
+[data-analytics] dl[class~='grid-cols-2'] {
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+/* Heatmaps: thinner rows. */
+[data-analytics] table td a[class~='py-2'],
+[data-analytics] table :is([class~='py-1.5']) {
+  padding-top: 0.1875rem;
+  padding-bottom: 0.1875rem;
+}
+[data-analytics] table[class~='border-spacing-1'] {
+  border-spacing: 0.125rem;
+}
+[data-analytics] table [class~='text-sm'] {
+  font-size: 0.75rem;
+}
+[data-analytics] table [class~='pt-4'] {
+  padding-top: 0.5rem;
+}
+/* Recent transactions: a tighter timeline and spotlight. */
+[data-analytics] li[class~='pb-3'] {
+  padding-bottom: 0.25rem;
+}
+[data-analytics] [class~='bg-hero-deep'][class~='p-4'] {
+  padding: 0.5rem 0.75rem;
+}
+[data-analytics] [class~='py-8'] {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+[data-analytics] [class~='h-48'] {
+  height: 8rem;
+}
+/* The overview's tall cards span one row here. */
+[data-analytics] [class~='lg:row-span-2'] {
+  grid-row: auto;
+}
+
+/* D: a sheet, not cards: no chrome, hairlines between sections. */
+[data-analytics='D'] [class~='p-5'][class~='rounded-3xl'] {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+[data-analytics='D'] [class~='bg-insight'] {
+  border-radius: 0;
+  box-shadow: none;
+}
