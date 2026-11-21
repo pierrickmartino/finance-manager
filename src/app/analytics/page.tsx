@@ -66,15 +66,26 @@ export default async function AnalyticsPage({
             <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
           </StreamedSection>
         </div>
-        {/* Net cash flow, Account balances and Spending by Category side by side on wide screens,
-            one after the other below. */}
+        {/* Three columns on wide screens, one after the other below: Net cash flow over Income
+            vs expense (the pair together as tall as the row, each growing to share it), then
+            Account balances and Spending by Category. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref}>
-            <CardSection
-              card={sections.netCashFlow}
-              empty="Nothing to show yet: no Transactions in these periods."
-            />
-          </StreamedSection>
+          <div className="flex min-w-0 flex-col gap-5">
+            <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} className="flex-1">
+              <CardSection
+                card={sections.netCashFlow}
+                empty="Nothing to show yet: no Transactions in these periods."
+                className="flex-1"
+              />
+            </StreamedSection>
+            <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref} className="flex-1">
+              <CardSection
+                card={sections.incomeVsExpense}
+                empty="Nothing to show yet: no income, expense or Capital in these periods."
+                className="flex-1"
+              />
+            </StreamedSection>
+          </div>
           <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref}>
             <CardSection
               card={sections.accountBalances}
@@ -88,12 +99,6 @@ export default async function AnalyticsPage({
             />
           </StreamedSection>
         </div>
-        <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
-          <CardSection
-            card={sections.incomeVsExpense}
-            empty="Nothing to show yet: no income, expense or Capital in these periods."
-          />
-        </StreamedSection>
         <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref}>
           <CardSection
             card={sections.categoriesPerPeriod}
