@@ -66,8 +66,9 @@ export default async function AnalyticsPage({
             <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
           </StreamedSection>
         </div>
-        {/* Net cash flow beside Account balances on wide screens, one after the other below. */}
-        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
+        {/* Net cash flow, Account balances and Spending by Category side by side on wide screens,
+            one after the other below. */}
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref}>
             <CardSection
               card={sections.netCashFlow}
@@ -80,13 +81,13 @@ export default async function AnalyticsPage({
               empty="Nothing to show yet: no Accounts."
             />
           </StreamedSection>
+          <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref}>
+            <CardSection
+              card={sections.spendingByCategory}
+              empty="Nothing to show yet: no expense in these periods."
+            />
+          </StreamedSection>
         </div>
-        <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref}>
-          <CardSection
-            card={sections.spendingByCategory}
-            empty="Nothing to show yet: no expense in these periods."
-          />
-        </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
           <CardSection
             card={sections.incomeVsExpense}
