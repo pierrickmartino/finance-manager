@@ -1,4 +1,3 @@
-import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
 import type { AxisSelector } from '../reporting/cell-ref';
@@ -11,7 +10,7 @@ import {
   sumOf,
   type AnalyticsCard,
 } from './figures';
-import type { AnalyticsPeriod } from './window';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Income vs. expense, drawn as the Dashboard's heatmap card: Income, Expense and
@@ -52,18 +51,17 @@ const ROWS: readonly RowDefinition[] = [
 
 export async function incomeVsExpense(
   ctx: ServiceContext,
-  view: PeriodView,
-  window: readonly AnalyticsPeriod[],
+  reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
   const report = await runWidgetQuery(ctx, {
     filters: { categoryGroupTypes: [...TYPES] },
-    dateRange: windowRange(view),
+    dateRange: reading.range,
     rows: 'categoryGroupType',
-    columns: view,
+    columns: reading.grain,
   });
   const cell = cellOf(report);
   const rows = ROWS.map(({ key, label, types, selector }) =>
-    periodRow(window, {
+    periodRow(reading, {
       key,
       label,
       query: report.query,
@@ -76,7 +74,7 @@ export async function incomeVsExpense(
     name: INCOME_VS_EXPENSE,
     visualisation: 'table',
     rows: 'categoryGroupType',
-    data: periodRowsSource(view, window, rows, report),
+    data: periodRowsSource(reading, rows, report),
     status: statusOf(report),
   });
 }

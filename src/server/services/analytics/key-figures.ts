@@ -1,6 +1,5 @@
 import { accountsHref } from '@/lib/accounts/links';
 import { analyticsDrillUrl } from '@/lib/analytics/links';
-import type { PeriodView } from '@/lib/analytics/period-view';
 import { formatPeriod } from '@/lib/format';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
@@ -16,11 +15,11 @@ import {
   type KeyFigureChange,
 } from './key-figure-change';
 import { flowSparklines, netWorthSparkline, type SparklinePoint } from './key-figure-sparklines';
-import { periodWindow } from './window';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Key figures (spec #225): the four tiles that open the page. Net worth today, loans
- * counting against it, whatever the Period view; then the current period of the view to date:
+ * counting against it, whatever the reading; then its last period to date:
  * Income, Expense and Profit (GLOSSARY: Profit). Income and Expense count only the Income and
  * Expense Category groups, signed so a refund nets within Expense; Capital, Transfers and
  * Unclassified Transactions are left out, as in Spending Insights, so the tiles agree with the
@@ -97,27 +96,27 @@ function typeTotal(report: ReportTable, type: FlowType): number {
 
 export async function keyFigures(
   ctx: ServiceContext,
-  view: PeriodView,
-  today: string,
+  reading: AnalyticsReading,
   sections: SharedSections,
 ): Promise<AnalyticsKeyFigures> {
-  const span = { from: periodOf(today, view).from, to: today };
-  const key = periodKey(today, view);
+  const { grain, to: today } = reading;
+  const span = { from: periodOf(today, grain).from, to: today };
+  const key = periodKey(today, grain);
   // Each type alone too, for what it leaves out: an unconverted expense is no Income's concern.
   const [flow, incomeOnly, expenseOnly, comparison, balances, trend, perPeriod] = await Promise.all(
     [
       runFlow(ctx, span),
       runFlow(ctx, span, ['income']),
       runFlow(ctx, span, ['expense']),
-      loadComparison(ctx, view, today),
+      loadComparison(ctx, reading),
       sections.balances,
       sections.trend,
       sections.flow,
     ],
   );
-  const sparklines = flowSparklines(perPeriod.data, periodWindow(view, today));
+  const sparklines = flowSparklines(perPeriod.data, reading);
   const caption = `${formatPeriod(key)} to date`;
-  const drill = (cell: CellRef) => analyticsDrillUrl(view, flow.query, cell);
+  const drill = (cell: CellRef) => analyticsDrillUrl(reading, flow.query, cell);
   const values = flowFigures(typeTotal(flow, 'income'), typeTotal(flow, 'expense'));
   const leftOut: Record<FlowFigureId, number> = {
     income: incomeOnly.unconvertedCount,
