@@ -4,7 +4,7 @@ import { formatPeriod } from '../src/lib/format';
 import { createAccount, listAccounts } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import { createCategory, createCategoryGroup } from '../src/server/services/categories';
-import { swissToday } from '../src/server/services/fx/dates';
+import { addDays, swissToday } from '../src/server/services/fx/dates';
 import { editClassification } from '../src/server/services/transactions';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { withServices } from './support/services';
@@ -281,26 +281,32 @@ test('on a phone the Span control stays at the top and the heatmap scrolls insid
   }
 });
 
-test('Net worth reads today, with a point per period end of the Span and its change since the previous one', async ({
+test("Net worth reads today, with a point at the Span's start, each period end and today, and its change since the start", async ({
   page,
 }) => {
   await seedSalary(Date.now());
   const netWorth = region(page, 'Your net worth today');
 
-  for (const [span, length, current, change] of [
-    ['rolling-12-months', ROLLING_MONTHS, CURRENT_MONTH, '1M'],
-    ['this-year-and-last-1', QUARTERS, formatPeriod(QUARTER), '1Q'],
-    ['this-year-and-last-4', 5, YEAR, '1Y'],
+  for (const [span, periods, current] of [
+    ['rolling-12-months', ROLLING_MONTHS, CURRENT_MONTH],
+    ['this-year-and-last-1', QUARTERS, formatPeriod(QUARTER)],
+    ['this-year-and-last-4', 5, YEAR],
   ] as const) {
+    const start = addDays(STARTS[span], -1);
+    const startLabel = spanDates({ from: start, to: start });
     await page.goto(`/analytics?span=${span}`);
     const trend = netWorth.getByRole('group', {
       name: `Net worth, ${spanDates({ from: STARTS[span], to: TODAY })}`,
     });
-    await expect(trend.getByRole('link')).toHaveCount(length);
+    // The start (the end of the day before the Span's first), then a point per period.
+    await expect(trend.getByRole('link')).toHaveCount(periods + 1);
+    await expect(trend.getByRole('link').first()).toHaveAccessibleName(
+      new RegExp(`^${startLabel}: `),
+    );
     await expect(trend.getByRole('link').last()).toHaveAccessibleName(new RegExp(`^${current}: `));
     await expect(
       netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
-    ).toHaveAccessibleName(new RegExp(`^${change}: .* since the end of `));
+    ).toHaveAccessibleName(new RegExp(`^Span: .* since the end of ${startLabel}$`));
     await expect(netWorth.getByText('Came in')).toBeVisible();
     // Income minus expense is Profit (GLOSSARY), and its share of Income the Profit margin.
     await expect(netWorth.getByText('Profit', { exact: true })).toBeVisible();

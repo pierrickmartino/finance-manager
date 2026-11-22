@@ -20,7 +20,9 @@ export type { ReportHeader } from './headers';
 export {
   NET_WORTH_TREND_QUERY,
   netWorthPointDate,
+  runNetWorthPoints,
   runNetWorthTrend,
+  type NetWorthPoint,
   type NetWorthTrendSpan,
 } from './balances';
 export {

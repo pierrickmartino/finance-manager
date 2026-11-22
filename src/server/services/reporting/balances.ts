@@ -243,6 +243,44 @@ async function runNetWorth(
   return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
 }
 
+/** A Net worth point asked for by its date: a row of the table, valued at the end of `date`. */
+export interface NetWorthPoint extends ReportHeader {
+  key: string;
+  date: string;
+}
+
+/**
+ * Net worth at each of `points` (oldest first) on every Account, valued as a Net worth Widget's
+ * points are (ADR-0014), by `axis`: the trend of a fixed stretch whose points the caller dates,
+ * as Analytics' Span does (ADR-0016). With no Account, no points at all.
+ */
+export async function runNetWorthPoints(
+  ctx: ServiceContext,
+  axis: TimeAxis,
+  points: readonly NetWorthPoint[],
+): Promise<ReportTable> {
+  const first = points[0]?.date ?? swissToday();
+  const last = points.at(-1)?.date ?? first;
+  const query: WidgetQuery = {
+    ...netWorthTrendQuery({ unit: axis, count: 0 }),
+    dateRange: { kind: 'fixed', from: first, to: last },
+  };
+  const resolved = resolveRange(query.dateRange, last);
+  const accounts = await listAccounts(ctx);
+  const shown = accounts.length === 0 ? [] : points;
+  const rows = shown.map(({ key, label, isPartial }) => ({ key, label, isPartial }));
+  const dates = shown.map((point) => point.date);
+  const [valued, markers] = await Promise.all([
+    valueBalances(ctx, accounts, dates),
+    listCapitalMarkers(
+      ctx,
+      accounts.map((account) => account.id),
+      resolved.range,
+    ),
+  ]);
+  return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
+}
+
 /** How far back a Net worth trend reaches: `count` complete periods before the running one. */
 export interface NetWorthTrendSpan {
   unit: TimeAxis;

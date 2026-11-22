@@ -1,31 +1,67 @@
 import { accountsHref } from '@/lib/accounts/links';
+import { spanDates } from '@/lib/analytics/span';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { toChartSource } from '@/lib/reporting/pivot-source';
 import type { ServiceContext } from '../context';
-import { netWorthPointDate, runNetWorthTrend, type ReportTable } from '../reporting';
+import { addDays } from '../fx/dates';
+import {
+  netWorthPointDate,
+  runNetWorthPoints,
+  type NetWorthPoint,
+  type ReportTable,
+} from '../reporting';
 import type { AnalyticsCard, SectionStatus, SharedSections } from './figures';
 import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Net worth (GLOSSARY: Net worth, ADR-0014), drawn as the Dashboard's Net worth card:
  * every Account's computed balance, loans counting against it, converted to CHF at each date's
- * FX rate (ADR-0002); beside it a trend with a point per period end of the Span and
- * today, and its change since the end of the previous period; under it what came in, went out
- * and the Profit over the Span.
+ * FX rate (ADR-0002); beside it a trend over the Span (ADR-0016), from its start through each
+ * period end to today, and its change since the start; under it what came in, went out and the
+ * Profit over the Span.
  */
 export interface AnalyticsNetWorth extends SectionStatus {
   /** What the card reads as it reads a Dashboard's Widgets: today's balances, and the flows. */
   cards: AnalyticsCard[];
-  /** Net worth at each period end of the Span, then today, each opening the Accounts then. */
+  /** Net worth at the Span's start, each period end of the Span, then today, each opening the Accounts then. */
   trend: ChartSource;
+  /** Net worth today less Net worth at the Span's start; null with no point to read. */
+  change: NetWorthChange | null;
 }
 
-/** Net worth at the end of each period of the reading but the last, then today. */
+/** How Net worth moved over the Span: today against its start. */
+export interface NetWorthChange {
+  /** The start point's label: the day at whose end it stands. */
+  since: string;
+  change: number;
+  /** The Accounts as of the start. */
+  href: string;
+}
+
+/**
+ * The trend's points: the Span's start (the end of the day before its first, so the change
+ * counts every day of the Span), then each period's end, the last today. A Span of a single
+ * period still has two.
+ */
+function trendPoints({ from, to: today, grain, periods }: AnalyticsReading): NetWorthPoint[] {
+  const start = addDays(from, -1);
+  return [
+    { key: start, label: spanDates({ from: start, to: start }), date: start, isPartial: false },
+    ...periods.map((period) => ({
+      key: period.key,
+      label: period.label,
+      date: netWorthPointDate(period.key, grain, today),
+      isPartial: period.isToDate,
+    })),
+  ];
+}
+
+/** Net worth over the reading: at its start, at the end of each period, the last today. */
 export function netWorthTrend(
   ctx: ServiceContext,
   reading: AnalyticsReading,
 ): Promise<ReportTable> {
-  return runNetWorthTrend(ctx, { unit: reading.grain, count: reading.periods.length - 1 });
+  return runNetWorthPoints(ctx, reading.grain, trendPoints(reading));
 }
 
 /**
@@ -42,17 +78,27 @@ export async function netWorth(
     sections.balances,
     sections.flow,
   ]);
-  const { grain, to: today } = reading;
-  const dateOf = (key: unknown) =>
-    typeof key === 'string' ? netWorthPointDate(key, grain, today) : today;
-  const trend = toChartSource(report, {
-    hrefOf: (cell) => accountsHref({ date: dateOf(cell.row) }),
-    drill: null,
-  });
+  const dates = new Map(trendPoints(reading).map((point) => [point.key, point.date]));
+  const hrefOf = (key: unknown) =>
+    accountsHref({ date: (typeof key === 'string' && dates.get(key)) || reading.to });
+  const trend = toChartSource(report, { hrefOf: (cell) => hrefOf(cell.row), drill: null });
   return {
     cards: [balances, flow],
     trend,
+    change: changeSinceStart(report, hrefOf),
     isEmpty: balances.isEmpty,
     unconvertedCount: report.unconvertedCount,
   };
+}
+
+/** The trend's last point less its first, the Span's start. */
+function changeSinceStart(
+  report: ReportTable,
+  hrefOf: (key: unknown) => string,
+): NetWorthChange | null {
+  const start = report.rows[0];
+  if (!start || report.rows.length < 2) return null;
+  const first = report.rowTotals[0] ?? 0;
+  const latest = report.rowTotals.at(-1) ?? 0;
+  return { since: start.label, change: latest - first, href: hrefOf(start.key) };
 }
