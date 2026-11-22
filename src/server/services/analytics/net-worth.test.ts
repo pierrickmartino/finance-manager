@@ -123,20 +123,20 @@ describe('Net worth', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const netWorth = await loadSection(t.ctx, { kind: 'custom', from: '2025-01-15' }, 'netWorth');
+    // From mid-February, after the first Transaction (10 Feb), so the Span is not clamped.
+    const netWorth = await loadSection(t.ctx, { kind: 'custom', from: '2025-02-15' }, 'netWorth');
 
-    // 14 January: Euros at 0.94 and the Mortgage; Francs opens on the 15th.
-    const START = 94_000 - 300_000;
+    // 14 February: Francs after its February gain, Euros at 0.94, the Mortgage at its opening.
+    const START = 120_000 + 94_000 - 300_000;
     expect(dated(netWorth.trend)).toEqual([
-      ['14 Jan 2025', START, '/accounts?date=2025-01-14'],
-      ['Jan 2025', 100_000 + 94_000 - 300_000, '/accounts?date=2025-01-31'],
+      ['14 Feb 2025', START, '/accounts?date=2025-02-14'],
       ['Feb 2025', 120_000 + 95_000 - 250_000, '/accounts?date=2025-02-28'],
       ['Mar 2025', TODAY, '/accounts?date=2025-03-20'],
     ]);
     expect(netWorth.change).toEqual({
-      since: '14 Jan 2025',
+      since: '14 Feb 2025',
       change: TODAY - START,
-      href: '/accounts?date=2025-01-14',
+      href: '/accounts?date=2025-02-14',
     });
   });
 
