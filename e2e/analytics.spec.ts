@@ -325,6 +325,60 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
 });
 
+test("a Key figure's change line opens both stretches of days, and Net worth's the Accounts then", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  // On the first of last month: always inside the Comparison span.
+  const lastMonthFirst = `${monthsAgo(1).slice(0, 8)}01`;
+  const earlier = `Analytics earlier salary ${suffix}`;
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Analytics earlier bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Analytics earlier account ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 0,
+      openingDate: '2021-01-01',
+    });
+    const group = await createCategoryGroup(ctx, { name: `Earlier pay ${suffix}`, type: 'income' });
+    const salary = await createCategory(ctx, { groupId: group.id, name: 'Salary' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: lastMonthFirst,
+      amountMinor: 1234_00,
+      description: earlier,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: salary.id });
+  });
+  const keyFigures = region(page, 'Key figures');
+  const changeOf = (name: string) =>
+    keyFigures.getByRole('region', { name, exact: true }).getByRole('link', { name: / vs / });
+
+  await page.goto('/analytics');
+  for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
+    await expect(changeOf(name)).toBeVisible();
+  }
+  await expect(changeOf('Income')).toHaveAccessibleName(/^(Up|Down|Unchanged) .*vs 1(–\d+)? /);
+
+  await changeOf('Income').click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  const table = page.getByRole('table', { name: 'Drill-down Transactions' });
+  await expect(table.getByText(description)).toBeVisible();
+  await expect(table.getByText(earlier)).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=month$/);
+
+  const lastMonthEnd = new Date(Date.UTC(Number(YEAR), Number(MONTH) - 1, 0))
+    .toISOString()
+    .slice(0, 10);
+  await changeOf('Net worth').click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${lastMonthEnd}$`));
+});
+
 test('Categories per period lists each Category beside its group subtotal, and both open their Drill-down', async ({
   page,
 }) => {

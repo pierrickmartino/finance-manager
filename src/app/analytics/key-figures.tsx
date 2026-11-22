@@ -3,6 +3,7 @@ import { HEADLINE_AMOUNT_CLASS, PLACEHOLDER_CLASS, TILE_CLASS } from '@/componen
 import type { Formatter } from '@/lib/format';
 import { plural } from '@/lib/reporting/drill-summary';
 import { KEY_FIGURES, type AnalyticsKeyFigures, type KeyFigure } from '@/server/services/analytics';
+import { ChangeLine } from './key-figure-change';
 
 /** Four equal tiles: one row from `lg` up, a 2×2 grid below. */
 const ROW_CLASS = 'grid min-w-0 grid-cols-2 gap-5 lg:grid-cols-4';
@@ -48,6 +49,7 @@ function FigureTile({ figure, fmt }: FigureTileProps) {
           >
             {fmt.amount(figure.value, { currency: 'CHF', isWhole: true })}
           </Link>
+          {figure.change && <ChangeLine change={figure.change} fmt={fmt} />}
         </>
       )}
       {count > 0 && (
