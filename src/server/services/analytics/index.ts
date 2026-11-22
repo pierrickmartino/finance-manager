@@ -49,8 +49,8 @@ export interface AnalyticsView {
 /**
  * Starts every section of Analytics at a Period view. The sections' promises are not awaited
  * here: the page awaits each where it shows it. Net worth reads the Account balances and
- * Spending Insights' income and expense, and Key figures the Account balances and Net worth's
- * trend, so they share those promises rather than run them again.
+ * Spending Insights' income and expense, and Key figures the Account balances, Net worth's
+ * trend and Spending Insights' income and expense, so they share those promises rather than run them again.
  */
 export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsView {
   const today = swissToday();
@@ -63,7 +63,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
     today,
     window,
     sections: {
-      keyFigures: keyFigures(ctx, view, today, { balances, trend }),
+      keyFigures: keyFigures(ctx, view, today, { balances, trend, flow }),
       netWorth: netWorth(view, today, { trend, balances, flow }),
       spendingInsights: flow,
       recentTransactions: recentTransactions(ctx),

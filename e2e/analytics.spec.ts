@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { formatPeriod } from '../src/lib/format';
-import { createAccount } from '../src/server/services/accounts';
+import { createAccount, listAccounts } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import { createCategory, createCategoryGroup } from '../src/server/services/categories';
 import { swissToday } from '../src/server/services/fx/dates';
@@ -332,27 +332,25 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
   const { description } = await seedSalary(suffix);
   // On the first of last month: always inside the Comparison span.
   const lastMonthFirst = `${monthsAgo(1).slice(0, 8)}01`;
-  const earlier = `Analytics earlier salary ${suffix}`;
+  const earlier = `Analytics earlier groceries ${suffix}`;
   await withServices(async (ctx) => {
-    const bank = await createBank(ctx, { name: `Analytics earlier bank ${suffix}` });
-    const account = await createAccount(ctx, {
-      bankId: bank.id,
-      kind: 'current',
-      importFormat: null,
-      name: `Analytics earlier account ${suffix}`,
-      currency: 'CHF',
-      openingBalanceMinor: 0,
-      openingDate: '2021-01-01',
+    // On the salary's own Account, lowering its balance: a new or larger Account would crowd
+    // the Account balances card, which keeps only the largest.
+    const account = (await listAccounts(ctx)).find(
+      (candidate) => candidate.name === `Analytics account ${suffix}`,
+    )!;
+    const group = await createCategoryGroup(ctx, {
+      name: `Earlier living ${suffix}`,
+      type: 'expense',
     });
-    const group = await createCategoryGroup(ctx, { name: `Earlier pay ${suffix}`, type: 'income' });
-    const salary = await createCategory(ctx, { groupId: group.id, name: 'Salary' });
+    const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
     const transaction = await createManualTransaction(ctx, {
       accountId: account.id,
       bookingDate: lastMonthFirst,
-      amountMinor: 1234_00,
+      amountMinor: -1234_00,
       description: earlier,
     });
-    await editClassification(ctx, transaction.id, { categoryId: salary.id });
+    await editClassification(ctx, transaction.id, { categoryId: groceries.id });
   });
   const keyFigures = region(page, 'Key figures');
   const changeOf = (name: string) =>
@@ -364,7 +362,8 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
   }
   await expect(changeOf('Income')).toHaveAccessibleName(/^(Up|Down|Unchanged) .*vs 1(–\d+)? /);
 
-  await changeOf('Income').click();
+  // Profit's change opens both stretches of both: today's salary and last month's groceries.
+  await changeOf('Profit').click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   const table = page.getByRole('table', { name: 'Drill-down Transactions' });
   await expect(table.getByText(description)).toBeVisible();
@@ -377,6 +376,47 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
     .slice(0, 10);
   await changeOf('Net worth').click();
   await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${lastMonthEnd}$`));
+});
+
+test('each Key figure carries a sparkline, hidden from assistive technology, that fits its tile', async ({
+  page,
+}) => {
+  await seedSalary(Date.now());
+  const keyFigures = region(page, 'Key figures');
+  const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
+    keyFigures.getByRole('region', { name, exact: true }),
+  );
+  const sparklines = keyFigures.locator('[data-sparkline]');
+
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/analytics');
+    await expect(keyFigures).not.toHaveAttribute('aria-busy');
+    await expect(sparklines).toHaveCount(4);
+    for (const tile of tiles) {
+      const sparkline = tile.locator('[data-sparkline]');
+      await expect(sparkline).toBeVisible();
+      await expect(sparkline).toHaveAttribute('aria-hidden', 'true');
+      // The current period is partial: a dashed last segment to a hollow dot.
+      await expect(sparkline.locator('path[stroke-dasharray]')).toHaveCount(1);
+      await expect(sparkline.locator('span.bg-surface')).toHaveCount(1);
+      // Inside its tile, dot and line included, and the tile not overflowing either.
+      const box = (await tile.boundingBox())!;
+      for (const part of [sparkline.locator('svg'), sparkline.locator('span')]) {
+        const inner = (await part.boundingBox())!;
+        expect(inner.x, `${width}px`).toBeGreaterThanOrEqual(box.x);
+        expect(inner.x + inner.width, `${width}px`).toBeLessThanOrEqual(box.x + box.width);
+        expect(inner.y + inner.height, `${width}px`).toBeLessThanOrEqual(box.y + box.height);
+      }
+      expect(
+        await tile.evaluate((node) => node.scrollWidth <= node.clientWidth),
+        `${width}px`,
+      ).toBe(true);
+    }
+  }
+  // Nothing in the sparklines is in the page's accessibility tree.
+  const tree = await keyFigures.ariaSnapshot();
+  expect(tree).not.toMatch(/img|graphics|svg/i);
 });
 
 test('Categories per period lists each Category beside its group subtotal, and both open their Drill-down', async ({

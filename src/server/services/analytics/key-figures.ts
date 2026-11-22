@@ -14,6 +14,8 @@ import {
   type FlowFigureId,
   type KeyFigureChange,
 } from './key-figure-change';
+import { flowSparklines, netWorthSparkline, type SparklinePoint } from './key-figure-sparklines';
+import { periodWindow } from './window';
 
 /**
  * Analytics' Key figures (spec #225): the four tiles that open the page. Net worth today, loans
@@ -52,6 +54,8 @@ export interface KeyFigure {
   unconverted: KeyFigureUnconverted;
   /** Against the figure's earlier value; null when there is none to compare with. */
   change: KeyFigureChange | null;
+  /** Its recent trend, a point per period of the window; the current one partial. */
+  sparkline: SparklinePoint[];
 }
 
 export interface AnalyticsKeyFigures {
@@ -86,16 +90,22 @@ export async function keyFigures(
   ctx: ServiceContext,
   view: PeriodView,
   today: string,
-  sections: { balances: Promise<AnalyticsCard>; trend: Promise<ReportTable> },
+  sections: {
+    balances: Promise<AnalyticsCard>;
+    trend: Promise<ReportTable>;
+    flow: Promise<AnalyticsCard>;
+  },
 ): Promise<AnalyticsKeyFigures> {
   const span = { from: periodOf(today, view).from, to: today };
   const key = periodKey(today, view);
-  const [flow, comparison, balances, trend] = await Promise.all([
+  const [flow, comparison, balances, trend, perPeriod] = await Promise.all([
     runFlow(ctx, span),
     loadComparison(ctx, view, today),
     sections.balances,
     sections.trend,
+    sections.flow,
   ]);
+  const sparklines = flowSparklines(perPeriod.data, periodWindow(view, today));
   const caption = `${formatPeriod(key)} to date`;
   const drill = (cell: CellRef) => analyticsDrillUrl(view, flow.query, cell);
   const transactions: KeyFigureUnconverted = { count: flow.unconvertedCount, of: 'Transaction' };
@@ -116,6 +126,7 @@ export async function keyFigures(
     href: drill(cell),
     unconverted: transactions,
     change: flowChange(comparison, id, value),
+    sparkline: sparklines[id],
   });
   const netWorthValue = netWorthToday(trend);
   return {
@@ -130,6 +141,7 @@ export async function keyFigures(
         href: accountsHref({ date: today }),
         unconverted: { count: balances.unconvertedCount, of: 'Account' },
         change: netWorthChange(comparison, trend, netWorthValue),
+        sparkline: netWorthSparkline(trend),
       },
       flowFigure('income', 'Income', income, { row: 'income' }),
       flowFigure('expense', 'Expense', expense, { row: 'expense' }),

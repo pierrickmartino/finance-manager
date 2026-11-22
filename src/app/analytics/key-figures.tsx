@@ -3,6 +3,7 @@ import { HEADLINE_AMOUNT_CLASS, PLACEHOLDER_CLASS, TILE_CLASS } from '@/componen
 import type { Formatter } from '@/lib/format';
 import { plural } from '@/lib/reporting/drill-summary';
 import { KEY_FIGURES, type AnalyticsKeyFigures, type KeyFigure } from '@/server/services/analytics';
+import { FigureSparklineMark } from './figure-sparkline-mark';
 import { ChangeLine } from './key-figure-change';
 
 /** Four equal tiles: one row from `lg` up, a 2×2 grid below. */
@@ -32,7 +33,10 @@ interface FigureTileProps {
   fmt: Formatter;
 }
 
-/** One figure's tile: its label and when it stands, then its amount opening what is behind it. */
+/**
+ * One figure's tile: its label and when it stands, then its amount opening what is behind it,
+ * and its sparkline at the foot.
+ */
 function FigureTile({ figure, fmt }: FigureTileProps) {
   const { count, of } = figure.unconverted;
   return (
@@ -52,6 +56,7 @@ function FigureTile({ figure, fmt }: FigureTileProps) {
           {figure.change && <ChangeLine change={figure.change} fmt={fmt} />}
         </>
       )}
+      {!figure.isEmpty && <FigureSparklineMark points={figure.sparkline} />}
       {count > 0 && (
         <p className="text-sm text-warning">{plural(count, of)} left out: no FX rate yet.</p>
       )}
