@@ -10,6 +10,7 @@ import {
   seedClassified,
 } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { presetSpan } from '@/lib/analytics/span';
 import { readCard } from '@/lib/reporting/card';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
@@ -96,6 +97,38 @@ describe('Net cash flow', () => {
       ['Monthly average', '5455'],
     ]);
     expect(reading.mark.type).toBe('bars');
+  });
+
+  it('averages the complete periods only, leaving out the partial first and the to-date last', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    // From 20 January: January's salary falls in the partial first month and March's in the
+    // to-date last; February, -5'400.00, is the only complete month.
+    const card = await loadSection(t.ctx, { kind: 'custom', from: '2025-01-20' }, 'netCashFlow');
+
+    expect(card.data!.rowTotals).toEqual([600_000, -540_000, 293_000]);
+    const average = readCard(card, money).facts.at(-1)!;
+    expect(average).toMatchObject({ label: 'Monthly average', value: '-540000' });
+    expect((await openDrill(t.ctx, average.href)).value).toBe(-540_000);
+  });
+
+  it('shows no average when the Span has no complete period', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    // Rolling 30 days from 19 February: February cut short, March to date, neither complete.
+    const card = await loadSection(t.ctx, presetSpan('rolling-30-days'), 'netCashFlow');
+
+    expect(card.data!.rows.map((row) => [row.key, row.isPartial])).toEqual([
+      ['2025-02', true],
+      ['2025-03', true],
+    ]);
+    expect(readCard(card, money).facts.at(-1)).toEqual({
+      label: 'Monthly average',
+      value: '—',
+      href: null,
+    });
   });
 
   it('follows Spans read by quarter and by year, Capital in and the Transfer out in each', async () => {

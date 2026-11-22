@@ -377,30 +377,36 @@ const PERIOD_WORDS = {
   year: { noun: 'year', adjective: 'Yearly' },
 } as const satisfies Record<TimeAxis, PeriodWords>;
 
+/** What an average reads when there is nothing to average (GLOSSARY: Span, ADR-0016). */
+const NO_AVERAGE = '—';
+
 /**
  * The average of the complete periods' totals, rounded as the engine rounds, and its
- * Drill-down: the complete periods as an average per row period. A running period is left out
- * (unless every period is still running), as its numbers will still change. The link is there
- * only where the Drill-down works out that same number: a sum whose rows are those periods.
+ * Drill-down: the complete periods as an average per row period. A period still running or cut
+ * short is left out, as it would drag the average down; with no complete period there is no
+ * average (null), never one of nothing. The link is there only where the Drill-down works out
+ * that same number: a sum whose rows are those periods.
  */
 function periodAverage(
   data: ChartSource,
   period: TimeAxis,
-): { value: number; href: string | null } {
+): { value: number | null; href: string | null } {
   const partial = data.rows.filter((row) => row.isPartial).map((row) => row.key);
-  const isLeftOut = partial.length > 0 && partial.length < data.rows.length;
-  const counted = data.rows.flatMap((row, r) =>
-    isLeftOut && row.isPartial ? [] : [data.rowTotals[r] ?? 0],
-  );
+  if (partial.length === data.rows.length) return { value: null, href: null };
+  const counted = data.rows.flatMap((row, r) => (row.isPartial ? [] : [data.rowTotals[r] ?? 0]));
   const value = divideRounded(sum(counted), counted.length);
   const byPeriod = periodSumDrill(data);
   const isAverageOfRange = byPeriod?.period === period;
-  const cell = isLeftOut ? { row: { except: partial } } : {};
+  const cell = partial.length > 0 ? { row: { except: partial } } : {};
   return {
     value,
     href: byPeriod && isAverageOfRange ? drillUrl(averaged(byPeriod.drill, period), cell) : null,
   };
 }
+
+/** An average as a card states it: "—" when there is none. */
+const averageText = (value: number | null, money: Money): string =>
+  value === null ? NO_AVERAGE : money(value);
 
 /** The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`); months by default. */
 function periodWords(data: ChartSource): PeriodWords {
@@ -439,7 +445,11 @@ function flowSentences(
         value: money(expense[outMost]!),
         href: cellHref(outMost, expenseSlot),
       },
-      { label: `Kept per ${noun}, on average`, value: money(kept.value), href: kept.href },
+      {
+        label: `Kept per ${noun}, on average`,
+        value: averageText(kept.value, money),
+        href: kept.href,
+      },
     ],
   };
 }
@@ -469,7 +479,7 @@ function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardS
   const peak = period(top, topLabel);
   const facts = [
     period(low, lowLabel),
-    { label: `${adjective} average`, value: money(average.value), href: average.href },
+    { label: `${adjective} average`, value: averageText(average.value, money), href: average.href },
   ];
 
   if (kind === 'ranking') {

@@ -10,7 +10,7 @@ import { keyFigures, type AnalyticsKeyFigures } from './key-figures';
 import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { spendingByCategory } from './spending-by-category';
-import { spendingInsights } from './spending-insights';
+import { lastCompleteMonthInsights, spendingInsights } from './spending-insights';
 import { readingOf, type AnalyticsReading } from './reading';
 
 /**
@@ -50,9 +50,10 @@ export interface AnalyticsView {
 
 /**
  * Starts every section of Analytics over a Span. The sections' promises are not awaited
- * here: the page awaits each where it shows it. Net worth reads the Account balances and
- * Spending Insights' income and expense, and Key figures the Account balances, Net worth's
- * trend and Spending Insights' income and expense, so they share those promises rather than run them again.
+ * here: the page awaits each where it shows it. Net worth reads the Account balances and the
+ * Span's income and expense, and Key figures the Account balances, Net worth's trend and the
+ * Span's income and expense, so they share those promises rather than run them again. Spending
+ * Insights reads its own months: the last complete one and those before it, whatever the Span.
  */
 export function loadAnalytics(ctx: ServiceContext, span: Span): AnalyticsView {
   const today = swissToday();
@@ -66,7 +67,7 @@ export function loadAnalytics(ctx: ServiceContext, span: Span): AnalyticsView {
     sections: {
       keyFigures: keyFigures(ctx, reading, { balances, trend, flow }),
       netWorth: netWorth(reading, { trend, balances, flow }),
-      spendingInsights: flow,
+      spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
       netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
