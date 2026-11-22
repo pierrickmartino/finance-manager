@@ -9,8 +9,9 @@ import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-pa
  * saved Widget, the Widget editor (with the query in the URL), the Recurring payments page (a
  * Recurring payment's charges), or Analytics over a Span. It travels in the URL as a type and an
  * id (`origin=dashboard&originId=<uuid>`) or a Span, its parameters prefixed `origin`
- * (`origin=analytics&originSpan=year-to-date`, or `originFrom=2024-03-01` for a custom one), never as a path, so a forged value can only ever
- * fall back to the editor (or to Analytics over the default Span).
+ * (`origin=analytics&originSpan=year-to-date`, or `originFrom=2024-03-01` for a custom one),
+ * never as a path, so a forged value can only ever fall back to the editor (or to Analytics over
+ * the default Span).
  */
 export type DrillOrigin =
   | { kind: 'dashboard'; id: string }

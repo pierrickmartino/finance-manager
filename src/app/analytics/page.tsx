@@ -27,11 +27,11 @@ import { SpendingInsightsSection } from './spending-insights';
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 
 /**
- * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Span in the URL: a preset's
- * `span`, or a custom start date's `from` (Rolling 12 months when missing, unknown or after today); a former `period` link redirects to its
- * nearest Span. The shell and the Span control render at once; each section streams in behind
- * its own placeholder and error boundary (./section), and is drawn by the Dashboard's own cards
- * (GLOSSARY: Card).
+ * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Span in the URL: a
+ * preset's `span`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
+ * after today); a former `period` link redirects to its nearest Span. The shell and the Span
+ * control render at once; each section streams in behind its own placeholder and error boundary
+ * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
  *
  * Adding a section: its service module (src/server/services/analytics), and a `StreamedSection`
  * below drawing it (a `CardSection` for one drawn as a Widget's card).
@@ -56,7 +56,8 @@ export default async function AnalyticsPage({
     ctx,
     spanFromParams(params, swissToday()),
   );
-  // The effective Span: a custom start date before the first Transaction is moved to it.
+  // The effective Span: no Span starts before the first Transaction (a custom date moves to it,
+  // a preset keeps its name), and the control shows the start it is read from.
   const { span } = reading;
   const retryHref = analyticsHref(span);
 

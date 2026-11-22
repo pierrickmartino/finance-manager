@@ -12,9 +12,9 @@ import type { AnalyticsReading } from './reading';
 
 /**
  * A Key figure's change line (spec #225, #204): Income, Expense and Profit over the Span against
- * the same figure over its Comparison span (GLOSSARY), Net worth against its value at the end of the previous
- * period. There is no change when the Account data doesn't reach back to what it is compared
- * with: the Comparison span's start, or for Net worth the previous period's end.
+ * the same figure over its Comparison span (GLOSSARY), Net worth against its value at the end of
+ * the previous period. There is no change when the Account data doesn't reach back to what it is
+ * compared with: the Comparison span's start, or for Net worth the previous period's end.
  */
 
 export type ChangeDirection = 'up' | 'down' | 'flat';

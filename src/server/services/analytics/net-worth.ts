@@ -23,7 +23,10 @@ import type { AnalyticsReading } from './reading';
 export interface AnalyticsNetWorth extends SectionStatus {
   /** What the card reads as it reads a Dashboard's Widgets: today's balances, and the flows. */
   cards: AnalyticsCard[];
-  /** Net worth at the Span's start, each period end of the Span, then today, each opening the Accounts then. */
+  /**
+   * Net worth at the Span's start, each period end of the Span, then today, each opening the
+   * Accounts then.
+   */
   trend: ChartSource;
   /** Net worth today less Net worth at the Span's start; null with no point to read. */
   change: NetWorthChange | null;

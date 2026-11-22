@@ -148,7 +148,8 @@ describe('Key figures sparklines', () => {
       expect(netWorth.sparkline.at(-1)!.isPartial, label).toBe(true);
     }
     // By hand, by month: nothing at the Span's start (20 May 2024) nor until the December salary;
-    // then each month end; then today, the property purchase counting in Net worth (it is no expense).
+    // then each month end; then today, the property purchase counting in Net worth (it is no
+    // expense).
     const { netWorth } = byId((await loadSection(t.ctx, MONTHLY, 'keyFigures')).figures);
     expect(values(netWorth)).toEqual([
       0, 0, 0, 0, 0, 0, 0, 0, 80_000, 80_000, 90_000, 90_000, 110_000, 205_000,

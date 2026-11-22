@@ -53,7 +53,7 @@ async function figuresAt(span: Span): Promise<Record<KeyFigureId, KeyFigure>> {
   >;
 }
 
-/** A Drill-down's period subtotals that hold Transactions: it lists the empty months between too. */
+/** A Drill-down's period subtotals that hold Transactions: it lists empty months between too. */
 const booked = (page: CellTransactionPage) =>
   (page.subtotals ?? []).filter((subtotal) => subtotal.sumChfMinor !== 0);
 
