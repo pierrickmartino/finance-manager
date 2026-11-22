@@ -37,7 +37,7 @@ export async function NetWorthSection({ netWorth, reading }: NetWorthSectionProp
       period={reading.grain}
       trendLabel={`Net worth, ${spanDates(reading)}`}
       unconvertedCount={loaded.unconvertedCount}
-      changes={loaded.change ? [{ label: SPAN_CHANGE, ...loaded.change }] : []}
+      changes={loaded.change ? [{ label: SPAN_CHANGE, ...loaded.change, isSinceStart: true }] : []}
     />
   );
 }

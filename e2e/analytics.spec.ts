@@ -370,13 +370,13 @@ test("Net worth reads today, with a point at the Span's start, each period end a
     ['this-year-and-last-1', QUARTERS, formatPeriod(QUARTER)],
     ['this-year-and-last-4', 5, YEAR],
   ] as const) {
-    const start = addDays(STARTS[span], -1);
-    const startLabel = spanDates({ from: start, to: start });
+    // Labelled with the Span's first day: it stands at its start.
+    const startLabel = spanDates({ from: STARTS[span], to: STARTS[span] });
     await page.goto(`/analytics?span=${span}`);
     const trend = netWorth.getByRole('group', {
       name: `Net worth, ${spanDates({ from: STARTS[span], to: TODAY })}`,
     });
-    // The start (the end of the day before the Span's first), then a point per period.
+    // The start (Net worth at the end of the day before the Span's first), then a point per period.
     await expect(trend.getByRole('link')).toHaveCount(periods + 1);
     await expect(trend.getByRole('link').first()).toHaveAccessibleName(
       new RegExp(`^${startLabel}: `),
@@ -384,7 +384,7 @@ test("Net worth reads today, with a point at the Span's start, each period end a
     await expect(trend.getByRole('link').last()).toHaveAccessibleName(new RegExp(`^${current}: `));
     await expect(
       netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
-    ).toHaveAccessibleName(new RegExp(`^Span: .* since the end of ${startLabel}$`));
+    ).toHaveAccessibleName(new RegExp(`^Span: .* since the start of ${startLabel}$`));
     await expect(netWorth.getByText('Came in')).toBeVisible();
     // Income minus expense is Profit (GLOSSARY), and its share of Income the Profit margin.
     await expect(netWorth.getByText('Profit', { exact: true })).toBeVisible();

@@ -31,7 +31,7 @@ export interface AnalyticsNetWorth extends SectionStatus {
 
 /** How Net worth moved over the Span: today against its start. */
 export interface NetWorthChange {
-  /** The start point's label: the day at whose end it stands. */
+  /** The start point's label: the Span's first day, at whose start it stands. */
   since: string;
   change: number;
   /** The Accounts as of the start. */
@@ -39,14 +39,14 @@ export interface NetWorthChange {
 }
 
 /**
- * The trend's points: the Span's start (the end of the day before its first, so the change
- * counts every day of the Span), then each period's end, the last today. A Span of a single
- * period still has two.
+ * The trend's points: the Span's start, then each period's end, the last today. The start is
+ * labelled with the Span's first day but reads the end of the day before it, so the change
+ * counts every day of the Span. A Span of a single period still has two.
  */
 function trendPoints({ from, to: today, grain, periods }: AnalyticsReading): NetWorthPoint[] {
   const start = addDays(from, -1);
   return [
-    { key: start, label: spanDates({ from: start, to: start }), date: start, isPartial: false },
+    { key: start, label: spanDates({ from, to: from }), date: start, isPartial: false },
     ...periods.map((period) => ({
       key: period.key,
       label: period.label,

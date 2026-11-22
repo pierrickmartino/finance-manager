@@ -97,9 +97,10 @@ describe('Net worth', () => {
     const { netWorth, hero } = await headlineAt(MONTHLY, 'month');
 
     expect(hero).toMatchObject({ label: 'Your net worth today', value: TODAY, href: '/accounts' });
-    // Rolling 12 months starts on 21 Mar 2024: the start is the end of 20 March, before any Account.
+    // Rolling 12 months starts on 21 Mar 2024: the start, labelled with that day, reads the end
+    // of 20 March, before any Account.
     expect(dated(netWorth.trend).slice(0, 2)).toEqual([
-      ['20 Mar 2024', 0, '/accounts?date=2024-03-20'],
+      ['21 Mar 2024', 0, '/accounts?date=2024-03-20'],
       ['Mar 2024', 0, '/accounts?date=2024-03-31'],
     ]);
     expect(dated(netWorth.trend).slice(10)).toEqual([
@@ -113,14 +114,14 @@ describe('Net worth', () => {
     expect(netWorth.trend.rows).toHaveLength(14);
     expect(netWorth.trend.rows.at(-1)?.isPartial).toBe(true);
     expect(netWorth.change).toEqual({
-      since: '20 Mar 2024',
+      since: '21 Mar 2024',
       change: TODAY,
       href: '/accounts?date=2024-03-20',
     });
     expect(netWorth.unconvertedCount).toBe(0);
   });
 
-  it("by month from mid-month, starts the line on the day before the Span's first, its change since then", async () => {
+  it("by month from mid-month, starts the line at the Span's first day (the day before's end), its change since then", async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -130,12 +131,12 @@ describe('Net worth', () => {
     // 14 February: Francs after its February gain, Euros at 0.94, the Mortgage at its opening.
     const START = 120_000 + 94_000 - 300_000;
     expect(dated(netWorth.trend)).toEqual([
-      ['14 Feb 2025', START, '/accounts?date=2025-02-14'],
+      ['15 Feb 2025', START, '/accounts?date=2025-02-14'],
       ['Feb 2025', 120_000 + 95_000 - 250_000, '/accounts?date=2025-02-28'],
       ['Mar 2025', TODAY, '/accounts?date=2025-03-20'],
     ]);
     expect(netWorth.change).toEqual({
-      since: '14 Feb 2025',
+      since: '15 Feb 2025',
       change: TODAY - START,
       href: '/accounts?date=2025-02-14',
     });
@@ -149,7 +150,7 @@ describe('Net worth', () => {
 
     expect(hero?.value).toBe(TODAY);
     expect(netWorth.trend.rows.map((row) => row.label)).toEqual([
-      '31 Dec 2023',
+      '1 Jan 2024',
       'Q1 2024',
       'Q2 2024',
       'Q3 2024',
@@ -162,7 +163,7 @@ describe('Net worth', () => {
       ),
     );
     expect(netWorth.change).toEqual({
-      since: '31 Dec 2023',
+      since: '1 Jan 2024',
       change: TODAY,
       href: '/accounts?date=2023-12-31',
     });
@@ -175,7 +176,7 @@ describe('Net worth', () => {
     const { netWorth } = await headlineAt(YEARLY, 'year');
 
     expect(netWorth.trend.rows.map((row) => row.label)).toEqual([
-      '31 Dec 2020',
+      '1 Jan 2021',
       '2021',
       '2022',
       '2023',
@@ -193,7 +194,7 @@ describe('Net worth', () => {
     const netWorth = await loadSection(t.ctx, presetSpan('year-to-date'), 'netWorth');
 
     expect(dated(netWorth.trend)).toEqual([
-      ['31 Dec 2024', END_OF_2024, '/accounts?date=2024-12-31'],
+      ['1 Jan 2025', END_OF_2024, '/accounts?date=2024-12-31'],
       ['Jan 2025', 100_000 + 94_000 - 300_000, '/accounts?date=2025-01-31'],
       ['Feb 2025', 120_000 + 95_000 - 250_000, '/accounts?date=2025-02-28'],
       ['Mar 2025', TODAY, '/accounts?date=2025-03-20'],
@@ -220,15 +221,15 @@ describe('Net worth', () => {
 
     const netWorth = await loadSection(t.ctx, { kind: 'custom', from: '2025-03-01' }, 'netWorth');
 
-    // The start stands just before the Span's first day: Net worth at the end of February.
+    // The start is labelled with the Span's first day: Net worth at the end of February.
     const START = 120_000 + 95_000 - 250_000;
     expect(dated(netWorth.trend)).toEqual([
-      ['28 Feb 2025', START, '/accounts?date=2025-02-28'],
+      ['1 Mar 2025', START, '/accounts?date=2025-02-28'],
       ['Mar 2025', TODAY, '/accounts?date=2025-03-20'],
     ]);
     expect(netWorth.trend.rows.map((row) => row.isPartial)).toEqual([false, true]);
     expect(netWorth.change).toEqual({
-      since: '28 Feb 2025',
+      since: '1 Mar 2025',
       change: TODAY - START,
       href: '/accounts?date=2025-02-28',
     });
