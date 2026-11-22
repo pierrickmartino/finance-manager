@@ -7,6 +7,8 @@ import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
 import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
 import type { AnalyticsCard } from './figures';
+import { flowSparklines, netWorthSparkline, type SparklinePoint } from './key-figure-sparklines';
+import { periodWindow } from './window';
 
 /**
  * Analytics' Key figures (spec #225): the four tiles that open the page. Net worth today, loans
@@ -43,6 +45,8 @@ export interface KeyFigure {
   /** Where the amount opens: its Drill-down, or the Accounts as of today for Net worth. */
   href: string;
   unconverted: KeyFigureUnconverted;
+  /** Its recent trend, a point per period of the window; the current one partial. */
+  sparkline: SparklinePoint[];
 }
 
 export interface AnalyticsKeyFigures {
@@ -77,22 +81,33 @@ export async function keyFigures(
   ctx: ServiceContext,
   view: PeriodView,
   today: string,
-  sections: { balances: Promise<AnalyticsCard>; trend: Promise<ReportTable> },
+  sections: {
+    balances: Promise<AnalyticsCard>;
+    trend: Promise<ReportTable>;
+    flow: Promise<AnalyticsCard>;
+  },
 ): Promise<AnalyticsKeyFigures> {
   const span = { from: periodOf(today, view).from, to: today };
   const key = periodKey(today, view);
-  const [flow, balances, trend] = await Promise.all([
+  const [flow, balances, trend, perPeriod] = await Promise.all([
     runFlow(ctx, span),
     sections.balances,
     sections.trend,
+    sections.flow,
   ]);
+  const sparklines = flowSparklines(perPeriod.data, periodWindow(view, today));
   const caption = `${formatPeriod(key)} to date`;
   const drill = (cell: CellRef) => analyticsDrillUrl(view, flow.query, cell);
   const transactions: KeyFigureUnconverted = { count: flow.unconvertedCount, of: 'Transaction' };
   const income = typeTotal(flow, 'income');
   // Booked negative: what went out is its opposite (and 0, not -0, when nothing did).
   const expense = 0 - typeTotal(flow, 'expense');
-  const flowFigure = (id: KeyFigureId, label: string, value: number, cell: CellRef): KeyFigure => ({
+  const flowFigure = (
+    id: Exclude<KeyFigureId, 'netWorth'>,
+    label: string,
+    value: number,
+    cell: CellRef,
+  ): KeyFigure => ({
     id,
     label,
     caption,
@@ -100,6 +115,7 @@ export async function keyFigures(
     isEmpty: false,
     href: drill(cell),
     unconverted: transactions,
+    sparkline: sparklines[id],
   });
   return {
     current: { key, label: formatPeriod(key), span },
@@ -112,6 +128,7 @@ export async function keyFigures(
         isEmpty: balances.isEmpty,
         href: accountsHref({ date: today }),
         unconverted: { count: balances.unconvertedCount, of: 'Account' },
+        sparkline: netWorthSparkline(trend),
       },
       flowFigure('income', 'Income', income, { row: 'income' }),
       flowFigure('expense', 'Expense', expense, { row: 'expense' }),
