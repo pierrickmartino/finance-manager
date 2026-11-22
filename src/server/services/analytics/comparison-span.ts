@@ -1,4 +1,5 @@
 import type { PeriodView } from '@/lib/analytics/period-view';
+import { MONTH_NAMES } from '@/lib/format';
 import { addDays, daysBetween } from '../fx/dates';
 import { periodOf, type DateSpan } from '../reporting/periods';
 
@@ -6,21 +7,6 @@ import { periodOf, type DateSpan } from '../reporting/periods';
  * The Comparison span (GLOSSARY): the stretch of the previous period, of the same length as the
  * current period to date, that a to-date figure is compared with.
  */
-
-const MONTH_NAMES = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
 
 const pad = (value: number) => String(value).padStart(2, '0');
 const isoDate = (year: number, month: number, day: number) =>
@@ -60,12 +46,12 @@ export function comparisonSpan(view: PeriodView, today: string): DateSpan {
 
 /** A span's dates as the change line says them: "vs 1–22 Oct", the year only when not today's. */
 export function comparisonLabel(span: DateSpan, today: string): string {
-  const part = (iso: string) => ({
+  const dateParts = (iso: string) => ({
     year: iso.slice(0, 4),
     month: MONTH_NAMES[Number(iso.slice(5, 7)) - 1]!,
     day: String(Number(iso.slice(8, 10))),
   });
-  const [from, to] = [part(span.from), part(span.to)];
+  const [from, to] = [dateParts(span.from), dateParts(span.to)];
   const year = to.year === today.slice(0, 4) ? '' : ` ${to.year}`;
   if (span.from === span.to) return `vs ${to.day} ${to.month}${year}`;
   if (from.month === to.month && from.year === to.year) {

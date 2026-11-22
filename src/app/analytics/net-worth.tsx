@@ -19,7 +19,10 @@ export async function NetWorthSection({ netWorth, view }: NetWorthSectionProps) 
   const loaded = await netWorth;
   if (loaded.isEmpty) {
     return (
-      <SectionCard name={NET_WORTH} unconverted={{ count: loaded.unconvertedCount, of: 'Account' }}>
+      <SectionCard
+        name={NET_WORTH}
+        unconverted={{ count: loaded.unconvertedCount, counted: 'Account' }}
+      >
         <SectionEmpty>Nothing to show yet: no Account holds money.</SectionEmpty>
       </SectionCard>
     );

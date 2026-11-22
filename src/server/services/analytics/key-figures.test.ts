@@ -183,7 +183,7 @@ describe('Key figures', () => {
     ]);
   });
 
-  it('counts what each figure leaves out for want of an FX rate', async () => {
+  it('flags an unconverted expense on Expense and Profit, not Income', async () => {
     fixToday('2025-05-20');
     const { salary, groceries } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
@@ -199,11 +199,32 @@ describe('Key figures', () => {
     const [netWorth, income, expense, profit] = (await loadSection(t.ctx, 'month', 'keyFigures'))
       .figures as [KeyFigure, KeyFigure, KeyFigure, KeyFigure];
 
-    expect(netWorth.unconverted).toEqual({ count: 1, of: 'Account' });
+    expect(netWorth.unconverted).toEqual({ count: 1, counted: 'Account' });
     expect(netWorth.value).toBe(120_000);
     expect(expense.value).toBe(0);
-    for (const figure of [income, expense, profit]) {
-      expect(figure.unconverted, figure.label).toEqual({ count: 1, of: 'Transaction' });
-    }
+    expect(income.unconverted).toEqual({ count: 0, counted: 'Transaction' });
+    expect(expense.unconverted).toEqual({ count: 1, counted: 'Transaction' });
+    expect(profit.unconverted).toEqual({ count: 1, counted: 'Transaction' });
+  });
+
+  it('flags an unconverted income on Income and Profit, not Expense', async () => {
+    fixToday('2025-05-20');
+    const { salary, groceries } = await categories();
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    const ca = await seedAccount(t.ctx, 'CA', 'EUR');
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2025-05-10', amountMinor: -30_000, classify: groceries },
+    ]);
+    await seedClassified(t.ctx, ca, [
+      { bookingDate: '2025-05-12', amountMinor: 50_000, classify: salary },
+    ]);
+
+    const [, income, expense, profit] = (await loadSection(t.ctx, 'month', 'keyFigures'))
+      .figures as [KeyFigure, KeyFigure, KeyFigure, KeyFigure];
+
+    expect(income.value).toBe(0);
+    expect(income.unconverted.count).toBe(1);
+    expect(expense.unconverted.count).toBe(0);
+    expect(profit.unconverted.count).toBe(1);
   });
 });

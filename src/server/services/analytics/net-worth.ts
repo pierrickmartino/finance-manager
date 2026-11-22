@@ -4,7 +4,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { toChartSource } from '@/lib/reporting/pivot-source';
 import type { ServiceContext } from '../context';
 import { netWorthPointDate, runNetWorthTrend, type ReportTable } from '../reporting';
-import type { AnalyticsCard, SectionStatus } from './figures';
+import type { AnalyticsCard, SectionStatus, SharedSections } from './figures';
 
 /**
  * Analytics' Net worth (GLOSSARY: Net worth, ADR-0014), drawn as the Dashboard's Net worth card:
@@ -33,11 +33,7 @@ export function netWorthTrend(ctx: ServiceContext, view: PeriodView): Promise<Re
 export async function netWorth(
   view: PeriodView,
   today: string,
-  sections: {
-    trend: Promise<ReportTable>;
-    balances: Promise<AnalyticsCard>;
-    flow: Promise<AnalyticsCard>;
-  },
+  sections: SharedSections,
 ): Promise<AnalyticsNetWorth> {
   const [report, balances, flow] = await Promise.all([
     sections.trend,

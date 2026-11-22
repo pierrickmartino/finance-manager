@@ -10,12 +10,12 @@ const SECTION_CLASS = `${TILE_CLASS} flex min-w-0 flex-col gap-4`;
 export interface Unconverted {
   count: number;
   /** What is counted; Transactions unless said. */
-  of?: 'Transaction' | 'Account';
+  counted?: 'Transaction' | 'Account';
 }
 
 /** The note a section shows when its figures leave something out, as a Dashboard Widget does. */
-function UnconvertedNote({ count, of = 'Transaction' }: Unconverted) {
-  return <p className="text-sm text-warning">{plural(count, of)} left out: no FX rate yet.</p>;
+export function UnconvertedNote({ count, counted = 'Transaction' }: Unconverted) {
+  return <p className="text-sm text-warning">{plural(count, counted)} left out: no FX rate yet.</p>;
 }
 
 interface SectionCardProps {

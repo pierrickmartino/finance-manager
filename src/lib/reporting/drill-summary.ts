@@ -74,14 +74,23 @@ export function changeWorking(
   return `${[...parts, ...average].join(' · ')} → ${change}`;
 }
 
+/** The days a fixed range leaves out inside it, in words (", except 21.04 to 30.04"); else none. */
+function exceptWords(query: WidgetQuery, formatDate: (iso: string) => string): string {
+  const range = query.dateRange;
+  if (range.kind !== 'fixed' || !range.except) return '';
+  return `, except ${formatDate(range.except.from)} to ${formatDate(range.except.to)}`;
+}
+
 /**
- * The filters in words: the period, then each filter of the query with the names it selects,
- * then what reports always leave out (Capital unless asked for, and Transfers).
+ * The filters in words: the period, with the days it leaves out inside it, then each filter of
+ * the query with the names it selects, then what reports always leave out (Capital unless asked
+ * for, and Transfers). Dates are said by `formatDate`.
  */
 export function drillFilterLine(
   query: WidgetQuery,
   choices: FilterChoices,
   period: string,
+  formatDate: (iso: string) => string = (iso) => iso,
 ): string[] {
   const filters = queryFilterLists(query.filters, choices)
     .filter((list) => list.selected.length > 0)
@@ -94,7 +103,7 @@ export function drillFilterLine(
       return `${list.label}: ${names.join(', ')}`;
     });
   return [
-    period,
+    `${period}${exceptWords(query, formatDate)}`,
     ...filters,
     ...(includesCapital(query) ? [] : ['Capital left out']),
     'Transfers left out',

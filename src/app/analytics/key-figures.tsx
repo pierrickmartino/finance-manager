@@ -1,13 +1,14 @@
 import Link from 'next/link';
-import { HEADLINE_AMOUNT_CLASS, PLACEHOLDER_CLASS, TILE_CLASS } from '@/components/surface';
+import { PLACEHOLDER_CLASS, TILE_AMOUNT_CLASS, TILE_CLASS } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
-import { plural } from '@/lib/reporting/drill-summary';
 import { KEY_FIGURES, type AnalyticsKeyFigures, type KeyFigure } from '@/server/services/analytics';
+import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { FigureSparklineMark } from './figure-sparkline-mark';
 import { ChangeLine } from './key-figure-change';
+import { UnconvertedNote } from './section';
 
-/** Four equal tiles: one row from `lg` up, a 2×2 grid below. */
-const ROW_CLASS = 'grid min-w-0 grid-cols-2 gap-5 lg:grid-cols-4';
+/** Four equal tiles: one row from `lg` up, a 2×2 grid below, tighter on phones. */
+const ROW_CLASS = 'grid min-w-0 grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4';
 /** One tile; its change line and sparkline stack under the amount. */
 const FIGURE_CLASS = `${TILE_CLASS} flex min-w-0 flex-col gap-1`;
 
@@ -38,7 +39,6 @@ interface FigureTileProps {
  * and its sparkline at the foot.
  */
 function FigureTile({ figure, fmt }: FigureTileProps) {
-  const { count, of } = figure.unconverted;
   return (
     <section aria-label={figure.label} className={FIGURE_CLASS}>
       <h3 className="font-medium">{figure.label}</h3>
@@ -49,17 +49,15 @@ function FigureTile({ figure, fmt }: FigureTileProps) {
           <p className="text-sm text-muted">{figure.caption}</p>
           <Link
             href={figure.href}
-            className={`${HEADLINE_AMOUNT_CLASS} mt-2 truncate hover:underline ${figure.value < 0 ? 'text-negative' : ''}`}
+            className={`${TILE_AMOUNT_CLASS} mt-2 hover:underline ${figure.value < 0 ? 'text-negative' : ''}`}
           >
-            {fmt.amount(figure.value, { currency: 'CHF', isWhole: true })}
+            {fmt.amount(figure.value, { currency: BASE_CURRENCY, isWhole: true })}
           </Link>
           {figure.change && <ChangeLine change={figure.change} fmt={fmt} />}
         </>
       )}
       {!figure.isEmpty && <FigureSparklineMark points={figure.sparkline} />}
-      {count > 0 && (
-        <p className="text-sm text-warning">{plural(count, of)} left out: no FX rate yet.</p>
-      )}
+      {figure.unconverted.count > 0 && <UnconvertedNote {...figure.unconverted} />}
     </section>
   );
 }

@@ -12,6 +12,12 @@ export const PAGE_TITLE_CLASS = 'font-display text-2xl leading-tight tracking-ti
 export const SECTION_TITLE_CLASS = 'font-display text-lg leading-snug tracking-tight';
 /** A number that is the point of its page (a balance, a total), in the display face. */
 export const HEADLINE_AMOUNT_CLASS = 'font-display text-3xl tracking-tight tabular-nums';
+/**
+ * A Key figure's amount, one of a row of tiles: the headline amount from `sm` up, a step smaller
+ * on phones where two tiles share the width, and free to wrap after its Currency, never cut.
+ */
+export const TILE_AMOUNT_CLASS =
+  'font-display text-xl leading-tight tracking-tight tabular-nums sm:text-3xl';
 
 // Surfaces -------------------------------------------------------------------------------------
 

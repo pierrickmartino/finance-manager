@@ -49,6 +49,26 @@ async function seedSalary(suffix: number): Promise<Seeded> {
   return { description, account: `Analytics bank ${suffix} · Analytics account ${suffix}` };
 }
 
+/** A grocery purchase booked today, in the current period of every Period view; its description. */
+async function seedGrocery(suffix: number): Promise<string> {
+  const description = `Analytics groceries ${suffix}`;
+  await withServices(async (ctx) => {
+    const account = (await listAccounts(ctx)).find(
+      (item) => item.name === `Analytics account ${suffix}`,
+    );
+    const group = await createCategoryGroup(ctx, { name: `Living ${suffix}`, type: 'expense' });
+    const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account!.id,
+      bookingDate: swissToday(),
+      amountMinor: -87_00,
+      description,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: groceries.id });
+  });
+  return description;
+}
+
 const [YEAR, MONTH] = swissToday().split('-') as [string, string];
 const QUARTER = `${YEAR}-Q${Math.ceil(Number(MONTH) / 3)}`;
 const CURRENT_MONTH = formatPeriod(`${YEAR}-${MONTH}`);
@@ -263,7 +283,9 @@ test('Net worth reads today, with a point per period end of the window and its c
 test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2 on a narrow one', async ({
   page,
 }) => {
-  const { description } = await seedSalary(Date.now());
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  const grocery = await seedGrocery(suffix);
   const keyFigures = region(page, 'Key figures');
   const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
     keyFigures.getByRole('region', { name, exact: true }),
@@ -316,6 +338,10 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   }
   await amountOf(2).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  // Expense lists what went out today, and not the salary that came in.
+  const drilled = page.getByRole('table', { name: 'Drill-down Transactions' });
+  await expect(drilled.getByText(grocery)).toBeVisible();
+  await expect(drilled.getByText(description)).toHaveCount(0);
 
   // Net worth stays today's in every Period view, and opens the Accounts as of today.
   await page.goto('/analytics?period=year');
@@ -627,11 +653,13 @@ test('every section with figures left out for want of an FX rate says so', async
   await page.goto('/analytics');
   const notes = page.getByText(/left out: no FX rate yet\./);
   const keyFigures = region(page, 'Key figures');
-  for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
-    await expect(
-      keyFigures.getByRole('region', { name, exact: true }).getByText(/left out: no FX rate yet\./),
-    ).toBeVisible();
+  const keyFigureNote = (name: string) =>
+    keyFigures.getByRole('region', { name, exact: true }).getByText(/left out: no FX rate yet\./);
+  // The left-out Account weighs on Net worth, its expense on Expense and Profit; Income is whole.
+  for (const name of ['Net worth', 'Expense', 'Profit']) {
+    await expect(keyFigureNote(name)).toBeVisible();
   }
+  await expect(keyFigureNote('Income')).toHaveCount(0);
   for (const name of [
     'Your net worth today',
     'Net cash flow',
@@ -643,6 +671,6 @@ test('every section with figures left out for want of an FX rate says so', async
     await expect(region(page, name).getByText(/left out: no FX rate yet\./)).toBeVisible();
   }
   // Spending Insights too, whether it draws its insight or says why it can't yet.
-  // And each of the four Key figures.
-  await expect(notes).toHaveCount(7 + 4);
+  // And the three Key figures it weighs on.
+  await expect(notes).toHaveCount(7 + 3);
 });

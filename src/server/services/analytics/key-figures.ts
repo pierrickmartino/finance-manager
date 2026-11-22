@@ -6,7 +6,8 @@ import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
 import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
-import type { AnalyticsCard } from './figures';
+import type { SharedSections } from './figures';
+import { flowFigures } from './flow-figures';
 import {
   flowChange,
   loadComparison,
@@ -36,7 +37,8 @@ export type KeyFigureId = 'netWorth' | 'income' | 'expense' | 'profit';
 /** What a figure leaves out for want of an FX rate: Transactions, or Accounts for Net worth. */
 export interface KeyFigureUnconverted {
   count: number;
-  of: 'Transaction' | 'Account';
+  /** What is counted. */
+  counted: 'Transaction' | 'Account';
 }
 
 /** One tile's figure. */
@@ -59,8 +61,6 @@ export interface KeyFigure {
 }
 
 export interface AnalyticsKeyFigures {
-  /** The current period of the Period view, to date. */
-  current: { key: string; label: string; span: DateSpan };
   /** Net worth, Income, Expense, Profit: the tiles in order. */
   figures: KeyFigure[];
 }
@@ -70,10 +70,19 @@ function netWorthToday(trend: ReportTable): number {
   return trend.rowTotals.at(-1) ?? 0;
 }
 
-/** Income and expense of a stretch of days, by Category group type, as Spending Insights reads them. */
-function runFlow(ctx: ServiceContext, span: DateSpan): Promise<ReportTable> {
+type FlowType = 'income' | 'expense';
+
+/**
+ * Income and expense of a stretch of days, by Category group type, as Spending Insights reads
+ * them; or one of them alone.
+ */
+function runFlow(
+  ctx: ServiceContext,
+  span: DateSpan,
+  types: readonly FlowType[] = ['income', 'expense'],
+): Promise<ReportTable> {
   return runWidgetQuery(ctx, {
-    filters: { categoryGroupTypes: ['income', 'expense'] },
+    filters: { categoryGroupTypes: [...types] },
     dateRange: { kind: 'fixed', from: span.from, to: span.to },
     rows: 'categoryGroupType',
     columns: null,
@@ -81,7 +90,7 @@ function runFlow(ctx: ServiceContext, span: DateSpan): Promise<ReportTable> {
 }
 
 /** A flow report's Category group type total; 0 when nothing of it falls in the span. */
-function typeTotal(report: ReportTable, type: 'income' | 'expense'): number {
+function typeTotal(report: ReportTable, type: FlowType): number {
   const index = report.rows.findIndex((row) => row.key === type);
   return index < 0 ? 0 : (report.rowTotals[index] ?? 0);
 }
@@ -90,47 +99,44 @@ export async function keyFigures(
   ctx: ServiceContext,
   view: PeriodView,
   today: string,
-  sections: {
-    balances: Promise<AnalyticsCard>;
-    trend: Promise<ReportTable>;
-    flow: Promise<AnalyticsCard>;
-  },
+  sections: SharedSections,
 ): Promise<AnalyticsKeyFigures> {
   const span = { from: periodOf(today, view).from, to: today };
   const key = periodKey(today, view);
-  const [flow, comparison, balances, trend, perPeriod] = await Promise.all([
-    runFlow(ctx, span),
-    loadComparison(ctx, view, today),
-    sections.balances,
-    sections.trend,
-    sections.flow,
-  ]);
+  // Each type alone too, for what it leaves out: an unconverted expense is no Income's concern.
+  const [flow, incomeOnly, expenseOnly, comparison, balances, trend, perPeriod] = await Promise.all(
+    [
+      runFlow(ctx, span),
+      runFlow(ctx, span, ['income']),
+      runFlow(ctx, span, ['expense']),
+      loadComparison(ctx, view, today),
+      sections.balances,
+      sections.trend,
+      sections.flow,
+    ],
+  );
   const sparklines = flowSparklines(perPeriod.data, periodWindow(view, today));
   const caption = `${formatPeriod(key)} to date`;
   const drill = (cell: CellRef) => analyticsDrillUrl(view, flow.query, cell);
-  const transactions: KeyFigureUnconverted = { count: flow.unconvertedCount, of: 'Transaction' };
-  const income = typeTotal(flow, 'income');
-  // Booked negative: what went out is its opposite (and 0, not -0, when nothing did).
-  const expense = 0 - typeTotal(flow, 'expense');
-  const flowFigure = (
-    id: FlowFigureId,
-    label: string,
-    value: number,
-    cell: CellRef,
-  ): KeyFigure => ({
+  const values = flowFigures(typeTotal(flow, 'income'), typeTotal(flow, 'expense'));
+  const leftOut: Record<FlowFigureId, number> = {
+    income: incomeOnly.unconvertedCount,
+    expense: expenseOnly.unconvertedCount,
+    profit: flow.unconvertedCount,
+  };
+  const flowFigure = (id: FlowFigureId, label: string, cell: CellRef): KeyFigure => ({
     id,
     label,
     caption,
-    value,
+    value: values[id],
     isEmpty: false,
     href: drill(cell),
-    unconverted: transactions,
-    change: flowChange(comparison, id, value),
+    unconverted: { count: leftOut[id], counted: 'Transaction' },
+    change: flowChange(comparison, id, values[id]),
     sparkline: sparklines[id],
   });
   const netWorthValue = netWorthToday(trend);
   return {
-    current: { key, label: formatPeriod(key), span },
     figures: [
       {
         id: 'netWorth',
@@ -139,14 +145,14 @@ export async function keyFigures(
         value: netWorthValue,
         isEmpty: balances.isEmpty,
         href: accountsHref({ date: today }),
-        unconverted: { count: balances.unconvertedCount, of: 'Account' },
+        unconverted: { count: balances.unconvertedCount, counted: 'Account' },
         change: netWorthChange(comparison, trend, netWorthValue),
         sparkline: netWorthSparkline(trend),
       },
-      flowFigure('income', 'Income', income, { row: 'income' }),
-      flowFigure('expense', 'Expense', expense, { row: 'expense' }),
+      flowFigure('income', 'Income', { row: 'income' }),
+      flowFigure('expense', 'Expense', { row: 'expense' }),
       // The report holds only Income and Expense groups: its total is both of them.
-      flowFigure('profit', 'Profit', income - expense, {}),
+      flowFigure('profit', 'Profit', {}),
     ],
   };
 }

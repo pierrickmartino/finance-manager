@@ -58,7 +58,6 @@ describe('Key figures change', () => {
 
     expect(income.change).toMatchObject({
       amount: 20_000,
-      span: { from: '2025-04-01', to: '2025-04-20' },
       label: 'vs 1–20 Apr',
     });
   });
@@ -77,7 +76,6 @@ describe('Key figures change', () => {
 
     expect(income.change).toMatchObject({
       amount: 10_000,
-      span: { from: '2025-02-01', to: '2025-02-28' },
       label: 'vs 1–28 Feb',
     });
   });
@@ -98,7 +96,6 @@ describe('Key figures change', () => {
 
     expect(income.change).toMatchObject({
       amount: 20_000,
-      span: { from: '2025-01-01', to: '2025-02-19' },
       label: 'vs 1 Jan – 19 Feb',
     });
   });
@@ -115,7 +112,7 @@ describe('Key figures change', () => {
 
     const { income } = await figuresAt('quarter');
 
-    expect(income.change?.span).toEqual({ from: '2025-04-01', to: '2025-06-30' });
+    expect(income.change?.label).toBe('vs 1 Apr – 30 Jun');
   });
 
   it('in Year, compares with the same dates last year', async () => {
@@ -132,7 +129,6 @@ describe('Key figures change', () => {
 
     expect(income.change).toMatchObject({
       amount: 20_000,
-      span: { from: '2024-01-01', to: '2024-05-20' },
       label: 'vs 1 Jan – 20 May 2024',
     });
   });
@@ -149,7 +145,6 @@ describe('Key figures change', () => {
     const { income } = await figuresAt('year');
 
     expect(income.change).toMatchObject({
-      span: { from: '2023-01-01', to: '2023-02-28' },
       label: 'vs 1 Jan – 28 Feb 2023',
     });
   });
@@ -229,7 +224,6 @@ describe('Key figures change', () => {
       percent: -0.5,
       direction: 'down',
       isGood: false,
-      span: { from: '2025-04-30', to: '2025-04-30' },
       label: 'vs 30 Apr',
       href: '/accounts?date=2025-04-30',
     });

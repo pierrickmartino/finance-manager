@@ -8,6 +8,7 @@ import type { CellRef } from '../reporting/cell-ref';
 import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
 import type { WidgetQueryInput } from '../reporting/query';
 import { comparisonLabel, comparisonSpan } from './comparison-span';
+import { flowFigures, type FlowFigureId } from './flow-figures';
 
 /**
  * A Key figure's change line (spec #225): Income, Expense and Profit against the same figure
@@ -29,8 +30,6 @@ export interface KeyFigureChange {
   direction: ChangeDirection;
   /** Whether the change is good for this figure; null when it has not moved. */
   isGood: boolean | null;
-  /** The dates the earlier value covers: the Comparison span, or the day Net worth stood at. */
-  span: DateSpan;
   /** Those dates as the line says them: "vs 1–22 Oct". */
   label: string;
   /**
@@ -40,14 +39,21 @@ export interface KeyFigureChange {
   href: string;
 }
 
-/** The flow figures a change is read for, and the cell of the comparison report each is. */
-export type FlowFigureId = 'income' | 'expense' | 'profit';
+export type { FlowFigureId } from './flow-figures';
 
+/** The cell of the comparison report each flow figure is. */
 const FLOW_CELLS: Record<FlowFigureId, CellRef> = {
   income: { column: 'income', withPeriodSubtotals: true },
   expense: { column: 'expense', withPeriodSubtotals: true },
   // The report holds only Income and Expense groups: its total is both of them.
   profit: { withPeriodSubtotals: true },
+};
+
+/** Which way each flow figure is good: more spending is never good. */
+const FLOW_GOOD_WAYS: Record<FlowFigureId, GoodWay> = {
+  income: 'up',
+  expense: 'down',
+  profit: 'up',
 };
 
 /** What a Key figure's change is read from, at a Period view on a day. */
@@ -76,7 +82,6 @@ function changeOf(
     percent: earlier > 0 ? amount / earlier : null,
     direction,
     isGood: direction === 'flat' ? null : direction === goodWay,
-    span,
     label: comparisonLabel(span, today),
     href,
   };
@@ -148,15 +153,14 @@ export function flowChange(
   value: number,
 ): KeyFigureChange | null {
   if (!reachesBack(comparison, comparison.span.from)) return null;
-  const income = earlierOf(comparison, 'income');
-  // Booked negative: what went out is its opposite.
-  const expense = 0 - earlierOf(comparison, 'expense');
-  const earlier = { income, expense, profit: income - expense }[id];
+  const earlier = flowFigures(earlierOf(comparison, 'income'), earlierOf(comparison, 'expense'))[
+    id
+  ];
   const { view, today, span, report } = comparison;
   return changeOf([value, earlier], {
     span,
     today,
-    goodWay: id === 'expense' ? 'down' : 'up',
+    goodWay: FLOW_GOOD_WAYS[id],
     href: analyticsDrillUrl(view, report.query, FLOW_CELLS[id]),
   });
 }
