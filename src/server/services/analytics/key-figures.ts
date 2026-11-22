@@ -5,6 +5,7 @@ import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
 import type { DateSpan } from '../reporting/periods';
+import type { DataStart } from './data-start';
 import type { SharedSections } from './figures';
 import { flowFigures } from './flow-figures';
 import {
@@ -98,6 +99,7 @@ export async function keyFigures(
   ctx: ServiceContext,
   reading: AnalyticsReading,
   sections: SharedSections,
+  dataStart: DataStart,
 ): Promise<AnalyticsKeyFigures> {
   const { from, to: today } = reading;
   const span = { from, to: today };
@@ -107,14 +109,14 @@ export async function keyFigures(
       runFlow(ctx, span),
       runFlow(ctx, span, ['income']),
       runFlow(ctx, span, ['expense']),
-      loadComparison(ctx, reading),
+      loadComparison(ctx, reading, dataStart.accountData),
       sections.balances,
       sections.trend,
       sections.flow,
     ],
   );
   const sparklines = flowSparklines(perPeriod.data, reading);
-  const caption = spanCaption(reading.span, from);
+  const caption = spanCaption(reading.span, span);
   const drill = (cell: CellRef) => analyticsDrillUrl(reading, flow.query, cell);
   const values = flowFigures(typeTotal(flow, 'income'), typeTotal(flow, 'expense'));
   const leftOut: Record<FlowFigureId, number> = {

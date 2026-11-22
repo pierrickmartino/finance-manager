@@ -140,7 +140,7 @@ export interface PeriodRowSpec {
   valueAt: (periodKey: string) => number | null;
 }
 
-/** A row of figures over the reading, each with its Drill-down: a cell per period, and the Total. */
+/** A row of figures over the reading, each with its Drill-down: a cell per period, the Total. */
 export function periodRow(reading: AnalyticsReading, spec: PeriodRowSpec): PeriodRow {
   const { query, selector } = spec;
   const at = (period?: string): CellRef => ({

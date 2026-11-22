@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, openDrill, seedAccount, seedClassified } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
 import { DEFAULT_SPAN, presetSpan, type Span } from '@/lib/analytics/span';
+import { createAccount } from '@/server/services/accounts';
+import { createBank } from '@/server/services/banks';
 import { loadAnalytics, type AnalyticsSections, type AnalyticsView } from '.';
 
 /** The page as a whole: the reading (the Span resolved once) every section reads. */
@@ -72,6 +74,65 @@ describe('a custom Span', () => {
     expect((await settled(await loadAnalytics(t.ctx, custom('2024-09-10')))).reading.from).toBe(
       '2024-09-10',
     );
+  });
+});
+
+describe('a preset Span', () => {
+  it('starts no earlier than the first Transaction, keeping its preset name', async () => {
+    fixToday('2025-03-20');
+    // Opened long before its first Transaction, so the change lines reach back.
+    const bank = await createBank(t.ctx, { name: 'UBS' });
+    const ubs = await createAccount(t.ctx, {
+      bankId: bank.id,
+      name: 'UBS',
+      currency: 'CHF',
+      iban: null,
+      kind: 'current',
+      importFormat: 'ubs_csv',
+      openingBalanceMinor: 0,
+      openingDate: '2020-01-01',
+    });
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2024-09-10', amountMinor: -4_000 },
+      { bookingDate: '2025-02-01', amountMinor: 6_000 },
+    ]);
+
+    const { reading, starts, sections } = await settled(
+      await loadAnalytics(t.ctx, presetSpan('this-year-and-last-4')),
+    );
+
+    expect(reading).toMatchObject({
+      span: presetSpan('this-year-and-last-4'),
+      from: '2024-09-10',
+      grain: 'month',
+    });
+    expect(keys(reading.periods)[0]).toBe('2024-09');
+    // Picking a preset fills in the start it is read from.
+    expect(starts).toMatchObject({
+      'this-year-and-last-4': '2024-09-10',
+      'rolling-12-months': '2024-09-10',
+      'rolling-30-days': '2025-02-19',
+    });
+    // Its figures are captioned with the clamped start, not the preset's.
+    const income = sections.keyFigures.figures.find((figure) => figure.id === 'income')!;
+    expect(income.caption).toBe('10 Sep 2024 – today');
+    // Read from a later start than its preset gives: compared with as many days just before.
+    expect(income.change?.label).toBe('vs 2 Mar – 9 Sep 2024');
+  });
+
+  it('is read as named when it starts on or after the first Transaction', async () => {
+    fixToday('2025-03-20');
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedClassified(t.ctx, ubs, [{ bookingDate: '2020-05-01', amountMinor: -1_000 }]);
+
+    const { reading, sections } = await settled(
+      await loadAnalytics(t.ctx, presetSpan('year-to-date')),
+    );
+
+    expect(reading.from).toBe('2025-01-01');
+    const income = sections.keyFigures.figures.find((figure) => figure.id === 'income')!;
+    expect(income.caption).toBe('Year to date');
+    expect(income.change?.label).toBe('vs 1 Jan – 20 Mar 2024');
   });
 });
 

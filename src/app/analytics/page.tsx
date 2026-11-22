@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
-import {
-  analyticsHref,
-  legacySpan,
-  presetStarts,
-  spanFromParams,
-  spanPhrase,
-} from '@/lib/analytics/span';
+import { analyticsHref, legacySpan, spanFromParams, spanPhrase } from '@/lib/analytics/span';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { swissToday } from '@/server/services/fx/dates';
@@ -33,11 +27,11 @@ import { SpendingInsightsSection } from './spending-insights';
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 
 /**
- * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Span in the URL: a preset's
- * `span`, or a custom start date's `from` (Rolling 12 months when missing, unknown or after today); a former `period` link redirects to its
- * nearest Span. The shell and the Span control render at once; each section streams in behind
- * its own placeholder and error boundary (./section), and is drawn by the Dashboard's own cards
- * (GLOSSARY: Card).
+ * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Span in the URL: a
+ * preset's `span`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
+ * after today); a former `period` link redirects to its nearest Span. The shell and the Span
+ * control render at once; each section streams in behind its own placeholder and error boundary
+ * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
  *
  * Adding a section: its service module (src/server/services/analytics), and a `StreamedSection`
  * below drawing it (a `CardSection` for one drawn as a Widget's card).
@@ -58,11 +52,12 @@ export default async function AnalyticsPage({
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
-  const { sections, today, reading } = await loadAnalytics(
+  const { sections, today, reading, starts } = await loadAnalytics(
     ctx,
     spanFromParams(params, swissToday()),
   );
-  // The effective Span: a custom start date before the first Transaction is moved to it.
+  // The effective Span: no Span starts before the first Transaction (a custom date moves to it,
+  // a preset keeps its name), and the control shows the start it is read from.
   const { span } = reading;
   const retryHref = analyticsHref(span);
 
@@ -78,7 +73,7 @@ export default async function AnalyticsPage({
         span={span}
         from={reading.from}
         phrase={spanPhrase(span, reading)}
-        starts={presetStarts(today)}
+        starts={starts}
         today={today}
       />
       <div className="grid min-w-0 grid-cols-1 gap-5">

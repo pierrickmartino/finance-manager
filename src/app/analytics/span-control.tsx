@@ -3,6 +3,7 @@
 import Form from 'next/form';
 import { useId, useState, useSyncExternalStore, type ChangeEvent } from 'react';
 import { flushSync } from 'react-dom';
+import { FIELD_LABEL_CLASS } from '@/components/form';
 import { INPUT_CLASS } from '@/components/named-list';
 import { SECONDARY_BUTTON_CLASS } from '@/components/surface';
 import {
@@ -12,9 +13,6 @@ import {
   type Span,
   type SpanPreset,
 } from '@/lib/analytics/span';
-
-/** A field: its label above its control. */
-const FIELD_CLASS = 'flex flex-col gap-1 text-sm font-medium';
 
 interface SpanControlProps {
   span: Span;
@@ -83,7 +81,10 @@ export function SpanControl({ span, from, phrase, starts, today }: SpanControlPr
       data-testid="span-control"
       className="sticky top-0 z-10 -mx-1 flex flex-wrap items-end gap-x-3 gap-y-2 bg-paper px-1 py-2"
     >
-      <div className={FIELD_CLASS}>
+      {/* The field primitive's layout, but each label set beside its control (htmlFor) rather
+          than wrapping it: a wrapping label would fold the chosen option into the select's
+          accessible name ("Span Rolling 12 months"). */}
+      <div className={FIELD_LABEL_CLASS}>
         <label htmlFor={`${id}-span`}>Span</label>
         <select
           id={`${id}-span`}
@@ -100,7 +101,7 @@ export function SpanControl({ span, from, phrase, starts, today }: SpanControlPr
           <option value={CUSTOM}>Custom</option>
         </select>
       </div>
-      <div className={FIELD_CLASS}>
+      <div className={FIELD_LABEL_CLASS}>
         <label htmlFor={`${id}-from`}>From</label>
         <input
           id={`${id}-from`}

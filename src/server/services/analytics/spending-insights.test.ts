@@ -15,7 +15,10 @@ import { spendingBars, spendingInsight } from '@/lib/reporting/overview';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 
-/** Analytics' Spending Insights (spec #170, user stories 18-22; ticket #176; spec #204, ticket #236). */
+/**
+ * Analytics' Spending Insights (spec #170, user stories 18-22; ticket #176; spec #204, ticket
+ * #236).
+ */
 
 const t = setupTestDatabase();
 

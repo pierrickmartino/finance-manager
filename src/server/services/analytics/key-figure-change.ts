@@ -12,9 +12,9 @@ import type { AnalyticsReading } from './reading';
 
 /**
  * A Key figure's change line (spec #225, #204): Income, Expense and Profit over the Span against
- * the same figure over its Comparison span (GLOSSARY), Net worth against its value at the end of the previous
- * period. There is no change when the Account data doesn't reach back to what it is compared
- * with: the Comparison span's start, or for Net worth the previous period's end.
+ * the same figure over its Comparison span (GLOSSARY), Net worth against its value at the end of
+ * the previous period. There is no change when the Account data doesn't reach back to what it is
+ * compared with: the Comparison span's start, or for Net worth the previous period's end.
  */
 
 export type ChangeDirection = 'up' | 'down' | 'flat';
@@ -108,28 +108,18 @@ function bothStretchesQuery(grain: TimeAxis, span: DateSpan, current: DateSpan):
 }
 
 /**
- * The first day any Account holds data: its opening date, or its first Transaction. Null when
- * no Account has either.
+ * Starts reading what the Key figures' changes compare with, over a reading, given the first
+ * day any Account holds data (`DataStart.accountData`).
  */
-async function accountDataStart(ctx: ServiceContext): Promise<string | null> {
-  const result = await ctx.db.query<{ start: string | null }>(
-    `SELECT to_char(least(
-       (SELECT min(opening_date) FROM account),
-       (SELECT min(booking_date) FROM "transaction")
-     ), 'YYYY-MM-DD') AS start`,
-  );
-  return result.rows[0]?.start ?? null;
-}
-
-/** Starts reading what the Key figures' changes compare with, over a reading. */
 export async function loadComparison(
   ctx: ServiceContext,
   reading: AnalyticsReading,
+  dataStart: string | null,
 ): Promise<Comparison> {
   const { grain, from, to: today } = reading;
   const current = { from, to: today };
   const span = comparisonSpan(reading.span, current);
-  const [report, earlier, start] = await Promise.all([
+  const [report, earlier] = await Promise.all([
     runWidgetQuery(ctx, bothStretchesQuery(grain, span, current)),
     runWidgetQuery(ctx, {
       filters: { categoryGroupTypes: ['income', 'expense'] },
@@ -137,9 +127,8 @@ export async function loadComparison(
       rows: 'categoryGroupType',
       columns: null,
     }),
-    accountDataStart(ctx),
   ]);
-  return { reading, span, dataStart: start, report, earlier };
+  return { reading, span, dataStart, report, earlier };
 }
 
 const reachesBack = ({ dataStart }: Comparison, date: string) =>

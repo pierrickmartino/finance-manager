@@ -70,6 +70,24 @@ async function seedGrocery(suffix: number): Promise<string> {
   return description;
 }
 
+/**
+ * An older Transaction on the seeded Account, early in 2021: no Span starts before the first
+ * Transaction, so this lets every preset here read from the start it gives.
+ */
+async function seedOldPurchase(suffix: number): Promise<void> {
+  await withServices(async (ctx) => {
+    const account = (await listAccounts(ctx)).find(
+      (item) => item.name === `Analytics account ${suffix}`,
+    );
+    await createManualTransaction(ctx, {
+      accountId: account!.id,
+      bookingDate: '2021-01-05',
+      amountMinor: -10_00,
+      description: `Analytics old purchase ${suffix}`,
+    });
+  });
+}
+
 const TODAY = swissToday();
 const [YEAR, MONTH] = TODAY.split('-') as [string, string];
 const LAST_YEAR = Number(YEAR) - 1;
@@ -122,7 +140,9 @@ test('/ lands on Analytics over Rolling 12 months, its dates in words', async ({
 test('picking a Span preset fills in its date, reads every section over it, and a Drill-down returns to it', async ({
   page,
 }) => {
-  const { description } = await seedSalary(Date.now());
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  await seedOldPurchase(suffix);
   const control = spanControl(page);
   const preset = control.getByLabel('Span', { exact: true });
   const name = 'Income vs. expense';
@@ -198,18 +218,8 @@ test('typing a start date switches the Span to Custom, reads every section from 
 }) => {
   const suffix = Date.now();
   const { description } = await seedSalary(suffix);
-  // An older Transaction, so the typed date is never before the first one (and stays as typed).
-  await withServices(async (ctx) => {
-    const account = (await listAccounts(ctx)).find(
-      (item) => item.name === `Analytics account ${suffix}`,
-    );
-    await createManualTransaction(ctx, {
-      accountId: account!.id,
-      bookingDate: '2021-01-05',
-      amountMinor: -10_00,
-      description: `Analytics old purchase ${suffix}`,
-    });
-  });
+  // So the typed date is never before the first Transaction (and stays as typed).
+  await seedOldPurchase(suffix);
   const from = monthsAgo(2);
   const atFrom = new RegExp(`/analytics\\?from=${from}$`);
   const control = spanControl(page);
@@ -360,13 +370,13 @@ test("Net worth reads today, with a point at the Span's start, each period end a
     ['this-year-and-last-1', QUARTERS, formatPeriod(QUARTER)],
     ['this-year-and-last-4', 5, YEAR],
   ] as const) {
-    const start = addDays(STARTS[span], -1);
-    const startLabel = spanDates({ from: start, to: start });
+    // Labelled with the Span's first day: it stands at its start.
+    const startLabel = spanDates({ from: STARTS[span], to: STARTS[span] });
     await page.goto(`/analytics?span=${span}`);
     const trend = netWorth.getByRole('group', {
       name: `Net worth, ${spanDates({ from: STARTS[span], to: TODAY })}`,
     });
-    // The start (the end of the day before the Span's first), then a point per period.
+    // The start (Net worth at the end of the day before the Span's first), then a point per period.
     await expect(trend.getByRole('link')).toHaveCount(periods + 1);
     await expect(trend.getByRole('link').first()).toHaveAccessibleName(
       new RegExp(`^${startLabel}: `),
@@ -374,7 +384,7 @@ test("Net worth reads today, with a point at the Span's start, each period end a
     await expect(trend.getByRole('link').last()).toHaveAccessibleName(new RegExp(`^${current}: `));
     await expect(
       netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
-    ).toHaveAccessibleName(new RegExp(`^Span: .* since the end of ${startLabel}$`));
+    ).toHaveAccessibleName(new RegExp(`^Span: .* since the start of ${startLabel}$`));
     await expect(netWorth.getByText('Came in')).toBeVisible();
     // Income minus expense is Profit (GLOSSARY), and its share of Income the Profit margin.
     await expect(netWorth.getByText('Profit', { exact: true })).toBeVisible();

@@ -459,6 +459,18 @@ describe('readCard: periods', () => {
     });
   });
 
+  it('reads no average, "—" without a link, for a Widget with only a running period', () => {
+    const running = drillable(
+      source(['2025-03'], ['Rent'], [[-100_00]], { lastIsPartial: true }),
+      'month',
+      'category',
+    );
+
+    const average = read(widget({ data: running })).facts.at(-1)!;
+
+    expect(average).toMatchObject({ label: 'Monthly average', value: '—', href: null });
+  });
+
   it('rounds the average half away from zero, as the Drill-down does', () => {
     // -5 over 2 months is -2.5: the engine's average is -3.
     const odd = widget({ data: source(['2025-01', '2025-02'], ['Net'], [[-2], [-3]]) });
