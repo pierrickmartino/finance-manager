@@ -235,12 +235,24 @@ async function runNetWorth(
   // No Account left to count: no points at all, rather than a flat line at zero.
   const rows = accounts.length === 0 ? [] : await pointRows(ctx, axis, resolved, today);
   const dates = rows.map((row) => netWorthPointDate(row.key!, axis, today));
+  return valuedNetWorth(ctx, accounts, { query, axis, resolved, rows, dates });
+}
+
+/**
+ * The Net worth table of `accounts`, each valued at the end of each row's date, with their
+ * capital movements in the range: what every Net worth trend ends with.
+ */
+async function valuedNetWorth(
+  ctx: ServiceContext,
+  accounts: readonly Account[],
+  parts: Omit<NetWorthParts, 'valued' | 'markers'>,
+): Promise<ReportTable> {
   const accountIds = accounts.map((account) => account.id);
   const [valued, markers] = await Promise.all([
-    valueBalances(ctx, accounts, dates),
-    listCapitalMarkers(ctx, accountIds, resolved.range),
+    valueBalances(ctx, accounts, parts.dates),
+    listCapitalMarkers(ctx, accountIds, parts.resolved.range),
   ]);
-  return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
+  return netWorthTable({ ...parts, valued, markers });
 }
 
 /** A Net worth point asked for by its date: a row of the table, valued at the end of `date`. */
@@ -270,15 +282,7 @@ export async function runNetWorthPoints(
   const shown = accounts.length === 0 ? [] : points;
   const rows = shown.map(({ key, label, isPartial }) => ({ key, label, isPartial }));
   const dates = shown.map((point) => point.date);
-  const [valued, markers] = await Promise.all([
-    valueBalances(ctx, accounts, dates),
-    listCapitalMarkers(
-      ctx,
-      accounts.map((account) => account.id),
-      resolved.range,
-    ),
-  ]);
-  return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
+  return valuedNetWorth(ctx, accounts, { query, axis, resolved, rows, dates });
 }
 
 /** How far back a Net worth trend reaches: `count` complete periods before the running one. */
