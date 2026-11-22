@@ -23,7 +23,7 @@ export async function CardSection({ card, empty, className = '' }: CardSectionPr
         className={className}
         unconverted={{
           count: loaded.unconvertedCount,
-          of: loaded.source === 'account_balances' ? 'Account' : 'Transaction',
+          counted: loaded.source === 'account_balances' ? 'Account' : 'Transaction',
         }}
       >
         <SectionEmpty>{empty}</SectionEmpty>

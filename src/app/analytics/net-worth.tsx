@@ -13,13 +13,16 @@ interface NetWorthSectionProps {
 /**
  * Analytics' Net worth, once it arrives, drawn as the Dashboard's Net worth card: Net worth
  * today beside a trend with a point per period end of the window and today, its change since the
- * end of the previous period, then what came in, went out and was kept over the window.
+ * end of the previous period, then what came in, went out and the Profit over the window.
  */
 export async function NetWorthSection({ netWorth, view }: NetWorthSectionProps) {
   const loaded = await netWorth;
   if (loaded.isEmpty) {
     return (
-      <SectionCard name={NET_WORTH} unconverted={{ count: loaded.unconvertedCount, of: 'Account' }}>
+      <SectionCard
+        name={NET_WORTH}
+        unconverted={{ count: loaded.unconvertedCount, counted: 'Account' }}
+      >
         <SectionEmpty>Nothing to show yet: no Account holds money.</SectionEmpty>
       </SectionCard>
     );

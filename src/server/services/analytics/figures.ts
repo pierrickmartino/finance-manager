@@ -46,6 +46,17 @@ export interface AnalyticsCard extends WidgetCardData {
   isEmpty: boolean;
 }
 
+/**
+ * What Net worth and the Key figures read from other sections, sharing their promises rather
+ * than run them again: the Account balances, Net worth's trend and Spending Insights' income and
+ * expense.
+ */
+export interface SharedSections {
+  balances: Promise<AnalyticsCard>;
+  trend: Promise<ReportTable>;
+  flow: Promise<AnalyticsCard>;
+}
+
 export interface AnalyticsCardSpec {
   id: string;
   name: string;

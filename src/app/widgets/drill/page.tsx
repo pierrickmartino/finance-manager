@@ -154,7 +154,7 @@ function FilterLine({ report, lists, fmt }: FilterLineProps) {
   const period = from <= to ? `${fmt.date(from)} to ${fmt.date(to)}` : 'No complete period yet';
   return (
     <p aria-label="Filters" className="text-sm text-muted">
-      {drillFilterLine(report.query, lists, period).join(' · ')}
+      {drillFilterLine(report.query, lists, period, fmt.date).join(' · ')}
     </p>
   );
 }

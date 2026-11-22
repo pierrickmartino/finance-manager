@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { formatPeriod } from '../src/lib/format';
-import { createAccount } from '../src/server/services/accounts';
+import { createAccount, listAccounts } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import { createCategory, createCategoryGroup } from '../src/server/services/categories';
 import { swissToday } from '../src/server/services/fx/dates';
@@ -47,6 +47,26 @@ async function seedSalary(suffix: number): Promise<Seeded> {
     await editClassification(ctx, transaction.id, { categoryId: salary.id });
   });
   return { description, account: `Analytics bank ${suffix} · Analytics account ${suffix}` };
+}
+
+/** A grocery purchase booked today, in the current period of every Period view; its description. */
+async function seedGrocery(suffix: number): Promise<string> {
+  const description = `Analytics groceries ${suffix}`;
+  await withServices(async (ctx) => {
+    const account = (await listAccounts(ctx)).find(
+      (item) => item.name === `Analytics account ${suffix}`,
+    );
+    const group = await createCategoryGroup(ctx, { name: `Living ${suffix}`, type: 'expense' });
+    const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account!.id,
+      bookingDate: swissToday(),
+      amountMinor: -87_00,
+      description,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: groceries.id });
+  });
+  return description;
 }
 
 const [YEAR, MONTH] = swissToday().split('-') as [string, string];
@@ -248,11 +268,181 @@ test('Net worth reads today, with a point per period end of the window and its c
       netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
     ).toHaveAccessibleName(new RegExp(`^${change}: .* since the end of `));
     await expect(netWorth.getByText('Came in')).toBeVisible();
+    // Income minus expense is Profit (GLOSSARY), and its share of Income the Profit margin.
+    await expect(netWorth.getByText('Profit', { exact: true })).toBeVisible();
+    await expect(netWorth.getByText('Profit margin', { exact: true })).toBeVisible();
+    await expect(netWorth.getByText(/profit over \d+ /)).toBeVisible();
+    await expect(netWorth.getByText(/Kept|Savings rate/)).toHaveCount(0);
   }
 
   // Today's amount opens the Accounts.
   await netWorth.getByRole('link', { name: /^CHF / }).first().click();
   await expect(page).toHaveURL(/\/accounts$/);
+});
+
+test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2 on a narrow one', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  const grocery = await seedGrocery(suffix);
+  const keyFigures = region(page, 'Key figures');
+  const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
+    keyFigures.getByRole('region', { name, exact: true }),
+  );
+  const amountOf = (index: number) => tiles[index]!.getByRole('link', { name: /^CHF / });
+  const boxes = async () => {
+    await expect(keyFigures).not.toHaveAttribute('aria-busy');
+    return Promise.all(tiles.map(async (tile) => (await tile.boundingBox())!));
+  };
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/analytics');
+  for (const index of [0, 1, 2, 3]) await expect(amountOf(index)).toBeVisible();
+  await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
+  for (const tile of tiles.slice(1)) {
+    await expect(tile.getByText(`${CURRENT_MONTH} to date`, { exact: true })).toBeVisible();
+  }
+  // Above the overview row, all four in one row of equal tiles.
+  const wide = await boxes();
+  const overview = (await region(page, 'Your net worth today').boundingBox())!;
+  for (const box of wide) {
+    expect(box.y).toBe(wide[0]!.y);
+    expect(Math.round(box.width)).toBe(Math.round(wide[0]!.width));
+    expect(box.y + box.height).toBeLessThan(overview.y);
+  }
+  for (const [i, box] of wide.slice(1).entries()) {
+    expect(wide[i]!.x + wide[i]!.width).toBeLessThan(box.x);
+  }
+
+  // A 2×2 grid on a phone: Net worth and Income, then Expense and Profit.
+  await page.setViewportSize({ width: 390, height: 900 });
+  const [netWorth, income, expense, profit] = await boxes();
+  expect(income!.y).toBe(netWorth!.y);
+  expect(netWorth!.x + netWorth!.width).toBeLessThan(income!.x);
+  expect(expense!.x).toBe(netWorth!.x);
+  expect(profit!.x).toBe(income!.x);
+  expect(expense!.y).toBe(profit!.y);
+  expect(netWorth!.y + netWorth!.height).toBeLessThan(expense!.y);
+
+  // Income and Profit open their Drill-downs, with today's salary in both; Expense its own.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  for (const index of [1, 3]) {
+    await amountOf(index).click();
+    await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+    await expect(
+      page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Back to Analytics' }).click();
+    await expect(page).toHaveURL(/\/analytics\?period=month$/);
+  }
+  await amountOf(2).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  // Expense lists what went out today, and not the salary that came in.
+  const drilled = page.getByRole('table', { name: 'Drill-down Transactions' });
+  await expect(drilled.getByText(grocery)).toBeVisible();
+  await expect(drilled.getByText(description)).toHaveCount(0);
+
+  // Net worth stays today's in every Period view, and opens the Accounts as of today.
+  await page.goto('/analytics?period=year');
+  await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
+  await expect(tiles[1]!.getByText(`${YEAR} to date`, { exact: true })).toBeVisible();
+  await amountOf(0).click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
+});
+
+test("a Key figure's change line opens both stretches of days, and Net worth's the Accounts then", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  // On the first of last month: always inside the Comparison span.
+  const lastMonthFirst = `${monthsAgo(1).slice(0, 8)}01`;
+  const earlier = `Analytics earlier groceries ${suffix}`;
+  await withServices(async (ctx) => {
+    // On the salary's own Account, lowering its balance: a new or larger Account would crowd
+    // the Account balances card, which keeps only the largest.
+    const account = (await listAccounts(ctx)).find(
+      (candidate) => candidate.name === `Analytics account ${suffix}`,
+    )!;
+    const group = await createCategoryGroup(ctx, {
+      name: `Earlier living ${suffix}`,
+      type: 'expense',
+    });
+    const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: lastMonthFirst,
+      amountMinor: -1234_00,
+      description: earlier,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: groceries.id });
+  });
+  const keyFigures = region(page, 'Key figures');
+  const changeOf = (name: string) =>
+    keyFigures.getByRole('region', { name, exact: true }).getByRole('link', { name: / vs / });
+
+  await page.goto('/analytics');
+  for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
+    await expect(changeOf(name)).toBeVisible();
+  }
+  await expect(changeOf('Income')).toHaveAccessibleName(/^(Up|Down|Unchanged) .*vs 1(–\d+)? /);
+
+  // Profit's change opens both stretches of both: today's salary and last month's groceries.
+  await changeOf('Profit').click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  const table = page.getByRole('table', { name: 'Drill-down Transactions' });
+  await expect(table.getByText(description)).toBeVisible();
+  await expect(table.getByText(earlier)).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=month$/);
+
+  const lastMonthEnd = new Date(Date.UTC(Number(YEAR), Number(MONTH) - 1, 0))
+    .toISOString()
+    .slice(0, 10);
+  await changeOf('Net worth').click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${lastMonthEnd}$`));
+});
+
+test('each Key figure carries a sparkline, hidden from assistive technology, that fits its tile', async ({
+  page,
+}) => {
+  await seedSalary(Date.now());
+  const keyFigures = region(page, 'Key figures');
+  const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
+    keyFigures.getByRole('region', { name, exact: true }),
+  );
+  const sparklines = keyFigures.locator('[data-sparkline]');
+
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/analytics');
+    await expect(keyFigures).not.toHaveAttribute('aria-busy');
+    await expect(sparklines).toHaveCount(4);
+    for (const tile of tiles) {
+      const sparkline = tile.locator('[data-sparkline]');
+      await expect(sparkline).toBeVisible();
+      await expect(sparkline).toHaveAttribute('aria-hidden', 'true');
+      // The current period is partial: a dashed last segment to a hollow dot.
+      await expect(sparkline.locator('path[stroke-dasharray]')).toHaveCount(1);
+      await expect(sparkline.locator('span.bg-surface')).toHaveCount(1);
+      // Inside its tile, dot and line included, and the tile not overflowing either.
+      const box = (await tile.boundingBox())!;
+      for (const part of [sparkline.locator('svg'), sparkline.locator('span')]) {
+        const inner = (await part.boundingBox())!;
+        expect(inner.x, `${width}px`).toBeGreaterThanOrEqual(box.x);
+        expect(inner.x + inner.width, `${width}px`).toBeLessThanOrEqual(box.x + box.width);
+        expect(inner.y + inner.height, `${width}px`).toBeLessThanOrEqual(box.y + box.height);
+      }
+      expect(
+        await tile.evaluate((node) => node.scrollWidth <= node.clientWidth),
+        `${width}px`,
+      ).toBe(true);
+    }
+  }
+  // Nothing in the sparklines is in the page's accessibility tree.
+  const tree = await keyFigures.ariaSnapshot();
+  expect(tree).not.toMatch(/img|graphics|svg/i);
 });
 
 test('Categories per period lists each Category beside its group subtotal, and both open their Drill-down', async ({
@@ -462,6 +652,14 @@ test('every section with figures left out for want of an FX rate says so', async
   await seedUnconverted(Date.now());
   await page.goto('/analytics');
   const notes = page.getByText(/left out: no FX rate yet\./);
+  const keyFigures = region(page, 'Key figures');
+  const keyFigureNote = (name: string) =>
+    keyFigures.getByRole('region', { name, exact: true }).getByText(/left out: no FX rate yet\./);
+  // The left-out Account weighs on Net worth, its expense on Expense and Profit; Income is whole.
+  for (const name of ['Net worth', 'Expense', 'Profit']) {
+    await expect(keyFigureNote(name)).toBeVisible();
+  }
+  await expect(keyFigureNote('Income')).toHaveCount(0);
   for (const name of [
     'Your net worth today',
     'Net cash flow',
@@ -473,5 +671,6 @@ test('every section with figures left out for want of an FX rate says so', async
     await expect(region(page, name).getByText(/left out: no FX rate yet\./)).toBeVisible();
   }
   // Spending Insights too, whether it draws its insight or says why it can't yet.
-  await expect(notes).toHaveCount(7);
+  // And the three Key figures it weighs on.
+  await expect(notes).toHaveCount(7 + 3);
 });

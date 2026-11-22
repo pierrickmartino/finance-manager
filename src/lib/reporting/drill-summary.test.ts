@@ -99,6 +99,9 @@ const CHOICES: FilterChoices = {
 
 const query = (more: Partial<WidgetQuery>): WidgetQuery => ({ ...DEFAULT_WIDGET_QUERY, ...more });
 
+/** An ISO date as dd.mm.yyyy. */
+const isoAsSwiss = (iso: string) => iso.split('-').reverse().join('.');
+
 describe('drillFilterLine', () => {
   it('with no filters: the period, Capital and Transfers left out', () => {
     expect(drillFilterLine(query({}), CHOICES, '1 Jan 2025 to 31 Mar 2025')).toEqual([
@@ -145,6 +148,21 @@ describe('drillFilterLine', () => {
 
     expect(withCapital).toEqual(['Q1 2025', 'Transfers left out']);
     expect(byType).toEqual(['Q1 2025', 'Category group types: Capital', 'Transfers left out']);
+  });
+
+  it('says the days a fixed range leaves out after its period', () => {
+    const both = query({
+      dateRange: {
+        kind: 'fixed',
+        from: '2025-04-01',
+        to: '2025-05-20',
+        except: { from: '2025-04-21', to: '2025-04-30' },
+      },
+    });
+
+    expect(drillFilterLine(both, CHOICES, '01.04.2025 to 20.05.2025', isoAsSwiss)[0]).toBe(
+      '01.04.2025 to 20.05.2025, except 21.04.2025 to 30.04.2025',
+    );
   });
 
   it('names a filter value it no longer knows as unknown', () => {

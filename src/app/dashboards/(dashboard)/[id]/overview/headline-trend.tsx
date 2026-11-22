@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
+import { SparklineDot, SparklineSvg } from '@/components/sparkline-mark';
+import { directionOf } from '@/lib/reporting/change-direction';
 import { sparkline, type HeadlineChange } from '@/lib/reporting/net-worth-headline';
 import type { PeriodValue } from '@/lib/reporting/period-values';
 
@@ -37,22 +39,7 @@ export function NetWorthSparkline({
       aria-label={label}
       className="relative mr-1.5 mb-1.5 h-12 min-w-32 grow basis-32 max-sm:basis-full"
     >
-      <svg
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        className="absolute inset-0 h-full w-full overflow-visible"
-        aria-hidden
-      >
-        <path d={shape.area} className="fill-hero-mist" fillOpacity={0.4} />
-        <path
-          d={shape.line}
-          fill="none"
-          className="stroke-hero-deep"
-          strokeWidth={1.75}
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
+      <SparklineSvg area={shape.area} line={shape.line} />
       {points.map((point, i) => (
         <Link
           key={point.label}
@@ -68,20 +55,9 @@ export function NetWorthSparkline({
           />
         </Link>
       ))}
-      <span
-        aria-hidden
-        className={`pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-hero-deep ${points.at(-1)!.isPartial ? 'bg-surface' : 'bg-hero-deep'}`}
-        style={{ left: `${latest.x}%`, top: `${latest.y}%` }}
-      />
+      <SparklineDot {...latest} isPartial={points.at(-1)!.isPartial} />
     </div>
   );
-}
-
-/** A change's direction: its arrow, sign, tone and the word that says it. */
-function directionOf(change: number) {
-  if (change > 0) return { arrow: '↗', sign: '+', tone: 'text-positive', word: 'up' };
-  if (change < 0) return { arrow: '↘', sign: '−', tone: 'text-negative', word: 'down' };
-  return { arrow: '→', sign: '', tone: 'text-muted', word: 'unchanged' };
 }
 
 /**

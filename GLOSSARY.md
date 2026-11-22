@@ -194,7 +194,7 @@ How one Widget is drawn on the Dashboard Story, or one section of Analytics: a s
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The landing page: a single fixed page of reports, read through one Period view at a time: Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Period window, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read through one Period view at a time: the Key figures (Net worth, Income, Expense and Profit to date), Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Period window, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
 **Period view**:
@@ -204,6 +204,14 @@ _Avoid_: Granularity, zoom, time scale
 **Period window**:
 The periods a Period view shows: the last 6 years, 8 quarters or 12 months, always ending with the current period, which is shown "to date" and set apart from complete ones. A judgement such as the spending insight speaks only of complete periods.
 _Avoid_: Date range, lookback
+
+**Profit**:
+Income minus expense over a span of time, with Capital left out. It is negative when more went out than came in.
+_Avoid_: Kept, net profit, savings, net, surplus
+
+**Comparison span**:
+The stretch of the previous period, of the same length as the current period to date, that a to-date figure is compared with. A short month is compared up to its last day.
+_Avoid_: Baseline, previous period, last period
 
 **Edit mode**:
 The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History. On narrow screens the board is one column in reading order, with no dragging or resizing: a card moves up or down instead, swapping places with its neighbour. From the keyboard, a focused card moves one cell with the arrow keys and resizes one cell with Shift+arrows.

@@ -7,6 +7,7 @@ import {
   ACCOUNT_BALANCES,
   CATEGORIES_PER_PERIOD,
   INCOME_VS_EXPENSE,
+  KEY_FIGURES,
   loadAnalytics,
   NET_CASH_FLOW,
   SPENDING_BY_CATEGORY,
@@ -14,6 +15,7 @@ import {
 } from '@/server/services/analytics';
 import { CardSection } from './card-section';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
+import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
 import { NET_WORTH, NetWorthSection } from './net-worth';
 import { PeriodSwitch } from './period-switch';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
@@ -54,6 +56,14 @@ export default async function AnalyticsPage({
       <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
       <PeriodSwitch view={view} />
       <div className="grid min-w-0 grid-cols-1 gap-5">
+        {/* Key figures: four tiles in a row on wide screens, 2×2 below. */}
+        <StreamedSection
+          name={KEY_FIGURES}
+          retryHref={retryHref}
+          placeholder={<KeyFiguresPlaceholder />}
+        >
+          <KeyFiguresSection keyFigures={sections.keyFigures} fmt={fmt} />
+        </StreamedSection>
         {/* The overview: three side by side on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_WORTH} retryHref={retryHref}>

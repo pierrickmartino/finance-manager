@@ -189,15 +189,15 @@ describe('spendingInsight', () => {
 });
 
 describe('flowSummary', () => {
-  it('totals what came in, went out and was kept over every month shown', () => {
+  it('totals what came in, went out and the Profit over every month shown', () => {
     const summary = flowSummary([
       month('Jan', 1000_00, 600_00),
       month('Feb', 1000_00, 1200_00),
       month('Mar', 500_00, 100_00, true),
     ]);
 
-    expect(summary).toMatchObject({ income: 2500_00, expense: 1900_00, kept: 600_00 });
-    expect(summary.savingsRate).toBeCloseTo(0.24);
+    expect(summary).toMatchObject({ income: 2500_00, expense: 1900_00, profit: 600_00 });
+    expect(summary.profitMargin).toBeCloseTo(0.24);
   });
 
   it('averages, and picks the best and leanest month, over full months only', () => {
@@ -207,25 +207,25 @@ describe('flowSummary', () => {
       month('Mar', 900_00, 0, true),
     ]);
 
-    expect(summary.keptPerPeriod).toBe(100_00);
+    expect(summary.profitPerPeriod).toBe(100_00);
     expect(summary.best?.label).toBe('Jan');
     expect(summary.leanest?.label).toBe('Feb');
   });
 
-  it('has no savings rate without income', () => {
-    expect(flowSummary([month('Jan', 0, 100_00), month('Feb', 0, 50_00)]).savingsRate).toBeNull();
+  it('has no profit margin without income', () => {
+    expect(flowSummary([month('Jan', 0, 100_00), month('Feb', 0, 50_00)]).profitMargin).toBeNull();
   });
 
   it('has no best or leanest month with fewer than two full months', () => {
     const summary = flowSummary([month('Jan', 1000_00, 600_00), month('Feb', 0, 10_00, true)]);
 
-    expect(summary.keptPerPeriod).toBe(400_00);
+    expect(summary.profitPerPeriod).toBe(400_00);
     expect(summary.best).toBeNull();
     expect(summary.leanest).toBeNull();
   });
 
   it('has no monthly average without a full month', () => {
-    expect(flowSummary([month('Jan', 100_00, 10_00, true)]).keptPerPeriod).toBeNull();
+    expect(flowSummary([month('Jan', 100_00, 10_00, true)]).profitPerPeriod).toBeNull();
   });
 });
 

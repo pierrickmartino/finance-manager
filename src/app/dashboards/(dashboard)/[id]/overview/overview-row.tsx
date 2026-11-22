@@ -89,9 +89,9 @@ interface FlowBreakdownProps {
   money: Money;
 }
 
-/** What came in, went out and was kept, then the average per period, rate, best and leanest. */
+/** What came in, went out and the Profit, then the Profit per period, margin, best and leanest. */
 function FlowBreakdown({ summary, period, money }: FlowBreakdownProps) {
-  const { income, expense, kept, savingsRate, keptPerPeriod, best, leanest } = summary;
+  const { income, expense, profit, profitMargin, profitPerPeriod, best, leanest } = summary;
   const top = Math.max(1, income, expense);
   return (
     <>
@@ -99,21 +99,21 @@ function FlowBreakdown({ summary, period, money }: FlowBreakdownProps) {
         <Stat label="Came in" value={money(income)} share={income / top} tone="bg-hero-deep" />
         <Stat label="Went out" value={money(expense)} share={expense / top} tone="bg-hero-glow" />
         <Stat
-          label="Kept"
-          value={money(kept)}
-          share={Math.abs(kept) / top}
-          tone={kept >= 0 ? 'bg-positive' : 'bg-negative'}
+          label="Profit"
+          value={money(profit)}
+          share={Math.abs(profit) / top}
+          tone={profit >= 0 ? 'bg-positive' : 'bg-negative'}
         />
       </div>
       <dl className="mt-auto grid grid-cols-2 gap-3 pt-6 text-sm">
-        {keptPerPeriod !== null && (
-          <Fact label={`Kept per ${period}`}>
-            <span className="font-display text-xl">{money(Math.round(keptPerPeriod))}</span>
+        {profitPerPeriod !== null && (
+          <Fact label={`Profit per ${period}`}>
+            <span className="font-display text-xl">{money(Math.round(profitPerPeriod))}</span>
           </Fact>
         )}
-        {savingsRate !== null && (
-          <Fact label="Savings rate">
-            <span className="font-display text-xl">{Math.round(savingsRate * 100)}%</span>
+        {profitMargin !== null && (
+          <Fact label="Profit margin">
+            <span className="font-display text-xl">{Math.round(profitMargin * 100)}%</span>
           </Fact>
         )}
         {best && (
@@ -156,7 +156,7 @@ interface NetWorthCardProps {
 /**
  * The opening number (net worth, else the first Widget's total), beside net worth a sparkline of
  * its last 24 months and under it its change over 1M, 1Y and 2Y, and, from an income-vs-expense
- * Widget, what came in, went out and was kept over its periods. With that breakdown it stands as tall as Recent activity (both span the overview
+ * Widget, what came in, went out and the Profit over its periods. With that breakdown it stands as tall as Recent activity (both span the overview
  * row's two rows from `lg` up).
  */
 export function NetWorthCard({
@@ -195,11 +195,11 @@ export function NetWorthCard({
           <p className="mt-2 text-sm text-muted">
             <FigureLink
               href={flow.href}
-              className={summary.kept >= 0 ? 'text-positive' : 'text-negative'}
+              className={summary.profit >= 0 ? 'text-positive' : 'text-negative'}
             >
-              <span aria-hidden>{summary.kept >= 0 ? '↗' : '↘'}</span> {money(summary.kept)}
+              <span aria-hidden>{summary.profit >= 0 ? '↗' : '↘'}</span> {money(summary.profit)}
             </FigureLink>{' '}
-            kept over {periodCount(flow.months.length, flow.period)}
+            profit over {periodCount(flow.months.length, flow.period)}
           </p>
           <FlowBreakdown summary={summary} period={flow.period} money={money} />
         </>

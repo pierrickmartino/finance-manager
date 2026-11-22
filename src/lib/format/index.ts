@@ -165,7 +165,8 @@ export function formatPercent(share: number, numberFormat: NumberFormat): string
   return `${sign}${whole}${decimal}${abs % 10}%`;
 }
 
-const MONTH_NAMES = [
+/** Months' short names, January first, as periods and dates are said. */
+export const MONTH_NAMES = [
   'Jan',
   'Feb',
   'Mar',
