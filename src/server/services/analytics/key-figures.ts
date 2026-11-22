@@ -7,6 +7,13 @@ import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
 import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
 import type { AnalyticsCard } from './figures';
+import {
+  flowChange,
+  loadComparison,
+  netWorthChange,
+  type FlowFigureId,
+  type KeyFigureChange,
+} from './key-figure-change';
 
 /**
  * Analytics' Key figures (spec #225): the four tiles that open the page. Net worth today, loans
@@ -43,6 +50,8 @@ export interface KeyFigure {
   /** Where the amount opens: its Drill-down, or the Accounts as of today for Net worth. */
   href: string;
   unconverted: KeyFigureUnconverted;
+  /** Against the figure's earlier value; null when there is none to compare with. */
+  change: KeyFigureChange | null;
 }
 
 export interface AnalyticsKeyFigures {
@@ -81,8 +90,9 @@ export async function keyFigures(
 ): Promise<AnalyticsKeyFigures> {
   const span = { from: periodOf(today, view).from, to: today };
   const key = periodKey(today, view);
-  const [flow, balances, trend] = await Promise.all([
+  const [flow, comparison, balances, trend] = await Promise.all([
     runFlow(ctx, span),
+    loadComparison(ctx, view, today),
     sections.balances,
     sections.trend,
   ]);
@@ -92,7 +102,12 @@ export async function keyFigures(
   const income = typeTotal(flow, 'income');
   // Booked negative: what went out is its opposite (and 0, not -0, when nothing did).
   const expense = 0 - typeTotal(flow, 'expense');
-  const flowFigure = (id: KeyFigureId, label: string, value: number, cell: CellRef): KeyFigure => ({
+  const flowFigure = (
+    id: FlowFigureId,
+    label: string,
+    value: number,
+    cell: CellRef,
+  ): KeyFigure => ({
     id,
     label,
     caption,
@@ -100,7 +115,9 @@ export async function keyFigures(
     isEmpty: false,
     href: drill(cell),
     unconverted: transactions,
+    change: flowChange(comparison, id, value),
   });
+  const netWorthValue = netWorthToday(trend);
   return {
     current: { key, label: formatPeriod(key), span },
     figures: [
@@ -108,10 +125,11 @@ export async function keyFigures(
         id: 'netWorth',
         label: 'Net worth',
         caption: 'Today',
-        value: netWorthToday(trend),
+        value: netWorthValue,
         isEmpty: balances.isEmpty,
         href: accountsHref({ date: today }),
         unconverted: { count: balances.unconvertedCount, of: 'Account' },
+        change: netWorthChange(comparison, trend, netWorthValue),
       },
       flowFigure('income', 'Income', income, { row: 'income' }),
       flowFigure('expense', 'Expense', expense, { row: 'expense' }),

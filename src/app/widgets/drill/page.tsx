@@ -151,7 +151,13 @@ interface FilterLineProps {
 /** The period and the filters the number was counted under. */
 function FilterLine({ report, lists, fmt }: FilterLineProps) {
   const { from, to } = report.range;
-  const period = from <= to ? `${fmt.date(from)} to ${fmt.date(to)}` : 'No complete period yet';
+  const range = report.query.dateRange;
+  const except =
+    range.kind === 'fixed' && range.except
+      ? `, except ${fmt.date(range.except.from)} to ${fmt.date(range.except.to)}`
+      : '';
+  const period =
+    from <= to ? `${fmt.date(from)} to ${fmt.date(to)}${except}` : 'No complete period yet';
   return (
     <p aria-label="Filters" className="text-sm text-muted">
       {drillFilterLine(report.query, lists, period).join(' · ')}

@@ -64,8 +64,15 @@ function all(value: string | string[] | undefined): string[] {
 function readRange(params: UrlParams): WidgetQueryInput['dateRange'] {
   const includeCurrent = first(params.current) === '1';
   switch (first(params.range)) {
-    case 'fixed':
-      return { kind: 'fixed', from: first(params.from), to: first(params.to) };
+    case 'fixed': {
+      const except = { from: first(params.exceptFrom), to: first(params.exceptTo) };
+      return {
+        kind: 'fixed',
+        from: first(params.from),
+        to: first(params.to),
+        ...(except.from || except.to ? { except } : {}),
+      };
+    }
     case 'yearToDate':
       return { kind: 'yearToDate', includeCurrent };
     default:
@@ -139,6 +146,10 @@ export function queryToParams(query: WidgetQueryInput): URLSearchParams {
   if (range.kind === 'fixed') {
     params.set('from', range.from);
     params.set('to', range.to);
+    if (range.except) {
+      params.set('exceptFrom', range.except.from);
+      params.set('exceptTo', range.except.to);
+    }
   } else {
     if (range.kind === 'last') {
       params.set('count', String(range.count));

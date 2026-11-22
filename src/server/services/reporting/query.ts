@@ -56,8 +56,18 @@ const MAX_FIXED_DAYS = 18_300;
 const isoDate = (what: string) => z.iso.date({ error: `${what} must be a date (YYYY-MM-DD)` });
 const ids = (what: string) => z.array(z.uuid({ error: `Unknown ${what}` })).max(500);
 
+/** Days inside a fixed range left out of it: the range is then the two stretches either side. */
+const exceptSpan = z
+  .object({ from: isoDate('Except from'), to: isoDate('Except to') })
+  .refine((span) => span.from <= span.to, 'Except from must not be after Except to');
+
 const fixedRange = z
-  .object({ kind: z.literal('fixed'), from: isoDate('From'), to: isoDate('To') })
+  .object({
+    kind: z.literal('fixed'),
+    from: isoDate('From'),
+    to: isoDate('To'),
+    except: exceptSpan.optional(),
+  })
   .refine((range) => range.from <= range.to, 'From must not be after To')
   .refine(
     (range) => Date.parse(range.to) - Date.parse(range.from) <= MAX_FIXED_DAYS * 86_400_000,

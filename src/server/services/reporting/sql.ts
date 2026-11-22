@@ -75,6 +75,14 @@ function minorUnitFactors(currencies: readonly string[]): Record<string, string>
   return factors;
 }
 
+/** The days a fixed range leaves out inside it, if any. */
+function exceptCondition(query: WidgetQuery, params: SqlParams): string[] {
+  const range = query.dateRange;
+  if (range.kind !== 'fixed' || !range.except) return [];
+  const { from, to } = range.except;
+  return [`t.booking_date NOT BETWEEN ${params.add(from)}::date AND ${params.add(to)}::date`];
+}
+
 /**
  * `WITH report_base AS (...)`: reportable rows (unsplit Transactions and Split lines) in
  * `range` that pass the filters, never Transfers (spec 89) nor Split lines that are Transfer
@@ -94,6 +102,7 @@ export function baseCte(
     't.transfer_id IS NULL',
     'sl.transfer_id IS NULL',
     `t.booking_date BETWEEN ${params.add(range.from)}::date AND ${params.add(range.to)}::date`,
+    ...exceptCondition(query, params),
     ...filterConditions(query, params),
   ];
   return `WITH report_base AS MATERIALIZED (

@@ -79,6 +79,7 @@ export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsV
 export type { AnalyticsPeriod } from './window';
 export type { AnalyticsCard, SectionStatus } from './figures';
 export type { AnalyticsKeyFigures, KeyFigure, KeyFigureId } from './key-figures';
+export type { KeyFigureChange } from './key-figure-change';
 export type { AnalyticsNetWorth } from './net-worth';
 export type { RecentTransactions } from './recent-transactions';
 export { ACCOUNT_BALANCES } from './account-balances';
