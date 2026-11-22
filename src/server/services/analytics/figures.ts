@@ -29,7 +29,7 @@ export interface Figure {
 
 /** What every section says besides its figures. */
 export interface SectionStatus {
-  /** Nothing the section reports falls in the window. */
+  /** Nothing the section reports falls in the Span. */
   isEmpty: boolean;
   /** Transactions (Accounts, for balances) left out for want of an FX rate. */
   unconvertedCount: number;
@@ -81,9 +81,26 @@ export function analyticsCard(spec: AnalyticsCardSpec): AnalyticsCard {
   };
 }
 
-/** A report's values, each opening its Drill-down from Analytics, read the same way. */
+/**
+ * A report's headers with the reading's incomplete periods (its partial first and its to-date
+ * last) marked partial: over the reading's fixed range, the engine marks none of them.
+ */
+function markIncomplete(report: ReportTable, reading: AnalyticsReading): ReportTable {
+  const incomplete = new Set(reading.periods.filter(isIncomplete).map((period) => period.key));
+  const mark = (headers: readonly ReportHeader[]) =>
+    headers.map((header) =>
+      header.key !== null && incomplete.has(header.key) ? { ...header, isPartial: true } : header,
+    );
+  return { ...report, rows: mark(report.rows), columns: mark(report.columns) };
+}
+
+/**
+ * A report over the reading's periods, each value opening its Drill-down from Analytics, read
+ * the same way; its incomplete periods are set apart.
+ */
 export function reportSource(report: ReportTable, reading: AnalyticsReading): ChartSource {
-  return toChartSource(report, drillLinks(report, analyticsOrigin(reading)));
+  const marked = markIncomplete(report, reading);
+  return toChartSource(marked, drillLinks(marked, analyticsOrigin(reading)));
 }
 
 /** The sum of some figures; null when every one is null. */
@@ -103,12 +120,12 @@ export function cellOf(report: ReportTable) {
   };
 }
 
-/** A row worked out by Analytics itself: a figure per period of the window, then its Total. */
+/** A row worked out by Analytics itself: a figure per period of the Span, then its Total. */
 export interface PeriodRow {
   key: string;
   label: string;
   cells: Figure[];
-  /** The whole window, the current period included. */
+  /** The whole Span, both incomplete periods included. */
   total: Figure;
 }
 
@@ -119,7 +136,7 @@ export interface PeriodRowSpec {
   query: WidgetQuery;
   /** The row's selector on the query's rows; absent for the whole of them. */
   selector?: AxisSelector;
-  /** The row's value in one period of the window. */
+  /** The row's value in one period of the Span. */
   valueAt: (periodKey: string) => number | null;
 }
 

@@ -1,6 +1,13 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
-import { analyticsHref, parsePeriodView, windowPhrase } from '@/lib/analytics/period-view';
+import {
+  analyticsHref,
+  legacySpan,
+  presetStarts,
+  spanFromParams,
+  spanPhrase,
+} from '@/lib/analytics/span';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import {
@@ -17,18 +24,19 @@ import { CardSection } from './card-section';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
 import { NET_WORTH, NetWorthSection } from './net-worth';
-import { PeriodSwitch } from './period-switch';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
+import { SpanControl } from './span-control';
 import { SpendingInsightsSection } from './spending-insights';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 
 /**
- * Analytics (GLOSSARY, ADR-0015): one fixed page of reports read through the Period view in the
- * `period` URL parameter (Month when missing or unknown). The shell and the switch render at
- * once; each section streams in behind its own placeholder and error boundary (./section), and
- * is drawn by the Dashboard's own cards (GLOSSARY: Card).
+ * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Span in the `span` URL
+ * parameter (Rolling 12 months when missing or unknown); a former `period` link redirects to its
+ * nearest Span. The shell and the Span control render at once; each section streams in behind
+ * its own placeholder and error boundary (./section), and is drawn by the Dashboard's own cards
+ * (GLOSSARY: Card).
  *
  * Adding a section: its service module (src/server/services/analytics), and a `StreamedSection`
  * below drawing it (a `CardSection` for one drawn as a Widget's card).
@@ -36,25 +44,32 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string | string[] }>;
+  searchParams: Promise<{ span?: string | string[]; period?: string | string[] }>;
 }) {
-  const view = parsePeriodView((await searchParams).period);
+  const params = await searchParams;
+  const legacy = params.span === undefined ? legacySpan(params.period) : null;
+  if (legacy) redirect(analyticsHref(legacy));
+  const span = spanFromParams(params);
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
-  const { sections, today } = loadAnalytics(ctx, view);
-  const retryHref = analyticsHref(view);
+  const { sections, today, reading } = loadAnalytics(ctx, span);
+  const retryHref = analyticsHref(span);
 
   return (
     <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
-        <p className="text-muted">
-          Your finances over {windowPhrase(view)}, the current one to date.
-        </p>
+        <p className="text-muted">Your finances over the Span you choose, up to today.</p>
       </header>
       <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
-      <PeriodSwitch view={view} />
+      <SpanControl
+        key={analyticsHref(span)}
+        span={span}
+        from={reading.from}
+        phrase={spanPhrase(span, reading)}
+        starts={presetStarts(today)}
+      />
       <div className="grid min-w-0 grid-cols-1 gap-5">
         {/* Key figures: four tiles in a row on wide screens, 2×2 below. */}
         <StreamedSection
@@ -67,7 +82,7 @@ export default async function AnalyticsPage({
         {/* The overview: three side by side on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_WORTH} retryHref={retryHref}>
-            <NetWorthSection netWorth={sections.netWorth} view={view} />
+            <NetWorthSection netWorth={sections.netWorth} reading={reading} />
           </StreamedSection>
           <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
             <SpendingInsightsSection flow={sections.spendingInsights} />

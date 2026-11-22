@@ -7,8 +7,9 @@ import {
   seedAccount,
   seedClassified,
 } from '@test/support/analytics';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
-import type { PeriodView } from '@/lib/analytics/period-view';
+import type { Span } from '@/lib/analytics/span';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import type { KeyFigure, KeyFigureId } from './key-figures';
 
@@ -33,7 +34,7 @@ async function categories() {
 /** An Unclassified booking in March: the Account's data reaches back before April. */
 const SINCE_MARCH = { bookingDate: '2025-03-01', amountMinor: 1_000 };
 
-async function figuresAt(view: PeriodView): Promise<Record<KeyFigureId, KeyFigure>> {
+async function figuresAt(view: Span): Promise<Record<KeyFigureId, KeyFigure>> {
   const section = await loadSection(t.ctx, view, 'keyFigures');
   return Object.fromEntries(section.figures.map((figure) => [figure.id, figure])) as Record<
     KeyFigureId,
@@ -54,7 +55,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-05-10', amountMinor: 120_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt('month');
+    const { income } = await figuresAt(MONTHLY);
 
     expect(income.change).toMatchObject({
       amount: 20_000,
@@ -72,7 +73,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-03-31', amountMinor: 40_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt('month');
+    const { income } = await figuresAt(MONTHLY);
 
     expect(income.change).toMatchObject({
       amount: 10_000,
@@ -80,7 +81,7 @@ describe('Key figures change', () => {
     });
   });
 
-  it('in Quarter, compares with the same number of days into the previous quarter', async () => {
+  it('by quarter, compares with the same number of days into the previous quarter', async () => {
     // The 50th day of Q2 (1 April is the first); the 50th of Q1 is 19 February.
     fixToday('2025-05-20');
     const { salary } = await categories();
@@ -92,7 +93,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-04-01', amountMinor: 50_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt('quarter');
+    const { income } = await figuresAt(QUARTERLY);
 
     expect(income.change).toMatchObject({
       amount: 20_000,
@@ -100,7 +101,7 @@ describe('Key figures change', () => {
     });
   });
 
-  it('in Quarter, on the last day of a longer quarter, compares with the whole previous one', async () => {
+  it('by quarter, on the last day of a longer quarter, compares with the whole previous one', async () => {
     // Q3 has 92 days, Q2 91: 30 September is compared with all of Q2.
     fixToday('2025-09-30');
     const { salary } = await categories();
@@ -110,12 +111,12 @@ describe('Key figures change', () => {
       { bookingDate: '2025-06-30', amountMinor: 30_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt('quarter');
+    const { income } = await figuresAt(QUARTERLY);
 
     expect(income.change?.label).toBe('vs 1 Apr – 30 Jun');
   });
 
-  it('in Year, compares with the same dates last year', async () => {
+  it('by year, compares with the same dates last year', async () => {
     fixToday('2025-05-20');
     const { salary } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
@@ -125,7 +126,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-03-01', amountMinor: 50_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt('year');
+    const { income } = await figuresAt(YEARLY);
 
     expect(income.change).toMatchObject({
       amount: 20_000,
@@ -133,7 +134,7 @@ describe('Key figures change', () => {
     });
   });
 
-  it('on 29 February, in Year, compares up to 28 February last year', async () => {
+  it('on 29 February, by year, compares up to 28 February last year', async () => {
     fixToday('2024-02-29');
     const { salary } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
@@ -142,7 +143,7 @@ describe('Key figures change', () => {
       { bookingDate: '2024-02-29', amountMinor: 1_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt('year');
+    const { income } = await figuresAt(YEARLY);
 
     expect(income.change).toMatchObject({
       label: 'vs 1 Jan – 28 Feb 2023',
@@ -161,7 +162,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-05-11', amountMinor: -25_000, classify: groceries },
     ]);
 
-    const { income, expense, profit } = await figuresAt('month');
+    const { income, expense, profit } = await figuresAt(MONTHLY);
 
     expect([income.change, expense.change, profit.change]).toMatchObject([
       { amount: 20_000, percent: 0.2, direction: 'up', isGood: true },
@@ -181,7 +182,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-05-11', amountMinor: -10_000, classify: groceries },
     ]);
 
-    const { income, expense, profit } = await figuresAt('month');
+    const { income, expense, profit } = await figuresAt(MONTHLY);
 
     // April 1-20: no income, CHF 400 out, a Profit of −CHF 400.
     expect([income.change, expense.change, profit.change]).toMatchObject([
@@ -201,7 +202,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-05-15', amountMinor: 1_000, classify: salary },
     ]);
 
-    const { income, expense } = await figuresAt('month');
+    const { income, expense } = await figuresAt(MONTHLY);
 
     expect(income.change).toMatchObject({ amount: 0, direction: 'flat', isGood: null });
     expect(expense.change).toMatchObject({ amount: 0, percent: null, direction: 'flat' });
@@ -216,8 +217,8 @@ describe('Key figures change', () => {
       { bookingDate: '2025-05-10', amountMinor: -55_000 },
     ]);
 
-    const month = (await figuresAt('month')).netWorth;
-    const quarter = (await figuresAt('quarter')).netWorth;
+    const month = (await figuresAt(MONTHLY)).netWorth;
+    const quarter = (await figuresAt(QUARTERLY)).netWorth;
 
     expect(month.change).toEqual({
       amount: -55_000,
@@ -251,7 +252,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-05-11', amountMinor: -25_000, classify: groceries },
     ]);
 
-    const { income, expense, profit } = await figuresAt('month');
+    const { income, expense, profit } = await figuresAt(MONTHLY);
 
     const incomeBoth = await openDrill(t.ctx, income.change?.href);
     expect(incomeBoth.sumChfMinor).toBe(220_000);
@@ -270,10 +271,10 @@ describe('Key figures change', () => {
       { key: '2025-05', sumChfMinor: 95_000 },
       { key: '2025-04', sumChfMinor: 80_000 },
     ]);
-    expect(originOf(profit.change!.href)).toEqual({ kind: 'analytics', period: 'month' });
+    expect(originOf(profit.change!.href)).toEqual({ kind: 'analytics', span: MONTHLY });
   });
 
-  it('in Year, opens both stretches a year apart', async () => {
+  it('by year, opens both stretches a year apart', async () => {
     fixToday('2025-05-20');
     const { salary } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
@@ -283,7 +284,7 @@ describe('Key figures change', () => {
       { bookingDate: '2025-03-01', amountMinor: 50_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt('year');
+    const { income } = await figuresAt(YEARLY);
 
     const both = await openDrill(t.ctx, income.change?.href);
     expect(both.subtotals).toEqual([
@@ -302,8 +303,8 @@ describe('Key figures change', () => {
       { bookingDate: '2025-05-15', amountMinor: 1_000, classify: salary },
     ]);
 
-    const month = await figuresAt('month');
-    const quarter = await figuresAt('quarter');
+    const month = await figuresAt(MONTHLY);
+    const quarter = await figuresAt(QUARTERLY);
 
     expect([month.income, month.expense, month.profit].map((figure) => figure.change)).toEqual([
       null,
@@ -311,14 +312,14 @@ describe('Key figures change', () => {
       null,
     ]);
     expect(month.netWorth.change).toMatchObject({ amount: 1_000, label: 'vs 30 Apr' });
-    // In Quarter, Net worth is compared with 31 March: before the data starts.
+    // By quarter, Net worth is compared with 31 March: before the data starts.
     expect(quarter.netWorth.change).toBeNull();
   });
 
   it('with no Accounts, has no change at all', async () => {
     fixToday('2025-05-20');
 
-    const section = await loadSection(t.ctx, 'month', 'keyFigures');
+    const section = await loadSection(t.ctx, MONTHLY, 'keyFigures');
 
     expect(section.figures.map((figure) => figure.change)).toEqual([null, null, null, null]);
   });

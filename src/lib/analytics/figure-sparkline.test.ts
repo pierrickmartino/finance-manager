@@ -24,6 +24,26 @@ describe("a Key figure's sparkline", () => {
     expect(shape.last.isPartial).toBe(false);
   });
 
+  it("sets a Span's cut-short first period apart too: its first segment dashed", () => {
+    const shape = figureSparkline([
+      point(0, true),
+      point(25),
+      point(50),
+      point(75),
+      point(100, true),
+    ])!;
+
+    expect(shape.solid).toBe('M25,70 L50,50 L75,30');
+    expect(shape.partial).toBe('M0,90 L25,70 M75,30 L100,10');
+  });
+
+  it('draws no solid line when both of only two periods are partial', () => {
+    const shape = figureSparkline([point(0, true), point(100, true)])!;
+
+    expect(shape.solid).toBe('');
+    expect(shape.partial).toBe('M0,90 L100,10');
+  });
+
   it('fits a line that crosses zero inside the box, lowest loss at the foot', () => {
     const shape = figureSparkline([point(-200), point(600), point(200, true)])!;
 

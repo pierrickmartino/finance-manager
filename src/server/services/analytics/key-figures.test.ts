@@ -7,6 +7,7 @@ import {
   seedAccount,
   seedClassified,
 } from '@test/support/analytics';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { linkTransfer, transactionSide } from '../transfers';
@@ -77,11 +78,11 @@ async function drilled(figure: KeyFigure): Promise<number> {
 }
 
 describe('Key figures', () => {
-  it('in Month, gives Net worth today and this month to date: income, expense and profit', async () => {
+  it('by month, gives Net worth today and this month to date: income, expense and profit', async () => {
     fixToday('2025-05-20');
     await dataset();
 
-    const section = await loadSection(t.ctx, 'month', 'keyFigures');
+    const section = await loadSection(t.ctx, MONTHLY, 'keyFigures');
 
     // May: 1,200.00 in; 300.00 of groceries less the 50.00 refund out. The property purchase,
     // the Unclassified payment and the Transfer count in neither.
@@ -103,7 +104,7 @@ describe('Key figures', () => {
     fixToday('2025-05-20');
     await dataset();
 
-    const [netWorth, income, expense, profit] = (await loadSection(t.ctx, 'month', 'keyFigures'))
+    const [netWorth, income, expense, profit] = (await loadSection(t.ctx, MONTHLY, 'keyFigures'))
       .figures as [KeyFigure, KeyFigure, KeyFigure, KeyFigure];
 
     expect(netWorth.href).toBe('/accounts?date=2025-05-20');
@@ -114,15 +115,15 @@ describe('Key figures', () => {
     const both = await openDrill(t.ctx, profit.href);
     expect(both.sumChfMinor).toBe(95_000);
     expect(both.total).toBe(3);
-    expect(originOf(profit.href)).toEqual({ kind: 'analytics', period: 'month' });
+    expect(originOf(profit.href)).toEqual({ kind: 'analytics', span: MONTHLY });
   });
 
-  it('in Quarter and Year, reads the current quarter and year to date, Net worth unchanged', async () => {
+  it('by quarter and by year, reads the current quarter and year to date, Net worth unchanged', async () => {
     fixToday('2025-05-20');
     await dataset();
 
-    const quarter = await loadSection(t.ctx, 'quarter', 'keyFigures');
-    const year = await loadSection(t.ctx, 'year', 'keyFigures');
+    const quarter = await loadSection(t.ctx, QUARTERLY, 'keyFigures');
+    const year = await loadSection(t.ctx, YEARLY, 'keyFigures');
 
     // Q2: April and May. 2025: February too; December 2024 is in neither.
     expect(amounts(quarter.figures)).toEqual([
@@ -139,14 +140,14 @@ describe('Key figures', () => {
     ]);
     expect(quarter.figures[1]!.caption).toBe('Q2 2025 to date');
     expect(year.figures[1]!.caption).toBe('2025 to date');
-    for (const [view, section] of [
-      ['quarter', quarter],
-      ['year', year],
+    for (const [span, section] of [
+      [QUARTERLY, quarter],
+      [YEARLY, year],
     ] as const) {
       for (const figure of section.figures.slice(1)) {
         const sign = figure.id === 'expense' ? -1 : 1;
-        expect(await drilled(figure), `${view} ${figure.label}`).toBe(sign * figure.value);
-        expect(originOf(figure.href)).toEqual({ kind: 'analytics', period: view });
+        expect(await drilled(figure), figure.label).toBe(sign * figure.value);
+        expect(originOf(figure.href)).toEqual({ kind: 'analytics', span });
       }
       expect(section.figures[0]!.href).toBe('/accounts?date=2025-05-20');
     }
@@ -161,7 +162,7 @@ describe('Key figures', () => {
       { bookingDate: '2025-05-05', amountMinor: -30_000, classify: groceries },
     ]);
 
-    const [, income, expense, profit] = (await loadSection(t.ctx, 'month', 'keyFigures'))
+    const [, income, expense, profit] = (await loadSection(t.ctx, MONTHLY, 'keyFigures'))
       .figures as [KeyFigure, KeyFigure, KeyFigure, KeyFigure];
 
     expect([income.value, expense.value, profit.value]).toEqual([0, 30_000, -30_000]);
@@ -173,7 +174,7 @@ describe('Key figures', () => {
   it('with no Accounts, has no Net worth to show and CHF 0 for the period', async () => {
     fixToday('2025-05-20');
 
-    const section = await loadSection(t.ctx, 'month', 'keyFigures');
+    const section = await loadSection(t.ctx, MONTHLY, 'keyFigures');
 
     expect(section.figures.map((figure) => [figure.label, figure.value, figure.isEmpty])).toEqual([
       ['Net worth', 0, true],
@@ -196,7 +197,7 @@ describe('Key figures', () => {
       { bookingDate: '2025-05-12', amountMinor: -5_000, classify: groceries },
     ]);
 
-    const [netWorth, income, expense, profit] = (await loadSection(t.ctx, 'month', 'keyFigures'))
+    const [netWorth, income, expense, profit] = (await loadSection(t.ctx, MONTHLY, 'keyFigures'))
       .figures as [KeyFigure, KeyFigure, KeyFigure, KeyFigure];
 
     expect(netWorth.unconverted).toEqual({ count: 1, counted: 'Account' });
@@ -219,7 +220,7 @@ describe('Key figures', () => {
       { bookingDate: '2025-05-12', amountMinor: 50_000, classify: salary },
     ]);
 
-    const [, income, expense, profit] = (await loadSection(t.ctx, 'month', 'keyFigures'))
+    const [, income, expense, profit] = (await loadSection(t.ctx, MONTHLY, 'keyFigures'))
       .figures as [KeyFigure, KeyFigure, KeyFigure, KeyFigure];
 
     expect(income.value).toBe(0);

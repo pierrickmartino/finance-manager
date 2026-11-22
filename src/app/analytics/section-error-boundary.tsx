@@ -6,7 +6,7 @@ import { SECTION_TITLE_CLASS, SMALL_BUTTON_CLASS, TILE_CLASS } from '@/component
 interface SectionErrorBoundaryProps {
   /** The section's name, so the failed section still says which it is. */
   name: string;
-  /** Analytics at the same Period view, to load again. */
+  /** Analytics over the same Span, to load again. */
   retryHref: string;
   children: ReactNode;
 }

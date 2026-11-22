@@ -1,0 +1,92 @@
+import { describe, expect, it } from 'vitest';
+import {
+  analyticsHref,
+  legacySpan,
+  presetSpan,
+  presetStarts,
+  spanFromParams,
+  spanGrain,
+  spanPhrase,
+  spanStart,
+} from './span';
+
+/** The Span model (GLOSSARY: Span, Span preset; ADR-0016), read on a fixed today. */
+
+const preset = presetSpan;
+
+describe('a Span preset', () => {
+  it('starts where its name says on 22 Nov 2026', () => {
+    expect(presetStarts('2026-11-22')).toEqual({
+      'rolling-30-days': '2026-10-24',
+      'rolling-60-days': '2026-09-24',
+      'rolling-90-days': '2026-08-25',
+      'quarter-to-date': '2026-10-01',
+      'year-to-date': '2026-01-01',
+      'rolling-12-months': '2025-11-23',
+      'this-year-and-last-1': '2025-01-01',
+      'this-year-and-last-2': '2024-01-01',
+      'this-year-and-last-3': '2023-01-01',
+      'this-year-and-last-4': '2022-01-01',
+    });
+  });
+
+  it('starts Rolling 12 months the day after a year earlier, 29 February included', () => {
+    expect(spanStart(preset('rolling-12-months'), '2024-02-29')).toBe('2023-03-01');
+    expect(spanStart(preset('rolling-12-months'), '2026-01-01')).toBe('2025-01-02');
+    expect(spanStart(preset('quarter-to-date'), '2026-03-31')).toBe('2026-01-01');
+  });
+});
+
+describe("a Span's grain", () => {
+  it('is months up to 13 calendar months, quarters up to 24, years beyond', () => {
+    const today = '2026-11-22';
+
+    expect(spanGrain('2026-11-01', today)).toBe('month');
+    // Rolling 12 months reaches into 13 calendar months.
+    expect(spanGrain('2025-11-23', today)).toBe('month');
+    expect(spanGrain('2025-10-31', today)).toBe('quarter');
+    expect(spanGrain('2024-12-01', today)).toBe('quarter');
+    expect(spanGrain('2024-11-30', today)).toBe('year');
+  });
+});
+
+describe('the Span in the URL', () => {
+  it('reads `span` as its preset, and a missing or unknown one as Rolling 12 months', () => {
+    expect(spanFromParams({ span: 'rolling-90-days' })).toEqual(preset('rolling-90-days'));
+    expect(spanFromParams({ span: ['year-to-date', 'rolling-30-days'] })).toEqual(
+      preset('year-to-date'),
+    );
+    for (const params of [{}, { span: 'rolling-7-days' }, { span: '' }]) {
+      expect(spanFromParams(params)).toEqual(preset('rolling-12-months'));
+    }
+  });
+
+  it('maps a legacy `period` to its nearest preset, and anything else to none', () => {
+    expect(legacySpan('month')).toEqual(preset('rolling-12-months'));
+    expect(legacySpan('quarter')).toEqual(preset('this-year-and-last-1'));
+    expect(legacySpan('year')).toEqual(preset('this-year-and-last-4'));
+    expect(legacySpan('week')).toBeNull();
+    expect(legacySpan(undefined)).toBeNull();
+  });
+
+  it('links Analytics with a preset by its slug, and a custom Span by its start date', () => {
+    expect(analyticsHref(preset('quarter-to-date'))).toBe('/analytics?span=quarter-to-date');
+    expect(analyticsHref({ kind: 'custom', from: '2024-03-01' })).toBe(
+      '/analytics?from=2024-03-01',
+    );
+  });
+});
+
+describe('the Span in words', () => {
+  it('names the preset and its dates, the year once when both ends share it', () => {
+    expect(spanPhrase(preset('rolling-90-days'), { from: '2026-08-25', to: '2026-11-22' })).toBe(
+      'Rolling 90 days · 25 Aug – 22 Nov 2026',
+    );
+    expect(spanPhrase(preset('rolling-12-months'), { from: '2025-11-23', to: '2026-11-22' })).toBe(
+      'Rolling 12 months · 23 Nov 2025 – 22 Nov 2026',
+    );
+    expect(
+      spanPhrase({ kind: 'custom', from: '2026-11-22' }, { from: '2026-11-22', to: '2026-11-22' }),
+    ).toBe('Custom · 22 Nov 2026');
+  });
+});

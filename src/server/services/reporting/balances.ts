@@ -277,7 +277,7 @@ export const NET_WORTH_TREND_QUERY: WidgetQuery = netWorthTrendQuery(HEADLINE_SP
 /**
  * A Net worth trend: Net worth over time on every Account, valued as a Net worth Widget's
  * points are (ADR-0014), whatever any Widget's filters. By default the overview headline's
- * (GLOSSARY: Dashboard Story); Analytics reads one per Period view.
+ * (GLOSSARY: Dashboard Story); Analytics reads one per grain of its Span.
  */
 export function runNetWorthTrend(
   ctx: ServiceContext,

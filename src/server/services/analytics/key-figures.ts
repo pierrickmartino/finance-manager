@@ -55,7 +55,7 @@ export interface KeyFigure {
   unconverted: KeyFigureUnconverted;
   /** Against the figure's earlier value; null when there is none to compare with. */
   change: KeyFigureChange | null;
-  /** Its recent trend, a point per period of the window; the current one partial. */
+  /** Its recent trend, a point per period of the Span; the current one partial. */
   sparkline: SparklinePoint[];
 }
 

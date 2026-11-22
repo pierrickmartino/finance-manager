@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, loadSection, seedAccount, seedClassified } from '@test/support/analytics';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { readCard } from '@/lib/reporting/card';
@@ -39,7 +40,7 @@ describe('Account balances in CHF', () => {
     fixToday('2025-03-20');
     const { ubs, ca } = await dataset();
 
-    const card = await loadSection(t.ctx, 'month', 'accountBalances');
+    const card = await loadSection(t.ctx, MONTHLY, 'accountBalances');
     const reading = readCard(card, money);
 
     expect(card.name).toBe('Account balances in CHF');
@@ -72,13 +73,13 @@ describe('Account balances in CHF', () => {
     });
   });
 
-  it('is identical whatever the Period view', async () => {
+  it('is identical whatever the Span', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const year = await loadSection(t.ctx, 'year', 'accountBalances');
-    const quarter = await loadSection(t.ctx, 'quarter', 'accountBalances');
-    const month = await loadSection(t.ctx, 'month', 'accountBalances');
+    const year = await loadSection(t.ctx, YEARLY, 'accountBalances');
+    const quarter = await loadSection(t.ctx, QUARTERLY, 'accountBalances');
+    const month = await loadSection(t.ctx, MONTHLY, 'accountBalances');
 
     expect(month.data!.rows).toHaveLength(2);
     expect(quarter).toEqual(month);
@@ -92,7 +93,7 @@ describe('Account balances in CHF', () => {
     await seedClassified(t.ctx, ubs, [{ bookingDate: '2025-03-01', amountMinor: 5_000 }]);
     await seedClassified(t.ctx, ca, [{ bookingDate: '2025-03-01', amountMinor: 7_000 }]);
 
-    const card = await loadSection(t.ctx, 'month', 'accountBalances');
+    const card = await loadSection(t.ctx, MONTHLY, 'accountBalances');
 
     expect(card.data!.rowTotals).toEqual([null, 5_000]);
     expect(card.data!.total).toBe(5_000);
@@ -102,7 +103,7 @@ describe('Account balances in CHF', () => {
   it('is empty with no Accounts yet', async () => {
     fixToday('2025-03-20');
 
-    const card = await loadSection(t.ctx, 'month', 'accountBalances');
+    const card = await loadSection(t.ctx, MONTHLY, 'accountBalances');
 
     expect(card.data!.rows).toEqual([]);
     expect(card.data!.total).toBeNull();

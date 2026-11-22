@@ -1,6 +1,6 @@
 import { formatPeriod } from '@/lib/format';
-import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
-import { periodsIn, resolveRange } from '../reporting/periods';
+import { spanGrain, spanStart, type Span } from '@/lib/analytics/span';
+import { periodSpan, periodsIn } from '../reporting/periods';
 import type { DateRange, TimeAxis } from '../reporting/query';
 
 /** One period Analytics is read over, oldest first. */
@@ -15,19 +15,19 @@ export interface AnalyticsPeriod {
 }
 
 /**
- * What every section of Analytics reads: the stretch of days from `from` to today, split into
- * periods of its grain. `loadAnalytics` resolves it once, so a section never reads the Period
- * view (or, in its place, the Span) itself.
+ * What every section of Analytics reads: the Span (GLOSSARY, ADR-0016) resolved on today, from
+ * its first day to today, split into periods of its grain. `loadAnalytics` resolves it once, so a
+ * section never reads the Span itself.
  */
 export interface AnalyticsReading {
   /** How it was chosen: what Analytics' URL and a Drill-down's way back carry. */
-  view: PeriodView;
+  span: Span;
   /** The first day read. */
   from: string;
   /** The last day read: always today. */
   to: string;
   grain: TimeAxis;
-  /** The reporting date range the sections query, `from` to today. */
+  /** The reporting date range the sections query: `from` to today, fixed. */
   range: DateRange;
   periods: AnalyticsPeriod[];
 }
@@ -36,22 +36,25 @@ export interface AnalyticsReading {
 export const isIncomplete = (period: AnalyticsPeriod): boolean =>
   period.isToDate || period.isPartial;
 
-/** A Period view's reading on `today`: its Period window, the current period to date. */
-export function readingOf(view: PeriodView, today: string): AnalyticsReading {
-  const range = windowRange(view);
-  const { range: span } = resolveRange(range, today);
-  const keys = periodsIn(span, view);
+/**
+ * A Span's reading on `today`: its periods at the grain its length gives, the first cut at its
+ * start date (partial when that is not the period's first day), the last to date.
+ */
+export function readingOf(span: Span, today: string): AnalyticsReading {
+  const from = spanStart(span, today);
+  const grain = spanGrain(from, today);
+  const keys = periodsIn({ from, to: today }, grain);
   return {
-    view,
-    from: span.from,
-    to: span.to,
-    grain: view,
-    range,
+    span,
+    from,
+    to: today,
+    grain,
+    range: { kind: 'fixed', from, to: today },
     periods: keys.map((key, index) => ({
       key,
       label: formatPeriod(key),
       isToDate: index === keys.length - 1,
-      isPartial: false,
+      isPartial: index === 0 && periodSpan(key, grain).from < from,
     })),
   };
 }
