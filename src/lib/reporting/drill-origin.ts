@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { analyticsHref, spanFromParams, spanToParams, type Span } from '@/lib/analytics/span';
+import { swissToday } from '@/server/services/fx/dates';
 import type { WidgetQueryInput } from '@/server/services/reporting/query';
 import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-params';
 
@@ -8,7 +9,7 @@ import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-pa
  * saved Widget, the Widget editor (with the query in the URL), the Recurring payments page (a
  * Recurring payment's charges), or Analytics over a Span. It travels in the URL as a type and an
  * id (`origin=dashboard&originId=<uuid>`) or a Span, its parameters prefixed `origin`
- * (`origin=analytics&originSpan=year-to-date`), never as a path, so a forged value can only ever
+ * (`origin=analytics&originSpan=year-to-date`, or `originFrom=2024-03-01` for a custom one), never as a path, so a forged value can only ever
  * fall back to the editor (or to Analytics over the default Span).
  */
 export type DrillOrigin =
@@ -51,7 +52,10 @@ export function originFromParams(params: UrlParams): DrillOrigin {
   const kind = first(params.origin);
   const id = first(params.originId);
   if (kind === 'recurringPayment') return RECURRING_PAYMENT;
-  if (kind === 'analytics') return { kind, span: spanFromParams({ span: params.originSpan }) };
+  if (kind === 'analytics') {
+    const span = spanFromParams({ span: params.originSpan, from: params.originFrom }, swissToday());
+    return { kind, span };
+  }
   if ((kind !== 'dashboard' && kind !== 'widget') || !UUID.safeParse(id).success) return EDITOR;
   return { kind, id };
 }

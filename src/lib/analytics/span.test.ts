@@ -8,11 +8,13 @@ import {
   spanGrain,
   spanPhrase,
   spanStart,
+  type Span,
 } from './span';
 
 /** The Span model (GLOSSARY: Span, Span preset; ADR-0016), read on a fixed today. */
 
 const preset = presetSpan;
+const custom = (from: string): Span => ({ kind: 'custom', from });
 
 describe('a Span preset', () => {
   it('starts where its name says on 22 Nov 2026', () => {
@@ -52,13 +54,50 @@ describe("a Span's grain", () => {
 
 describe('the Span in the URL', () => {
   it('reads `span` as its preset, and a missing or unknown one as Rolling 12 months', () => {
-    expect(spanFromParams({ span: 'rolling-90-days' })).toEqual(preset('rolling-90-days'));
-    expect(spanFromParams({ span: ['year-to-date', 'rolling-30-days'] })).toEqual(
+    expect(spanFromParams({ span: 'rolling-90-days' }, '2026-11-22')).toEqual(
+      preset('rolling-90-days'),
+    );
+    expect(spanFromParams({ span: ['year-to-date', 'rolling-30-days'] }, '2026-11-22')).toEqual(
       preset('year-to-date'),
     );
     for (const params of [{}, { span: 'rolling-7-days' }, { span: '' }]) {
-      expect(spanFromParams(params)).toEqual(preset('rolling-12-months'));
+      expect(spanFromParams(params, '2026-11-22')).toEqual(preset('rolling-12-months'));
     }
+  });
+
+  it('reads a valid `from` on or before today as a custom Span', () => {
+    const today = '2026-11-22';
+    expect(spanFromParams({ from: '2024-03-01' }, today)).toEqual(custom('2024-03-01'));
+    expect(spanFromParams({ from: '2026-11-22' }, today)).toEqual(custom('2026-11-22'));
+    expect(spanFromParams({ from: ['2025-01-31', '2020-01-01'] }, today)).toEqual(
+      custom('2025-01-31'),
+    );
+  });
+
+  it('keeps a custom start date on a later day, where a preset rolls forward', () => {
+    for (const today of ['2026-11-22', '2027-05-03']) {
+      expect(spanStart(spanFromParams({ from: '2024-03-01' }, today), today)).toBe('2024-03-01');
+    }
+    expect(spanStart(spanFromParams({ span: 'rolling-30-days' }, '2027-05-03'), '2027-05-03')).toBe(
+      '2027-04-04',
+    );
+  });
+
+  it('reads a future or malformed `from` as Rolling 12 months', () => {
+    const today = '2026-11-22';
+    for (const from of ['2026-11-23', '2030-01-01', '2026-02-30', '2026-13-01', '1-3-2024', '']) {
+      expect(spanFromParams({ from }, today)).toEqual(preset('rolling-12-months'));
+    }
+  });
+
+  it('lets a chosen preset win over `from`, and an unknown `span` (Custom) defer to it', () => {
+    const today = '2026-11-22';
+    expect(spanFromParams({ span: 'year-to-date', from: '2024-03-01' }, today)).toEqual(
+      preset('year-to-date'),
+    );
+    expect(spanFromParams({ span: 'custom', from: '2024-03-01' }, today)).toEqual(
+      custom('2024-03-01'),
+    );
   });
 
   it('maps a legacy `period` to its nearest preset, and anything else to none', () => {

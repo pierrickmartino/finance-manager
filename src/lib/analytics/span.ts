@@ -111,14 +111,28 @@ export const DEFAULT_SPAN: Span = presetSpan('rolling-12-months');
 /** The search parameters a Span is read from. */
 export interface SpanParams {
   span?: string | string[];
+  from?: string | string[];
 }
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-/** The Span in Analytics' URL: `span=<slug>`; otherwise, or for an unknown slug, the default. */
-export function spanFromParams(params: SpanParams): Span {
+/** Whether a value is a real calendar day as `YYYY-MM-DD`. */
+function isIsoDay(value: string | undefined): value is string {
+  if (value === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const time = Date.parse(`${value}T00:00:00Z`);
+  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === value;
+}
+
+/**
+ * The Span in Analytics' URL on `today`: `span=<slug>` gives that preset (so a chosen preset wins
+ * over the date sent beside it); otherwise `from=YYYY-MM-DD`, on or before today, gives a custom
+ * Span. Anything else is the default.
+ */
+export function spanFromParams(params: SpanParams, today: string): Span {
   const slug = first(params.span);
-  return isSpanPreset(slug) ? presetSpan(slug) : DEFAULT_SPAN;
+  if (isSpanPreset(slug)) return presetSpan(slug);
+  const from = first(params.from);
+  return isIsoDay(from) && from <= today ? { kind: 'custom', from } : DEFAULT_SPAN;
 }
 
 /** The nearest preset of each former Period view (`?period=`), which the page redirects to. */

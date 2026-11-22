@@ -1,7 +1,8 @@
 'use client';
 
 import Form from 'next/form';
-import { useId, useState, type ChangeEvent } from 'react';
+import { useId, useState, useSyncExternalStore, type ChangeEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { INPUT_CLASS } from '@/components/named-list';
 import { SECONDARY_BUTTON_CLASS } from '@/components/surface';
 import {
@@ -23,21 +24,55 @@ interface SpanControlProps {
   phrase: string;
   /** Each preset's start date today, so picking one fills in its date at once. */
   starts: Record<SpanPreset, string>;
+  /** Today: the latest start date the field takes. */
+  today: string;
 }
 
+const noSubscription = () => () => {};
+
+/** Whether the control runs in the browser: false while server-rendering and hydrating. */
+function useIsHydrated(): boolean {
+  return useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+}
+
+/** The select's value for a typed start date. */
+const CUSTOM = 'custom';
+
 /**
- * Analytics' only control (GLOSSARY: Span, ADR-0016): a GET form of the Span presets and the
- * start date the chosen one gives, read-only, under the Span in words. Picking a preset fills
- * in its date and reads Analytics over it; without JavaScript, Show submits the form as is. It
- * sticks to the top of the screen as the page scrolls, so the Span can change from anywhere.
+ * Analytics' only control (GLOSSARY: Span, ADR-0016): a GET form of the Span presets (and
+ * Custom) and the Span's start date, under the Span in words. Picking a preset fills in its date
+ * and reads Analytics over it; typing a date switches the list to Custom, and Show reads
+ * Analytics from it. Once hydrated, the form sends only `span` for a preset or only `from` for
+ * Custom; without JavaScript it sends both, and the chosen preset wins unless Custom is
+ * selected. It sticks to the top of the screen as the page scrolls, so the Span can change from
+ * anywhere.
  */
-export function SpanControl({ span, from, phrase, starts }: SpanControlProps) {
+export function SpanControl({ span, from, phrase, starts, today }: SpanControlProps) {
   const id = useId();
+  const [choice, setChoice] = useState<string>(span.kind === 'preset' ? span.preset : CUSTOM);
   const [start, setStart] = useState(from);
+  const isHydrated = useIsHydrated();
+  const isCustom = choice === CUSTOM;
   const onPreset = (event: ChangeEvent<HTMLSelectElement>) => {
     const { value, form } = event.currentTarget;
-    if (isSpanPreset(value)) setStart(starts[value]);
+    if (!isSpanPreset(value)) {
+      setChoice(value);
+      return;
+    }
+    // Rendered before submitting, so the form names the preset's field, not the date's.
+    flushSync(() => {
+      setChoice(value);
+      setStart(starts[value]);
+    });
     form?.requestSubmit();
+  };
+  const onDate = (event: ChangeEvent<HTMLInputElement>) => {
+    setStart(event.currentTarget.value);
+    setChoice(CUSTOM);
   };
 
   return (
@@ -52,8 +87,8 @@ export function SpanControl({ span, from, phrase, starts }: SpanControlProps) {
         <label htmlFor={`${id}-span`}>Span</label>
         <select
           id={`${id}-span`}
-          name="span"
-          defaultValue={span.kind === 'preset' ? span.preset : undefined}
+          name={isHydrated && isCustom ? undefined : 'span'}
+          value={choice}
           onChange={onPreset}
           className={INPUT_CLASS}
         >
@@ -62,6 +97,7 @@ export function SpanControl({ span, from, phrase, starts }: SpanControlProps) {
               {SPAN_PRESET_LABELS[preset]}
             </option>
           ))}
+          <option value={CUSTOM}>Custom</option>
         </select>
       </div>
       <div className={FIELD_CLASS}>
@@ -69,9 +105,12 @@ export function SpanControl({ span, from, phrase, starts }: SpanControlProps) {
         <input
           id={`${id}-from`}
           type="date"
+          name={isHydrated && !isCustom ? undefined : 'from'}
           value={start}
-          readOnly
-          className={`${INPUT_CLASS} text-ink-soft`}
+          max={today}
+          required
+          onChange={onDate}
+          className={INPUT_CLASS}
         />
       </div>
       <button type="submit" className={SECONDARY_BUTTON_CLASS}>
