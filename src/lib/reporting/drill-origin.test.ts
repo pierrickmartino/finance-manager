@@ -85,6 +85,14 @@ describe('Drill-down origin', () => {
     });
   });
 
+  it('round-trips Analytics over a custom Span by its start date', () => {
+    const span = { kind: 'custom', from: '2024-03-01' } as const;
+    const params = Object.fromEntries(originToParams({ kind: 'analytics', span }));
+    expect(params).toEqual({ origin: 'analytics', originFrom: '2024-03-01' });
+    expect(originFromParams(params)).toEqual({ kind: 'analytics', span });
+    expect(backLink({ kind: 'analytics', span }).href).toBe('/analytics?from=2024-03-01');
+  });
+
   it('reads Analytics with a missing or unknown Span as the default one', () => {
     for (const params of [{ origin: 'analytics' }, { origin: 'analytics', originSpan: 'week' }]) {
       expect(originFromParams(params)).toEqual({ kind: 'analytics', span: DEFAULT_SPAN });

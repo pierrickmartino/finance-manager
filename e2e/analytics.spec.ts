@@ -194,6 +194,74 @@ test('picking a Span preset fills in its date, reads every section over it, and 
   await expect(preset).toHaveValue('this-year-and-last-4');
 });
 
+test('typing a start date switches the Span to Custom, reads every section from it, and a Drill-down returns to it', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  // An older Transaction, so the typed date is never before the first one (and stays as typed).
+  await withServices(async (ctx) => {
+    const account = (await listAccounts(ctx)).find(
+      (item) => item.name === `Analytics account ${suffix}`,
+    );
+    await createManualTransaction(ctx, {
+      accountId: account!.id,
+      bookingDate: '2021-01-05',
+      amountMinor: -10_00,
+      description: `Analytics old purchase ${suffix}`,
+    });
+  });
+  const from = monthsAgo(2);
+  const atFrom = new RegExp(`/analytics\\?from=${from}$`);
+  const control = spanControl(page);
+  const preset = control.getByLabel('Span', { exact: true });
+  const date = control.getByLabel('From', { exact: true });
+  const name = 'Income vs. expense';
+
+  await page.goto('/analytics');
+  await date.fill(from);
+  await expect(preset).toHaveValue('custom');
+  await control.getByRole('button', { name: 'Show' }).click();
+
+  await expect(page).toHaveURL(atFrom);
+  await expect(preset).toHaveValue('custom');
+  await expect(date).toHaveValue(from);
+  await expect(
+    control.getByText(spanPhrase({ kind: 'custom', from }, { from, to: TODAY })),
+  ).toBeVisible();
+  // Three months, the first cut short at the 15th and the current one running, then Total.
+  await expect(heatmap(page, name).getByRole('columnheader')).toHaveCount(3 + 1);
+  const headers = await columns(page, name);
+  expect(headers[0]!.endsWith('*')).toBe(true);
+  expect(headers.slice(-2)).toEqual([`${CURRENT_MONTH.split(' ')[0]}*`, 'Total']);
+  await expect(
+    region(page, 'Net cash flow').getByRole('link', {
+      name: new RegExp(`^${CURRENT_MONTH} \\(partial\\): `),
+    }),
+  ).toBeVisible();
+
+  // A bookmark keeps its start date: reloading reads from it again.
+  await page.reload();
+  await expect(date).toHaveValue(from);
+
+  // The current month's income opens the Transactions behind it, with a way back to the Span.
+  await heatmap(page, name)
+    .getByRole('link', { name: new RegExp(`^Income, ${CURRENT_MONTH} \\(partial\\): `) })
+    .click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*originFrom=/);
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(atFrom);
+  await expect(preset).toHaveValue('custom');
+
+  // Picking a preset refills the date.
+  await preset.selectOption('year-to-date');
+  await expect(page).toHaveURL(/\/analytics\?span=year-to-date$/);
+  await expect(date).toHaveValue(`${YEAR}-01-01`);
+});
+
 test('a former Period view link redirects to its nearest Span', async ({ page }) => {
   for (const [period, span] of [
     ['month', 'rolling-12-months'],

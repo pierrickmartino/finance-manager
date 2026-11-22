@@ -66,7 +66,7 @@ export async function loadSection<Name extends keyof AnalyticsSections>(
   span: Span,
   name: Name,
 ): Promise<Awaited<AnalyticsSections[Name]>> {
-  const { sections } = loadAnalytics(ctx, span);
+  const { sections } = await loadAnalytics(ctx, span);
   await Promise.allSettled(Object.values(sections));
   return await sections[name];
 }

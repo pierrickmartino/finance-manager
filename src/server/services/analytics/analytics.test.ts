@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, openDrill, seedAccount, seedClassified } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
-import { DEFAULT_SPAN, presetSpan } from '@/lib/analytics/span';
+import { DEFAULT_SPAN, presetSpan, type Span } from '@/lib/analytics/span';
 import { loadAnalytics, type AnalyticsSections, type AnalyticsView } from '.';
 
 /** The page as a whole: the reading (the Span resolved once) every section reads. */
@@ -25,13 +25,61 @@ async function settled(
 type Loaded = { [Name in keyof AnalyticsSections]: Awaited<AnalyticsSections[Name]> };
 
 const keys = (periods: { key: string | null }[]) => periods.map((period) => period.key);
+const custom = (from: string): Span => ({ kind: 'custom', from });
 const flags = (periods: { isPartial: boolean }[]) => periods.map((period) => period.isPartial);
+
+describe('a custom Span', () => {
+  it('reads from its start date to today, by the grain its length gives', async () => {
+    fixToday('2025-03-20');
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedClassified(t.ctx, ubs, [{ bookingDate: '2024-01-05', amountMinor: -1_000 }]);
+
+    const { reading } = await settled(await loadAnalytics(t.ctx, custom('2024-06-15')));
+
+    expect(reading).toMatchObject({ span: custom('2024-06-15'), from: '2024-06-15' });
+    expect(reading.grain).toBe('month');
+    expect(reading.periods[0]).toMatchObject({ key: '2024-06', isPartial: true });
+  });
+
+  it('is clamped to the first Transaction, and the effective Span returned', async () => {
+    fixToday('2025-03-20');
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2024-09-10', amountMinor: -4_000 },
+      { bookingDate: '2025-02-01', amountMinor: 6_000 },
+    ]);
+
+    const { reading, sections } = await settled(await loadAnalytics(t.ctx, custom('2020-01-01')));
+
+    expect(reading).toMatchObject({ span: custom('2024-09-10'), from: '2024-09-10' });
+    expect(reading.grain).toBe('month');
+    expect(keys(reading.periods)).toEqual([
+      ...['2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03'],
+    ]);
+    // Every section reads the clamped Span.
+    expect(keys(sections.netCashFlow.data!.rows)).toEqual(keys(reading.periods));
+    expect(sections.netCashFlow.data!.total).toBe(2_000);
+  });
+
+  it('is left as typed when it starts on or after the first Transaction, or there is none', async () => {
+    fixToday('2025-03-20');
+
+    expect((await settled(await loadAnalytics(t.ctx, custom('2020-01-01')))).reading.from).toBe(
+      '2020-01-01',
+    );
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedClassified(t.ctx, ubs, [{ bookingDate: '2024-09-10', amountMinor: -4_000 }]);
+    expect((await settled(await loadAnalytics(t.ctx, custom('2024-09-10')))).reading.from).toBe(
+      '2024-09-10',
+    );
+  });
+});
 
 describe('the reading', () => {
   it('opens on Rolling 12 months by month, its first month cut short and the last to date', async () => {
     fixToday('2025-03-20');
 
-    const { reading, sections } = await settled(loadAnalytics(t.ctx, DEFAULT_SPAN));
+    const { reading, sections } = await settled(await loadAnalytics(t.ctx, DEFAULT_SPAN));
     const { periods } = reading;
 
     expect(reading).toMatchObject({
@@ -70,9 +118,10 @@ describe('the reading', () => {
   it('is split by quarter up to 24 months and by year beyond', async () => {
     fixToday('2025-03-20');
 
-    const quarterly = (await settled(loadAnalytics(t.ctx, presetSpan('this-year-and-last-1'))))
-      .reading;
-    const yearly = (await settled(loadAnalytics(t.ctx, presetSpan('this-year-and-last-4'))))
+    const quarterly = (
+      await settled(await loadAnalytics(t.ctx, presetSpan('this-year-and-last-1')))
+    ).reading;
+    const yearly = (await settled(await loadAnalytics(t.ctx, presetSpan('this-year-and-last-4'))))
       .reading;
 
     expect(quarterly).toMatchObject({ from: '2024-01-01', grain: 'quarter' });
@@ -105,7 +154,7 @@ describe('the reading', () => {
       { bookingDate: '2025-03-20', amountMinor: 3_000 },
     ]);
 
-    const { sections } = await settled(loadAnalytics(t.ctx, DEFAULT_SPAN));
+    const { sections } = await settled(await loadAnalytics(t.ctx, DEFAULT_SPAN));
     const data = sections.netCashFlow.data!;
 
     expect(data.rowTotals[0]).toBe(-10_000);

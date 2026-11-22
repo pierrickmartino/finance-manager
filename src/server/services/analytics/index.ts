@@ -48,15 +48,36 @@ export interface AnalyticsView {
   sections: AnalyticsSections;
 }
 
+/** The first Transaction's date; null when there is none. */
+async function firstTransactionDate(ctx: ServiceContext): Promise<string | null> {
+  const result = await ctx.db.query<{ first: string | null }>(
+    `SELECT to_char(min(booking_date), 'YYYY-MM-DD') AS first FROM "transaction"`,
+  );
+  return result.rows[0]?.first ?? null;
+}
+
 /**
- * Starts every section of Analytics over a Span. The sections' promises are not awaited
- * here: the page awaits each where it shows it. Net worth reads the Account balances and
+ * The Span Analytics is read over: a custom start date before the first Transaction moves to
+ * that Transaction's date, so no empty periods come before the data. A preset stays as named.
+ */
+async function effectiveSpan(ctx: ServiceContext, span: Span, today: string): Promise<Span> {
+  if (span.kind !== 'custom') return span;
+  const first = await firstTransactionDate(ctx);
+  // Never past today: a Span always ends today, so it may not start after it.
+  const start = first !== null && first > today ? today : first;
+  return start !== null && span.from < start ? { kind: 'custom', from: start } : span;
+}
+
+/**
+ * Starts every section of Analytics over a Span, once it is clamped to the data (see
+ * `effectiveSpan`; the reading carries the effective Span). The sections' promises are not
+ * awaited here: the page awaits each where it shows it. Net worth reads the Account balances and
  * Spending Insights' income and expense, and Key figures the Account balances, Net worth's
  * trend and Spending Insights' income and expense, so they share those promises rather than run them again.
  */
-export function loadAnalytics(ctx: ServiceContext, span: Span): AnalyticsView {
+export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<AnalyticsView> {
   const today = swissToday();
-  const reading = readingOf(span, today);
+  const reading = readingOf(await effectiveSpan(ctx, span, today), today);
   const balances = accountBalances(ctx, today);
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
