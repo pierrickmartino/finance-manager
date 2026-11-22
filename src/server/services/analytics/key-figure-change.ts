@@ -108,28 +108,18 @@ function bothStretchesQuery(grain: TimeAxis, span: DateSpan, current: DateSpan):
 }
 
 /**
- * The first day any Account holds data: its opening date, or its first Transaction. Null when
- * no Account has either.
+ * Starts reading what the Key figures' changes compare with, over a reading, given the first
+ * day any Account holds data (`DataStart.accountData`).
  */
-async function accountDataStart(ctx: ServiceContext): Promise<string | null> {
-  const result = await ctx.db.query<{ start: string | null }>(
-    `SELECT to_char(least(
-       (SELECT min(opening_date) FROM account),
-       (SELECT min(booking_date) FROM "transaction")
-     ), 'YYYY-MM-DD') AS start`,
-  );
-  return result.rows[0]?.start ?? null;
-}
-
-/** Starts reading what the Key figures' changes compare with, over a reading. */
 export async function loadComparison(
   ctx: ServiceContext,
   reading: AnalyticsReading,
+  dataStart: string | null,
 ): Promise<Comparison> {
   const { grain, from, to: today } = reading;
   const current = { from, to: today };
   const span = comparisonSpan(reading.span, current);
-  const [report, earlier, start] = await Promise.all([
+  const [report, earlier] = await Promise.all([
     runWidgetQuery(ctx, bothStretchesQuery(grain, span, current)),
     runWidgetQuery(ctx, {
       filters: { categoryGroupTypes: ['income', 'expense'] },
@@ -137,9 +127,8 @@ export async function loadComparison(
       rows: 'categoryGroupType',
       columns: null,
     }),
-    accountDataStart(ctx),
   ]);
-  return { reading, span, dataStart: start, report, earlier };
+  return { reading, span, dataStart, report, earlier };
 }
 
 const reachesBack = ({ dataStart }: Comparison, date: string) =>

@@ -3,6 +3,7 @@ import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { accountBalances } from './account-balances';
 import { categoriesPerPeriod } from './categories-per-period';
+import { loadDataStart } from './data-start';
 import type { AnalyticsCard } from './figures';
 import { incomeVsExpense } from './income-vs-expense';
 import { netCashFlow } from './net-cash-flow';
@@ -48,21 +49,12 @@ export interface AnalyticsView {
   sections: AnalyticsSections;
 }
 
-/** The first Transaction's date; null when there is none. */
-async function firstTransactionDate(ctx: ServiceContext): Promise<string | null> {
-  const result = await ctx.db.query<{ first: string | null }>(
-    `SELECT to_char(min(booking_date), 'YYYY-MM-DD') AS first FROM "transaction"`,
-  );
-  return result.rows[0]?.first ?? null;
-}
-
 /**
  * The Span Analytics is read over: a custom start date before the first Transaction moves to
  * that Transaction's date, so no empty periods come before the data. A preset stays as named.
  */
-async function effectiveSpan(ctx: ServiceContext, span: Span, today: string): Promise<Span> {
+function effectiveSpan(span: Span, first: string | null, today: string): Span {
   if (span.kind !== 'custom') return span;
-  const first = await firstTransactionDate(ctx);
   // Never past today: a Span always ends today, so it may not start after it.
   const start = first !== null && first > today ? today : first;
   return start !== null && span.from < start ? { kind: 'custom', from: start } : span;
@@ -78,7 +70,8 @@ async function effectiveSpan(ctx: ServiceContext, span: Span, today: string): Pr
  */
 export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<AnalyticsView> {
   const today = swissToday();
-  const reading = readingOf(await effectiveSpan(ctx, span, today), today);
+  const dataStart = await loadDataStart(ctx);
+  const reading = readingOf(effectiveSpan(span, dataStart.firstTransaction, today), today);
   const balances = accountBalances(ctx, today);
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
@@ -86,7 +79,7 @@ export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<An
     today,
     reading,
     sections: {
-      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }),
+      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, dataStart),
       netWorth: netWorth(reading, { trend, balances, flow }),
       spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
