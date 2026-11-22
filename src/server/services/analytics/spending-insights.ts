@@ -1,3 +1,4 @@
+import { monthIndex, monthStart } from '@/lib/dates';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './figures';
@@ -37,11 +38,8 @@ const INSIGHT_MONTHS = 12;
  * Drill-downs lead back to the Span the page is read over.
  */
 function insightReading(reading: AnalyticsReading): AnalyticsReading {
-  const today = reading.to;
-  const index = Number(today.slice(0, 4)) * 12 + Number(today.slice(5, 7)) - 1 - INSIGHT_MONTHS;
-  const month = String((index % 12) + 1).padStart(2, '0');
-  const from = `${String(Math.floor(index / 12)).padStart(4, '0')}-${month}-01`;
-  return { ...readingOf({ kind: 'custom', from }, today), span: reading.span };
+  const from = monthStart(monthIndex(reading.to) - INSIGHT_MONTHS);
+  return { ...readingOf({ kind: 'custom', from }, reading.to), span: reading.span };
 }
 
 /** The Span's income and expense per period, which the Key figures and Net worth share. */

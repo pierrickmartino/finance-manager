@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { analyticsHref, spanFromParams, spanToParams, type Span } from '@/lib/analytics/span';
-import { swissToday } from '@/server/services/fx/dates';
+import { swissToday } from '@/lib/dates';
 import type { WidgetQueryInput } from '@/server/services/reporting/query';
 import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-params';
 
