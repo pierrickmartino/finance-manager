@@ -60,11 +60,15 @@ export function NetWorthSparkline({
   );
 }
 
+/** One change chip: its short label, the change and the point it is measured from. */
+export type ChangeChip = Pick<HeadlineChange, 'since' | 'change' | 'href'> & { label: string };
+
 /**
- * Net worth's change over 1M, 1Y and 2Y, each opening the Accounts as of the point it is
- * measured from. Shown without the currency, which the amount above already says.
+ * Net worth's change over 1M, 1Y and 2Y (or since an Analytics Span's start), each opening the
+ * Accounts as of the point it is measured from. Shown without the currency, which the amount
+ * above already says.
  */
-export function ChangeChips({ changes }: { changes: HeadlineChange[] }) {
+export function ChangeChips({ changes }: { changes: readonly ChangeChip[] }) {
   const fmt = useFormatter();
   if (changes.length === 0) return null;
   return (

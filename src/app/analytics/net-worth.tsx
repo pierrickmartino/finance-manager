@@ -5,6 +5,9 @@ import { SectionCard, SectionEmpty } from './section';
 
 export const NET_WORTH = 'Net worth';
 
+/** The change chip's label: Net worth's change over the Span. */
+export const SPAN_CHANGE = 'Span';
+
 interface NetWorthSectionProps {
   netWorth: Promise<AnalyticsNetWorth>;
   reading: AnalyticsReading;
@@ -12,8 +15,8 @@ interface NetWorthSectionProps {
 
 /**
  * Analytics' Net worth, once it arrives, drawn as the Dashboard's Net worth card: Net worth
- * today beside a trend with a point per period end of the Span and today, its change since the
- * end of the previous period, then what came in, went out and the Profit over the Span.
+ * today beside a trend from the Span's start through each period end to today, its change since
+ * the Span's start, then what came in, went out and the Profit over the Span.
  */
 export async function NetWorthSection({ netWorth, reading }: NetWorthSectionProps) {
   const loaded = await netWorth;
@@ -34,6 +37,7 @@ export async function NetWorthSection({ netWorth, reading }: NetWorthSectionProp
       period={reading.grain}
       trendLabel={`Net worth, ${spanDates(reading)}`}
       unconvertedCount={loaded.unconvertedCount}
+      changes={loaded.change ? [{ label: SPAN_CHANGE, ...loaded.change }] : []}
     />
   );
 }

@@ -127,7 +127,7 @@ describe('Key figures sparklines', () => {
     expect(partials(year.income)).toEqual([false, false, false, false, true]);
   });
 
-  it("gives Net worth the Net worth trend's points: each period end of the Span, then today", async () => {
+  it("gives Net worth the Net worth trend's points: the Span's start, each period end, then today", async () => {
     fixToday('2025-05-20');
     await dataset();
 
@@ -140,11 +140,11 @@ describe('Key figures sparklines', () => {
       expect(partials(netWorth), label).toEqual(trend.rows.map((row) => row.isPartial));
       expect(netWorth.sparkline.at(-1)!.isPartial, label).toBe(true);
     }
-    // By hand, by month: nothing until the December salary; then each month end; then today,
-    // the property purchase counting in Net worth (it is no expense).
+    // By hand, by month: nothing at the Span's start (20 May 2024) nor until the December salary;
+    // then each month end; then today, the property purchase counting in Net worth (it is no expense).
     const { netWorth } = byId((await loadSection(t.ctx, MONTHLY, 'keyFigures')).figures);
     expect(values(netWorth)).toEqual([
-      0, 0, 0, 0, 0, 0, 0, 80_000, 80_000, 90_000, 90_000, 110_000, 205_000,
+      0, 0, 0, 0, 0, 0, 0, 0, 80_000, 80_000, 90_000, 90_000, 110_000, 205_000,
     ]);
   });
 

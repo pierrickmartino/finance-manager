@@ -50,7 +50,7 @@ export function flowSparklines(
   return { income: line('income'), expense: line('expense'), profit: line('profit') };
 }
 
-/** Net worth's points: the Net worth trend's, each period end of the Span, then today. */
+/** Net worth's points: the Net worth trend's, the Span's start, each period end, then today. */
 export function netWorthSparkline(trend: ReportTable): SparklinePoint[] {
   return trend.rows.map((row, r) => ({
     label: row.label,
