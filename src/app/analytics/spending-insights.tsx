@@ -6,9 +6,9 @@ import { SectionCard, SectionEmpty } from './section';
 
 /**
  * Analytics' Spending Insights, once its figures arrive, drawn as the Dashboard's insight card:
- * the latest complete period's spending against the complete ones before it, each complete
- * period's bar, and its Transactions. Without two complete periods to compare, a quiet line
- * says why instead.
+ * the last complete month's spending against the months before it, whatever the Span
+ * (ADR-0016), each complete month's bar, and its Transactions. Without two complete months to
+ * compare, a quiet line says why instead.
  */
 export async function SpendingInsightsSection({ flow }: { flow: Promise<AnalyticsCard> }) {
   const card = await flow;
@@ -21,7 +21,7 @@ export async function SpendingInsightsSection({ flow }: { flow: Promise<Analytic
         <SectionEmpty>
           {card.isEmpty
             ? 'Nothing to show yet: no income or expense.'
-            : 'Not enough complete periods yet to compare: the insight needs two.'}
+            : 'Not enough complete months yet to compare: the insight needs two.'}
         </SectionEmpty>
       </SectionCard>
     );
