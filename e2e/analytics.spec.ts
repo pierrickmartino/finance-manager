@@ -205,7 +205,7 @@ test('a former Period view link redirects to its nearest Span', async ({ page })
   }
 });
 
-test("Spending Insights is the Dashboard's insight card and opens the latest complete month's Transactions", async ({
+test('Spending Insights judges the last complete month whatever the Span and opens its Transactions', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -238,7 +238,8 @@ test("Spending Insights is the Dashboard's insight card and opens the latest com
     }
   });
 
-  await page.goto('/analytics');
+  // Rolling 30 days holds no complete month, yet the insight still speaks of the last one.
+  await page.goto('/analytics?span=rolling-30-days');
   const latest = page.getByRole('link', { name: 'See the Transactions' });
   await expect(page.getByRole('heading', { name: /^Spending is / })).toBeVisible();
   await latest.click();
@@ -249,7 +250,7 @@ test("Spending Insights is the Dashboard's insight card and opens the latest com
     }),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?span=rolling-12-months$/);
+  await expect(page).toHaveURL(/\/analytics\?span=rolling-30-days$/);
 });
 
 test('on a phone the Span control stays at the top and the heatmap scrolls inside its card', async ({
