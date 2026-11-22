@@ -9,13 +9,13 @@ import {
 } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 
-import { spanLabel, type Span } from '@/lib/analytics/span';
+import { presetSpan, SPAN_PRESETS, spanLabel, type Span } from '@/lib/analytics/span';
 import { readCard } from '@/lib/reporting/card';
 import { spendingBars, spendingInsight } from '@/lib/reporting/overview';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 
-/** Analytics' Spending Insights (spec #170, user stories 18-22; ticket #176). */
+/** Analytics' Spending Insights (spec #170, user stories 18-22; ticket #176; spec #204, ticket #236). */
 
 const t = setupTestDatabase();
 
@@ -98,27 +98,25 @@ describe('Spending Insights', () => {
     });
   });
 
-  it('by quarter and by year, names the grain and reads the complete periods of the Span', async () => {
+  it('judges the last complete month under every Span, whatever its start or grain', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    const quarters = await insightAt(QUARTERLY);
-    const years = await insightAt(YEARLY);
+    const monthly = await insightAt(MONTHLY);
+    const spans: Span[] = [
+      ...SPAN_PRESETS.map(presetSpan),
+      { kind: 'custom', from: '2025-03-01' },
+      { kind: 'custom', from: '2023-01-01' },
+    ];
 
-    // Quarters from Q1 2024, from the first with data on: Q3 2024's 200.00, so Q4 2024's 100.00
-    // is 50% below. Income 500.00 against spending 300.00 over them: 40% kept.
-    expect(quarters.insight?.detail).toEqual([
-      'Q4 2024 came in ',
-      '50% below',
-      ' your quarterly average, and you kept 40% of everything that came in.',
-    ]);
-    expect(quarters.insight?.headline).toBe('Spending is easing.');
-    // Years from 2021, from the first with data on, 2023: 2024's 300.00 against 2023's 600.00 is 50% below.
-    expect(years.insight?.detail).toEqual([
-      '2024 came in ',
-      '50% below',
-      ' your yearly average, and you kept 55% of everything that came in.',
-    ]);
+    for (const span of spans) {
+      const { flow, insight } = await insightAt(span);
+      // Rolling 30 days holds no complete month, This year and last 4 reads by year: the insight
+      // still names February 2025, against the months before it.
+      expect(flow?.period, spanLabel(span)).toBe('month');
+      expect(insight, spanLabel(span)).toEqual(monthly.insight);
+      expect(insight?.detail[0], spanLabel(span)).toBe('Feb 2025 came in ');
+    }
   });
 
   it('charts the complete periods from the first with data, against the average of the ones before the latest', async () => {
@@ -147,10 +145,9 @@ describe('Spending Insights', () => {
     });
   });
 
-  it('gives no insight with fewer than two complete periods with data, at every grain', async () => {
+  it('gives no insight with fewer than two complete months with data, under every Span', async () => {
     fixToday('2025-03-20');
-    // February is the only complete month with data; by quarter and by year both fall in the
-    // current period, so no complete one has any.
+    // February is the only complete month with data, whatever the Span's grain.
     await seed([
       { date: '2025-02-11', amount: -40_000 },
       { date: '2025-02-25', amount: 100_000 },
@@ -164,7 +161,7 @@ describe('Spending Insights', () => {
     }
   });
 
-  it('is empty with no income or expense in the Span', async () => {
+  it('is empty with no income or expense in the months it reads', async () => {
     fixToday('2025-03-20');
 
     const { card, flow } = await insightAt(QUARTERLY);
@@ -173,7 +170,7 @@ describe('Spending Insights', () => {
     expect(flow).toBeNull();
   });
 
-  it('opens a Drill-down behind the change and the latest complete period, back to Analytics', async () => {
+  it('opens a Drill-down behind the change and the last complete month, back to the same Span', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
