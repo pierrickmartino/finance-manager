@@ -149,6 +149,16 @@ export function spanLabel(span: Span): string {
   return span.kind === 'preset' ? SPAN_PRESET_LABELS[span.preset] : 'Custom';
 }
 
+/**
+ * What a figure over a Span is captioned with: its preset's name ("Rolling 90 days"), or for a
+ * custom Span its start date to today ("1 Jan 2024 – today").
+ */
+export function spanCaption(span: Span, from: string): string {
+  return span.kind === 'preset'
+    ? SPAN_PRESET_LABELS[span.preset]
+    : `${dayInWords(from, true)} – today`;
+}
+
 /** A day in words: "25 Aug", with its year when asked. */
 function dayInWords(iso: string, withYear: boolean): string {
   const day = `${Number(iso.slice(8, 10))} ${MONTH_NAMES[Number(iso.slice(5, 7)) - 1]}`;

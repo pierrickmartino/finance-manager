@@ -1,10 +1,10 @@
 import { accountsHref } from '@/lib/accounts/links';
 import { analyticsDrillUrl } from '@/lib/analytics/links';
-import { formatPeriod } from '@/lib/format';
+import { spanCaption } from '@/lib/analytics/span';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
-import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
+import type { DateSpan } from '../reporting/periods';
 import type { SharedSections } from './figures';
 import { flowFigures } from './flow-figures';
 import {
@@ -18,8 +18,8 @@ import { flowSparklines, netWorthSparkline, type SparklinePoint } from './key-fi
 import type { AnalyticsReading } from './reading';
 
 /**
- * Analytics' Key figures (spec #225): the four tiles that open the page. Net worth today, loans
- * counting against it, whatever the reading; then its last period to date:
+ * Analytics' Key figures (spec #225, #204): the four tiles that open the page. Net worth today,
+ * loans counting against it, whatever the Span; then the whole Span, captioned with it:
  * Income, Expense and Profit (GLOSSARY: Profit). Income and Expense count only the Income and
  * Expense Category groups, signed so a refund nets within Expense; Capital, Transfers and
  * Unclassified Transactions are left out, as in Spending Insights, so the tiles agree with the
@@ -44,7 +44,7 @@ export interface KeyFigureUnconverted {
 export interface KeyFigure {
   id: KeyFigureId;
   label: string;
-  /** When the figure stands: "Today", or the current period "to date" ("May 2025 to date"). */
+  /** When the figure stands: "Today", or the Span ("Rolling 90 days", "1 Jan 2024 – today"). */
   caption: string;
   /** CHF minor units. Expense is what went out, net of refunds, as a positive amount. */
   value: number;
@@ -99,9 +99,8 @@ export async function keyFigures(
   reading: AnalyticsReading,
   sections: SharedSections,
 ): Promise<AnalyticsKeyFigures> {
-  const { grain, to: today } = reading;
-  const span = { from: periodOf(today, grain).from, to: today };
-  const key = periodKey(today, grain);
+  const { from, to: today } = reading;
+  const span = { from, to: today };
   // Each type alone too, for what it leaves out: an unconverted expense is no Income's concern.
   const [flow, incomeOnly, expenseOnly, comparison, balances, trend, perPeriod] = await Promise.all(
     [
@@ -115,7 +114,7 @@ export async function keyFigures(
     ],
   );
   const sparklines = flowSparklines(perPeriod.data, reading);
-  const caption = `${formatPeriod(key)} to date`;
+  const caption = spanCaption(reading.span, from);
   const drill = (cell: CellRef) => analyticsDrillUrl(reading, flow.query, cell);
   const values = flowFigures(typeTotal(flow, 'income'), typeTotal(flow, 'expense'));
   const leftOut: Record<FlowFigureId, number> = {

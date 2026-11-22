@@ -11,8 +11,8 @@ import { flowFigures, type FlowFigureId } from './flow-figures';
 import type { AnalyticsReading } from './reading';
 
 /**
- * A Key figure's change line (spec #225): Income, Expense and Profit against the same figure
- * over the Comparison span (GLOSSARY), Net worth against its value at the end of the previous
+ * A Key figure's change line (spec #225, #204): Income, Expense and Profit over the Span against
+ * the same figure over its Comparison span (GLOSSARY), Net worth against its value at the end of the previous
  * period. There is no change when the Account data doesn't reach back to what it is compared
  * with: the Comparison span's start, or for Net worth the previous period's end.
  */
@@ -33,8 +33,8 @@ export interface KeyFigureChange {
   /** Those dates as the line says them: "vs 1–22 Oct". */
   label: string;
   /**
-   * The Transactions of both stretches of days (the current period to date and the Comparison
-   * span), or for Net worth the Accounts at the end of the previous period.
+   * The Transactions of both stretches of days (the Span and its Comparison span), or for Net
+   * worth the Accounts at the end of the previous period.
    */
   href: string;
 }
@@ -63,8 +63,10 @@ export interface Comparison {
   span: DateSpan;
   /** The first day any Account holds data; null when none does. */
   dataStart: string | null;
-  /** Income and expense of both stretches, a row per period: the earlier one is the first. */
+  /** Income and expense of both stretches, a row per period: what a change line opens. */
   report: ReportTable;
+  /** Income and expense of the Comparison span, a row per Category group type. */
+  earlier: ReportTable;
 }
 
 const directionOf = (amount: number): ChangeDirection =>
@@ -124,25 +126,29 @@ export async function loadComparison(
   ctx: ServiceContext,
   reading: AnalyticsReading,
 ): Promise<Comparison> {
-  const { grain, to: today } = reading;
-  const span = comparisonSpan(grain, today);
-  const current = { from: periodOf(today, grain).from, to: today };
-  const [report, start] = await Promise.all([
+  const { grain, from, to: today } = reading;
+  const current = { from, to: today };
+  const span = comparisonSpan(reading.span, current);
+  const [report, earlier, start] = await Promise.all([
     runWidgetQuery(ctx, bothStretchesQuery(grain, span, current)),
+    runWidgetQuery(ctx, {
+      filters: { categoryGroupTypes: ['income', 'expense'] },
+      dateRange: { kind: 'fixed', from: span.from, to: span.to },
+      rows: 'categoryGroupType',
+      columns: null,
+    }),
     accountDataStart(ctx),
   ]);
-  return { reading, span, dataStart: start, report };
+  return { reading, span, dataStart: start, report, earlier };
 }
 
 const reachesBack = ({ dataStart }: Comparison, date: string) =>
   dataStart !== null && dataStart <= date;
 
-/** A comparison report's value at the earlier period's row, in one Category group type. */
-function earlierOf(comparison: Comparison, type: 'income' | 'expense'): number {
-  const { report, span, reading } = comparison;
-  const row = report.rows.findIndex((header) => header.key === periodKey(span.from, reading.grain));
-  const column = report.columns.findIndex((header) => header.key === type);
-  return row < 0 || column < 0 ? 0 : (report.cells[row]?.[column] ?? 0);
+/** The Comparison span's total of one Category group type; 0 when nothing of it falls there. */
+function earlierOf({ earlier }: Comparison, type: 'income' | 'expense'): number {
+  const row = earlier.rows.findIndex((header) => header.key === type);
+  return row < 0 ? 0 : (earlier.rowTotals[row] ?? 0);
 }
 
 /** A flow figure's change against the Comparison span; null when the data doesn't reach back. */

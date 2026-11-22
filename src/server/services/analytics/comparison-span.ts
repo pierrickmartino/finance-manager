@@ -1,11 +1,10 @@
+import { spanStart, type Span, type SpanPreset } from '@/lib/analytics/span';
 import { MONTH_NAMES } from '@/lib/format';
 import { addDays, daysBetween } from '../fx/dates';
 import { periodOf, type DateSpan } from '../reporting/periods';
-import type { TimeAxis } from '../reporting/query';
 
 /**
- * The Comparison span (GLOSSARY): the stretch of the previous period, of the same length as the
- * current period to date, that a to-date figure is compared with.
+ * The Comparison span (GLOSSARY, ADR-0016): the stretch a Span's Key figures are compared with.
  */
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -24,24 +23,54 @@ function cappedDay(year: number, month: number, day: number): string {
   return isoDate(y, m, Math.min(day, daysIn(y, m)));
 }
 
-/** The Comparison span of the current period of a grain on `today`. */
-export function comparisonSpan(grain: TimeAxis, today: string): DateSpan {
+/** The calendar years a preset to date of years reads: this one, and the whole ones before. */
+const YEARS_READ: Partial<Record<SpanPreset, number>> = {
+  'year-to-date': 1,
+  'this-year-and-last-1': 2,
+  'this-year-and-last-2': 3,
+  'this-year-and-last-3': 4,
+  'this-year-and-last-4': 5,
+};
+
+/** The same stretch of the previous calendar quarter: as many days in, capped at its end. */
+function previousQuarterToDate(today: string): DateSpan {
+  const current = periodOf(today, 'quarter');
+  const previous = periodOf(addDays(current.from, -1), 'quarter');
+  const to = addDays(previous.from, daysBetween(current.from, today));
+  return { from: previous.from, to: to < previous.to ? to : previous.to };
+}
+
+/** A date `years` years earlier: 29 February falls back to 28 February. */
+function yearsEarlier(iso: string, years: number): string {
   const [year, month, day] = [
-    Number(today.slice(0, 4)),
-    Number(today.slice(5, 7)) - 1,
-    Number(today.slice(8, 10)),
+    Number(iso.slice(0, 4)),
+    Number(iso.slice(5, 7)),
+    Number(iso.slice(8)),
   ];
-  if (grain === 'quarter') {
-    const current = periodOf(today, 'quarter');
-    const previous = periodOf(addDays(current.from, -1), 'quarter');
-    const to = addDays(previous.from, daysBetween(current.from, today));
-    return { from: previous.from, to: to < previous.to ? to : previous.to };
+  return cappedDay(year - years, month - 1, day);
+}
+
+/** The stretch of as many days just before a span's start. */
+function daysBefore({ from, to }: DateSpan): DateSpan {
+  const days = daysBetween(from, to) + 1;
+  return { from: addDays(from, -days), to: addDays(from, -1) };
+}
+
+/**
+ * The Comparison span of a Span read over `dates` (its start, then today). A Span to date of a
+ * calendar quarter, or of calendar years, is compared with the same stretch of the previous
+ * quarter, or of as many years before; any other Span, or one read from a later start than its
+ * preset gives, with as many days just before it.
+ */
+export function comparisonSpan(span: Span, dates: DateSpan): DateSpan {
+  if (span.kind === 'preset' && spanStart(span, dates.to) === dates.from) {
+    if (span.preset === 'quarter-to-date') return previousQuarterToDate(dates.to);
+    const years = YEARS_READ[span.preset];
+    if (years !== undefined) {
+      return { from: yearsEarlier(dates.from, years), to: yearsEarlier(dates.to, years) };
+    }
   }
-  if (grain === 'year') {
-    // The same dates last year; 29 February falls back to 28 February.
-    return { from: isoDate(year - 1, 0, 1), to: cappedDay(year - 1, month, day) };
-  }
-  return { from: cappedDay(year, month - 1, 1), to: cappedDay(year, month - 1, day) };
+  return daysBefore(dates);
 }
 
 /** A span's dates as the change line says them: "vs 1–22 Oct", the year only when not today's. */
