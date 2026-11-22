@@ -1,5 +1,5 @@
 import { formatPeriod } from '@/lib/format';
-import { spanGrain, spanStart, type Span } from '@/lib/analytics/span';
+import { readStart, spanGrain, type Span } from '@/lib/analytics/span';
 import { periodSpan, periodsIn } from '../reporting/periods';
 import type { DateRange, TimeAxis } from '../reporting/query';
 
@@ -37,15 +37,21 @@ export const isIncomplete = (period: AnalyticsPeriod): boolean =>
   period.isToDate || period.isPartial;
 
 /**
- * A Span's reading on `today`: its periods at the grain its length gives, the first cut at its
- * start date (partial when that is not the period's first day), the last to date.
+ * A Span's reading on `today`, given the first Transaction's date (`dataStart`, null for none):
+ * read from its start cut to the data (`readStart`), a custom Span's date moved with it while a
+ * preset keeps its name; its periods at the grain its length gives, the first cut at that start
+ * (partial when it is not the period's first day), the last to date.
  */
-export function readingOf(span: Span, today: string): AnalyticsReading {
-  const from = spanStart(span, today);
+export function readingOf(
+  span: Span,
+  today: string,
+  dataStart: string | null = null,
+): AnalyticsReading {
+  const from = readStart(span, today, dataStart);
   const grain = spanGrain(from, today);
   const keys = periodsIn({ from, to: today }, grain);
   return {
-    span,
+    span: span.kind === 'custom' ? { kind: 'custom', from } : span,
     from,
     to: today,
     grain,

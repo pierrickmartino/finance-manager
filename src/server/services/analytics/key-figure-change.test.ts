@@ -6,6 +6,7 @@ import {
   originOf,
   seedAccount,
   seedClassified,
+  seedEarlyStart,
 } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
@@ -252,6 +253,7 @@ describe('Key figures change', () => {
   it('compares Net worth with the end of the previous period, opening the Accounts then', async () => {
     fixToday('2025-05-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedEarlyStart(t.ctx, ubs);
     await seedClassified(t.ctx, ubs, [
       { bookingDate: '2025-03-10', amountMinor: 10_000 },
       { bookingDate: '2025-04-15', amountMinor: 100_000 },
@@ -346,7 +348,6 @@ describe('Key figures change', () => {
     ]);
 
     const month = await figuresAt(MONTHLY);
-    const quarter = await figuresAt(QUARTERLY);
 
     expect([month.income, month.expense, month.profit].map((figure) => figure.change)).toEqual([
       null,
@@ -354,8 +355,17 @@ describe('Key figures change', () => {
       null,
     ]);
     expect(month.netWorth.change).toMatchObject({ amount: 1_000, label: 'vs 30 Apr' });
-    // By quarter, Net worth is compared with 31 March: before the data starts.
-    expect(quarter.netWorth.change).toBeNull();
+  });
+
+  it('has no Net worth change when the data starts in the current period', async () => {
+    fixToday('2025-05-20');
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedClassified(t.ctx, ubs, [{ bookingDate: '2025-05-05', amountMinor: 1_000 }]);
+
+    const month = await figuresAt(MONTHLY);
+
+    // The Span is cut to 5 May: Net worth would be compared with 30 April, before the data.
+    expect(month.netWorth.change).toBeNull();
   });
 
   it('with no Accounts, has no change at all', async () => {

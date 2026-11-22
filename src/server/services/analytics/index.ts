@@ -1,4 +1,4 @@
-import type { Span } from '@/lib/analytics/span';
+import { presetStarts, type Span, type SpanPreset } from '@/lib/analytics/span';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { accountBalances } from './account-balances';
@@ -44,25 +44,17 @@ export interface AnalyticsSections {
 export interface AnalyticsView {
   /** Today's Swiss date, the one every section reads at. */
   today: string;
-  /** What every section reads: the Span resolved on today. */
+  /** What every section reads: the Span resolved on today, cut to the data. */
   reading: AnalyticsReading;
+  /** Each preset's start date today, cut to the data as it would be read. */
+  starts: Record<SpanPreset, string>;
   sections: AnalyticsSections;
 }
 
 /**
- * The Span Analytics is read over: a custom start date before the first Transaction moves to
- * that Transaction's date, so no empty periods come before the data. A preset stays as named.
- */
-function effectiveSpan(span: Span, first: string | null, today: string): Span {
-  if (span.kind !== 'custom') return span;
-  // Never past today: a Span always ends today, so it may not start after it.
-  const start = first !== null && first > today ? today : first;
-  return start !== null && span.from < start ? { kind: 'custom', from: start } : span;
-}
-
-/**
- * Starts every section of Analytics over a Span, once it is clamped to the data (see
- * `effectiveSpan`; the reading carries the effective Span). The sections' promises are not
+ * Starts every section of Analytics over a Span, once it is cut to the data: no Span, preset or
+ * custom, starts before the first Transaction (`readingOf`; a custom Span's date moves, a preset
+ * keeps its name, and the reading carries the effective Span). The sections' promises are not
  * awaited here: the page awaits each where it shows it. Net worth reads the Account balances and
  * the Span's income and expense, and Key figures the Account balances, Net worth's trend and the
  * Span's income and expense, so they share those promises rather than run them again. Spending
@@ -71,13 +63,14 @@ function effectiveSpan(span: Span, first: string | null, today: string): Span {
 export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<AnalyticsView> {
   const today = swissToday();
   const dataStart = await loadDataStart(ctx);
-  const reading = readingOf(effectiveSpan(span, dataStart.firstTransaction, today), today);
+  const reading = readingOf(span, today, dataStart.firstTransaction);
   const balances = accountBalances(ctx, today);
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
   return {
     today,
     reading,
+    starts: presetStarts(today, dataStart.firstTransaction),
     sections: {
       keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, dataStart),
       netWorth: netWorth(reading, { trend, balances, flow }),

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fixToday, loadSection } from '@test/support/analytics';
+import { fixToday, loadSection, seedEarlyStart } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
@@ -39,6 +39,7 @@ async function dataset(): Promise<void> {
     openingBalanceMinor: 100_000,
     openingDate: '2025-01-15',
   });
+  await seedEarlyStart(t.ctx, francs);
   await seedTransactions(t.ctx.db, francs, [
     { bookingDate: '2025-02-10', amountMinor: 20_000 },
     { bookingDate: '2025-03-05', amountMinor: -5_000 },

@@ -6,6 +6,7 @@ import {
   originOf,
   seedAccount,
   seedClassified,
+  seedEarlyStart,
 } from '@test/support/analytics';
 import { MONTHLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
@@ -43,6 +44,7 @@ async function categories() {
 async function dataset(): Promise<void> {
   const { salary, groceries, property } = await categories();
   const ubs = await seedAccount(t.ctx, 'UBS');
+  await seedEarlyStart(t.ctx, ubs);
   const savings = await seedAccount(t.ctx, 'Savings');
   const ids = await seedClassified(t.ctx, ubs, [
     { bookingDate: '2024-12-20', amountMinor: 80_000, classify: salary },

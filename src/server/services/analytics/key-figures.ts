@@ -116,7 +116,7 @@ export async function keyFigures(
     ],
   );
   const sparklines = flowSparklines(perPeriod.data, reading);
-  const caption = spanCaption(reading.span, from);
+  const caption = spanCaption(reading.span, span);
   const drill = (cell: CellRef) => analyticsDrillUrl(reading, flow.query, cell);
   const values = flowFigures(typeTotal(flow, 'income'), typeTotal(flow, 'expense'));
   const leftOut: Record<FlowFigureId, number> = {

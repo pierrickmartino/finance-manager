@@ -8,6 +8,7 @@ import {
   originOf,
   seedAccount,
   seedClassified,
+  seedEarlyStart,
   type ClassifiedRow,
 } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
@@ -59,6 +60,7 @@ async function dataset(names = Object.keys(SPENDING)): Promise<void> {
   const pay = await createCategoryGroup(t.ctx, { name: 'Pay', type: 'income' });
   const salary = await createCategory(t.ctx, { groupId: pay.id, name: 'Salary' });
   const ubs = await seedAccount(t.ctx, 'UBS');
+  await seedEarlyStart(t.ctx, ubs);
   const rows: ClassifiedRow[] = [
     { bookingDate: '2025-01-25', amountMinor: 900_000, classify: { categoryId: salary.id } },
   ];

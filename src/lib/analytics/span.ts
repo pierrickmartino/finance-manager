@@ -97,15 +97,40 @@ export const presetSpan = (preset: SpanPreset): Span => ({ kind: 'preset', prese
 const presetStart = (preset: SpanPreset, today: string): string =>
   PRESET_RULES[preset].start(today);
 
-/** The first day a Span reads on `today`. */
+/** The first day a Span gives on `today`, as chosen: its preset's start, or the typed date. */
 export function spanStart(span: Span, today: string): string {
   return span.kind === 'custom' ? span.from : presetStart(span.preset, today);
 }
 
-/** Each preset's start date on `today`: what the control fills in when one is picked. */
-export function presetStarts(today: string): Record<SpanPreset, string> {
+/**
+ * A start date cut to the data: moved up to the first Transaction's date (`dataStart`, null when
+ * there is none) when earlier, so no empty periods come before the data, but never past today,
+ * since a Span always ends today.
+ */
+function clampedStart(start: string, dataStart: string | null, today: string): string {
+  if (dataStart === null) return start;
+  const earliest = dataStart > today ? today : dataStart;
+  return start < earliest ? earliest : start;
+}
+
+/** The first day a Span is read from on `today`: its start, cut to the data (`clampedStart`). */
+export function readStart(span: Span, today: string, dataStart: string | null): string {
+  return clampedStart(spanStart(span, today), dataStart, today);
+}
+
+/**
+ * Each preset's start date on `today`, cut to the data as it is read (`clampedStart`): what the
+ * control fills in when one is picked.
+ */
+export function presetStarts(
+  today: string,
+  dataStart: string | null = null,
+): Record<SpanPreset, string> {
   return Object.fromEntries(
-    SPAN_PRESETS.map((preset) => [preset, presetStart(preset, today)]),
+    SPAN_PRESETS.map((preset) => [
+      preset,
+      clampedStart(presetStart(preset, today), dataStart, today),
+    ]),
   ) as Record<SpanPreset, string>;
 }
 
@@ -182,11 +207,12 @@ export function spanLabel(span: Span): string {
 }
 
 /**
- * What a figure over a Span is captioned with: its preset's name ("Rolling 90 days"), or for a
- * custom Span its start date to today ("1 Jan 2024 – today").
+ * What a figure over a Span read over `dates` is captioned with: its preset's name ("Rolling 90
+ * days"), or its start date to today ("1 Jan 2024 – today") for a custom Span, or a preset read
+ * from a later start than it gives (cut to the data).
  */
-export function spanCaption(span: Span, from: string): string {
-  return span.kind === 'preset'
+export function spanCaption(span: Span, { from, to }: DateSpan): string {
+  return span.kind === 'preset' && spanStart(span, to) === from
     ? SPAN_PRESET_LABELS[span.preset]
     : `${dayInWords(from, true)} – today`;
 }

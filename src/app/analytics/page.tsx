@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
-import {
-  analyticsHref,
-  legacySpan,
-  presetStarts,
-  spanFromParams,
-  spanPhrase,
-} from '@/lib/analytics/span';
+import { analyticsHref, legacySpan, spanFromParams, spanPhrase } from '@/lib/analytics/span';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { swissToday } from '@/server/services/fx/dates';
@@ -58,7 +52,7 @@ export default async function AnalyticsPage({
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
-  const { sections, today, reading } = await loadAnalytics(
+  const { sections, today, reading, starts } = await loadAnalytics(
     ctx,
     spanFromParams(params, swissToday()),
   );
@@ -78,7 +72,7 @@ export default async function AnalyticsPage({
         span={span}
         from={reading.from}
         phrase={spanPhrase(span, reading)}
-        starts={presetStarts(today)}
+        starts={starts}
         today={today}
       />
       <div className="grid min-w-0 grid-cols-1 gap-5">

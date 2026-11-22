@@ -58,6 +58,20 @@ export async function seedClassified(
 }
 
 /**
+ * Seeds a Transaction of nothing long before the tests' Spans (by default before This year and
+ * last 4 on the usual today, 20 March 2025), so a preset is read from the start it gives rather
+ * than cut to the first Transaction (ADR-0016). It falls in no Span and counts in no figure, but
+ * the Account data reaches back to it.
+ */
+export async function seedEarlyStart(
+  ctx: ServiceContext,
+  on: Account,
+  bookingDate = '2020-01-01',
+): Promise<void> {
+  await seedTransactions(ctx.db, on, [{ bookingDate, amountMinor: 0 }]);
+}
+
+/**
  * One section of Analytics over a Span, once every section has loaded: the page starts
  * them all, and none may outlive the test (its database is dropped after it).
  */

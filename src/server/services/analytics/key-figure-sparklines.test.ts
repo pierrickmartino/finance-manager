@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fixToday, loadSection, seedAccount, seedClassified } from '@test/support/analytics';
+import {
+  fixToday,
+  loadSection,
+  seedAccount,
+  seedClassified,
+  seedEarlyStart,
+} from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { spanLabel } from '@/lib/analytics/span';
 import { setupTestDatabase } from '@test/support/db';
@@ -34,6 +40,7 @@ async function categories() {
 async function dataset(): Promise<void> {
   const { salary, groceries, property } = await categories();
   const ubs = await seedAccount(t.ctx, 'UBS');
+  await seedEarlyStart(t.ctx, ubs);
   await seedClassified(t.ctx, ubs, [
     { bookingDate: '2024-12-20', amountMinor: 80_000, classify: salary },
     { bookingDate: '2025-02-25', amountMinor: 50_000, classify: salary },
