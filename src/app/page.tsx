@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 /**
- * The landing page is Analytics, in its default Period view (Month; ADR-0015). It no longer seeds
+ * The landing page is Analytics, over its default Span (Rolling 12 months; ADR-0016). It no longer seeds
  * the starter Dashboard: setup and the Dashboards page still do.
  */
 export default function HomePage() {

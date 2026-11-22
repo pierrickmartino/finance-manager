@@ -14,7 +14,7 @@ import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Income vs. expense, drawn as the Dashboard's heatmap card: Income, Expense and
- * Capital per period of the window, then Net (income − expense) and Net incl. Capital, each with
+ * Capital per period of the Span, then Net (income − expense) and Net incl. Capital, each with
  * its Total. Signed CHF amounts, as booked: expense is negative and a refund nets within it.
  * Transfers are left out and Split lines count by their own Category (the reporting engine's
  * base rows).

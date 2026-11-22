@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, loadSection } from '@test/support/analytics';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { seedTransactions } from '@test/support/transactions';
 import { archiveAccount, createAccount } from '../accounts';
 import { recordBalanceSnapshot } from '../balance-snapshots';
 import { createBank } from '../banks';
-import type { PeriodView } from '@/lib/analytics/period-view';
+import type { Span } from '@/lib/analytics/span';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { readHeadlineTrend } from '@/lib/reporting/net-worth-headline';
 import { headlineAmount } from '@/lib/reporting/overview';
+import type { TimeAxis } from '../reporting/query';
 
 /** Analytics' Net worth (spec #170, user stories 14-17): today, its trend and its change. */
 
@@ -75,11 +77,11 @@ const TODAY = 115_000 + 95_000 - 250_000;
 const END_OF_2024 = 94_000;
 
 /** What the Dashboard's Net worth card heads with, read from the section as it reads a Story. */
-async function headlineAt(view: PeriodView) {
-  const netWorth = await loadSection(t.ctx, view, 'netWorth');
+async function headlineAt(span: Span, grain: TimeAxis) {
+  const netWorth = await loadSection(t.ctx, span, 'netWorth');
   return {
     netWorth,
-    hero: headlineAmount(netWorth.cards, readHeadlineTrend(netWorth.trend, view)),
+    hero: headlineAmount(netWorth.cards, readHeadlineTrend(netWorth.trend, grain)),
   };
 }
 
@@ -87,21 +89,21 @@ const dated = (trend: ChartSource) =>
   trend.rows.map((row, r) => [row.label, trend.rowTotals[r], trend.hrefs.rowTotals[r]]);
 
 describe('Net worth', () => {
-  it('in Month, has a point at each month end of the window and today, each opening the Accounts then', async () => {
+  it('by month, has a point at each month end of the Span and today, each opening the Accounts then', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const { netWorth, hero } = await headlineAt('month');
+    const { netWorth, hero } = await headlineAt(MONTHLY, 'month');
 
     expect(hero).toMatchObject({ label: 'Your net worth today', value: TODAY, href: '/accounts' });
-    expect(dated(netWorth.trend).slice(8)).toEqual([
+    expect(dated(netWorth.trend).slice(9)).toEqual([
       ['Dec 2024', END_OF_2024, '/accounts?date=2024-12-31'],
       // January: Francs at its opening, the Mortgage at its opening.
       ['Jan 2025', 100_000 + 94_000 - 300_000, '/accounts?date=2025-01-31'],
       ['Feb 2025', 120_000 + 95_000 - 250_000, '/accounts?date=2025-02-28'],
       ['Mar 2025', TODAY, '/accounts?date=2025-03-20'],
     ]);
-    expect(netWorth.trend.rows).toHaveLength(12);
+    expect(netWorth.trend.rows).toHaveLength(13);
     expect(netWorth.trend.rows.at(-1)?.isPartial).toBe(true);
     // The line starts at the first month with any Net worth.
     expect(hero?.trend?.points.map((point) => point.label)).toEqual([
@@ -123,15 +125,14 @@ describe('Net worth', () => {
     expect(netWorth.unconvertedCount).toBe(0);
   });
 
-  it('in Quarter, has a point at each quarter end of the window and today, its change since Q4', async () => {
+  it('by quarter, has a point at each quarter end of the Span and today, its change since Q4', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const { netWorth, hero } = await headlineAt('quarter');
+    const { netWorth, hero } = await headlineAt(QUARTERLY, 'quarter');
 
     expect(hero?.value).toBe(TODAY);
     expect(netWorth.trend.hrefs.rowTotals).toEqual([
-      ...['2023-06-30', '2023-09-30', '2023-12-31'].map((date) => `/accounts?date=${date}`),
       ...['2024-03-31', '2024-06-30', '2024-09-30'].map((date) => `/accounts?date=${date}`),
       '/accounts?date=2024-12-31',
       '/accounts?date=2025-03-20',
@@ -147,13 +148,13 @@ describe('Net worth', () => {
     ]);
   });
 
-  it('in Year, has a point at each year end of the window and today, its change since 2024', async () => {
+  it('by year, has a point at each year end of the Span and today, its change since 2024', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const { netWorth, hero } = await headlineAt('year');
+    const { netWorth, hero } = await headlineAt(YEARLY, 'year');
 
-    expect(netWorth.trend.rowTotals).toEqual([0, 0, 0, 0, END_OF_2024, TODAY]);
+    expect(netWorth.trend.rowTotals).toEqual([0, 0, 0, END_OF_2024, TODAY]);
     expect(hero?.trend?.changes).toEqual([
       {
         label: '1Y',
@@ -165,11 +166,11 @@ describe('Net worth', () => {
     ]);
   });
 
-  it("breaks down the window's income and expense with the Account balances, as the Dashboard's card does", async () => {
+  it("breaks down the Span's income and expense with the Account balances, as the Dashboard's card does", async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const { netWorth } = await headlineAt('month');
+    const { netWorth } = await headlineAt(MONTHLY, 'month');
 
     expect(netWorth.cards.map((card) => card.name)).toEqual([
       'Account balances in CHF',
@@ -180,7 +181,7 @@ describe('Net worth', () => {
   it('has nothing to show without an Account', async () => {
     fixToday('2025-03-20');
 
-    const { netWorth, hero } = await headlineAt('month');
+    const { netWorth, hero } = await headlineAt(MONTHLY, 'month');
 
     expect(netWorth.isEmpty).toBe(true);
     expect(hero).toBeNull();

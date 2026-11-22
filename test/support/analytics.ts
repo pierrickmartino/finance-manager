@@ -4,7 +4,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { cellFromParams, queryFromParams } from '@/lib/reporting/widget-params';
 import { createAccount, type Account } from '@/server/services/accounts';
 import { createBank } from '@/server/services/banks';
-import type { PeriodView } from '@/lib/analytics/period-view';
+import type { Span } from '@/lib/analytics/span';
 import { loadAnalytics, type AnalyticsSections } from '@/server/services/analytics';
 import type { ServiceContext } from '@/server/services/context';
 import { listCellTransactions, type CellTransactionPage } from '@/server/services/reporting';
@@ -58,15 +58,15 @@ export async function seedClassified(
 }
 
 /**
- * One section of Analytics at a Period view, once every section has loaded: the page starts
+ * One section of Analytics over a Span, once every section has loaded: the page starts
  * them all, and none may outlive the test (its database is dropped after it).
  */
 export async function loadSection<Name extends keyof AnalyticsSections>(
   ctx: ServiceContext,
-  view: PeriodView,
+  span: Span,
   name: Name,
 ): Promise<Awaited<AnalyticsSections[Name]>> {
-  const { sections } = loadAnalytics(ctx, view);
+  const { sections } = loadAnalytics(ctx, span);
   await Promise.allSettled(Object.values(sections));
   return await sections[name];
 }

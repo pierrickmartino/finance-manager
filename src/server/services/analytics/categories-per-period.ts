@@ -23,10 +23,10 @@ import type { AnalyticsReading } from './reading';
 /**
  * Analytics' Categories per period, drawn as the Dashboard's heatmap card: each Category group
  * of the three types (Income groups first, then Expense, then Capital) as a subtotal row, then
- * its Categories ("Group › Category"), per period of the window and in Total. The rows carry
+ * its Categories ("Group › Category"), per period of the Span and in Total. The rows carry
  * their tree (a section per type, each group over its Categories), so the card draws them
  * indented under their group instead of ranked by size. Categories with
- * nothing booked in the window are hidden, and so is a group left with none. Signed CHF
+ * nothing booked in the Span are hidden, and so is a group left with none. Signed CHF
  * amounts, as booked: a refund nets within its Category, Split lines count by their own
  * Category and Transfers are left out (the reporting engine's base rows).
  */
@@ -40,7 +40,7 @@ interface GroupRows {
   categories: { row: PeriodRow; name: string }[];
 }
 
-/** A group's subtotal then its Categories, or null when none has anything in the window. */
+/** A group's subtotal then its Categories, or null when none has anything in the Span. */
 function groupRows(
   reading: AnalyticsReading,
   report: ReportTable,

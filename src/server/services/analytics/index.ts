@@ -1,4 +1,4 @@
-import type { PeriodView } from '@/lib/analytics/period-view';
+import type { Span } from '@/lib/analytics/span';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { accountBalances } from './account-balances';
@@ -14,11 +14,11 @@ import { spendingInsights } from './spending-insights';
 import { readingOf, type AnalyticsReading } from './reading';
 
 /**
- * The Analytics reporting service (GLOSSARY: Analytics, ADR-0015): the page's only data source.
- * Given a Period view, it resolves it once into a reading (from a start date to today, at a grain,
+ * The Analytics reporting service (GLOSSARY: Analytics, ADR-0016): the page's only data source.
+ * Given a Span, it resolves it once into a reading (from a start date to today, at a grain,
  * split into periods) and returns it with one promise per section, each started at once so the
  * page can stream every section in behind its own placeholder. Every section reads the reading,
- * never the Period view.
+ * never the Span.
  *
  * Each section is drawn by the Dashboard's own cards (GLOSSARY: Card), so each hands them what
  * they read from a Widget (`AnalyticsCard`), its figures linked to their Drill-downs back to
@@ -41,28 +41,26 @@ export interface AnalyticsSections {
 }
 
 export interface AnalyticsView {
-  view: PeriodView;
   /** Today's Swiss date, the one every section reads at. */
   today: string;
-  /** What every section reads: the Period view resolved on today. */
+  /** What every section reads: the Span resolved on today. */
   reading: AnalyticsReading;
   sections: AnalyticsSections;
 }
 
 /**
- * Starts every section of Analytics at a Period view. The sections' promises are not awaited
+ * Starts every section of Analytics over a Span. The sections' promises are not awaited
  * here: the page awaits each where it shows it. Net worth reads the Account balances and
  * Spending Insights' income and expense, and Key figures the Account balances, Net worth's
  * trend and Spending Insights' income and expense, so they share those promises rather than run them again.
  */
-export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsView {
+export function loadAnalytics(ctx: ServiceContext, span: Span): AnalyticsView {
   const today = swissToday();
-  const reading = readingOf(view, today);
+  const reading = readingOf(span, today);
   const balances = accountBalances(ctx, today);
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
   return {
-    view,
     today,
     reading,
     sections: {

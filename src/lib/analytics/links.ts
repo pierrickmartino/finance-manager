@@ -6,7 +6,7 @@ import type { WidgetQuery } from '@/server/services/reporting/query';
 
 /** Where a Drill-down opened from Analytics leads back to: Analytics, read the same way. */
 export function analyticsOrigin(reading: AnalyticsReading): DrillOrigin {
-  return { kind: 'analytics', period: reading.view };
+  return { kind: 'analytics', span: reading.span };
 }
 
 /** A query's Drill-downs, opened from Analytics. */

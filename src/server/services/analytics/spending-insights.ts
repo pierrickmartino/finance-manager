@@ -4,7 +4,7 @@ import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './fig
 import type { AnalyticsReading } from './reading';
 
 /**
- * Analytics' income and expense per period of the window: what the Dashboard's overview cards
+ * Analytics' income and expense per period of the Span: what the Dashboard's overview cards
  * read from an income-vs-expense Widget. The insight card (Spending Insights) sets the latest
  * complete period's spending against the complete ones before it; the Net worth card breaks
  * down what came in, went out and was kept.

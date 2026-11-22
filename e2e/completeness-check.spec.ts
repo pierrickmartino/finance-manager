@@ -84,8 +84,8 @@ test('Analytics shows the Completeness check above its reports: one line when cu
     await expect(page).toHaveURL(/\/analytics$/);
     const notice = page.getByRole('region', { name: 'Completeness check' });
     await expect(notice).toContainText(/^1 Account current to \d{2}\.\d{2}\.\d{4}/);
-    const periodSwitch = page.getByRole('navigation', { name: 'Period view' });
-    expect((await notice.boundingBox())!.y).toBeLessThan((await periodSwitch.boundingBox())!.y);
+    const spanControl = page.getByRole('form', { name: 'Span' });
+    expect((await notice.boundingBox())!.y).toBeLessThan((await spanControl.boundingBox())!.y);
     await expect(page.getByRole('alert', { name: 'Completeness check' })).toHaveCount(0);
     // Collapsed: the per-Account list is there, but closed.
     await expect(notice.getByRole('link', { name: new RegExp(`Current ${suffix}`) })).toBeHidden();
