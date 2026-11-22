@@ -194,23 +194,23 @@ How one Widget is drawn on the Dashboard Story, or one section of Analytics: a s
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The landing page: a single fixed page of reports, read through one Period view at a time: the Key figures (Net worth, Income, Expense and Profit to date), Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Period window, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read over one Span at a time: the Key figures (Net worth today; Income, Expense and Profit over the Span), Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Span, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
-**Period view**:
-The grain Analytics is read at: Year, Quarter or Month. Changing it refreshes every figure that is reported per period.
-_Avoid_: Granularity, zoom, time scale
+**Span**:
+The stretch of days Analytics is read over: from a start date, never before the first Transaction, to today. It is split into months, quarters or years by its length; its first period starts at the start date and its last is shown "to date", both set apart from complete ones. The spending insight always speaks of the last complete month, whatever the Span.
+_Avoid_: Date range, period window, period view, lookback
 
-**Period window**:
-The periods a Period view shows: the last 6 years, 8 quarters or 12 months, always ending with the current period, which is shown "to date" and set apart from complete ones. A judgement such as the spending insight speaks only of complete periods.
-_Avoid_: Date range, lookback
+**Span preset**:
+A named way of choosing a Span's start date, such as "Rolling 90 days", "Year to date" or "This year and last 2". A Span chosen by preset moves with it as days pass; one chosen by date keeps its start date.
+_Avoid_: Quick range, shortcut
 
 **Profit**:
 Income minus expense over a span of time, with Capital left out. It is negative when more went out than came in.
 _Avoid_: Kept, net profit, savings, net, surplus
 
 **Comparison span**:
-The stretch of the previous period, of the same length as the current period to date, that a to-date figure is compared with. A short month is compared up to its last day.
+The stretch a Span's figures are compared with. For a Span to date of a calendar period (quarter, year, or years), it is the same stretch of the previous one, a short month compared up to its last day; for any other Span, the stretch of the same number of days just before it.
 _Avoid_: Baseline, previous period, last period
 
 **Edit mode**:

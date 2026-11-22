@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted (its Period view and Period window superseded by ADR-0016: Analytics is read over a Span ending today)
 ---
 
 # Analytics is a fixed page read through one Period view
