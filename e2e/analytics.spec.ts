@@ -325,6 +325,47 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
 });
 
+test('each Key figure carries a sparkline, hidden from assistive technology, that fits its tile', async ({
+  page,
+}) => {
+  await seedSalary(Date.now());
+  const keyFigures = region(page, 'Key figures');
+  const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
+    keyFigures.getByRole('region', { name, exact: true }),
+  );
+  const sparklines = keyFigures.locator('[data-sparkline]');
+
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/analytics');
+    await expect(keyFigures).not.toHaveAttribute('aria-busy');
+    await expect(sparklines).toHaveCount(4);
+    for (const tile of tiles) {
+      const sparkline = tile.locator('[data-sparkline]');
+      await expect(sparkline).toBeVisible();
+      await expect(sparkline).toHaveAttribute('aria-hidden', 'true');
+      // The current period is partial: a dashed last segment to a hollow dot.
+      await expect(sparkline.locator('path[stroke-dasharray]')).toHaveCount(1);
+      await expect(sparkline.locator('span.bg-surface')).toHaveCount(1);
+      // Inside its tile, dot and line included, and the tile not overflowing either.
+      const box = (await tile.boundingBox())!;
+      for (const part of [sparkline.locator('svg'), sparkline.locator('span')]) {
+        const inner = (await part.boundingBox())!;
+        expect(inner.x, `${width}px`).toBeGreaterThanOrEqual(box.x);
+        expect(inner.x + inner.width, `${width}px`).toBeLessThanOrEqual(box.x + box.width);
+        expect(inner.y + inner.height, `${width}px`).toBeLessThanOrEqual(box.y + box.height);
+      }
+      expect(
+        await tile.evaluate((node) => node.scrollWidth <= node.clientWidth),
+        `${width}px`,
+      ).toBe(true);
+    }
+  }
+  // Nothing in the sparklines is in the page's accessibility tree.
+  const tree = await keyFigures.ariaSnapshot();
+  expect(tree).not.toMatch(/img|graphics|svg/i);
+});
+
 test('Categories per period lists each Category beside its group subtotal, and both open their Drill-down', async ({
   page,
 }) => {
