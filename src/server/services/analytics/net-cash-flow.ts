@@ -1,7 +1,7 @@
-import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
 import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './figures';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Net cash flow, drawn as the Dashboard's card for a line Widget: every flow in or
@@ -12,10 +12,13 @@ import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './fig
 
 export const NET_CASH_FLOW = 'Net cash flow';
 
-export async function netCashFlow(ctx: ServiceContext, view: PeriodView): Promise<AnalyticsCard> {
+export async function netCashFlow(
+  ctx: ServiceContext,
+  reading: AnalyticsReading,
+): Promise<AnalyticsCard> {
   const report = await runWidgetQuery(ctx, {
-    dateRange: windowRange(view),
-    rows: view,
+    dateRange: reading.range,
+    rows: reading.grain,
     columns: null,
     includeCapital: true,
   });
@@ -23,8 +26,8 @@ export async function netCashFlow(ctx: ServiceContext, view: PeriodView): Promis
     id: 'net-cash-flow',
     name: NET_CASH_FLOW,
     visualisation: 'line',
-    rows: view,
-    data: reportSource(report, view),
+    rows: reading.grain,
+    data: reportSource(report, reading),
     status: statusOf(report),
   });
 }

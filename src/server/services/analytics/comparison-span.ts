@@ -1,7 +1,7 @@
-import type { PeriodView } from '@/lib/analytics/period-view';
 import { MONTH_NAMES } from '@/lib/format';
 import { addDays, daysBetween } from '../fx/dates';
 import { periodOf, type DateSpan } from '../reporting/periods';
+import type { TimeAxis } from '../reporting/query';
 
 /**
  * The Comparison span (GLOSSARY): the stretch of the previous period, of the same length as the
@@ -24,20 +24,20 @@ function cappedDay(year: number, month: number, day: number): string {
   return isoDate(y, m, Math.min(day, daysIn(y, m)));
 }
 
-/** The Comparison span of the current period of a Period view on `today`. */
-export function comparisonSpan(view: PeriodView, today: string): DateSpan {
+/** The Comparison span of the current period of a grain on `today`. */
+export function comparisonSpan(grain: TimeAxis, today: string): DateSpan {
   const [year, month, day] = [
     Number(today.slice(0, 4)),
     Number(today.slice(5, 7)) - 1,
     Number(today.slice(8, 10)),
   ];
-  if (view === 'quarter') {
+  if (grain === 'quarter') {
     const current = periodOf(today, 'quarter');
     const previous = periodOf(addDays(current.from, -1), 'quarter');
     const to = addDays(previous.from, daysBetween(current.from, today));
     return { from: previous.from, to: to < previous.to ? to : previous.to };
   }
-  if (view === 'year') {
+  if (grain === 'year') {
     // The same dates last year; 29 February falls back to 28 February.
     return { from: isoDate(year - 1, 0, 1), to: cappedDay(year - 1, month, day) };
   }

@@ -1,10 +1,10 @@
 import { accountsHref } from '@/lib/accounts/links';
-import { windowSpan, type PeriodView } from '@/lib/analytics/period-view';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { toChartSource } from '@/lib/reporting/pivot-source';
 import type { ServiceContext } from '../context';
 import { netWorthPointDate, runNetWorthTrend, type ReportTable } from '../reporting';
 import type { AnalyticsCard, SectionStatus, SharedSections } from './figures';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Net worth (GLOSSARY: Net worth, ADR-0014), drawn as the Dashboard's Net worth card:
@@ -20,19 +20,21 @@ export interface AnalyticsNetWorth extends SectionStatus {
   trend: ChartSource;
 }
 
-/** Net worth at each period end of a Period view's window, then today. */
-export function netWorthTrend(ctx: ServiceContext, view: PeriodView): Promise<ReportTable> {
-  return runNetWorthTrend(ctx, { unit: view, count: windowSpan(view) });
+/** Net worth at the end of each period of the reading but the last, then today. */
+export function netWorthTrend(
+  ctx: ServiceContext,
+  reading: AnalyticsReading,
+): Promise<ReportTable> {
+  return runNetWorthTrend(ctx, { unit: reading.grain, count: reading.periods.length - 1 });
 }
 
 /**
- * Net worth at a Period view, from its trend (`netWorthTrend`), the Account balances and the
+ * Net worth over the reading, from its trend (`netWorthTrend`), the Account balances and the
  * window's income and expense (the Account balances and Spending Insights sections). Its
  * `unconvertedCount` counts Accounts left out of some point for want of an FX rate.
  */
 export async function netWorth(
-  view: PeriodView,
-  today: string,
+  reading: AnalyticsReading,
   sections: SharedSections,
 ): Promise<AnalyticsNetWorth> {
   const [report, balances, flow] = await Promise.all([
@@ -40,8 +42,9 @@ export async function netWorth(
     sections.balances,
     sections.flow,
   ]);
+  const { grain, to: today } = reading;
   const dateOf = (key: unknown) =>
-    typeof key === 'string' ? netWorthPointDate(key, view, today) : today;
+    typeof key === 'string' ? netWorthPointDate(key, grain, today) : today;
   const trend = toChartSource(report, {
     hrefOf: (cell) => accountsHref({ date: dateOf(cell.row) }),
     drill: null,

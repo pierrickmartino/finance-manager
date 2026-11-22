@@ -11,12 +11,14 @@ import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { spendingByCategory } from './spending-by-category';
 import { spendingInsights } from './spending-insights';
-import { periodWindow, type AnalyticsPeriod } from './window';
+import { readingOf, type AnalyticsReading } from './reading';
 
 /**
  * The Analytics reporting service (GLOSSARY: Analytics, ADR-0015): the page's only data source.
- * Given a Period view, it returns the Period window and one promise per section, each started
- * at once so the page can stream every section in behind its own placeholder.
+ * Given a Period view, it resolves it once into a reading (from a start date to today, at a grain,
+ * split into periods) and returns it with one promise per section, each started at once so the
+ * page can stream every section in behind its own placeholder. Every section reads the reading,
+ * never the Period view.
  *
  * Each section is drawn by the Dashboard's own cards (GLOSSARY: Card), so each hands them what
  * they read from a Widget (`AnalyticsCard`), its figures linked to their Drill-downs back to
@@ -42,7 +44,8 @@ export interface AnalyticsView {
   view: PeriodView;
   /** Today's Swiss date, the one every section reads at. */
   today: string;
-  window: AnalyticsPeriod[];
+  /** What every section reads: the Period view resolved on today. */
+  reading: AnalyticsReading;
   sections: AnalyticsSections;
 }
 
@@ -54,29 +57,29 @@ export interface AnalyticsView {
  */
 export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsView {
   const today = swissToday();
-  const window = periodWindow(view, today);
+  const reading = readingOf(view, today);
   const balances = accountBalances(ctx, today);
-  const flow = spendingInsights(ctx, view);
-  const trend = netWorthTrend(ctx, view);
+  const flow = spendingInsights(ctx, reading);
+  const trend = netWorthTrend(ctx, reading);
   return {
     view,
     today,
-    window,
+    reading,
     sections: {
-      keyFigures: keyFigures(ctx, view, today, { balances, trend, flow }),
-      netWorth: netWorth(view, today, { trend, balances, flow }),
+      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }),
+      netWorth: netWorth(reading, { trend, balances, flow }),
       spendingInsights: flow,
       recentTransactions: recentTransactions(ctx),
-      netCashFlow: netCashFlow(ctx, view),
+      netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
-      spendingByCategory: spendingByCategory(ctx, view),
-      incomeVsExpense: incomeVsExpense(ctx, view, window),
-      categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
+      spendingByCategory: spendingByCategory(ctx, reading),
+      incomeVsExpense: incomeVsExpense(ctx, reading),
+      categoriesPerPeriod: categoriesPerPeriod(ctx, reading),
     },
   };
 }
 
-export type { AnalyticsPeriod } from './window';
+export type { AnalyticsPeriod, AnalyticsReading } from './reading';
 export type { AnalyticsCard, SectionStatus } from './figures';
 export type { AnalyticsKeyFigures, KeyFigure, KeyFigureId } from './key-figures';
 export type { KeyFigureChange } from './key-figure-change';

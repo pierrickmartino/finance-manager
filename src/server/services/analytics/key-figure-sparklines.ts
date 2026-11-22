@@ -1,7 +1,7 @@
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import type { ReportTable } from '../reporting';
 import { flowFigures, type FlowFigures } from './flow-figures';
-import type { AnalyticsPeriod } from './window';
+import { isIncomplete, type AnalyticsReading } from './reading';
 
 /**
  * The sparklines of Analytics' Key figures (spec #225, ticket #230): Income, Expense and Profit
@@ -35,9 +35,9 @@ function valueAt(data: ChartSource | null, rowKey: string, columnKey: string): n
  */
 export function flowSparklines(
   flow: ChartSource | null,
-  window: readonly AnalyticsPeriod[],
+  reading: AnalyticsReading,
 ): FlowSparklines {
-  const periods = window.map((period) => ({
+  const periods = reading.periods.map((period) => ({
     period,
     figures: flowFigures(valueAt(flow, period.key, 'income'), valueAt(flow, period.key, 'expense')),
   }));
@@ -45,7 +45,7 @@ export function flowSparklines(
     periods.map(({ period, figures }) => ({
       label: period.label,
       value: figures[id],
-      isPartial: period.isToDate,
+      isPartial: isIncomplete(period),
     }));
   return { income: line('income'), expense: line('expense'), profit: line('profit') };
 }

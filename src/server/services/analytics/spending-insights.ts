@@ -1,7 +1,7 @@
-import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './figures';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' income and expense per period of the window: what the Dashboard's overview cards
@@ -29,20 +29,20 @@ function fromFirstData(report: ReportTable): ReportTable {
 
 export async function spendingInsights(
   ctx: ServiceContext,
-  view: PeriodView,
+  reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
   const report = await runWidgetQuery(ctx, {
     filters: { categoryGroupTypes: ['income', 'expense'] },
-    dateRange: windowRange(view),
-    rows: view,
+    dateRange: reading.range,
+    rows: reading.grain,
     columns: 'categoryGroupType',
   });
   return analyticsCard({
     id: 'spending-insights',
     name: SPENDING_INSIGHTS,
     visualisation: 'stacked_bar',
-    rows: view,
-    data: reportSource(fromFirstData(report), view),
+    rows: reading.grain,
+    data: reportSource(fromFirstData(report), reading),
     status: statusOf(report),
   });
 }
