@@ -50,7 +50,7 @@ export function NetWorthSparkline({
           style={{ left: `${shape.spots[i]!.x - strip / 2}%`, width: `${strip}%` }}
         >
           <span
-            className="absolute left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-hero-deep opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+            className="absolute left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ramp-1 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
             style={{ top: `${shape.spots[i]!.y}%` }}
           />
         </Link>

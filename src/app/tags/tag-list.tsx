@@ -76,7 +76,7 @@ function TagLink({ tag, isActive, query }: { tag: Tag; isActive: boolean; query:
       scroll={false}
       aria-current={isActive ? 'page' : undefined}
       className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm ${
-        isActive ? 'bg-ink text-white' : 'hover:bg-sunken'
+        isActive ? 'bg-ink text-on-ink' : 'hover:bg-sunken'
       }`}
     >
       <span className="truncate">

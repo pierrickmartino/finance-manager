@@ -6,7 +6,7 @@ import type { MonthFlow, PeriodValue, TickItem } from '@/lib/reporting/card';
 import { litTicks } from '@/lib/reporting/overview';
 
 /**
- * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the hero's navy,
+ * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the ramp's navy,
  * with the latest full period hatched. Amounts in minor units, shown in CHF.
  */
 
@@ -49,8 +49,8 @@ export function DotMatrix({ months }: { months: MonthFlow[] }) {
             className="flex gap-0.5"
             title={`${month.label}: in ${money(month.income)}, out ${money(month.expense)}`}
           >
-            <DotColumn value={month.income} max={max} tone="bg-hero-deep" />
-            <DotColumn value={month.expense} max={max} tone="bg-hero-glow" />
+            <DotColumn value={month.income} max={max} tone="bg-ramp-1" />
+            <DotColumn value={month.expense} max={max} tone="bg-ramp-4" />
           </div>
         ))}
       </div>
@@ -63,10 +63,10 @@ export function DotMatrix({ months }: { months: MonthFlow[] }) {
       </div>
       <figcaption className="mt-3 flex gap-4 text-xs text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-hero-deep" /> In
+          <span className="h-2 w-2 rounded-full bg-ramp-1" /> In
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-hero-glow" /> Out
+          <span className="h-2 w-2 rounded-full bg-ramp-4" /> Out
         </span>
       </figcaption>
     </figure>
@@ -79,7 +79,7 @@ const BAR_PERIODS = 6;
 function barTone(period: PeriodValue, index: number, isMarked: boolean): string {
   if (isMarked) return 'bg-hatch';
   if (period.value < 0) return 'bg-negative-tint';
-  return index % 2 ? 'bg-hero-mist/50' : 'bg-sunken';
+  return index % 2 ? 'bg-ramp-5/50' : 'bg-sunken';
 }
 
 /**
@@ -153,7 +153,7 @@ export function TickList({ items }: { items: TickItem[] }) {
               {Array.from({ length: TICKS }, (_, i) => (
                 <span
                   key={i}
-                  className={`h-4 w-1.5 rounded-sm ${i < lit ? 'bg-hero-mid' : 'bg-rule'}`}
+                  className={`h-4 w-1.5 rounded-sm ${i < lit ? 'bg-ramp-3' : 'bg-rule'}`}
                 />
               ))}
             </span>

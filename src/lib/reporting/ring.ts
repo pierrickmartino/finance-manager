@@ -3,7 +3,7 @@ import { shareParts } from './card';
 
 /**
  * The ring a Donut Widget's card draws (ADR-0009): its parts as slices, largest first and
- * clockwise from the top, each a tone of the hero's navy, darkest first; "Other" comes last in
+ * clockwise from the top, each a step of the ramp's navy, darkest first; "Other" comes last in
  * a neutral grey. Sized by magnitude, labelled with the signed value.
  */
 

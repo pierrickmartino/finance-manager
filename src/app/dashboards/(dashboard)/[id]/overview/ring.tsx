@@ -7,7 +7,7 @@ import { ringArcPath, ringSlices, type RingSlice } from '@/lib/reporting/ring';
 
 /**
  * A Donut Widget's mark on its card (docs/design-system.md, "Charts"): a ring of its parts in
- * the hero's navy, the total in the hole, and beside it a list of every part with its amount
+ * the ramp's navy, the total in the hole, and beside it a list of every part with its amount
  * and share. Pointing at a slice or a row, or focusing a row, shows that part in the hole.
  */
 
@@ -19,13 +19,13 @@ const WHOLE = 0.999;
 
 /** The navy ramp, darkest first (`RING_TONES` long); full class names for Tailwind. */
 const FILLS = [
-  'fill-hero-deep',
-  'fill-hero',
-  'fill-hero-mid',
-  'fill-hero-glow',
-  'fill-hero-glow/60',
-  'fill-hero-mist',
-  'fill-hero-mist/60',
+  'fill-ramp-1',
+  'fill-ramp-2',
+  'fill-ramp-3',
+  'fill-ramp-4',
+  'fill-ramp-4/60',
+  'fill-ramp-5',
+  'fill-ramp-5/60',
 ];
 
 const fill = (slice: RingSlice) => (slice.isOther ? 'fill-rule-strong' : FILLS[slice.tone]);
@@ -143,7 +143,7 @@ function LegendRow({ slice, money, isActive, onFocus }: LegendRowProps) {
     <span
       className={`grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${isActive ? 'bg-sunken' : ''}`}
     >
-      {/* An SVG dot, so it takes the slice's own fill (`bg-hero` is the hero's gradient). */}
+      {/* An SVG dot, so it takes the slice's own fill class (some are translucent ramp steps). */}
       <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" aria-hidden>
         <circle cx={5} cy={5} r={5} className={fill(slice)} />
       </svg>

@@ -14,7 +14,7 @@ import {
   type HistoryFilter,
 } from '@/server/services/history';
 import { HistoryTable } from './history-table';
-import { PAGE_TITLE_CLASS } from '@/components/surface';
+import { PAGE_TITLE_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'History · Finance Manager' };
 
@@ -90,10 +90,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
         />
         {filter.actorId && <input type="hidden" name="actorId" value={filter.actorId} />}
         <FilterInput label="Batch" name="batchId" value={filter.batchId} />
-        <button
-          type="submit"
-          className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-hover"
-        >
+        <button type="submit" className={PRIMARY_BUTTON_CLASS}>
           Filter
         </button>
         <Link href="/history" className="py-1.5 text-sm underline">

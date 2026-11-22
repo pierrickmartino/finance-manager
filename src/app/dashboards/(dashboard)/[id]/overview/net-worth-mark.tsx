@@ -32,9 +32,9 @@ interface BandTone {
 
 /** Each kind's tone; a loan, below zero, is debt. */
 const BAND_TONES: Record<AccountKind, BandTone> = {
-  current: { fill: 'fill-hero-mid', dot: 'bg-hero-mid', swatch: 'bg-hero-mid' },
-  savings: { fill: 'fill-hero-glow', dot: 'bg-hero-glow', swatch: 'bg-hero-glow' },
-  '3a': { fill: 'fill-hero-mist', dot: 'bg-hero-mist', swatch: 'bg-hero-mist' },
+  current: { fill: 'fill-ramp-3', dot: 'bg-ramp-3', swatch: 'bg-ramp-3' },
+  savings: { fill: 'fill-ramp-4', dot: 'bg-ramp-4', swatch: 'bg-ramp-4' },
+  '3a': { fill: 'fill-ramp-5', dot: 'bg-ramp-5', swatch: 'bg-ramp-5' },
   loan: { fill: 'fill-negative-tint', dot: 'bg-negative', swatch: 'bg-negative-tint' },
 };
 
@@ -80,7 +80,7 @@ function NetWorthPlot({ points, bands, stacks, scale }: PlotProps) {
       <polyline
         points={points.map((point, i) => `${scale.x(i)},${scale.y(point.value)}`).join(' ')}
         fill="none"
-        className="stroke-hero-deep"
+        className="stroke-ramp-1"
         strokeWidth={2}
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
@@ -154,8 +154,8 @@ function PointDots({ points, scale, money }: PointDotsProps) {
         </span>
       )}
       <span
-        className={`h-2.5 w-2.5 rounded-full border-2 border-hero-deep group-hover:scale-125 ${
-          point.isPartial ? 'bg-surface' : 'bg-hero-deep'
+        className={`h-2.5 w-2.5 rounded-full border-2 border-ramp-1 group-hover:scale-125 ${
+          point.isPartial ? 'bg-surface' : 'bg-ramp-1'
         }`}
       />
     </Link>

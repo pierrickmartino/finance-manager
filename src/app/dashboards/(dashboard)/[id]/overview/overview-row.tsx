@@ -96,8 +96,8 @@ function FlowBreakdown({ summary, period, money }: FlowBreakdownProps) {
   return (
     <>
       <div className="mt-6 flex flex-col gap-4">
-        <Stat label="Came in" value={money(income)} share={income / top} tone="bg-hero-deep" />
-        <Stat label="Went out" value={money(expense)} share={expense / top} tone="bg-hero-glow" />
+        <Stat label="Came in" value={money(income)} share={income / top} tone="bg-ramp-1" />
+        <Stat label="Went out" value={money(expense)} share={expense / top} tone="bg-ramp-4" />
         <Stat
           label="Profit"
           value={money(profit)}
@@ -174,27 +174,27 @@ export function NetWorthCard({
 }: NetWorthCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const hero = headlineAmount(cards, trend && readHeadlineTrend(trend, period));
-  if (!hero) return null;
+  const headline = headlineAmount(cards, trend && readHeadlineTrend(trend, period));
+  if (!headline) return null;
   const flow = overviewFlow(cards, money);
   const summary = flow ? flowSummary(flow.months) : null;
   return (
     <section
       aria-labelledby="overview-headline"
-      className={`${TILE_CLASS} flex flex-col bg-gradient-to-br from-hero-mist/30 to-surface ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
+      className={`${TILE_CLASS} flex flex-col bg-gradient-to-br from-ramp-5/30 to-surface ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
     >
       <h2 id="overview-headline" className="font-medium">
-        {hero.label}
+        {headline.label}
       </h2>
       <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3">
-        <Link href={hero.href} className={`${HEADLINE_AMOUNT_CLASS} shrink-0 hover:underline`}>
-          {money(hero.value)}
+        <Link href={headline.href} className={`${HEADLINE_AMOUNT_CLASS} shrink-0 hover:underline`}>
+          {money(headline.value)}
         </Link>
-        {hero.trend && (
-          <NetWorthSparkline points={hero.trend.points} money={money} label={trendLabel} />
+        {headline.trend && (
+          <NetWorthSparkline points={headline.trend.points} money={money} label={trendLabel} />
         )}
       </div>
-      {hero.trend && <ChangeChips changes={changes ?? hero.trend.changes} />}
+      {headline.trend && <ChangeChips changes={changes ?? headline.trend.changes} />}
       <Unconverted count={unconvertedCount} of="Account" className="mt-2 text-warning" />
       {flow && summary && (
         <>
@@ -233,7 +233,7 @@ function SpendingChart({ months, period, money }: SpendingChartProps) {
   const label = `${caption}: ${bars.map((bar) => `${bar.label} ${money(bar.expense)}`).join(', ')}. Average ${money(Math.round(average))}.`;
   return (
     <figure className="mt-6 flex min-h-40 flex-1 flex-col">
-      <figcaption className="flex items-baseline justify-between text-xs text-on-hero/70">
+      <figcaption className="flex items-baseline justify-between text-xs text-on-ramp/70">
         <span>{caption}</span>
         <span>
           Average <span className="tabular-nums">{money(Math.round(average))}</span>
@@ -246,23 +246,23 @@ function SpendingChart({ months, period, money }: SpendingChartProps) {
       >
         <div
           aria-hidden
-          className="absolute inset-x-0 border-t border-dashed border-on-hero/50"
+          className="absolute inset-x-0 border-t border-dashed border-on-ramp/50"
           style={{ bottom: `${averageShare * 100}%` }}
         />
         {bars.map((bar) => (
           <div
             key={bar.label}
             title={`${bar.label}: ${money(bar.expense)}`}
-            className={`flex-1 rounded-t-md ${bar.isLatest ? 'bg-on-hero' : 'bg-on-hero/25'}`}
+            className={`flex-1 rounded-t-md ${bar.isLatest ? 'bg-on-ramp' : 'bg-on-ramp/25'}`}
             style={{ height: `${Math.max(2, bar.share * 100)}%` }}
           />
         ))}
       </div>
-      <div aria-hidden className="mt-1.5 flex gap-1.5 text-[10px] text-on-hero/60">
+      <div aria-hidden className="mt-1.5 flex gap-1.5 text-[10px] text-on-ramp/60">
         {bars.map((bar) => (
           <span
             key={bar.label}
-            className={`flex-1 truncate text-center ${bar.isLatest ? 'font-medium text-on-hero' : ''}`}
+            className={`flex-1 truncate text-center ${bar.isLatest ? 'font-medium text-on-ramp' : ''}`}
           >
             {barLabel(bar.label, period)}
           </span>
@@ -273,7 +273,7 @@ function SpendingChart({ months, period, money }: SpendingChartProps) {
 }
 
 /**
- * How the latest full month compares, in the hero's navy: one sentence, then each full month's
+ * How the latest full month compares, in the ramp's navy: one sentence, then each full month's
  * spending against the average. As tall as Recent activity (both span the overview row's two
  * rows from `lg` up).
  */
@@ -294,12 +294,12 @@ export function InsightCard({
   return (
     <section
       aria-labelledby="overview-insight"
-      className="flex flex-col rounded-3xl bg-insight p-6 text-on-hero shadow-lg lg:row-span-2 lg:self-stretch"
+      className="flex flex-col rounded-3xl bg-insight p-6 text-on-ramp shadow-lg lg:row-span-2 lg:self-stretch"
     >
       <h2 id="overview-insight" className="font-display text-lg leading-snug tracking-tight">
         {insight.headline}
       </h2>
-      <p className="mt-3 max-w-sm text-on-hero/80">
+      <p className="mt-3 max-w-sm text-on-ramp/80">
         {before}
         <FigureLink
           href={flow.changeHref}
@@ -309,12 +309,12 @@ export function InsightCard({
         </FigureLink>
         {after}
       </p>
-      <Unconverted count={unconvertedCount} of="Transaction" className="mt-2 text-on-hero/80" />
+      <Unconverted count={unconvertedCount} of="Transaction" className="mt-2 text-on-ramp/80" />
       <SpendingChart months={flow.months} period={flow.period} money={money} />
       {flow.latestHref && (
         <Link
           href={flow.latestHref}
-          className="mt-6 self-start rounded-lg bg-on-hero px-5 py-2.5 text-sm font-medium text-hero shadow-lg hover:bg-on-hero/90"
+          className="mt-6 self-start rounded-lg bg-on-ramp px-5 py-2.5 text-sm font-medium text-ramp-2 shadow-lg hover:bg-on-ramp/90"
         >
           See the Transactions
         </Link>
@@ -324,7 +324,7 @@ export function InsightCard({
 }
 
 /**
- * The latest Transactions, newest first: the largest of them in the spotlight, in the hero's
+ * The latest Transactions, newest first: the largest of them in the spotlight, in the ramp's
  * navy, then the rest on a timeline with their Category and how long ago they were booked.
  * Each opens its page.
  */
@@ -368,13 +368,13 @@ function RecentActivityList({ recent }: { recent: RecentActivity[] }) {
     <>
       <Link
         href={`/transactions/${lit.spotlit.id}`}
-        className="mt-3 block rounded-2xl bg-hero-deep p-4 text-on-hero hover:bg-hero"
+        className="mt-3 block rounded-2xl bg-ramp-1 p-4 text-on-ramp hover:bg-ramp-2"
       >
-        <span className="block text-xs text-on-hero/75">Largest lately · {when(lit.spotlit)}</span>
+        <span className="block text-xs text-on-ramp/75">Largest lately · {when(lit.spotlit)}</span>
         <span className="mt-1 block font-display text-3xl tracking-tight tabular-nums">
           {signed(lit.spotlit)}
         </span>
-        <span className="mt-1 block truncate text-sm text-on-hero/85">
+        <span className="mt-1 block truncate text-sm text-on-ramp/85">
           {lit.spotlit.name} · {lit.spotlit.category}
         </span>
       </Link>
@@ -384,7 +384,7 @@ function RecentActivityList({ recent }: { recent: RecentActivity[] }) {
             <li key={transaction.id} className="relative pb-3 pl-4 last:pb-0">
               <span
                 aria-hidden
-                className="absolute top-2 -left-[5px] h-2.5 w-2.5 rounded-full border-2 border-surface bg-hero-mid"
+                className="absolute top-2 -left-[5px] h-2.5 w-2.5 rounded-full border-2 border-surface bg-ramp-3"
               />
               <Link
                 href={`/transactions/${transaction.id}`}

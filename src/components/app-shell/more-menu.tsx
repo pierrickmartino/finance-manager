@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from './icon';
 import { isActive, overflowGroups } from './navigation';
-import { HERO_PILL_ACTIVE, HERO_PILL_CLASS, HERO_PILL_IDLE } from './hero-styles';
+import { BAR_PILL_ACTIVE, BAR_PILL_CLASS, BAR_PILL_IDLE } from './bar-styles';
 
 const GROUPS = overflowGroups();
 
@@ -48,7 +48,7 @@ export function MoreMenu({ pathname }: { pathname: string }) {
         aria-expanded={isOpen}
         aria-controls={panelId}
         onClick={() => setIsOpen((open) => !open)}
-        className={`${HERO_PILL_CLASS} ${isCurrent ? HERO_PILL_ACTIVE : HERO_PILL_IDLE}`}
+        className={`${BAR_PILL_CLASS} ${isCurrent ? BAR_PILL_ACTIVE : BAR_PILL_IDLE}`}
       >
         <Icon name="menu" className="h-3.5 w-3.5" />
         More

@@ -16,7 +16,7 @@ import {
 
 /**
  * A table Widget's card (docs/design-system.md, "Charts"): rows × columns as cells shaded in six
- * steps of `hero-mid`, each a link to its Transactions. Rows that form a tree (Analytics'
+ * steps of `ramp-3`, each a link to its Transactions. Rows that form a tree (Analytics'
  * Categories per period) are drawn as one: a heading per type, each group a band of plain
  * subtotals, its Categories indented beneath it and shaded within their type.
  */
@@ -38,9 +38,9 @@ function useText(data: ChartSource, isSigned: boolean): Text {
 }
 
 const shade = (mix: number) =>
-  `color-mix(in srgb, var(--color-hero-mid) ${mix}%, var(--color-surface))`;
+  `color-mix(in srgb, var(--color-ramp-3) ${mix}%, var(--color-surface))`;
 
-const PARTIAL_OUTLINE = 'outline-2 -outline-offset-2 outline-hero-deep outline-dashed';
+const PARTIAL_OUTLINE = 'outline-2 -outline-offset-2 outline-ramp-1 outline-dashed';
 
 function ColumnHeads({ columns, hasTotal }: { columns: HeatmapColumn[]; hasTotal: boolean }) {
   return (
@@ -85,7 +85,7 @@ function HeatCell({ cell, column, label, text }: CellProps) {
         href={cell.href}
         aria-label={`${label}, ${column.fullLabel}: ${text.full(cell.value)}`}
         title={text.full(cell.value)}
-        className={`block min-w-12 rounded-md px-1 py-2 text-center tabular-nums hover:ring-2 hover:ring-accent ${level.isDark ? 'text-on-hero' : 'text-ink'} ${column.isPartial ? PARTIAL_OUTLINE : ''}`}
+        className={`block min-w-12 rounded-md px-1 py-2 text-center tabular-nums hover:ring-2 hover:ring-accent ${level.isDark ? 'text-on-ramp' : 'text-ink'} ${column.isPartial ? PARTIAL_OUTLINE : ''}`}
         style={{ backgroundColor: shade(level.mix) }}
       >
         {text.compact(cell.value)}

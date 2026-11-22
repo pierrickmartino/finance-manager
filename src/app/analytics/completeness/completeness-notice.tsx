@@ -87,9 +87,7 @@ function CoverageTrack({ entry, today }: { entry: CompletenessEntry; today: stri
       aria-hidden
       className={`relative h-3 rounded-full ${entry.isFreshnessChecked ? 'bg-sunken' : 'border border-dashed border-rule-strong'}`}
     >
-      {covered && (
-        <div className="absolute inset-y-0 rounded-full bg-hero-mid" style={at(covered)} />
-      )}
+      {covered && <div className="absolute inset-y-0 rounded-full bg-ramp-3" style={at(covered)} />}
       {overdue && (
         <div
           className="absolute inset-y-0 rounded-r-full border border-warning-rule bg-warning-tint"
@@ -148,7 +146,7 @@ function Legend() {
   return (
     <p aria-hidden className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-muted">
       <span>
-        <span className={`${swatch} h-2 w-4 rounded-full bg-hero-mid`} />
+        <span className={`${swatch} h-2 w-4 rounded-full bg-ramp-3`} />
         Covered
       </span>
       <span>

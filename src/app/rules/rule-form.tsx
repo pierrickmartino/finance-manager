@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { FieldError } from '@/components/form';
 import { BUTTON_CLASS, INPUT_CLASS } from '@/components/named-list';
+import { PRIMARY_BUTTON_CLASS } from '@/components/surface';
 import type { ActionResult } from '@/server/actions';
 import {
   CONDITION_KIND_LABELS,
@@ -267,11 +268,7 @@ export function RuleForm({ initial, options, action, submitLabel }: RuleFormProp
 
       {state && !state.ok && <FieldError message={state.error} />}
       <div>
-        <button
-          type="submit"
-          disabled={isPending}
-          className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-hover disabled:opacity-50"
-        >
+        <button type="submit" disabled={isPending} className={PRIMARY_BUTTON_CLASS}>
           {submitLabel}
         </button>
       </div>

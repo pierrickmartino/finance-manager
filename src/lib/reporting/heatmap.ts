@@ -8,7 +8,7 @@ import type { ChartSource, RowTree } from './chart-data';
  */
 
 /**
- * The shades, lightest first: how much of `hero-mid` is mixed into the card's white. Stepped,
+ * The shades, lightest first: how much of `ramp-3` is mixed into the card's white. Stepped,
  * not continuous, so the text on each shade passes AA: ink up to the fourth step (≥ 4.6:1),
  * white from the fifth (≥ 5.3:1). Between those two a continuous shade would fail both.
  */

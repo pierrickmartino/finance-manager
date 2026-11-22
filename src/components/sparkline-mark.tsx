@@ -1,6 +1,6 @@
 /**
  * The sparkline's drawing (docs/design-system.md, "Charts"), shared by the Net worth headline
- * and the Key figures: a `hero-deep` line over a flat `hero-mist` fill in a 100 × 100 box that
+ * and the Key figures: a `ramp-1` line over a flat `ramp-5` fill in a 100 × 100 box that
  * stretches to its container, and the latest point's dot, hollow while its period runs. Paths
  * come from `sparkline` (src/lib/reporting/net-worth-headline.ts). Neither part is read by
  * assistive technology: whoever draws them says the values as text.
@@ -8,7 +8,7 @@
 
 const STROKE = {
   fill: 'none',
-  className: 'stroke-hero-deep',
+  className: 'stroke-ramp-1',
   strokeWidth: 1.75,
   strokeLinejoin: 'round',
   strokeLinecap: 'round',
@@ -33,7 +33,7 @@ export function SparklineSvg({ area, line, partial }: SparklineSvgProps) {
       className="absolute inset-0 h-full w-full overflow-visible"
       aria-hidden
     >
-      <path d={area} className="fill-hero-mist" fillOpacity={0.4} />
+      <path d={area} className="fill-ramp-5" fillOpacity={0.4} />
       <path d={line} {...STROKE} />
       {partial && <path d={partial} {...STROKE} strokeDasharray="3 3" />}
     </svg>
@@ -53,7 +53,7 @@ export function SparklineDot({ x, y, isPartial }: SparklineDotProps) {
   return (
     <span
       aria-hidden
-      className={`pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-hero-deep ${isPartial ? 'bg-surface' : 'bg-hero-deep'}`}
+      className={`pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ramp-1 ${isPartial ? 'bg-surface' : 'bg-ramp-1'}`}
       style={{ left: `${x}%`, top: `${y}%` }}
     />
   );

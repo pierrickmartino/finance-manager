@@ -5,13 +5,13 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { logoutAction } from '@/app/login/actions';
 import {
-  HERO_ICON_BUTTON_CLASS,
-  HERO_PILL_ACTIVE,
-  HERO_PILL_CLASS,
-  HERO_PILL_IDLE,
-  HERO_PRIMARY_BUTTON_CLASS,
-  HERO_SECONDARY_BUTTON_CLASS,
-} from './hero-styles';
+  BAR_ICON_BUTTON_CLASS,
+  BAR_PILL_ACTIVE,
+  BAR_PILL_CLASS,
+  BAR_PILL_IDLE,
+  BAR_PRIMARY_BUTTON_CLASS,
+  BAR_SECONDARY_BUTTON_CLASS,
+} from './bar-styles';
 import { Icon } from './icon';
 import { MobileDrawer } from './mobile-drawer';
 import { MoreMenu } from './more-menu';
@@ -23,12 +23,12 @@ import { PRIMARY_LINKS, isActive } from './navigation';
  */
 function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => void }) {
   return (
-    <header className="flex h-12 items-center gap-2 px-3 text-on-hero md:px-5">
+    <header className="flex h-12 items-center gap-2 px-3 text-on-ramp md:px-5">
       <button
         type="button"
         aria-label="Open menu"
         onClick={onOpenMenu}
-        className={`${HERO_ICON_BUTTON_CLASS} lg:hidden`}
+        className={`${BAR_ICON_BUTTON_CLASS} lg:hidden`}
       >
         <Icon name="menu" />
       </button>
@@ -44,7 +44,7 @@ function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => 
               key={link.href}
               href={link.href}
               aria-current={active ? 'page' : undefined}
-              className={`${HERO_PILL_CLASS} ${active ? HERO_PILL_ACTIVE : HERO_PILL_IDLE}`}
+              className={`${BAR_PILL_CLASS} ${active ? BAR_PILL_ACTIVE : BAR_PILL_IDLE}`}
             >
               <Icon name={link.icon} className="h-3.5 w-3.5" />
               {link.label}
@@ -55,17 +55,17 @@ function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => 
       </nav>
       <div className="ml-auto flex items-center gap-1.5">
         {/* Statements are imported from an Account's page: pick the Account there. */}
-        <Link href="/accounts" className={`${HERO_SECONDARY_BUTTON_CLASS} hidden md:block`}>
+        <Link href="/accounts" className={`${BAR_SECONDARY_BUTTON_CLASS} hidden md:block`}>
           Import statement
         </Link>
-        <Link href="/unclassified" className={`${HERO_PRIMARY_BUTTON_CLASS} hidden md:block`}>
+        <Link href="/unclassified" className={`${BAR_PRIMARY_BUTTON_CLASS} hidden md:block`}>
           Review unclassified
         </Link>
-        <Link href="/settings" aria-label="Settings" className={HERO_ICON_BUTTON_CLASS}>
+        <Link href="/settings" aria-label="Settings" className={BAR_ICON_BUTTON_CLASS}>
           <Icon name="settings" />
         </Link>
         <form action={logoutAction}>
-          <button type="submit" aria-label="Sign out" className={HERO_ICON_BUTTON_CLASS}>
+          <button type="submit" aria-label="Sign out" className={BAR_ICON_BUTTON_CLASS}>
             <Icon name="signOut" />
           </button>
         </form>
@@ -75,7 +75,7 @@ function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => 
 }
 
 interface AppShellProps {
-  /** Signed out (login, setup), only the page renders: no hero, top bar or drawer. */
+  /** Signed out (login, setup), only the page renders: no band, top bar or drawer. */
   showNavigation: boolean;
   children: ReactNode;
 }
@@ -96,13 +96,13 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
   // Nothing clips the page: a menu that drops past the end of a page must still be reachable,
   // and sticky columns must stick.
   const main = showNavigation
-    ? 'mx-2 mt-1 mb-4 rounded-xl bg-paper px-4 py-5 shadow-lg shadow-hero/10 md:mx-4 md:px-6'
+    ? 'mx-2 mt-1 mb-4 rounded-xl bg-paper px-4 py-5 shadow-lg shadow-ramp-2/10 md:mx-4 md:px-6'
     : 'mx-auto w-full max-w-5xl px-4 py-8 md:px-6';
 
   return (
     <div className={`relative min-h-screen ${showNavigation ? 'bg-sunken' : 'bg-paper'}`}>
       {showNavigation && (
-        <div aria-hidden="true" className="bg-hero absolute inset-x-0 top-0 h-28" />
+        <div aria-hidden="true" className="bg-band absolute inset-x-0 top-0 h-28" />
       )}
       <div className="relative">
         {showNavigation && <TopBar pathname={pathname} onOpenMenu={() => setIsMenuOpen(true)} />}
