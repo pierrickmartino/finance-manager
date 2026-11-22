@@ -209,6 +209,10 @@ _Avoid_: Date range, lookback
 Income minus expense over a span of time, with Capital left out. It is negative when more went out than came in.
 _Avoid_: Kept, net profit, savings, net, surplus
 
+**Comparison span**:
+The stretch of the previous period, of the same length as the current period to date, that a to-date figure is compared with. A short month is compared up to its last day.
+_Avoid_: Baseline, previous period, last period
+
 **Edit mode**:
 The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History. On narrow screens the board is one column in reading order, with no dragging or resizing: a card moves up or down instead, swapping places with its neighbour. From the keyboard, a focused card moves one cell with the arrow keys and resizes one cell with Shift+arrows.
 _Avoid_: Layout editor, design mode
