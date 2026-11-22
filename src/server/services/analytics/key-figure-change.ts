@@ -1,20 +1,20 @@
 import { accountsHref } from '@/lib/accounts/links';
 import { analyticsDrillUrl } from '@/lib/analytics/links';
-import type { PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { addDays } from '../fx/dates';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
 import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
-import type { WidgetQueryInput } from '../reporting/query';
+import type { TimeAxis, WidgetQueryInput } from '../reporting/query';
 import { comparisonLabel, comparisonSpan } from './comparison-span';
 import { flowFigures, type FlowFigureId } from './flow-figures';
+import type { AnalyticsReading } from './reading';
 
 /**
- * A Key figure's change line (spec #225): Income, Expense and Profit against the same figure
- * over the Comparison span (GLOSSARY), Net worth against its value at the end of the previous
- * period. There is no change when the Account data doesn't reach back to what it is compared
- * with: the Comparison span's start, or for Net worth the previous period's end.
+ * A Key figure's change line (spec #225, #204): Income, Expense and Profit over the Span against
+ * the same figure over its Comparison span (GLOSSARY), Net worth against its value at the end of
+ * the previous period. There is no change when the Account data doesn't reach back to what it is
+ * compared with: the Comparison span's start, or for Net worth the previous period's end.
  */
 
 export type ChangeDirection = 'up' | 'down' | 'flat';
@@ -33,8 +33,8 @@ export interface KeyFigureChange {
   /** Those dates as the line says them: "vs 1–22 Oct". */
   label: string;
   /**
-   * The Transactions of both stretches of days (the current period to date and the Comparison
-   * span), or for Net worth the Accounts at the end of the previous period.
+   * The Transactions of both stretches of days (the Span and its Comparison span), or for Net
+   * worth the Accounts at the end of the previous period.
    */
   href: string;
 }
@@ -56,16 +56,17 @@ const FLOW_GOOD_WAYS: Record<FlowFigureId, GoodWay> = {
   profit: 'up',
 };
 
-/** What a Key figure's change is read from, at a Period view on a day. */
+/** What a Key figure's change is read from, over a reading. */
 export interface Comparison {
-  view: PeriodView;
-  today: string;
+  reading: AnalyticsReading;
   /** The Comparison span. */
   span: DateSpan;
   /** The first day any Account holds data; null when none does. */
   dataStart: string | null;
-  /** Income and expense of both stretches, a row per period: the earlier one is the first. */
+  /** Income and expense of both stretches, a row per period: what a change line opens. */
   report: ReportTable;
+  /** Income and expense of the Comparison span, a row per Category group type. */
+  earlier: ReportTable;
 }
 
 const directionOf = (amount: number): ChangeDirection =>
@@ -88,10 +89,10 @@ function changeOf(
 }
 
 /**
- * Income and expense over both stretches, by period of the view: from the Comparison span's
+ * Income and expense over both stretches, by period of the grain: from the Comparison span's
  * start to today, leaving out the days between the two stretches.
  */
-function bothStretchesQuery(view: PeriodView, span: DateSpan, current: DateSpan): WidgetQueryInput {
+function bothStretchesQuery(grain: TimeAxis, span: DateSpan, current: DateSpan): WidgetQueryInput {
   const gap = { from: addDays(span.to, 1), to: addDays(current.from, -1) };
   return {
     filters: { categoryGroupTypes: ['income', 'expense'] },
@@ -101,49 +102,42 @@ function bothStretchesQuery(view: PeriodView, span: DateSpan, current: DateSpan)
       to: current.to,
       ...(gap.from <= gap.to ? { except: gap } : {}),
     },
-    rows: view,
+    rows: grain,
     columns: 'categoryGroupType',
   };
 }
 
 /**
- * The first day any Account holds data: its opening date, or its first Transaction. Null when
- * no Account has either.
+ * Starts reading what the Key figures' changes compare with, over a reading, given the first
+ * day any Account holds data (`DataStart.accountData`).
  */
-async function accountDataStart(ctx: ServiceContext): Promise<string | null> {
-  const result = await ctx.db.query<{ start: string | null }>(
-    `SELECT to_char(least(
-       (SELECT min(opening_date) FROM account),
-       (SELECT min(booking_date) FROM "transaction")
-     ), 'YYYY-MM-DD') AS start`,
-  );
-  return result.rows[0]?.start ?? null;
-}
-
-/** Starts reading what the Key figures' changes compare with, at a Period view on `today`. */
 export async function loadComparison(
   ctx: ServiceContext,
-  view: PeriodView,
-  today: string,
+  reading: AnalyticsReading,
+  dataStart: string | null,
 ): Promise<Comparison> {
-  const span = comparisonSpan(view, today);
-  const current = { from: periodOf(today, view).from, to: today };
-  const [report, start] = await Promise.all([
-    runWidgetQuery(ctx, bothStretchesQuery(view, span, current)),
-    accountDataStart(ctx),
+  const { grain, from, to: today } = reading;
+  const current = { from, to: today };
+  const span = comparisonSpan(reading.span, current);
+  const [report, earlier] = await Promise.all([
+    runWidgetQuery(ctx, bothStretchesQuery(grain, span, current)),
+    runWidgetQuery(ctx, {
+      filters: { categoryGroupTypes: ['income', 'expense'] },
+      dateRange: { kind: 'fixed', from: span.from, to: span.to },
+      rows: 'categoryGroupType',
+      columns: null,
+    }),
   ]);
-  return { view, today, span, dataStart: start, report };
+  return { reading, span, dataStart, report, earlier };
 }
 
 const reachesBack = ({ dataStart }: Comparison, date: string) =>
   dataStart !== null && dataStart <= date;
 
-/** A comparison report's value at the earlier period's row, in one Category group type. */
-function earlierOf(comparison: Comparison, type: 'income' | 'expense'): number {
-  const { report, span, view } = comparison;
-  const row = report.rows.findIndex((header) => header.key === periodKey(span.from, view));
-  const column = report.columns.findIndex((header) => header.key === type);
-  return row < 0 || column < 0 ? 0 : (report.cells[row]?.[column] ?? 0);
+/** The Comparison span's total of one Category group type; 0 when nothing of it falls there. */
+function earlierOf({ earlier }: Comparison, type: 'income' | 'expense'): number {
+  const row = earlier.rows.findIndex((header) => header.key === type);
+  return row < 0 ? 0 : (earlier.rowTotals[row] ?? 0);
 }
 
 /** A flow figure's change against the Comparison span; null when the data doesn't reach back. */
@@ -156,12 +150,12 @@ export function flowChange(
   const earlier = flowFigures(earlierOf(comparison, 'income'), earlierOf(comparison, 'expense'))[
     id
   ];
-  const { view, today, span, report } = comparison;
+  const { reading, span, report } = comparison;
   return changeOf([value, earlier], {
     span,
-    today,
+    today: reading.to,
     goodWay: FLOW_GOOD_WAYS[id],
-    href: analyticsDrillUrl(view, report.query, FLOW_CELLS[id]),
+    href: analyticsDrillUrl(reading, report.query, FLOW_CELLS[id]),
   });
 }
 
@@ -174,10 +168,10 @@ export function netWorthChange(
   trend: ReportTable,
   value: number,
 ): KeyFigureChange | null {
-  const { view, today } = comparison;
-  const end = addDays(periodOf(today, view).from, -1);
+  const { grain, to: today } = comparison.reading;
+  const end = addDays(periodOf(today, grain).from, -1);
   if (!reachesBack(comparison, end)) return null;
-  const row = trend.rows.findIndex((header) => header.key === periodKey(end, view));
+  const row = trend.rows.findIndex((header) => header.key === periodKey(end, grain));
   if (row < 0) return null;
   return changeOf([value, trend.rowTotals[row] ?? 0], {
     span: { from: end, to: end },

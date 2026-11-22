@@ -8,7 +8,9 @@ import {
   originOf,
   seedAccount,
   seedClassified,
+  seedEarlyStart,
 } from '@test/support/analytics';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
@@ -29,7 +31,7 @@ afterEach(() => {
  * Capital order cannot come from creation order. Salary in January and March (to date); a
  * Bonus with nothing booked; groceries with a refund and an EUR purchase in January; a split
  * purchase in February, part groceries and part property; a restaurant meal in March; groceries
- * in February 2024, before the Month window; a Transfer out to the EUR Account; and a Travel
+ * in February 2024, before Rolling 12 months; a Transfer out to the EUR Account; and a Travel
  * group whose only Category has nothing booked.
  */
 async function dataset(): Promise<void> {
@@ -46,6 +48,7 @@ async function dataset(): Promise<void> {
   const as = (category: Category) => ({ categoryId: category.id });
 
   const ubs = await seedAccount(t.ctx, 'UBS');
+  await seedEarlyStart(t.ctx, ubs);
   const ca = await seedAccount(t.ctx, 'CA', 'EUR');
   await seedEurRates(t.ctx, [['2025-01-10', '0.9400']]);
 
@@ -80,13 +83,15 @@ describe('Categories per period', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, 'month', 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, MONTHLY, 'categoriesPerPeriod');
     const data = card.data!;
 
     expect(card.name).toBe('Categories per period');
     expect(card.isEmpty).toBe(false);
     expect(readCard(card, money).kind).toBe('grid');
-    expect(data.columns).toHaveLength(12);
+    expect(data.columns).toHaveLength(13);
+    // Cut short at the Span's start, and to date.
+    expect(data.columns[0]).toMatchObject({ label: 'Mar 2024', isPartial: true });
     expect(data.columns.at(-1)).toMatchObject({ label: 'Mar 2025', isPartial: true });
     // Bonus and Hotels have nothing booked, so they are hidden, and so is the Travel group.
     expect(labels(data.rows)).toEqual([
@@ -98,7 +103,7 @@ describe('Categories per period', () => {
       'Capital',
       'Capital › Property',
     ]);
-    const empty = Array<null>(9).fill(null);
+    const empty = Array<null>(10).fill(null);
     // Groceries in January: -120.00 + 20.00 refund + EUR -100.00 at 0.94 = -194.00. The split
     // purchase counts -200.00 under Groceries and -100.00 under Property; the Transfer counts
     // nowhere.
@@ -118,7 +123,7 @@ describe('Categories per period', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const data = (await loadSection(t.ctx, 'month', 'categoriesPerPeriod')).data!;
+    const data = (await loadSection(t.ctx, MONTHLY, 'categoriesPerPeriod')).data!;
 
     // Row indexes into data.rows; a Category keeps its whole label there and its own name here.
     expect(data.rowTree).toEqual({
@@ -145,7 +150,7 @@ describe('Categories per period', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, 'month', 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, MONTHLY, 'categoriesPerPeriod');
     // Income and Expense net to a total Income isn't a share of: the card names the largest row.
     // Income is 900'000 of the rows' 1'907'800 in all, by magnitude: 47%.
     expect(readCard(card, money).lead).toMatchObject({
@@ -154,23 +159,23 @@ describe('Categories per period', () => {
     });
   });
 
-  it('reads the window of the Period view: Quarter and Year', async () => {
+  it('reads the Span by quarter and by year', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = (await loadSection(t.ctx, 'quarter', 'categoriesPerPeriod')).data!;
-    const years = (await loadSection(t.ctx, 'year', 'categoriesPerPeriod')).data!;
+    const quarters = (await loadSection(t.ctx, QUARTERLY, 'categoriesPerPeriod')).data!;
+    const years = (await loadSection(t.ctx, YEARLY, 'categoriesPerPeriod')).data!;
 
     const groceries = 3;
-    // February 2024 is in the Quarter and Year windows; the current period is to date.
-    expect(quarters.cells[groceries]).toEqual([null, null, null, -999, null, null, null, -39_400]);
+    // February 2024 is in both Spans (not in Rolling 12 months); the current period is to date.
+    expect(quarters.cells[groceries]).toEqual([-999, null, null, null, -39_400]);
     expect(quarters.rowTotals[groceries]).toBe(-40_399);
-    expect(years.cells[groceries]).toEqual([null, null, null, null, -999, -39_400]);
+    expect(years.cells[groceries]).toEqual([null, null, null, -999, -39_400]);
     expect(years.rowTotals[2]).toBe(-44_899);
   });
 
-  it.each(['month', 'quarter', 'year'] as const)(
-    'opens a Drill-down behind every cell, subtotal and Total that sums to it (%s)',
+  it.each([MONTHLY, QUARTERLY, YEARLY])(
+    'opens a Drill-down behind every cell, subtotal and Total that sums to it ($preset)',
     async (view) => {
       fixToday('2025-03-20');
       await dataset();
@@ -183,18 +188,18 @@ describe('Categories per period', () => {
       const periods = data.columns.length;
       expect(values).toHaveLength(7 * (periods + 1) + periods + 1);
       for (const { value, href } of values) {
-        expect(originOf(href)).toEqual({ kind: 'analytics', period: view });
+        expect(originOf(href)).toEqual({ kind: 'analytics', span: view });
         expect((await openDrill(t.ctx, href)).value).toBe(value);
       }
     },
   );
 
-  it('is empty when no Transaction falls in the window', async () => {
+  it('is empty when no Transaction falls in the Span', async () => {
     fixToday('2025-03-20');
     await dataset();
     vi.setSystemTime(new Date('2035-03-20T09:00:00Z'));
 
-    const card = await loadSection(t.ctx, 'year', 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, YEARLY, 'categoriesPerPeriod');
 
     expect(card.isEmpty).toBe(true);
     expect(card.data!.rows).toEqual([]);

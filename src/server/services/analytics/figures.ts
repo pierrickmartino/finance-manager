@@ -1,5 +1,4 @@
 import { analyticsDrillUrl, analyticsOrigin } from '@/lib/analytics/links';
-import type { PeriodView } from '@/lib/analytics/period-view';
 import type { WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { drillLinks, toChartSource } from '@/lib/reporting/pivot-source';
@@ -8,12 +7,12 @@ import type { ReportHeader } from '../reporting/headers';
 import type { AxisSelector, CellRef } from '../reporting/cell-ref';
 import type { WidgetQuery } from '../reporting/query';
 import type { Visualisation, WidgetSource } from '../reporting/widgets';
-import type { AnalyticsPeriod } from './window';
+import { isIncomplete, type AnalyticsReading } from './reading';
 
 /**
  * The building blocks of Analytics' sections. Each section is drawn by the Dashboard's own
  * cards (GLOSSARY: Card), so it hands them what they read from a Widget: its data as a chart
- * source, every value linked to its Drill-down back to Analytics at the same Period view.
+ * source, every value linked to its Drill-down back to Analytics, read the same way.
  */
 
 /** A figure's Drill-down (GLOSSARY): the query and cell `listCellTransactions` reads. */
@@ -30,7 +29,7 @@ export interface Figure {
 
 /** What every section says besides its figures. */
 export interface SectionStatus {
-  /** Nothing the section reports falls in the window. */
+  /** Nothing the section reports falls in the Span. */
   isEmpty: boolean;
   /** Transactions (Accounts, for balances) left out for want of an FX rate. */
   unconvertedCount: number;
@@ -82,9 +81,26 @@ export function analyticsCard(spec: AnalyticsCardSpec): AnalyticsCard {
   };
 }
 
-/** A report's values, each opening its Drill-down from Analytics at a Period view. */
-export function reportSource(report: ReportTable, view: PeriodView): ChartSource {
-  return toChartSource(report, drillLinks(report, analyticsOrigin(view)));
+/**
+ * A report's headers with the reading's incomplete periods (its partial first and its to-date
+ * last) marked partial: over the reading's fixed range, the engine marks none of them.
+ */
+function markIncomplete(report: ReportTable, reading: AnalyticsReading): ReportTable {
+  const incomplete = new Set(reading.periods.filter(isIncomplete).map((period) => period.key));
+  const mark = (headers: readonly ReportHeader[]) =>
+    headers.map((header) =>
+      header.key !== null && incomplete.has(header.key) ? { ...header, isPartial: true } : header,
+    );
+  return { ...report, rows: mark(report.rows), columns: mark(report.columns) };
+}
+
+/**
+ * A report over the reading's periods, each value opening its Drill-down from Analytics, read
+ * the same way; its incomplete periods are set apart.
+ */
+export function reportSource(report: ReportTable, reading: AnalyticsReading): ChartSource {
+  const marked = markIncomplete(report, reading);
+  return toChartSource(marked, drillLinks(marked, analyticsOrigin(reading)));
 }
 
 /** The sum of some figures; null when every one is null. */
@@ -104,34 +120,34 @@ export function cellOf(report: ReportTable) {
   };
 }
 
-/** A row worked out by Analytics itself: a figure per period of the window, then its Total. */
+/** A row worked out by Analytics itself: a figure per period of the Span, then its Total. */
 export interface PeriodRow {
   key: string;
   label: string;
   cells: Figure[];
-  /** The whole window, the current period included. */
+  /** The whole Span, both incomplete periods included. */
   total: Figure;
 }
 
 export interface PeriodRowSpec {
   key: string;
   label: string;
-  /** The query behind the row; its columns are the view's periods. */
+  /** The query behind the row; its columns are the reading's periods. */
   query: WidgetQuery;
   /** The row's selector on the query's rows; absent for the whole of them. */
   selector?: AxisSelector;
-  /** The row's value in one period of the window. */
+  /** The row's value in one period of the Span. */
   valueAt: (periodKey: string) => number | null;
 }
 
-/** A row of figures over the window, each with its Drill-down: a cell per period, and the Total. */
-export function periodRow(window: readonly AnalyticsPeriod[], spec: PeriodRowSpec): PeriodRow {
+/** A row of figures over the reading, each with its Drill-down: a cell per period, the Total. */
+export function periodRow(reading: AnalyticsReading, spec: PeriodRowSpec): PeriodRow {
   const { query, selector } = spec;
   const at = (period?: string): CellRef => ({
     ...(selector === undefined ? {} : { row: selector }),
     ...(period === undefined ? {} : { column: period }),
   });
-  const cells = window.map((period) => ({
+  const cells = reading.periods.map((period) => ({
     value: spec.valueAt(period.key),
     drill: { query, cell: at(period.key) },
   }));
@@ -143,12 +159,12 @@ export function periodRow(window: readonly AnalyticsPeriod[], spec: PeriodRowSpe
   };
 }
 
-/** A window's periods as a card's column headers, the current one partial ("to date"). */
-function periodHeaders(window: readonly AnalyticsPeriod[]): ReportHeader[] {
-  return window.map((period) => ({
+/** A reading's periods as a card's column headers, a partial or to-date one partial. */
+function periodHeaders(reading: AnalyticsReading): ReportHeader[] {
+  return reading.periods.map((period) => ({
     key: period.key,
     label: period.label,
-    isPartial: period.isToDate,
+    isPartial: isIncomplete(period),
   }));
 }
 
@@ -157,25 +173,25 @@ function periodHeaders(window: readonly AnalyticsPeriod[]): ReportHeader[] {
  * column total and the total are the report's own: every row's Transactions in that period.
  */
 export function periodRowsSource(
-  view: PeriodView,
-  window: readonly AnalyticsPeriod[],
+  reading: AnalyticsReading,
   rows: readonly PeriodRow[],
   report: ReportTable,
 ): ChartSource {
-  const href = ({ query, cell }: DrillRef) => analyticsDrillUrl(view, query, cell);
+  const href = ({ query, cell }: DrillRef) => analyticsDrillUrl(reading, query, cell);
+  const { periods } = reading;
   const totals = new Map(report.columns.map((column, c) => [column.key, report.columnTotals[c]]));
   return {
     measure: 'sum',
     rows: rows.map((row) => ({ key: row.key, label: row.label, isPartial: false })),
-    columns: periodHeaders(window),
+    columns: periodHeaders(reading),
     cells: rows.map((row) => row.cells.map((cell) => cell.value)),
     rowTotals: rows.map((row) => row.total.value),
-    columnTotals: window.map((period) => totals.get(period.key) ?? null),
+    columnTotals: periods.map((period) => totals.get(period.key) ?? null),
     total: report.total,
     hrefs: {
       cells: rows.map((row) => row.cells.map((cell) => href(cell.drill))),
       rowTotals: rows.map((row) => href(row.total.drill)),
-      columnTotals: window.map((period) =>
+      columnTotals: periods.map((period) =>
         href({ query: report.query, cell: { column: period.key } }),
       ),
       total: href({ query: report.query, cell: {} }),

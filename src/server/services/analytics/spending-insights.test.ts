@@ -7,13 +7,18 @@ import {
   seedAccount,
   seedClassified,
 } from '@test/support/analytics';
-import type { PeriodView } from '@/lib/analytics/period-view';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+
+import { presetSpan, SPAN_PRESETS, spanLabel, type Span } from '@/lib/analytics/span';
 import { readCard } from '@/lib/reporting/card';
 import { spendingBars, spendingInsight } from '@/lib/reporting/overview';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 
-/** Analytics' Spending Insights (spec #170, user stories 18-22; ticket #176). */
+/**
+ * Analytics' Spending Insights (spec #170, user stories 18-22; ticket #176; spec #204, ticket
+ * #236).
+ */
 
 const t = setupTestDatabase();
 
@@ -68,18 +73,18 @@ const DATASET: Booking[] = [
 const money = String;
 
 /** The insight the Dashboard's insight card tells from a section's flow, and the flow itself. */
-async function insightAt(view: PeriodView) {
+async function insightAt(view: Span) {
   const card = await loadSection(t.ctx, view, 'spendingInsights');
   const { flow } = readCard(card, money);
   return { card, flow, insight: flow && spendingInsight(flow.months, flow.period) };
 }
 
 describe('Spending Insights', () => {
-  it('in Month, sets the latest complete month against the complete months before it', async () => {
+  it('by month, sets the latest complete month against the complete months before it', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    const { card, flow, insight } = await insightAt('month');
+    const { card, flow, insight } = await insightAt(MONTHLY);
 
     expect(card.name).toBe('Spending Insights');
     expect(flow?.period).toBe('month');
@@ -96,34 +101,32 @@ describe('Spending Insights', () => {
     });
   });
 
-  it('in Quarter and Year, names the view and reads the complete periods of its window', async () => {
+  it('judges the last complete month under every Span, whatever its start or grain', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    const quarters = await insightAt('quarter');
-    const years = await insightAt('year');
+    const monthly = await insightAt(MONTHLY);
+    const spans: Span[] = [
+      ...SPAN_PRESETS.map(presetSpan),
+      { kind: 'custom', from: '2025-03-01' },
+      { kind: 'custom', from: '2023-01-01' },
+    ];
 
-    // Quarters from Q2 2023: 600, 0, 0, 0, 0 and 200 average 133.33, so Q4 2024's 100.00 is 25%
-    // below. Income 2,000.00 against spending 900.00 over them: 55% kept.
-    expect(quarters.insight?.detail).toEqual([
-      'Q4 2024 came in ',
-      '25% below',
-      ' your quarterly average, and you kept 55% of everything that came in.',
-    ]);
-    expect(quarters.insight?.headline).toBe('Spending is easing.');
-    // Years from 2023: 2024's 300.00 against 2023's 600.00 is 50% below.
-    expect(years.insight?.detail).toEqual([
-      '2024 came in ',
-      '50% below',
-      ' your yearly average, and you kept 55% of everything that came in.',
-    ]);
+    for (const span of spans) {
+      const { flow, insight } = await insightAt(span);
+      // Rolling 30 days holds no complete month, This year and last 4 reads by year: the insight
+      // still names February 2025, against the months before it.
+      expect(flow?.period, spanLabel(span)).toBe('month');
+      expect(insight, spanLabel(span)).toEqual(monthly.insight);
+      expect(insight?.detail[0], spanLabel(span)).toBe('Feb 2025 came in ');
+    }
   });
 
   it('charts the complete periods from the first with data, against the average of the ones before the latest', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    const { flow } = await insightAt('month');
+    const { flow } = await insightAt(MONTHLY);
     const chart = spendingBars(flow!.months)!;
 
     expect(chart.bars.map((bar) => [bar.label, bar.expense, bar.isLatest])).toEqual([
@@ -145,43 +148,42 @@ describe('Spending Insights', () => {
     });
   });
 
-  it('gives no insight with fewer than two complete periods with data, in every view', async () => {
+  it('gives no insight with fewer than two complete months with data, under every Span', async () => {
     fixToday('2025-03-20');
-    // February is the only complete month with data; in Quarter and Year both fall in the
-    // current period, so no complete one has any.
+    // February is the only complete month with data, whatever the Span's grain.
     await seed([
       { date: '2025-02-11', amount: -40_000 },
       { date: '2025-02-25', amount: 100_000 },
       { date: '2025-03-05', amount: -5_000 },
     ]);
 
-    for (const view of ['month', 'quarter', 'year'] as const) {
+    for (const view of [MONTHLY, QUARTERLY, YEARLY]) {
       const { card, insight } = await insightAt(view);
-      expect(insight, view).toBeNull();
+      expect(insight, spanLabel(view)).toBeNull();
       expect(card.isEmpty).toBe(false);
     }
   });
 
-  it('is empty with no income or expense in the window', async () => {
+  it('is empty with no income or expense in the months it reads', async () => {
     fixToday('2025-03-20');
 
-    const { card, flow } = await insightAt('quarter');
+    const { card, flow } = await insightAt(QUARTERLY);
 
     expect(card.isEmpty).toBe(true);
     expect(flow).toBeNull();
   });
 
-  it('opens a Drill-down behind the change and the latest complete period, back to Analytics', async () => {
+  it('opens a Drill-down behind the change and the last complete month, back to the same Span', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
-    for (const view of ['month', 'quarter', 'year'] as const) {
+    for (const view of [MONTHLY, QUARTERLY, YEARLY]) {
       const { card, flow } = await insightAt(view);
       const complete = flow!.months.filter((month) => !month.isPartial);
       // "See the Transactions": the latest complete period's income and expense.
       const latest = await openDrill(t.ctx, flow!.latestHref);
       expect(latest.value).toBe(complete.at(-1)!.net);
-      expect(originOf(flow!.latestHref!)).toEqual({ kind: 'analytics', period: view });
+      expect(originOf(flow!.latestHref!)).toEqual({ kind: 'analytics', span: view });
       // The change's working: every complete period's spending, subtotalled per period.
       const working = await openDrill(t.ctx, flow!.changeHref);
       expect(working.sumChfMinor).toBe(0 - complete.reduce((sum, month) => sum + month.expense, 0));

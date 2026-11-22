@@ -1,11 +1,11 @@
 import { accountsHref } from '@/lib/accounts/links';
 import { analyticsDrillUrl } from '@/lib/analytics/links';
-import type { PeriodView } from '@/lib/analytics/period-view';
-import { formatPeriod } from '@/lib/format';
+import { spanCaption } from '@/lib/analytics/span';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
-import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
+import type { DateSpan } from '../reporting/periods';
+import type { DataStart } from './data-start';
 import type { SharedSections } from './figures';
 import { flowFigures } from './flow-figures';
 import {
@@ -16,11 +16,11 @@ import {
   type KeyFigureChange,
 } from './key-figure-change';
 import { flowSparklines, netWorthSparkline, type SparklinePoint } from './key-figure-sparklines';
-import { periodWindow } from './window';
+import type { AnalyticsReading } from './reading';
 
 /**
- * Analytics' Key figures (spec #225): the four tiles that open the page. Net worth today, loans
- * counting against it, whatever the Period view; then the current period of the view to date:
+ * Analytics' Key figures (spec #225, #204): the four tiles that open the page. Net worth today,
+ * loans counting against it, whatever the Span; then the whole Span, captioned with it:
  * Income, Expense and Profit (GLOSSARY: Profit). Income and Expense count only the Income and
  * Expense Category groups, signed so a refund nets within Expense; Capital, Transfers and
  * Unclassified Transactions are left out, as in Spending Insights, so the tiles agree with the
@@ -45,7 +45,7 @@ export interface KeyFigureUnconverted {
 export interface KeyFigure {
   id: KeyFigureId;
   label: string;
-  /** When the figure stands: "Today", or the current period "to date" ("May 2025 to date"). */
+  /** When the figure stands: "Today", or the Span ("Rolling 90 days", "1 Jan 2024 – today"). */
   caption: string;
   /** CHF minor units. Expense is what went out, net of refunds, as a positive amount. */
   value: number;
@@ -56,7 +56,7 @@ export interface KeyFigure {
   unconverted: KeyFigureUnconverted;
   /** Against the figure's earlier value; null when there is none to compare with. */
   change: KeyFigureChange | null;
-  /** Its recent trend, a point per period of the window; the current one partial. */
+  /** Its recent trend, a point per period of the Span; the current one partial. */
   sparkline: SparklinePoint[];
 }
 
@@ -97,27 +97,27 @@ function typeTotal(report: ReportTable, type: FlowType): number {
 
 export async function keyFigures(
   ctx: ServiceContext,
-  view: PeriodView,
-  today: string,
+  reading: AnalyticsReading,
   sections: SharedSections,
+  dataStart: DataStart,
 ): Promise<AnalyticsKeyFigures> {
-  const span = { from: periodOf(today, view).from, to: today };
-  const key = periodKey(today, view);
+  const { from, to: today } = reading;
+  const span = { from, to: today };
   // Each type alone too, for what it leaves out: an unconverted expense is no Income's concern.
   const [flow, incomeOnly, expenseOnly, comparison, balances, trend, perPeriod] = await Promise.all(
     [
       runFlow(ctx, span),
       runFlow(ctx, span, ['income']),
       runFlow(ctx, span, ['expense']),
-      loadComparison(ctx, view, today),
+      loadComparison(ctx, reading, dataStart.accountData),
       sections.balances,
       sections.trend,
       sections.flow,
     ],
   );
-  const sparklines = flowSparklines(perPeriod.data, periodWindow(view, today));
-  const caption = `${formatPeriod(key)} to date`;
-  const drill = (cell: CellRef) => analyticsDrillUrl(view, flow.query, cell);
+  const sparklines = flowSparklines(perPeriod.data, reading);
+  const caption = spanCaption(reading.span, span);
+  const drill = (cell: CellRef) => analyticsDrillUrl(reading, flow.query, cell);
   const values = flowFigures(typeTotal(flow, 'income'), typeTotal(flow, 'expense'));
   const leftOut: Record<FlowFigureId, number> = {
     income: incomeOnly.unconvertedCount,

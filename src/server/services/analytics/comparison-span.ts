@@ -1,58 +1,58 @@
-import type { PeriodView } from '@/lib/analytics/period-view';
+import { presetComparison, spanStart, type Span } from '@/lib/analytics/span';
+import { addDays, dateParts, daysBetween, yearsEarlier } from '@/lib/dates';
 import { MONTH_NAMES } from '@/lib/format';
-import { addDays, daysBetween } from '../fx/dates';
 import { periodOf, type DateSpan } from '../reporting/periods';
 
 /**
- * The Comparison span (GLOSSARY): the stretch of the previous period, of the same length as the
- * current period to date, that a to-date figure is compared with.
+ * The Comparison span (GLOSSARY, ADR-0016): the stretch a Span's Key figures are compared with.
  */
 
-const pad = (value: number) => String(value).padStart(2, '0');
-const isoDate = (year: number, month: number, day: number) =>
-  `${String(year).padStart(4, '0')}-${pad(month + 1)}-${pad(day)}`;
-
-/** Days in a month (0-based), of a year. */
-function daysIn(year: number, month: number): number {
-  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+/** The same stretch of the previous calendar quarter: as many days in, capped at its end. */
+function previousQuarterToDate(today: string): DateSpan {
+  const current = periodOf(today, 'quarter');
+  const previous = periodOf(addDays(current.from, -1), 'quarter');
+  const to = addDays(previous.from, daysBetween(current.from, today));
+  return { from: previous.from, to: to < previous.to ? to : previous.to };
 }
 
-/** The `day`th of a month (0-based, may run past December or before January), capped at its end. */
-function cappedDay(year: number, month: number, day: number): string {
-  const first = new Date(Date.UTC(year, month, 1));
-  const [y, m] = [first.getUTCFullYear(), first.getUTCMonth()];
-  return isoDate(y, m, Math.min(day, daysIn(y, m)));
+/** The stretch of as many days just before a span's start. */
+function daysBefore({ from, to }: DateSpan): DateSpan {
+  const days = daysBetween(from, to) + 1;
+  return { from: addDays(from, -days), to: addDays(from, -1) };
 }
 
-/** The Comparison span of the current period of a Period view on `today`. */
-export function comparisonSpan(view: PeriodView, today: string): DateSpan {
-  const [year, month, day] = [
-    Number(today.slice(0, 4)),
-    Number(today.slice(5, 7)) - 1,
-    Number(today.slice(8, 10)),
-  ];
-  if (view === 'quarter') {
-    const current = periodOf(today, 'quarter');
-    const previous = periodOf(addDays(current.from, -1), 'quarter');
-    const to = addDays(previous.from, daysBetween(current.from, today));
-    return { from: previous.from, to: to < previous.to ? to : previous.to };
+/**
+ * The Comparison span of a Span read over `dates` (its start, then today), by its preset's
+ * comparison rule (src/lib/analytics/span.ts): a Span to date of a calendar quarter, or of
+ * calendar years, is compared with the same stretch of the previous quarter, or of as many years
+ * before; any other Span, or one read from a later start than its preset gives (cut to the
+ * data), with as many days just before it.
+ */
+export function comparisonSpan(span: Span, dates: DateSpan): DateSpan {
+  if (span.kind !== 'preset' || spanStart(span, dates.to) !== dates.from) return daysBefore(dates);
+  const comparison = presetComparison(span.preset);
+  switch (comparison.kind) {
+    case 'previousQuarterToDate':
+      return previousQuarterToDate(dates.to);
+    case 'yearsEarlier': {
+      const { years } = comparison;
+      return { from: yearsEarlier(dates.from, years), to: yearsEarlier(dates.to, years) };
+    }
+    case 'daysBefore':
+      return daysBefore(dates);
   }
-  if (view === 'year') {
-    // The same dates last year; 29 February falls back to 28 February.
-    return { from: isoDate(year - 1, 0, 1), to: cappedDay(year - 1, month, day) };
-  }
-  return { from: cappedDay(year, month - 1, 1), to: cappedDay(year, month - 1, day) };
+}
+
+/** A day's parts as the change line says them: "22", "Oct", 2026. */
+function inWords(iso: string) {
+  const { year, month, day } = dateParts(iso);
+  return { year, month: MONTH_NAMES[month - 1]!, day };
 }
 
 /** A span's dates as the change line says them: "vs 1–22 Oct", the year only when not today's. */
 export function comparisonLabel(span: DateSpan, today: string): string {
-  const dateParts = (iso: string) => ({
-    year: iso.slice(0, 4),
-    month: MONTH_NAMES[Number(iso.slice(5, 7)) - 1]!,
-    day: String(Number(iso.slice(8, 10))),
-  });
-  const [from, to] = [dateParts(span.from), dateParts(span.to)];
-  const year = to.year === today.slice(0, 4) ? '' : ` ${to.year}`;
+  const [from, to] = [inWords(span.from), inWords(span.to)];
+  const year = to.year === dateParts(today).year ? '' : ` ${to.year}`;
   if (span.from === span.to) return `vs ${to.day} ${to.month}${year}`;
   if (from.month === to.month && from.year === to.year) {
     return `vs ${from.day}–${to.day} ${to.month}${year}`;

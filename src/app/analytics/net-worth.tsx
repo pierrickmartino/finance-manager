@@ -1,21 +1,24 @@
-import { windowPhrase, type PeriodView } from '@/lib/analytics/period-view';
-import type { AnalyticsNetWorth } from '@/server/services/analytics';
+import { spanDates } from '@/lib/analytics/span';
+import type { AnalyticsNetWorth, AnalyticsReading } from '@/server/services/analytics';
 import { NetWorthCard } from '../dashboards/(dashboard)/[id]/overview/overview-row';
 import { SectionCard, SectionEmpty } from './section';
 
 export const NET_WORTH = 'Net worth';
 
+/** The change chip's label: Net worth's change over the Span. */
+export const SPAN_CHANGE = 'Span';
+
 interface NetWorthSectionProps {
   netWorth: Promise<AnalyticsNetWorth>;
-  view: PeriodView;
+  reading: AnalyticsReading;
 }
 
 /**
  * Analytics' Net worth, once it arrives, drawn as the Dashboard's Net worth card: Net worth
- * today beside a trend with a point per period end of the window and today, its change since the
- * end of the previous period, then what came in, went out and the Profit over the window.
+ * today beside a trend from the Span's start through each period end to today, its change since
+ * the Span's start, then what came in, went out and the Profit over the Span.
  */
-export async function NetWorthSection({ netWorth, view }: NetWorthSectionProps) {
+export async function NetWorthSection({ netWorth, reading }: NetWorthSectionProps) {
   const loaded = await netWorth;
   if (loaded.isEmpty) {
     return (
@@ -31,9 +34,10 @@ export async function NetWorthSection({ netWorth, view }: NetWorthSectionProps) 
     <NetWorthCard
       cards={loaded.cards}
       trend={loaded.trend}
-      period={view}
-      trendLabel={`Net worth over ${windowPhrase(view)}`}
+      period={reading.grain}
+      trendLabel={`Net worth, ${spanDates(reading)}`}
       unconvertedCount={loaded.unconvertedCount}
+      changes={loaded.change ? [{ label: SPAN_CHANGE, ...loaded.change, isSinceStart: true }] : []}
     />
   );
 }

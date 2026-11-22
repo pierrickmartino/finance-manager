@@ -3,8 +3,7 @@ import { listTransactions, type TransactionListItem } from '../transactions';
 
 /**
  * Analytics' Recent transactions: the latest Transactions, newest first, as the Dashboard's
- * recent activity lists them. They don't depend on the Period view: the latest activity shows
- * whatever the window.
+ * recent activity lists them. They don't depend on the Span.
  */
 
 /** How many Transactions Recent transactions lists (the Dashboard's count). */

@@ -61,20 +61,32 @@ export function NetWorthSparkline({
 }
 
 /**
- * Net worth's change over 1M, 1Y and 2Y, each opening the Accounts as of the point it is
- * measured from. Shown without the currency, which the amount above already says.
+ * One change chip: its short label, the change and the point it is measured from, at the end of
+ * `since` (a period, on the Dashboard) or at its start (`isSinceStart`: the first day of an
+ * Analytics Span).
  */
-export function ChangeChips({ changes }: { changes: HeadlineChange[] }) {
+export type ChangeChip = Pick<HeadlineChange, 'since' | 'change' | 'href'> & {
+  label: string;
+  isSinceStart?: boolean;
+};
+
+/**
+ * Net worth's change over 1M, 1Y and 2Y (or since an Analytics Span's start), each opening the
+ * Accounts as of the point it is measured from. Shown without the currency, which the amount
+ * above already says.
+ */
+export function ChangeChips({ changes }: { changes: readonly ChangeChip[] }) {
   const fmt = useFormatter();
   if (changes.length === 0) return null;
   return (
     <ul aria-label="Change in Net worth" className="mt-2 flex flex-wrap gap-1 text-xs">
-      {changes.map(({ label, since, change, href }) => {
+      {changes.map(({ label, since, change, href, isSinceStart = false }) => {
         // Direction follows the whole francs shown, so a few cents never read as a move.
         const whole = Math.round(change / 100) * 100;
         const { arrow, sign, tone, word } = directionOf(whole);
         const amount = fmt.amount(Math.abs(whole), { isWhole: true });
-        const said = `${label}: ${word === 'unchanged' ? word : `${word} CHF ${amount}`} since the end of ${since}`;
+        const moved = word === 'unchanged' ? word : `${word} CHF ${amount}`;
+        const said = `${label}: ${moved} since the ${isSinceStart ? 'start' : 'end'} of ${since}`;
         return (
           <li key={label}>
             <Link

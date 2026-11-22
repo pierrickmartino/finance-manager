@@ -1,12 +1,12 @@
-import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './figures';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Spending by Category, drawn as the Dashboard's card for a stacked bar Widget: a
- * bar per period of the window stacked by Expense Category, read from 3 Categories on as a
- * ranking of the 6 largest over the whole window, with the heaviest and lightest periods.
+ * bar per period of the Span stacked by Expense Category, read from 3 Categories on as a
+ * ranking of the 6 largest over the whole Span, with the heaviest and lightest periods.
  * Signed CHF amounts, as booked: spending is negative and a refund nets within its Category.
  * Transfers are left out and Split lines count by their own Category (the reporting engine's
  * base rows).
@@ -34,21 +34,21 @@ function largestFirst(report: ReportTable): ReportTable {
 
 export async function spendingByCategory(
   ctx: ServiceContext,
-  view: PeriodView,
+  reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
   const report = await runWidgetQuery(ctx, {
     filters: { categoryGroupTypes: ['expense'] },
-    dateRange: windowRange(view),
-    rows: view,
+    dateRange: reading.range,
+    rows: reading.grain,
     columns: 'category',
   });
   return analyticsCard({
     id: 'spending-by-category',
     name: SPENDING_BY_CATEGORY,
     visualisation: 'stacked_bar',
-    rows: view,
+    rows: reading.grain,
     // The type filter leaves no Unclassified bucket: every column is an Expense Category.
-    data: reportSource(largestFirst(report), view),
+    data: reportSource(largestFirst(report), reading),
     status: statusOf(report),
   });
 }

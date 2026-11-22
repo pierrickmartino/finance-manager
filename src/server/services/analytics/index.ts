@@ -1,8 +1,9 @@
-import type { PeriodView } from '@/lib/analytics/period-view';
+import { presetStarts, type Span, type SpanPreset } from '@/lib/analytics/span';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { accountBalances } from './account-balances';
 import { categoriesPerPeriod } from './categories-per-period';
+import { loadDataStart } from './data-start';
 import type { AnalyticsCard } from './figures';
 import { incomeVsExpense } from './income-vs-expense';
 import { netCashFlow } from './net-cash-flow';
@@ -10,13 +11,15 @@ import { keyFigures, type AnalyticsKeyFigures } from './key-figures';
 import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { spendingByCategory } from './spending-by-category';
-import { spendingInsights } from './spending-insights';
-import { periodWindow, type AnalyticsPeriod } from './window';
+import { lastCompleteMonthInsights, spendingInsights } from './spending-insights';
+import { readingOf, type AnalyticsReading } from './reading';
 
 /**
- * The Analytics reporting service (GLOSSARY: Analytics, ADR-0015): the page's only data source.
- * Given a Period view, it returns the Period window and one promise per section, each started
- * at once so the page can stream every section in behind its own placeholder.
+ * The Analytics reporting service (GLOSSARY: Analytics, ADR-0016): the page's only data source.
+ * Given a Span, it resolves it once into a reading (from a start date to today, at a grain,
+ * split into periods) and returns it with one promise per section, each started at once so the
+ * page can stream every section in behind its own placeholder. Every section reads the reading,
+ * never the Span.
  *
  * Each section is drawn by the Dashboard's own cards (GLOSSARY: Card), so each hands them what
  * they read from a Widget (`AnalyticsCard`), its figures linked to their Drill-downs back to
@@ -39,44 +42,50 @@ export interface AnalyticsSections {
 }
 
 export interface AnalyticsView {
-  view: PeriodView;
   /** Today's Swiss date, the one every section reads at. */
   today: string;
-  window: AnalyticsPeriod[];
+  /** What every section reads: the Span resolved on today, cut to the data. */
+  reading: AnalyticsReading;
+  /** Each preset's start date today, cut to the data as it would be read. */
+  starts: Record<SpanPreset, string>;
   sections: AnalyticsSections;
 }
 
 /**
- * Starts every section of Analytics at a Period view. The sections' promises are not awaited
- * here: the page awaits each where it shows it. Net worth reads the Account balances and
- * Spending Insights' income and expense, and Key figures the Account balances, Net worth's
- * trend and Spending Insights' income and expense, so they share those promises rather than run them again.
+ * Starts every section of Analytics over a Span, once it is cut to the data: no Span, preset or
+ * custom, starts before the first Transaction (`readingOf`; a custom Span's date moves, a preset
+ * keeps its name, and the reading carries the effective Span). The sections' promises are not
+ * awaited here: the page awaits each where it shows it. Net worth reads the Account balances and
+ * the Span's income and expense, and Key figures the Account balances, Net worth's trend and the
+ * Span's income and expense, so they share those promises rather than run them again. Spending
+ * Insights reads its own months: the last complete one and those before it, whatever the Span.
  */
-export function loadAnalytics(ctx: ServiceContext, view: PeriodView): AnalyticsView {
+export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<AnalyticsView> {
   const today = swissToday();
-  const window = periodWindow(view, today);
+  const dataStart = await loadDataStart(ctx);
+  const reading = readingOf(span, today, dataStart.firstTransaction);
   const balances = accountBalances(ctx, today);
-  const flow = spendingInsights(ctx, view);
-  const trend = netWorthTrend(ctx, view);
+  const flow = spendingInsights(ctx, reading);
+  const trend = netWorthTrend(ctx, reading);
   return {
-    view,
     today,
-    window,
+    reading,
+    starts: presetStarts(today, dataStart.firstTransaction),
     sections: {
-      keyFigures: keyFigures(ctx, view, today, { balances, trend, flow }),
-      netWorth: netWorth(view, today, { trend, balances, flow }),
-      spendingInsights: flow,
+      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, dataStart),
+      netWorth: netWorth(reading, { trend, balances, flow }),
+      spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
-      netCashFlow: netCashFlow(ctx, view),
+      netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
-      spendingByCategory: spendingByCategory(ctx, view),
-      incomeVsExpense: incomeVsExpense(ctx, view, window),
-      categoriesPerPeriod: categoriesPerPeriod(ctx, view, window),
+      spendingByCategory: spendingByCategory(ctx, reading),
+      incomeVsExpense: incomeVsExpense(ctx, reading),
+      categoriesPerPeriod: categoriesPerPeriod(ctx, reading),
     },
   };
 }
 
-export type { AnalyticsPeriod } from './window';
+export type { AnalyticsPeriod, AnalyticsReading } from './reading';
 export type { AnalyticsCard, SectionStatus } from './figures';
 export type { AnalyticsKeyFigures, KeyFigure, KeyFigureId } from './key-figures';
 export type { KeyFigureChange } from './key-figure-change';

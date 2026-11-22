@@ -1,4 +1,3 @@
-import { windowRange, type PeriodView } from '@/lib/analytics/period-view';
 import type { RowTree } from '@/lib/reporting/chart-data';
 import {
   CATEGORY_GROUP_TYPE_LABELS,
@@ -19,15 +18,15 @@ import {
   type AnalyticsCard,
   type PeriodRow,
 } from './figures';
-import type { AnalyticsPeriod } from './window';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Categories per period, drawn as the Dashboard's heatmap card: each Category group
  * of the three types (Income groups first, then Expense, then Capital) as a subtotal row, then
- * its Categories ("Group › Category"), per period of the window and in Total. The rows carry
+ * its Categories ("Group › Category"), per period of the Span and in Total. The rows carry
  * their tree (a section per type, each group over its Categories), so the card draws them
  * indented under their group instead of ranked by size. Categories with
- * nothing booked in the window are hidden, and so is a group left with none. Signed CHF
+ * nothing booked in the Span are hidden, and so is a group left with none. Signed CHF
  * amounts, as booked: a refund nets within its Category, Split lines count by their own
  * Category and Transfers are left out (the reporting engine's base rows).
  */
@@ -41,9 +40,9 @@ interface GroupRows {
   categories: { row: PeriodRow; name: string }[];
 }
 
-/** A group's subtotal then its Categories, or null when none has anything in the window. */
+/** A group's subtotal then its Categories, or null when none has anything in the Span. */
 function groupRows(
-  window: readonly AnalyticsPeriod[],
+  reading: AnalyticsReading,
   report: ReportTable,
   group: CategoryGroup,
 ): GroupRows | null {
@@ -53,7 +52,7 @@ function groupRows(
   if (shown.length === 0) return null;
   const categories = shown.map((category) => ({
     name: category.name,
-    row: periodRow(window, {
+    row: periodRow(reading, {
       key: category.id,
       label: `${group.name} › ${category.name}`,
       query: report.query,
@@ -66,7 +65,7 @@ function groupRows(
     ...report.query,
     filters: { ...report.query.filters, categoryGroupIds: [group.id] },
   };
-  const subtotal = periodRow(window, {
+  const subtotal = periodRow(reading, {
     key: `group:${group.id}`,
     label: group.name,
     query: groupQuery,
@@ -97,21 +96,20 @@ const typeRank = (group: CategoryGroup) => CATEGORY_GROUP_TYPES.indexOf(group.ty
 
 export async function categoriesPerPeriod(
   ctx: ServiceContext,
-  view: PeriodView,
-  window: readonly AnalyticsPeriod[],
+  reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
   const [report, groups] = await Promise.all([
     runWidgetQuery(ctx, {
       filters: { categoryGroupTypes: [...CATEGORY_GROUP_TYPES] },
-      dateRange: windowRange(view),
+      dateRange: reading.range,
       rows: 'category',
-      columns: view,
+      columns: reading.grain,
     }),
     listCategoryGroups(ctx),
   ]);
   const ordered = [...groups].sort((a, b) => typeRank(a) - typeRank(b));
   const shown = ordered
-    .map((group) => groupRows(window, report, group))
+    .map((group) => groupRows(reading, report, group))
     .filter((entry): entry is GroupRows => entry !== null);
   const { rows, tree } = treeOf(shown);
   return analyticsCard({
@@ -119,7 +117,7 @@ export async function categoriesPerPeriod(
     name: CATEGORIES_PER_PERIOD,
     visualisation: 'table',
     rows: 'category',
-    data: { ...periodRowsSource(view, window, rows, report), rowTree: tree },
+    data: { ...periodRowsSource(reading, rows, report), rowTree: tree },
     status: statusOf(report),
   });
 }

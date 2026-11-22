@@ -7,7 +7,8 @@ interface FigureSparklineMarkProps {
 
 /**
  * A Key figure's sparkline, drawn as the overview's headline trend and scaled to its own low
- * and high. A partial current period is a dashed last segment to a hollow dot (ADR-0015).
+ * and high. A partial current period is a dashed last segment to a hollow dot, and a Span's
+ * first period cut short a dashed first segment (ADR-0016).
  * Hidden from assistive technology: the tile says every value it carries as text.
  */
 export function FigureSparklineMark({ points }: FigureSparklineMarkProps) {

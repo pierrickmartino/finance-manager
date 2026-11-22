@@ -1,22 +1,24 @@
 import { z } from 'zod';
-import { analyticsHref, parsePeriodView, type PeriodView } from '@/lib/analytics/period-view';
+import { analyticsHref, spanFromParams, spanToParams, type Span } from '@/lib/analytics/span';
+import { swissToday } from '@/lib/dates';
 import type { WidgetQueryInput } from '@/server/services/reporting/query';
 import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-params';
 
 /**
  * Where a Drill-down was opened from, so it can link back there: a Dashboard (its Story), a
  * saved Widget, the Widget editor (with the query in the URL), the Recurring payments page (a
- * Recurring payment's charges), or Analytics at a Period view. It travels in the URL as a type
- * and an id (`origin=dashboard&originId=<uuid>`) or a Period view
- * (`origin=analytics&originPeriod=quarter`), never as a path, so a forged value can only ever
- * fall back to the editor (or to Analytics in Month).
+ * Recurring payment's charges), or Analytics over a Span. It travels in the URL as a type and an
+ * id (`origin=dashboard&originId=<uuid>`) or a Span, its parameters prefixed `origin`
+ * (`origin=analytics&originSpan=year-to-date`, or `originFrom=2024-03-01` for a custom one),
+ * never as a path, so a forged value can only ever fall back to the editor (or to Analytics over
+ * the default Span).
  */
 export type DrillOrigin =
   | { kind: 'dashboard'; id: string }
   | { kind: 'widget'; id: string }
   | { kind: 'editor' }
   | { kind: 'recurringPayment' }
-  | { kind: 'analytics'; period: PeriodView };
+  | { kind: 'analytics'; span: Span };
 
 /** A Recurring payment's charges, opened from the Recurring payments page. */
 export const RECURRING_PAYMENT: DrillOrigin = { kind: 'recurringPayment' };
@@ -29,6 +31,9 @@ function first(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
 }
 
+/** A Span parameter's name in an origin: `span` travels as `originSpan`. */
+const originName = (name: string) => `origin${name[0]!.toUpperCase()}${name.slice(1)}`;
+
 /** The `origin` and `originId` parameters of an origin; none for the editor. */
 export function originToParams(origin: DrillOrigin): URLSearchParams {
   const params = new URLSearchParams();
@@ -36,7 +41,7 @@ export function originToParams(origin: DrillOrigin): URLSearchParams {
   params.set('origin', origin.kind);
   if (origin.kind === 'recurringPayment') return params;
   if (origin.kind === 'analytics') {
-    params.set('originPeriod', origin.period);
+    for (const [name, value] of spanToParams(origin.span)) params.set(originName(name), value);
     return params;
   }
   params.set('originId', origin.id);
@@ -48,7 +53,10 @@ export function originFromParams(params: UrlParams): DrillOrigin {
   const kind = first(params.origin);
   const id = first(params.originId);
   if (kind === 'recurringPayment') return RECURRING_PAYMENT;
-  if (kind === 'analytics') return { kind, period: parsePeriodView(first(params.originPeriod)) };
+  if (kind === 'analytics') {
+    const span = spanFromParams({ span: params.originSpan, from: params.originFrom }, swissToday());
+    return { kind, span };
+  }
   if ((kind !== 'dashboard' && kind !== 'widget') || !UUID.safeParse(id).success) return EDITOR;
   return { kind, id };
 }
@@ -76,6 +84,6 @@ export function backLink(
     case 'recurringPayment':
       return { href: '/recurring-payments', label: 'Back to Recurring payments' };
     case 'analytics':
-      return { href: analyticsHref(origin.period), label: 'Back to Analytics' };
+      return { href: analyticsHref(origin.span), label: 'Back to Analytics' };
   }
 }

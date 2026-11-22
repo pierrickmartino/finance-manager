@@ -8,7 +8,9 @@ import {
   originOf,
   seedAccount,
   seedClassified,
+  seedEarlyStart,
 } from '@test/support/analytics';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
@@ -29,7 +31,7 @@ afterEach(() => {
  * Today is 20 March 2025. A salary in January, February and March (to date); groceries with a
  * refund and an EUR purchase in January; a split purchase in February, part groceries and part
  * property (Capital); a property purchase in February; groceries in March; groceries in
- * February 2024, before the Month window; and a Transfer out to the EUR Account.
+ * February 2024, before Rolling 12 months; and a Transfer out to the EUR Account.
  */
 async function dataset(): Promise<void> {
   const income = await createCategoryGroup(t.ctx, { name: 'Income', type: 'income' });
@@ -41,6 +43,7 @@ async function dataset(): Promise<void> {
   const as = (category: Category) => ({ categoryId: category.id });
 
   const ubs = await seedAccount(t.ctx, 'UBS');
+  await seedEarlyStart(t.ctx, ubs);
   const ca = await seedAccount(t.ctx, 'CA', 'EUR');
   await seedEurRates(t.ctx, [['2025-01-10', '0.9400']]);
 
@@ -77,22 +80,24 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, 'month', 'incomeVsExpense');
+    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense');
     const data = card.data!;
 
     expect(card.name).toBe('Income vs. expense');
     expect(card.isEmpty).toBe(false);
     expect(readCard(card, money).kind).toBe('grid');
     expect(labels(data.columns)).toEqual([
-      ...['Apr 2024', 'May 2024', 'Jun 2024', 'Jul 2024', 'Aug 2024', 'Sep 2024'],
+      ...['Mar 2024', 'Apr 2024', 'May 2024', 'Jun 2024', 'Jul 2024', 'Aug 2024', 'Sep 2024'],
       ...['Oct 2024', 'Nov 2024', 'Dec 2024', 'Jan 2025', 'Feb 2025', 'Mar 2025'],
     ]);
-    // The current month is still running: drawn as the Dashboard draws a partial period.
+    // March 2024 is cut short at the Span's start and the current month is still running: both
+    // drawn as the Dashboard draws a partial period.
     expect(data.columns.map((column) => column.isPartial)).toEqual([
+      true,
       ...Array<boolean>(11).fill(false),
       true,
     ]);
-    const empty = Array<null>(9).fill(null);
+    const empty = Array<null>(10).fill(null);
     // Groceries in January: -120.00 + 20.00 refund + EUR -100.00 at 0.94 = -194.00. The split
     // purchase counts -200.00 under Groceries and -100.00 under Property. The Transfer counts
     // nowhere.
@@ -110,7 +115,7 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, 'month', 'incomeVsExpense');
+    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense');
 
     // Income and Expense net to a total Income isn't a share of: the card names the largest row.
     expect(readCard(card, money).lead).toMatchObject({
@@ -119,53 +124,43 @@ describe('Income vs. expense', () => {
     });
   });
 
-  it('reads the window of the Period view: Quarter and Year', async () => {
+  it('reads the Span by quarter and by year', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = (await loadSection(t.ctx, 'quarter', 'incomeVsExpense')).data!;
-    const years = (await loadSection(t.ctx, 'year', 'incomeVsExpense')).data!;
+    const quarters = (await loadSection(t.ctx, QUARTERLY, 'incomeVsExpense')).data!;
+    const years = (await loadSection(t.ctx, YEARLY, 'incomeVsExpense')).data!;
 
     const expense = (data: ChartSource) => data.rows.findIndex((row) => row.key === 'expense');
     expect(labels(quarters.columns)).toEqual([
-      ...['Q2 2023', 'Q3 2023', 'Q4 2023', 'Q1 2024'],
-      ...['Q2 2024', 'Q3 2024', 'Q4 2024', 'Q1 2025'],
+      ...['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024', 'Q1 2025'],
     ]);
-    // February 2024 is in the Quarter and Year windows; the current period is to date.
-    expect(quarters.cells[expense(quarters)]).toEqual([
-      null,
-      null,
-      null,
-      -999,
-      null,
-      null,
-      null,
-      -44_400,
-    ]);
+    // February 2024 is in both Spans (not in Rolling 12 months); the current period is to date.
+    expect(quarters.cells[expense(quarters)]).toEqual([-999, null, null, null, -44_400]);
     expect(quarters.rowTotals[expense(quarters)]).toBe(-45_399);
-    expect(labels(years.columns)).toEqual(['2020', '2021', '2022', '2023', '2024', '2025']);
-    expect(years.cells[expense(years)]).toEqual([null, null, null, null, -999, -44_400]);
+    expect(labels(years.columns)).toEqual(['2021', '2022', '2023', '2024', '2025']);
+    expect(years.cells[expense(years)]).toEqual([null, null, null, -999, -44_400]);
   });
 
   it('opens a Drill-down behind every value whose Transactions work out to it, back to Analytics', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, 'quarter', 'incomeVsExpense');
+    const card = await loadSection(t.ctx, QUARTERLY, 'incomeVsExpense');
 
     const values = linkedValues(card.data!);
-    // 5 rows of 8 quarters, 5 row totals, 8 column totals and the total.
-    expect(values).toHaveLength(5 * 8 + 5 + 8 + 1);
+    // 5 rows of 5 quarters, 5 row totals, 5 column totals and the total.
+    expect(values).toHaveLength(5 * 5 + 5 + 5 + 1);
     for (const { value, href } of values) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', period: 'quarter' });
+      expect(originOf(href)).toEqual({ kind: 'analytics', span: QUARTERLY });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });
 
-  it('is empty when no Transaction falls in the window', async () => {
+  it('is empty when no Transaction falls in the Span', async () => {
     fixToday('2025-03-20');
 
-    const card = await loadSection(t.ctx, 'year', 'incomeVsExpense');
+    const card = await loadSection(t.ctx, YEARLY, 'incomeVsExpense');
 
     expect(card.isEmpty).toBe(true);
     expect(card.data!.rowTotals.every((total) => total === null)).toBe(true);

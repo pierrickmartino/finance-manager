@@ -1,38 +1,79 @@
 import { accountsHref } from '@/lib/accounts/links';
-import { windowSpan, type PeriodView } from '@/lib/analytics/period-view';
+import { spanDates } from '@/lib/analytics/span';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { toChartSource } from '@/lib/reporting/pivot-source';
 import type { ServiceContext } from '../context';
-import { netWorthPointDate, runNetWorthTrend, type ReportTable } from '../reporting';
+import { addDays } from '../fx/dates';
+import {
+  netWorthPointDate,
+  runNetWorthPoints,
+  type NetWorthPoint,
+  type ReportTable,
+} from '../reporting';
 import type { AnalyticsCard, SectionStatus, SharedSections } from './figures';
+import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Net worth (GLOSSARY: Net worth, ADR-0014), drawn as the Dashboard's Net worth card:
  * every Account's computed balance, loans counting against it, converted to CHF at each date's
- * FX rate (ADR-0002); beside it a trend with a point per period end of the Period window and
- * today, and its change since the end of the previous period; under it what came in, went out
- * and the Profit over the window.
+ * FX rate (ADR-0002); beside it a trend over the Span (ADR-0016), from its start through each
+ * period end to today, and its change since the start; under it what came in, went out and the
+ * Profit over the Span.
  */
 export interface AnalyticsNetWorth extends SectionStatus {
   /** What the card reads as it reads a Dashboard's Widgets: today's balances, and the flows. */
   cards: AnalyticsCard[];
-  /** Net worth at each period end of the window, then today, each opening the Accounts then. */
+  /**
+   * Net worth at the Span's start, each period end of the Span, then today, each opening the
+   * Accounts then.
+   */
   trend: ChartSource;
+  /** Net worth today less Net worth at the Span's start; null with no point to read. */
+  change: NetWorthChange | null;
 }
 
-/** Net worth at each period end of a Period view's window, then today. */
-export function netWorthTrend(ctx: ServiceContext, view: PeriodView): Promise<ReportTable> {
-  return runNetWorthTrend(ctx, { unit: view, count: windowSpan(view) });
+/** How Net worth moved over the Span: today against its start. */
+export interface NetWorthChange {
+  /** The start point's label: the Span's first day, at whose start it stands. */
+  since: string;
+  change: number;
+  /** The Accounts as of the start. */
+  href: string;
 }
 
 /**
- * Net worth at a Period view, from its trend (`netWorthTrend`), the Account balances and the
- * window's income and expense (the Account balances and Spending Insights sections). Its
+ * The trend's points: the Span's start, then each period's end, the last today. The start is
+ * labelled with the Span's first day but reads the end of the day before it, so the change
+ * counts every day of the Span. A Span of a single period still has two.
+ */
+function trendPoints({ from, to: today, grain, periods }: AnalyticsReading): NetWorthPoint[] {
+  const start = addDays(from, -1);
+  return [
+    { key: start, label: spanDates({ from, to: from }), date: start, isPartial: false },
+    ...periods.map((period) => ({
+      key: period.key,
+      label: period.label,
+      date: netWorthPointDate(period.key, grain, today),
+      isPartial: period.isToDate,
+    })),
+  ];
+}
+
+/** Net worth over the reading: at its start, at the end of each period, the last today. */
+export function netWorthTrend(
+  ctx: ServiceContext,
+  reading: AnalyticsReading,
+): Promise<ReportTable> {
+  return runNetWorthPoints(ctx, reading.grain, trendPoints(reading));
+}
+
+/**
+ * Net worth over the reading, from its trend (`netWorthTrend`), the Account balances and the
+ * Span's income and expense (the Account balances and Spending Insights sections). Its
  * `unconvertedCount` counts Accounts left out of some point for want of an FX rate.
  */
 export async function netWorth(
-  view: PeriodView,
-  today: string,
+  reading: AnalyticsReading,
   sections: SharedSections,
 ): Promise<AnalyticsNetWorth> {
   const [report, balances, flow] = await Promise.all([
@@ -40,16 +81,27 @@ export async function netWorth(
     sections.balances,
     sections.flow,
   ]);
-  const dateOf = (key: unknown) =>
-    typeof key === 'string' ? netWorthPointDate(key, view, today) : today;
-  const trend = toChartSource(report, {
-    hrefOf: (cell) => accountsHref({ date: dateOf(cell.row) }),
-    drill: null,
-  });
+  const dates = new Map(trendPoints(reading).map((point) => [point.key, point.date]));
+  const hrefOf = (key: unknown) =>
+    accountsHref({ date: (typeof key === 'string' && dates.get(key)) || reading.to });
+  const trend = toChartSource(report, { hrefOf: (cell) => hrefOf(cell.row), drill: null });
   return {
     cards: [balances, flow],
     trend,
+    change: changeSinceStart(report, hrefOf),
     isEmpty: balances.isEmpty,
     unconvertedCount: report.unconvertedCount,
   };
+}
+
+/** The trend's last point less its first, the Span's start. */
+function changeSinceStart(
+  report: ReportTable,
+  hrefOf: (key: unknown) => string,
+): NetWorthChange | null {
+  const start = report.rows[0];
+  if (!start || report.rows.length < 2) return null;
+  const first = report.rowTotals[0] ?? 0;
+  const latest = report.rowTotals.at(-1) ?? 0;
+  return { since: start.label, change: latest - first, href: hrefOf(start.key) };
 }

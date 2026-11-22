@@ -20,7 +20,7 @@ import {
 } from '@/lib/reporting/overview';
 import { relativeDay, spotlight } from '@/lib/reporting/recent-activity';
 import { FigureLink } from '../figure-link';
-import { ChangeChips, NetWorthSparkline } from './headline-trend';
+import { ChangeChips, NetWorthSparkline, type ChangeChip } from './headline-trend';
 
 /** A recent Transaction, as the Dashboard's activity card lists it. */
 export interface RecentActivity {
@@ -151,6 +151,11 @@ interface NetWorthCardProps {
   trendLabel?: string;
   /** Accounts left out of the trend for want of an FX rate. */
   unconvertedCount?: number;
+  /**
+   * The change chips, in place of the trend's own 1M, 1Y and 2Y (Analytics: since the Span's
+   * start).
+   */
+  changes?: readonly ChangeChip[];
 }
 
 /**
@@ -165,6 +170,7 @@ export function NetWorthCard({
   period = 'month',
   trendLabel,
   unconvertedCount = 0,
+  changes,
 }: NetWorthCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
@@ -188,7 +194,7 @@ export function NetWorthCard({
           <NetWorthSparkline points={hero.trend.points} money={money} label={trendLabel} />
         )}
       </div>
-      {hero.trend && <ChangeChips changes={hero.trend.changes} />}
+      {hero.trend && <ChangeChips changes={changes ?? hero.trend.changes} />}
       <Unconverted count={unconvertedCount} of="Account" className="mt-2 text-warning" />
       {flow && summary && (
         <>

@@ -1,13 +1,13 @@
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import type { ReportTable } from '../reporting';
 import { flowFigures, type FlowFigures } from './flow-figures';
-import type { AnalyticsPeriod } from './window';
+import { isIncomplete, type AnalyticsReading } from './reading';
 
 /**
  * The sparklines of Analytics' Key figures (spec #225, ticket #230): Income, Expense and Profit
- * a point per period of the Period window, read off Spending Insights' income and expense;
- * Net worth the points of the Net worth trend, each period end of the window then today. The
- * current period's point is partial (ADR-0015): it is drawn set apart, never read as a drop.
+ * a point per period of the Span, read off Spending Insights' income and expense;
+ * Net worth the points of the Net worth trend, each period end of the Span then today. The
+ * Span's incomplete periods are partial (ADR-0016): drawn set apart, never read as a drop.
  */
 
 /** One point of a sparkline: CHF minor units. */
@@ -29,15 +29,15 @@ function valueAt(data: ChartSource | null, rowKey: string, columnKey: string): n
 }
 
 /**
- * Income, Expense and Profit in each period of the window, from Spending Insights' data
+ * Income, Expense and Profit in each period of the Span, from Spending Insights' data
  * (periods down, Category group types across). A period it leaves out, before its first data,
  * spent and earned nothing. Expense is what went out, as a positive amount.
  */
 export function flowSparklines(
   flow: ChartSource | null,
-  window: readonly AnalyticsPeriod[],
+  reading: AnalyticsReading,
 ): FlowSparklines {
-  const periods = window.map((period) => ({
+  const periods = reading.periods.map((period) => ({
     period,
     figures: flowFigures(valueAt(flow, period.key, 'income'), valueAt(flow, period.key, 'expense')),
   }));
@@ -45,12 +45,12 @@ export function flowSparklines(
     periods.map(({ period, figures }) => ({
       label: period.label,
       value: figures[id],
-      isPartial: period.isToDate,
+      isPartial: isIncomplete(period),
     }));
   return { income: line('income'), expense: line('expense'), profit: line('profit') };
 }
 
-/** Net worth's points: the Net worth trend's, each period end of the window, then today. */
+/** Net worth's points: the Net worth trend's, the Span's start, each period end, then today. */
 export function netWorthSparkline(trend: ReportTable): SparklinePoint[] {
   return trend.rows.map((row, r) => ({
     label: row.label,

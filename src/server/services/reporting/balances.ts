@@ -235,12 +235,54 @@ async function runNetWorth(
   // No Account left to count: no points at all, rather than a flat line at zero.
   const rows = accounts.length === 0 ? [] : await pointRows(ctx, axis, resolved, today);
   const dates = rows.map((row) => netWorthPointDate(row.key!, axis, today));
+  return valuedNetWorth(ctx, accounts, { query, axis, resolved, rows, dates });
+}
+
+/**
+ * The Net worth table of `accounts`, each valued at the end of each row's date, with their
+ * capital movements in the range: what every Net worth trend ends with.
+ */
+async function valuedNetWorth(
+  ctx: ServiceContext,
+  accounts: readonly Account[],
+  parts: Omit<NetWorthParts, 'valued' | 'markers'>,
+): Promise<ReportTable> {
   const accountIds = accounts.map((account) => account.id);
   const [valued, markers] = await Promise.all([
-    valueBalances(ctx, accounts, dates),
-    listCapitalMarkers(ctx, accountIds, resolved.range),
+    valueBalances(ctx, accounts, parts.dates),
+    listCapitalMarkers(ctx, accountIds, parts.resolved.range),
   ]);
-  return netWorthTable({ query, axis, resolved, rows, dates, valued, markers });
+  return netWorthTable({ ...parts, valued, markers });
+}
+
+/** A Net worth point asked for by its date: a row of the table, valued at the end of `date`. */
+export interface NetWorthPoint extends ReportHeader {
+  key: string;
+  date: string;
+}
+
+/**
+ * Net worth at each of `points` (oldest first) on every Account, valued as a Net worth Widget's
+ * points are (ADR-0014), by `axis`: the trend of a fixed stretch whose points the caller dates,
+ * as Analytics' Span does (ADR-0016). With no Account, no points at all.
+ */
+export async function runNetWorthPoints(
+  ctx: ServiceContext,
+  axis: TimeAxis,
+  points: readonly NetWorthPoint[],
+): Promise<ReportTable> {
+  const first = points[0]?.date ?? swissToday();
+  const last = points.at(-1)?.date ?? first;
+  const query: WidgetQuery = {
+    ...netWorthTrendQuery({ unit: axis, count: 0 }),
+    dateRange: { kind: 'fixed', from: first, to: last },
+  };
+  const resolved = resolveRange(query.dateRange, last);
+  const accounts = await listAccounts(ctx);
+  const shown = accounts.length === 0 ? [] : points;
+  const rows = shown.map(({ key, label, isPartial }) => ({ key, label, isPartial }));
+  const dates = shown.map((point) => point.date);
+  return valuedNetWorth(ctx, accounts, { query, axis, resolved, rows, dates });
 }
 
 /** How far back a Net worth trend reaches: `count` complete periods before the running one. */
@@ -277,7 +319,7 @@ export const NET_WORTH_TREND_QUERY: WidgetQuery = netWorthTrendQuery(HEADLINE_SP
 /**
  * A Net worth trend: Net worth over time on every Account, valued as a Net worth Widget's
  * points are (ADR-0014), whatever any Widget's filters. By default the overview headline's
- * (GLOSSARY: Dashboard Story); Analytics reads one per Period view.
+ * (GLOSSARY: Dashboard Story); Analytics reads one per grain of its Span.
  */
 export function runNetWorthTrend(
   ctx: ServiceContext,
