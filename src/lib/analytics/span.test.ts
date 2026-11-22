@@ -4,6 +4,7 @@ import {
   legacySpan,
   presetSpan,
   presetStarts,
+  spanCaption,
   spanFromParams,
   spanGrain,
   spanPhrase,
@@ -36,6 +37,28 @@ describe('a Span preset', () => {
     expect(spanStart(preset('rolling-12-months'), '2024-02-29')).toBe('2023-03-01');
     expect(spanStart(preset('rolling-12-months'), '2026-01-01')).toBe('2025-01-02');
     expect(spanStart(preset('quarter-to-date'), '2026-03-31')).toBe('2026-01-01');
+  });
+
+  it('fills in a start no earlier than the first Transaction', () => {
+    expect(presetStarts('2026-11-22', '2026-09-01')).toMatchObject({
+      'rolling-30-days': '2026-10-24',
+      'quarter-to-date': '2026-10-01',
+      'rolling-90-days': '2026-09-01',
+      'year-to-date': '2026-09-01',
+    });
+  });
+});
+
+describe("a Span's caption", () => {
+  const dates = { from: '2026-01-01', to: '2026-11-22' };
+
+  it("is its preset's name when read from the start it gives", () => {
+    expect(spanCaption(preset('year-to-date'), dates)).toBe('Year to date');
+  });
+
+  it('is its start date to today for a custom Span, or a preset cut to the data', () => {
+    expect(spanCaption(custom('2026-01-01'), dates)).toBe('1 Jan 2026 – today');
+    expect(spanCaption(preset('this-year-and-last-1'), dates)).toBe('1 Jan 2026 – today');
   });
 });
 
