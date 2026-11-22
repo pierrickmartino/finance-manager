@@ -11,7 +11,7 @@ import type { AnalyticsCard, SectionStatus } from './figures';
  * every Account's computed balance, loans counting against it, converted to CHF at each date's
  * FX rate (ADR-0002); beside it a trend with a point per period end of the Period window and
  * today, and its change since the end of the previous period; under it what came in, went out
- * and was kept over the window.
+ * and the Profit over the window.
  */
 export interface AnalyticsNetWorth extends SectionStatus {
   /** What the card reads as it reads a Dashboard's Widgets: today's balances, and the flows. */
