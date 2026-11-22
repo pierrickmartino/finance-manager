@@ -248,6 +248,11 @@ test('Net worth reads today, with a point per period end of the window and its c
       netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
     ).toHaveAccessibleName(new RegExp(`^${change}: .* since the end of `));
     await expect(netWorth.getByText('Came in')).toBeVisible();
+    // Income minus expense is Profit (GLOSSARY), and its share of Income the Profit margin.
+    await expect(netWorth.getByText('Profit', { exact: true })).toBeVisible();
+    await expect(netWorth.getByText('Profit margin', { exact: true })).toBeVisible();
+    await expect(netWorth.getByText(/profit over \d+ /)).toBeVisible();
+    await expect(netWorth.getByText(/Kept|Savings rate/)).toHaveCount(0);
   }
 
   // Today's amount opens the Accounts.

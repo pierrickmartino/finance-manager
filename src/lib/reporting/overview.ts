@@ -138,12 +138,13 @@ export interface FlowSummary {
   /** Over every month shown, the running one included. */
   income: number;
   expense: number;
-  kept: number;
-  /** The share of income kept; null without income. */
-  savingsRate: number | null;
-  /** The average kept over the full periods (months, quarters or years); null without one. */
-  keptPerPeriod: number | null;
-  /** The full months that kept the most and the least; null with fewer than two to compare. */
+  /** Income minus expense (GLOSSARY: Profit). */
+  profit: number;
+  /** Profit as a share of income; null without income. */
+  profitMargin: number | null;
+  /** The average Profit over the full periods (months, quarters or years); null without one. */
+  profitPerPeriod: number | null;
+  /** The full months with the most and the least Profit; null with fewer than two to compare. */
   best: MonthFlow | null;
   leanest: MonthFlow | null;
 }
@@ -151,16 +152,16 @@ export interface FlowSummary {
 export function flowSummary(months: MonthFlow[]): FlowSummary {
   const income = sum(months.map((month) => month.income));
   const expense = sum(months.map((month) => month.expense));
-  const kept = income - expense;
+  const profit = income - expense;
   const full = months.filter((month) => !month.isPartial);
   const byNet = [...full].sort((a, b) => b.net - a.net);
   const hasPair = full.length >= 2;
   return {
     income,
     expense,
-    kept,
-    savingsRate: income === 0 ? null : kept / income,
-    keptPerPeriod: full.length === 0 ? null : sum(full.map((month) => month.net)) / full.length,
+    profit,
+    profitMargin: income === 0 ? null : profit / income,
+    profitPerPeriod: full.length === 0 ? null : sum(full.map((month) => month.net)) / full.length,
     best: hasPair ? byNet[0]! : null,
     leanest: hasPair ? byNet.at(-1)! : null,
   };
