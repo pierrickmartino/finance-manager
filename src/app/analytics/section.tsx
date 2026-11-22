@@ -59,6 +59,8 @@ interface StreamedSectionProps {
   retryHref: string;
   /** Grid placement, shared by the placeholder and the loaded card. */
   className?: string;
+  /** Stands in while the figures load; by default the section's title over a quiet block. */
+  placeholder?: ReactNode;
   /** An async component awaiting the section's figures, rendering a `SectionCard`. */
   children: ReactNode;
 }
@@ -67,10 +69,16 @@ interface StreamedSectionProps {
  * One section of Analytics streamed in on its own: a placeholder until its figures arrive, and
  * its own error boundary, so one slow or failed section holds up nothing else.
  */
-export function StreamedSection({ name, retryHref, className, children }: StreamedSectionProps) {
+export function StreamedSection({
+  name,
+  retryHref,
+  className,
+  placeholder,
+  children,
+}: StreamedSectionProps) {
   return (
     <SectionErrorBoundary name={name} retryHref={retryHref}>
-      <Suspense fallback={<SectionPlaceholder name={name} className={className} />}>
+      <Suspense fallback={placeholder ?? <SectionPlaceholder name={name} className={className} />}>
         {children}
       </Suspense>
     </SectionErrorBoundary>

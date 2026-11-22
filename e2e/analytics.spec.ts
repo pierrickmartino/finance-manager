@@ -255,6 +255,71 @@ test('Net worth reads today, with a point per period end of the window and its c
   await expect(page).toHaveURL(/\/accounts$/);
 });
 
+test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2 on a narrow one', async ({
+  page,
+}) => {
+  const { description } = await seedSalary(Date.now());
+  const keyFigures = region(page, 'Key figures');
+  const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
+    keyFigures.getByRole('region', { name, exact: true }),
+  );
+  const amountOf = (index: number) => tiles[index]!.getByRole('link', { name: /^CHF / });
+  const boxes = async () => {
+    await expect(keyFigures).not.toHaveAttribute('aria-busy');
+    return Promise.all(tiles.map(async (tile) => (await tile.boundingBox())!));
+  };
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/analytics');
+  for (const index of [0, 1, 2, 3]) await expect(amountOf(index)).toBeVisible();
+  await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
+  for (const tile of tiles.slice(1)) {
+    await expect(tile.getByText(`${CURRENT_MONTH} to date`, { exact: true })).toBeVisible();
+  }
+  // Above the overview row, all four in one row of equal tiles.
+  const wide = await boxes();
+  const overview = (await region(page, 'Your net worth today').boundingBox())!;
+  for (const box of wide) {
+    expect(box.y).toBe(wide[0]!.y);
+    expect(Math.round(box.width)).toBe(Math.round(wide[0]!.width));
+    expect(box.y + box.height).toBeLessThan(overview.y);
+  }
+  for (const [i, box] of wide.slice(1).entries()) {
+    expect(wide[i]!.x + wide[i]!.width).toBeLessThan(box.x);
+  }
+
+  // A 2×2 grid on a phone: Net worth and Income, then Expense and Profit.
+  await page.setViewportSize({ width: 390, height: 900 });
+  const [netWorth, income, expense, profit] = await boxes();
+  expect(income!.y).toBe(netWorth!.y);
+  expect(netWorth!.x + netWorth!.width).toBeLessThan(income!.x);
+  expect(expense!.x).toBe(netWorth!.x);
+  expect(profit!.x).toBe(income!.x);
+  expect(expense!.y).toBe(profit!.y);
+  expect(netWorth!.y + netWorth!.height).toBeLessThan(expense!.y);
+
+  // Income and Profit open their Drill-downs, with today's salary in both; Expense its own.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  for (const index of [1, 3]) {
+    await amountOf(index).click();
+    await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+    await expect(
+      page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Back to Analytics' }).click();
+    await expect(page).toHaveURL(/\/analytics\?period=month$/);
+  }
+  await amountOf(2).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+
+  // Net worth stays today's in every Period view, and opens the Accounts as of today.
+  await page.goto('/analytics?period=year');
+  await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
+  await expect(tiles[1]!.getByText(`${YEAR} to date`, { exact: true })).toBeVisible();
+  await amountOf(0).click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
+});
+
 test('Categories per period lists each Category beside its group subtotal, and both open their Drill-down', async ({
   page,
 }) => {
@@ -462,6 +527,12 @@ test('every section with figures left out for want of an FX rate says so', async
   await seedUnconverted(Date.now());
   await page.goto('/analytics');
   const notes = page.getByText(/left out: no FX rate yet\./);
+  const keyFigures = region(page, 'Key figures');
+  for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
+    await expect(
+      keyFigures.getByRole('region', { name, exact: true }).getByText(/left out: no FX rate yet\./),
+    ).toBeVisible();
+  }
   for (const name of [
     'Your net worth today',
     'Net cash flow',
@@ -473,5 +544,6 @@ test('every section with figures left out for want of an FX rate says so', async
     await expect(region(page, name).getByText(/left out: no FX rate yet\./)).toBeVisible();
   }
   // Spending Insights too, whether it draws its insight or says why it can't yet.
-  await expect(notes).toHaveCount(7);
+  // And each of the four Key figures.
+  await expect(notes).toHaveCount(7 + 4);
 });
