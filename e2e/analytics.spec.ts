@@ -126,9 +126,8 @@ test('picking a Span preset fills in its date, reads every section over it, and 
   const control = spanControl(page);
   const preset = control.getByLabel('Span', { exact: true });
   const name = 'Income vs. expense';
-  const incomeCaption = region(page, 'Key figures')
-    .getByRole('region', { name: 'Income', exact: true })
-    .getByText(/ to date$/);
+  const income = region(page, 'Key figures').getByRole('region', { name: 'Income', exact: true });
+  const incomeCaption = (span: string) => income.getByText(span, { exact: true });
 
   // Rolling 12 months: a month each, the first cut short (unless it starts on the 1st) and the
   // current one starred as running, then Total.
@@ -161,7 +160,7 @@ test('picking a Span preset fills in its date, reads every section over it, and 
   ).toHaveText(`${formatPeriod(QUARTER)}*`);
   headers = await columns(page, name);
   expect(headers).toHaveLength(QUARTERS + 1);
-  await expect(incomeCaption).toHaveText(`${formatPeriod(QUARTER)} to date`);
+  await expect(incomeCaption('This year and last 1')).toBeVisible();
 
   // This year and last 4: by year, the first four years before this one.
   await preset.selectOption('this-year-and-last-4');
@@ -170,7 +169,7 @@ test('picking a Span preset fills in its date, reads every section over it, and 
   headers = await columns(page, name);
   expect(headers).toHaveLength(5 + 1);
   expect(headers[0]).toBe(String(Number(YEAR) - 4));
-  await expect(incomeCaption).toHaveText(`${YEAR} to date`);
+  await expect(incomeCaption('This year and last 4')).toBeVisible();
   await expect(
     region(page, 'Net cash flow').getByRole('link', {
       name: new RegExp(`^${YEAR} \\(partial\\): `),
@@ -342,7 +341,7 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   for (const index of [0, 1, 2, 3]) await expect(amountOf(index)).toBeVisible();
   await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
   for (const tile of tiles.slice(1)) {
-    await expect(tile.getByText(`${CURRENT_MONTH} to date`, { exact: true })).toBeVisible();
+    await expect(tile.getByText('Rolling 12 months', { exact: true })).toBeVisible();
   }
   // Above the overview row, all four in one row of equal tiles.
   const wide = await boxes();
@@ -387,7 +386,7 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   // Net worth stays today's whatever the Span, and opens the Accounts as of today.
   await page.goto('/analytics?span=this-year-and-last-4');
   await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
-  await expect(tiles[1]!.getByText(`${YEAR} to date`, { exact: true })).toBeVisible();
+  await expect(tiles[1]!.getByText('This year and last 4', { exact: true })).toBeVisible();
   await amountOf(0).click();
   await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
 });
@@ -397,8 +396,8 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
 }) => {
   const suffix = Date.now();
   const { description } = await seedSalary(suffix);
-  // On the first of last month: always inside the Comparison span.
-  const lastMonthFirst = `${monthsAgo(1).slice(0, 8)}01`;
+  // The day before Rolling 12 months starts: the last day of its Comparison span.
+  const beforeSpan = addDays(ROLLING_START, -1);
   const earlier = `Analytics earlier groceries ${suffix}`;
   await withServices(async (ctx) => {
     // On the salary's own Account, lowering its balance: a new or larger Account would crowd
@@ -413,7 +412,7 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
     const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
     const transaction = await createManualTransaction(ctx, {
       accountId: account.id,
-      bookingDate: lastMonthFirst,
+      bookingDate: beforeSpan,
       amountMinor: -1234_00,
       description: earlier,
     });
@@ -427,9 +426,14 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
   for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
     await expect(changeOf(name)).toBeVisible();
   }
-  await expect(changeOf('Income')).toHaveAccessibleName(/^(Up|Down|Unchanged) .*vs 1(–\d+)? /);
+  // The 365 days before the Span, which end last year.
+  await expect(changeOf('Income')).toHaveAccessibleName(
+    new RegExp(
+      `^(Up|Down|Unchanged) .*vs \\d+ \\w+( \\d{4})? – \\d+ \\w+ ${beforeSpan.slice(0, 4)}`,
+    ),
+  );
 
-  // Profit's change opens both stretches of both: today's salary and last month's groceries.
+  // Profit's change opens both stretches of both: today's salary and the earlier groceries.
   await changeOf('Profit').click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
   const table = page.getByRole('table', { name: 'Drill-down Transactions' });
