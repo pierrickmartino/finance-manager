@@ -3,7 +3,7 @@ import { includesCapital } from '@/lib/reporting/capital';
 import { BASE_CURRENCY } from '../fx/constants';
 import { REPORTED_PAYEE_ID } from '../transactions/line-payee';
 import type { DateSpan } from './periods';
-import type { ReportAxis, WidgetQuery } from './query';
+import type { ReportAxis, TimeAxis, WidgetQuery } from './query';
 
 /**
  * SQL building blocks of the reporting engine. Every report and drill-down reads the same
@@ -165,6 +165,14 @@ export function axisCondition(axis: ReportAxis, key: string | null, params: SqlP
       : `EXISTS (SELECT 1 FROM ${tags} dt WHERE dt.tag_id = ${params.add(key)}::uuid)`;
   }
   return key === null ? `${axisKey(axis)} IS NULL` : `${axisKey(axis)} = ${params.add(key)}::text`;
+}
+
+/**
+ * Condition (over `report_base b`) selecting the reportable rows under every key of a time axis
+ * up to and including `key`: its keys sort as text, oldest first.
+ */
+export function axisThroughCondition(axis: TimeAxis, key: string, params: SqlParams): string {
+  return `${axisKey(axis)} <= ${params.add(key)}::text`;
 }
 
 /**

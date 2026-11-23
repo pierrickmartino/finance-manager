@@ -1,4 +1,9 @@
-import { isExcept, type AxisSelector, type CellRef } from '@/server/services/reporting/cell-ref';
+import {
+  isExcept,
+  isThrough,
+  type AxisSelector,
+  type CellRef,
+} from '@/server/services/reporting/cell-ref';
 import {
   isTimeAxis,
   type ReportFilters,
@@ -175,7 +180,8 @@ const CELL_AXES = ['row', 'column'] as const;
 
 /**
  * Drill-down cell parameters: `row`, `column` (absent = the whole axis), or repeated `rowNot`,
- * `columnNot` for every key but those; `subtotals=1`, `page`.
+ * `columnNot` for every key but those, or `rowThrough`, `columnThrough` for every time key up
+ * to one; `subtotals=1`, `page`.
  */
 export function cellToParams(cell: CellRef): URLSearchParams {
   const params = new URLSearchParams();
@@ -184,6 +190,8 @@ export function cellToParams(cell: CellRef): URLSearchParams {
     if (selector === undefined) continue;
     if (isExcept(selector)) {
       for (const key of selector.except) params.append(`${axis}Not`, key ?? NONE);
+    } else if (isThrough(selector)) {
+      params.set(`${axis}Through`, selector.through);
     } else {
       params.set(axis, selector ?? NONE);
     }
@@ -197,6 +205,8 @@ export function cellFromParams(params: UrlParams): CellRef {
   const keyOf = (value: string): string | null => (value === NONE ? null : value);
   const selector = (axis: (typeof CELL_AXES)[number]): AxisSelector | undefined => {
     if (params[axis] !== undefined) return keyOf(first(params[axis]));
+    const through = params[`${axis}Through`];
+    if (through !== undefined) return { through: first(through) };
     const except = all(params[`${axis}Not`]).map(keyOf);
     return except.length > 0 ? { except } : undefined;
   };

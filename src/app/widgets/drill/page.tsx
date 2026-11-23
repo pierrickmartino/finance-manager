@@ -17,6 +17,7 @@ import { ServiceError } from '@/server/services/errors';
 import {
   ends,
   isExcept,
+  isThrough,
   isTimeAxis,
   keptBy,
   listCellTransactions,
@@ -60,8 +61,8 @@ const headerLabel = (headers: ReportHeader[] | undefined, key: string | null): s
   headers?.find((header) => header.key === key)?.label ?? key ?? 'None';
 
 /**
- * One axis of the cell in words: its key's label; for every key but some, the periods kept on
- * a time axis ("Jan 2025 to Feb 2025"), else "All but Rent" or "Other".
+ * One axis of the cell in words: its key's label; for every key but some, or every key up to
+ * one, the periods kept on a time axis ("Jan 2025 to Feb 2025"), else "All but Rent" or "Other".
  */
 function describeSelector(
   headers: ReportHeader[] | undefined,
@@ -69,12 +70,13 @@ function describeSelector(
   selector: AxisSelector | undefined,
 ): string | null {
   if (selector === undefined) return null;
-  if (!isExcept(selector)) return headerLabel(headers, selector);
+  if (!isExcept(selector) && !isThrough(selector)) return headerLabel(headers, selector);
   const kept = ends(keptBy(headers ?? [], (header) => header.key, selector));
   if (isTimeAxis(axis ?? null) && kept) {
     const [first, last] = kept;
     return first === last ? first.label : `${first.label} to ${last.label}`;
   }
+  if (isThrough(selector)) return `Up to ${headerLabel(headers, selector.through)}`;
   if (selector.except.length === 0) return 'All';
   if (selector.except.length > EXCEPT_NAMES) return 'Other';
   return `All but ${selector.except.map((key) => headerLabel(headers, key)).join(', ')}`;

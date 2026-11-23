@@ -46,7 +46,7 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
     case 'dots':
       return <DotMatrix months={mark.months} />;
     case 'areas':
-      return <FlowAreas points={mark.points} />;
+      return <FlowAreas points={mark.points} isRunning={mark.isRunning} />;
     case 'bars':
       return <MonthBars periods={mark.periods} />;
     case 'netWorthLine':

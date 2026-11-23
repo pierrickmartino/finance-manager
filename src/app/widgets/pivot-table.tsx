@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useFormatter } from '@/components/formatter-provider';
 import type { ChartSource } from '@/lib/reporting/chart-data';
-import type { ReportHeader } from '@/server/services/reporting';
+import { intervalLabel } from '@/lib/reporting/interval-label';
 import { SECTION_TITLE_CLASS } from '@/components/surface';
 
 /** What the pivot shows: the engine's table, plus where each value drills down to. */
@@ -14,9 +14,7 @@ export type PivotData = ChartSource;
 const CELL = 'px-3 py-1.5 text-right tabular-nums whitespace-nowrap';
 const HEAD = 'px-3 py-1.5 font-medium whitespace-nowrap';
 
-function headerLabel(header: ReportHeader): string {
-  return header.isPartial ? `${header.label} (partial)` : header.label;
-}
+const headerLabel = intervalLabel;
 
 /**
  * The table visualisation and its full-screen pivot view (spec 105). Every value is a link to

@@ -1,5 +1,6 @@
 import type { Measure, ReportHeader } from '@/server/services/reporting';
 import type { ChartSource, RowTree } from './chart-data';
+import { intervalLabel } from './interval-label';
 
 /**
  * A table Widget on its Dashboard card: the engine's rows × columns grid as a heatmap, each
@@ -68,7 +69,7 @@ export interface Heatmap {
 const MONTH_LABEL = /^([A-Z][a-z]{2}) \d{4}$/;
 
 function column(header: ReportHeader): HeatmapColumn {
-  const fullLabel = header.isPartial ? `${header.label} (partial)` : header.label;
+  const fullLabel = intervalLabel(header);
   const month = MONTH_LABEL.exec(header.label);
   return { label: month ? month[1]! : header.label, fullLabel, isPartial: header.isPartial };
 }

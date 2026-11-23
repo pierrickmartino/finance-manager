@@ -22,16 +22,25 @@ import {
   type WidgetQuery,
   type WidgetQueryInput,
 } from './query';
-import { axisCondition, axisExceptCondition, axisKey, baseCte, SqlParams } from './sql';
+import {
+  axisCondition,
+  axisExceptCondition,
+  axisKey,
+  axisThroughCondition,
+  baseCte,
+  SqlParams,
+} from './sql';
 
-import { ends, isExcept, keptBy, type AxisSelector, type CellRef } from './cell-ref';
+import { ends, isExcept, isThrough, keptBy, type AxisSelector, type CellRef } from './cell-ref';
 
 export {
   ends,
   isExcept,
+  isThrough,
   keptBy,
   type AxisExcept,
   type AxisSelector,
+  type AxisThrough,
   type CellRef,
 } from './cell-ref';
 
@@ -39,7 +48,11 @@ export {
 const MAX_EXCEPT = 100;
 const keyInput = z.string().max(100).nullable();
 const selectorInput = z
-  .union([keyInput, z.object({ except: z.array(keyInput).max(MAX_EXCEPT) })])
+  .union([
+    keyInput,
+    z.object({ except: z.array(keyInput).max(MAX_EXCEPT) }),
+    z.object({ through: z.string().max(100) }),
+  ])
   .optional();
 
 const cellInput = z.object({
@@ -128,6 +141,12 @@ function cellConditions(query: WidgetQuery, cell: CellAxes, params: SqlParams): 
     if (axis === null || key === undefined) continue;
     if (isExcept(key)) {
       conditions.push(axisExceptCondition(axis, key.except, params));
+      continue;
+    }
+    // "Up to" only orders the keys of a time axis; on any other it matches nothing.
+    if (isThrough(key)) {
+      if (!isTimeAxis(axis)) return null;
+      conditions.push(axisThroughCondition(axis, key.through, params));
       continue;
     }
     if (key !== null && ID_AXES.has(axis) && !UUID.safeParse(key).success) return null;

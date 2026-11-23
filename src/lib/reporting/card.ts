@@ -313,11 +313,52 @@ function flowPointsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots)
   }));
 }
 
+/**
+ * The Drill-down of every row from the first through `key` (one column, or both without one):
+ * what a running point adds up. Without a query to drill into, the whole range.
+ */
+function throughHref(data: ChartSource, key: string | null, column?: string | null): string {
+  if (!data.drill || key === null) return data.hrefs.total;
+  return drillUrl(data.drill, {
+    row: { through: key },
+    ...(column === undefined ? {} : { column }),
+  });
+}
+
+/**
+ * A line flow's points as running totals: each what came in and went out from the first row
+ * through its own, its Drill-downs those rows for its column.
+ */
+function runningPointsOf(data: ChartSource, slots: FlowSlots): FlowPoint[] {
+  const own = flowPointsOf(data, slots);
+  const income = data.columns[slots.incomeSlot]!.key;
+  const expense = data.columns[slots.expenseSlot]!.key;
+  let incomeSoFar = 0;
+  let expenseSoFar = 0;
+  return own.map((point) => {
+    incomeSoFar += point.income;
+    expenseSoFar += point.expense;
+    return {
+      ...point,
+      income: incomeSoFar,
+      expense: expenseSoFar,
+      href: throughHref(data, point.key),
+      incomeHref: throughHref(data, point.key, income),
+      expenseHref: throughHref(data, point.key, expense),
+    };
+  });
+}
+
+/** A line flow by day reads as running totals (ADR-0020); by any other Interval, its own. */
+const isRunningFlow = (kind: CardKind, data: ChartSource): boolean =>
+  kind === 'trend' && periodWords(data).noun === 'day';
+
 /** How a flow is drawn: a line as two areas, bars as dots. */
 function flowMark(kind: CardKind, data: ChartSource, slots: FlowSlots): CardMark {
-  return kind === 'trend'
-    ? { type: 'areas', isRunning: false, points: flowPointsOf(data, slots) }
-    : { type: 'dots', months: monthsOf(data, slots) };
+  if (kind !== 'trend') return { type: 'dots', months: monthsOf(data, slots) };
+  return isRunningFlow(kind, data)
+    ? { type: 'areas', isRunning: true, points: runningPointsOf(data, slots) }
+    : { type: 'areas', isRunning: false, points: flowPointsOf(data, slots) };
 }
 
 /**
@@ -521,6 +562,34 @@ function flowSentences(
   };
 }
 
+/**
+ * A running flow: what was kept over the whole stretch (its last gap), and the two column
+ * totals it is the difference of, each opening its Drill-down.
+ */
+function runningFlowSentences(
+  data: ChartSource,
+  { incomeSlot, expenseSlot }: FlowSlots,
+  money: Money,
+): CardSentences {
+  const income = data.columnTotals[incomeSlot] ?? 0;
+  const expense = 0 - (data.columnTotals[expenseSlot] ?? 0);
+  return {
+    lead: { headline: 'Kept so far', detail: money(income - expense), href: data.hrefs.total },
+    facts: [
+      {
+        label: 'Came in',
+        value: money(income),
+        href: data.hrefs.columnTotals[incomeSlot] ?? data.hrefs.total,
+      },
+      {
+        label: 'Went out',
+        value: money(expense),
+        href: data.hrefs.columnTotals[expenseSlot] ?? data.hrefs.total,
+      },
+    ],
+  };
+}
+
 /** Period by period: the best and weakest (or, for spending, heaviest and lightest) periods. */
 function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardSentences {
   const { noun, adjective } = periodWords(data);
@@ -592,7 +661,9 @@ function readRows(
     case 'bars':
       return slots
         ? {
-            ...flowSentences(data, slots, money),
+            ...(isRunningFlow(kind, data)
+              ? runningFlowSentences(data, slots, money)
+              : flowSentences(data, slots, money)),
             mark: flowMark(kind, data, slots),
           }
         : {
