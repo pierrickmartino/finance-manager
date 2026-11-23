@@ -58,6 +58,7 @@ export function changeOverAverage(latest: number, before: number[]): number {
 }
 
 const ADJECTIVES = {
+  day: 'daily',
   month: 'monthly',
   quarter: 'quarterly',
   year: 'yearly',
@@ -175,10 +176,12 @@ export function litTicks(share: number, ticks: number): number {
 
 /**
  * A period label short enough to fit under its bar: a month's first three letters
- * ("October 2026" → "Oct"), a quarter's number ("Q3 2025" → "Q3"), a year whole ("2025").
+ * ("October 2026" → "Oct"), a quarter's number ("Q3 2025" → "Q3"), a year whole ("2025"), a
+ * day without its year ("14 Mar 2025" → "14 Mar").
  */
 export function barLabel(label: string, period: TimeAxis): string {
   if (period === 'year') return label;
+  if (period === 'day') return label.split(' ').slice(0, 2).join(' ');
   const first = label.split(' ')[0] ?? label;
   return period === 'month' ? first.slice(0, 3) : first;
 }

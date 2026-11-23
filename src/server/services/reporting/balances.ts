@@ -115,7 +115,7 @@ async function pointRows(
   { range, partialPeriod }: ResolvedRange,
   today: string,
 ): Promise<ReportHeader[]> {
-  const headers = await axisHeaders(ctx.db, axis, new Set(), range, partialPeriod);
+  const headers = await axisHeaders(ctx.db, axis, new Set(), range, partialPeriod, today);
   return headers.flatMap((row) => {
     const period = periodSpan(row.key!, axis);
     if (period.from > today) return [];

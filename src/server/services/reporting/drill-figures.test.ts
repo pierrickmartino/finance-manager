@@ -222,3 +222,45 @@ describe("the overview's figures are what their Drill-downs work out", () => {
     expect(working).toMatch(new RegExp(`→ [+−]${percent}%$`));
   });
 });
+
+describe('a Widget by day', () => {
+  const januaryByDay = {
+    dateRange: { kind: 'fixed', from: '2025-01-01', to: '2025-01-31' },
+    rows: 'day',
+    columns: 'categoryGroupType',
+  } as const;
+
+  it("draws a table cell per day, each opening exactly that day's Transactions", async () => {
+    await dataset();
+    const { data } = await widget(januaryByDay, 'table');
+
+    expect(data.rows).toHaveLength(31);
+    for (const [r, row] of data.rows.entries()) {
+      for (const [c] of data.columns.entries()) {
+        const value = data.cells[r]![c] ?? null;
+        if (value === null) continue;
+        const page = await open(data.hrefs.cells[r]![c]);
+        expect(page.value).toBe(value);
+        expect(page.span).toEqual({ from: row.key, to: row.key });
+      }
+    }
+  });
+
+  it('draws a line point per day, quiet days empty, each the sum of its Drill-down', async () => {
+    await dataset();
+    const chart = toSeriesChart((await widget(januaryByDay, 'line')).data);
+
+    expect(chart.points.slice(0, 2).map((point) => point.label)).toEqual([
+      '1 Jan 2025',
+      '2 Jan 2025',
+    ]);
+    const income = chart.series.find((series) => series.label === 'Income')!;
+    expect(chart.points.filter((point) => point.values[income.key] !== null)).toHaveLength(1);
+    for (const point of chart.points) {
+      for (const series of chart.series) {
+        const value = point.values[series.key] ?? null;
+        if (value !== null) expect((await open(point.hrefs[series.key])).value).toBe(value);
+      }
+    }
+  });
+});

@@ -7,7 +7,7 @@ import { CATEGORY_GROUP_TYPES } from '../categories/model';
  * measure. It is stored as JSON on a Widget and compiled into one SQL query by the engine.
  */
 
-export const TIME_AXES = ['month', 'quarter', 'year'] as const;
+export const TIME_AXES = ['day', 'month', 'quarter', 'year'] as const;
 export type TimeAxis = (typeof TIME_AXES)[number];
 
 export const REPORT_AXES = [
@@ -23,6 +23,7 @@ export const REPORT_AXES = [
 export type ReportAxis = (typeof REPORT_AXES)[number];
 
 export const AXIS_LABELS: Record<ReportAxis, string> = {
+  day: 'Day',
   month: 'Month',
   quarter: 'Quarter',
   year: 'Year',
@@ -74,7 +75,7 @@ const fixedRange = z
     'The date range must be at most 50 years',
   );
 
-/** The last N complete months, quarters or years; optionally followed by the current one. */
+/** The last N complete days, months, quarters or years; optionally followed by the current one. */
 const lastPeriodsRange = z.object({
   kind: z.literal('last'),
   count: z
@@ -82,7 +83,7 @@ const lastPeriodsRange = z.object({
     .int()
     .min(1, 'Show at least one period')
     .max(MAX_LIVE_PERIODS, `Show at most ${MAX_LIVE_PERIODS} periods`),
-  unit: z.enum(TIME_AXES, { error: 'Period must be month, quarter or year' }),
+  unit: z.enum(TIME_AXES, { error: 'Period must be day, month, quarter or year' }),
   includeCurrent: z.boolean().default(false),
 });
 
