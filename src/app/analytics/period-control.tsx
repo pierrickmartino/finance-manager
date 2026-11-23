@@ -10,6 +10,8 @@ import {
   isPeriodPreset,
   PERIOD_PRESET_LABELS,
   PERIOD_PRESETS,
+  PINNABLE_SECTIONS,
+  type CardPeriods,
   type Period,
   type PeriodPreset,
 } from '@/lib/analytics/period';
@@ -24,6 +26,8 @@ interface PeriodControlProps {
   starts: Record<PeriodPreset, string>;
   /** Today: the latest start date the field takes. */
   today: string;
+  /** The Cards' pins, sent again as they are: changing the page's Period keeps every one. */
+  cardPeriods: CardPeriods;
 }
 
 const noSubscription = () => () => {};
@@ -46,10 +50,18 @@ const CUSTOM = 'custom';
  * and reads Analytics over it; typing a date switches the list to Custom, and Show reads
  * Analytics from it. Once hydrated, the form sends only `period` for a preset or only `from` for
  * Custom; without JavaScript it sends both, and the chosen preset wins unless Custom is
- * selected. It sticks to the top of the screen as the page scrolls, so the Period can change from
+ * selected. The Cards' pins ride along in hidden fields, so a pinned Card keeps its own Period
+ * (GLOSSARY: Card Period). It sticks to the top of the screen as the page scrolls, so the Period can change from
  * anywhere.
  */
-export function PeriodControl({ period, from, phrase, starts, today }: PeriodControlProps) {
+export function PeriodControl({
+  period,
+  from,
+  phrase,
+  starts,
+  today,
+  cardPeriods,
+}: PeriodControlProps) {
   const id = useId();
   const [choice, setChoice] = useState<string>(period.kind === 'preset' ? period.preset : CUSTOM);
   const [start, setStart] = useState(from);
@@ -114,6 +126,10 @@ export function PeriodControl({ period, from, phrase, starts, today }: PeriodCon
           className={INPUT_CLASS}
         />
       </div>
+      {PINNABLE_SECTIONS.map((section) => {
+        const pin = cardPeriods[section];
+        return pin && <input key={section} type="hidden" name={section} value={pin} />;
+      })}
       <button type="submit" className={SECONDARY_BUTTON_CLASS}>
         Show
       </button>

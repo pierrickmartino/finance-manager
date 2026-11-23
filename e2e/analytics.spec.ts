@@ -712,6 +712,117 @@ test('Spending by Category ranks the largest Categories and a Category opens its
   await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-1$/);
 });
 
+/** Analytics' search parameters, as the page reads them. */
+const searchOf = (page: Page) => Object.fromEntries(new URL(page.url()).searchParams);
+
+/** A Card's Period dropdown, named for the Card. */
+const cardPeriod = (page: Page, name: string) =>
+  region(page, name).getByLabel(`Period for ${name}`, { exact: true });
+
+const cardPeriodMark = (page: Page, name: string) =>
+  region(page, name).getByTestId('card-period-mark');
+
+test("pinning Spending by Category reads it over its own Period, which it keeps when the page's changes, through a Drill-down and back, until Same as page", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description, group } = await seedPurchase(suffix);
+  await seedOldPurchase(suffix, `Spending account ${suffix}`);
+  const name = 'Spending by Category';
+  const section = region(page, name);
+  const picker = cardPeriod(page, name);
+
+  // Unpinned: it follows the page's Period, by month, and shows no mark.
+  await page.goto('/analytics?period=rolling-90-days');
+  await expect(section.getByText('Furniture leads')).toBeVisible();
+  await expect(picker).toHaveValue('');
+  await expect(cardPeriodMark(page, name)).toHaveCount(0);
+  await expect(section.getByText(/^Monthly average$/)).toBeVisible();
+
+  // Pinned by keyboard: read by quarter over This year and last 1, its preset marked; the rest of
+  // the page still reads Rolling 90 days.
+  await picker.focus();
+  await picker.selectOption('this-year-and-last-1');
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'rolling-90-days', 'spending-by-category': 'this-year-and-last-1' });
+  await expect(cardPeriodMark(page, name)).toHaveText('Pinned to This year and last 1');
+  await expect(section.getByText(/^Quarterly average$/)).toBeVisible();
+  await expect(section.getByText(/^Heaviest quarter: /)).toBeVisible();
+  await expect(
+    region(page, 'Key figures')
+      .getByRole('region', { name: 'Income', exact: true })
+      .getByText('Rolling 90 days', { exact: true }),
+  ).toBeVisible();
+  expect((await columns(page, 'Income vs. expense')).length).toBeLessThanOrEqual(5);
+
+  // A pick equal to the page's Period is a pin too, and the page's Period moving leaves it be.
+  await periodControl(page).getByLabel('Period', { exact: true }).selectOption('year-to-date');
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'year-to-date', 'spending-by-category': 'this-year-and-last-1' });
+  await expect(picker).toHaveValue('this-year-and-last-1');
+  await expect(section.getByText(/^Quarterly average$/)).toBeVisible();
+
+  // A Category's Drill-down, and back to the page with its Period and the pin.
+  await section.getByRole('link', { name: new RegExp(`^Furniture\\s*${group}`) }).click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*originSpendingByCategory=this-year-and-last-1/);
+  await expect(
+    page
+      .getByRole('table', { name: 'Drill-down Transactions' })
+      .getByText(description, { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'year-to-date', 'spending-by-category': 'this-year-and-last-1' });
+  await expect(cardPeriodMark(page, name)).toBeVisible();
+
+  // Same as page: the pin and its mark go, and the Card reads the page's Period again.
+  await picker.selectOption({ label: 'Same as page' });
+  await expect.poll(() => searchOf(page)).toEqual({ period: 'year-to-date' });
+  await expect(cardPeriodMark(page, name)).toHaveCount(0);
+  await expect(section.getByText(/^Monthly average$|^Heaviest month: /).first()).toBeVisible();
+});
+
+test("on a phone a pinned Card's Period dropdown and mark fit its header", async ({ page }) => {
+  const suffix = Date.now();
+  await seedPurchase(suffix);
+  await seedOldPurchase(suffix, `Spending account ${suffix}`);
+  const name = 'Spending by Category';
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto('/analytics?period=rolling-90-days&spending-by-category=this-year-and-last-4');
+  const section = region(page, name);
+  await expect(cardPeriodMark(page, name)).toBeVisible();
+
+  const card = (await section.boundingBox())!;
+  for (const part of [cardPeriod(page, name), cardPeriodMark(page, name)]) {
+    const box = (await part.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(card.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width);
+  }
+  const pageOverflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(pageOverflows).toBe(false);
+});
+
+test('a hand-edited pin on a Card without a dropdown, or an invalid one, is ignored', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  await seedPurchase(suffix);
+  await seedOldPurchase(suffix, `Spending account ${suffix}`);
+  const name = 'Spending by Category';
+
+  await page.goto('/analytics?from=2024-03-01&key-figures=year-to-date&spending-by-category=week');
+  await expect(region(page, name).getByText('Furniture leads')).toBeVisible();
+  await expect(cardPeriod(page, name)).toHaveValue('');
+  await expect(cardPeriodMark(page, name)).toHaveCount(0);
+  await expect(region(page, 'Key figures').getByLabel(/^Period for /)).toHaveCount(0);
+});
+
 test('Net cash flow has a bar per interval, the current one partial, each opening its Drill-down', async ({
   page,
 }) => {

@@ -4,6 +4,7 @@ import { setupTestDatabase } from '@test/support/db';
 import { DEFAULT_PERIOD, presetPeriod, type Period } from '@/lib/analytics/period';
 import { createAccount } from '@/server/services/accounts';
 import { createBank } from '@/server/services/banks';
+import { createCategory, createCategoryGroup } from '@/server/services/categories';
 import { loadAnalytics, type AnalyticsSections, type AnalyticsView } from '.';
 
 /** The page as a whole: the reading (the Period resolved once) every section reads. */
@@ -227,5 +228,68 @@ describe('the reading', () => {
     expect(page.span).toEqual({ from: '2024-03-21', to: '2024-03-31' });
     expect(page.value).toBe(-10_000);
     expect(page.transactions.map((row) => row.chfMinor)).toEqual([-10_000]);
+  });
+});
+
+describe('a Card Period', () => {
+  it('reads a pinned section over its own Period while every other section follows the page', async () => {
+    fixToday('2025-03-20');
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2023-06-10', amountMinor: -4_000 },
+      { bookingDate: '2025-02-01', amountMinor: -6_000 },
+    ]);
+    const pins = { 'spending-by-category': 'this-year-and-last-1' } as const;
+
+    const { reading, sections } = await settled(
+      await loadAnalytics(t.ctx, presetPeriod('year-to-date'), pins),
+    );
+
+    expect(reading).toMatchObject({ period: presetPeriod('year-to-date'), from: '2025-01-01' });
+    const spending = sections.spendingByCategory;
+    expect(spending).toMatchObject({ isPinned: true });
+    expect(spending.reading).toMatchObject({
+      period: presetPeriod('this-year-and-last-1'),
+      from: '2024-01-01',
+      grain: 'quarter',
+    });
+    expect(keys(spending.data!.rows)).toEqual([
+      ...['2024-Q1', '2024-Q2', '2024-Q3', '2024-Q4', '2025-Q1'],
+    ]);
+    // The others, and the Key figures, read the page's Period.
+    const pageIntervals = ['2025-01', '2025-02', '2025-03'];
+    expect(keys(sections.netCashFlow.data!.rows)).toEqual(pageIntervals);
+    for (const card of [sections.incomeVsExpense, sections.categoriesPerInterval]) {
+      expect(keys(card.data!.columns)).toEqual(pageIntervals);
+    }
+    expect(sections.netCashFlow.data!.total).toBe(-6_000);
+    expect(sections.keyFigures.figures.find((figure) => figure.id === 'expense')).toMatchObject({
+      caption: 'Year to date',
+    });
+  });
+
+  it('clamps a pin to the first Transaction like any Period, beside a custom page Period', async () => {
+    fixToday('2025-03-20');
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    const living = await createCategoryGroup(t.ctx, { name: 'Living', type: 'expense' });
+    const rent = await createCategory(t.ctx, { groupId: living.id, name: 'Rent' });
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2024-09-10', amountMinor: -4_000, classify: { categoryId: rent.id } },
+      { bookingDate: '2025-02-01', amountMinor: -6_000, classify: { categoryId: rent.id } },
+    ]);
+    const pins = { 'spending-by-category': 'this-year-and-last-4' } as const;
+
+    const { reading, sections } = await settled(
+      await loadAnalytics(t.ctx, custom('2025-02-01'), pins),
+    );
+
+    expect(reading).toMatchObject({ period: custom('2025-02-01'), from: '2025-02-01' });
+    const spending = sections.spendingByCategory;
+    expect(spending.reading).toMatchObject({ from: '2024-09-10', grain: 'month' });
+    expect(keys(spending.data!.rows)).toEqual([
+      ...['2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03'],
+    ]);
+    expect(spending.data!.total).toBe(-10_000);
+    expect(keys(sections.netCashFlow.data!.rows)).toEqual(['2025-02', '2025-03']);
   });
 });

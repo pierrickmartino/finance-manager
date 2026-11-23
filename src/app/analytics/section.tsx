@@ -21,14 +21,30 @@ interface SectionCardProps {
   className?: string;
   /** Shown under the title when its count is above zero. */
   unconverted?: Unconverted;
+  /** Drawn beside the title: a pinnable Card's Period mark and dropdown. */
+  titleAside?: ReactNode;
   children: ReactNode;
 }
 
 /** A loaded section: its card and title, then what its figures leave out, if anything. */
-export function SectionCard({ name, className = '', unconverted, children }: SectionCardProps) {
+export function SectionCard({
+  name,
+  className = '',
+  unconverted,
+  titleAside,
+  children,
+}: SectionCardProps) {
+  const title = <h2 className={SECTION_TITLE_CLASS}>{name}</h2>;
   return (
     <section aria-label={name} className={`${SECTION_CLASS} ${className}`}>
-      <h2 className={SECTION_TITLE_CLASS}>{name}</h2>
+      {titleAside ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          {title}
+          {titleAside}
+        </div>
+      ) : (
+        title
+      )}
       {unconverted && unconverted.count > 0 && <UnconvertedNote {...unconverted} />}
       {children}
     </section>

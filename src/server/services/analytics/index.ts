@@ -1,4 +1,11 @@
-import { presetStarts, type Period, type PeriodPreset } from '@/lib/analytics/period';
+import {
+  NO_PINS,
+  presetStarts,
+  type CardPeriods,
+  type PinnableSection,
+  type Period,
+  type PeriodPreset,
+} from '@/lib/analytics/period';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { accountBalances } from './account-balances';
@@ -14,7 +21,7 @@ import { profitAndLoss, type AnalyticsProfitAndLoss } from './profit-and-loss';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { spendingByCategory } from './spending-by-category';
 import { lastCompleteMonthInsights, spendingInsights } from './spending-insights';
-import { readingOf, type AnalyticsReading } from './reading';
+import { cardReading, readingOf, type AnalyticsReading } from './reading';
 
 /**
  * The Analytics reporting service (GLOSSARY: Analytics, ADR-0016): the page's only data source.
@@ -30,6 +37,18 @@ import { readingOf, type AnalyticsReading } from './reading';
  * `AnalyticsSections` and a line in `loadAnalytics`.
  */
 
+/**
+ * What a pinnable section says besides its figures (GLOSSARY: Card Period): the reading it was
+ * read over, its own Period's when pinned, the page's otherwise.
+ */
+export interface SectionReading {
+  reading: AnalyticsReading;
+  isPinned: boolean;
+}
+
+/** A pinnable section's result: its figures, and the reading they were read over. */
+export type Pinnable<Result> = Result & SectionReading;
+
 /** Each section's promise, by name. */
 export interface AnalyticsSections {
   keyFigures: Promise<AnalyticsKeyFigures>;
@@ -38,7 +57,7 @@ export interface AnalyticsSections {
   recentTransactions: Promise<RecentTransactions>;
   netCashFlow: Promise<AnalyticsCard>;
   accountBalances: Promise<AnalyticsCard>;
-  spendingByCategory: Promise<AnalyticsCard>;
+  spendingByCategory: Promise<Pinnable<AnalyticsCard>>;
   profitAndLoss: Promise<AnalyticsProfitAndLoss>;
   incomeVsExpense: Promise<AnalyticsCard>;
   categoriesPerInterval: Promise<AnalyticsCard>;
@@ -47,11 +66,39 @@ export interface AnalyticsSections {
 export interface AnalyticsView {
   /** Today's Swiss date, the one every section reads at. */
   today: string;
-  /** What every section reads: the Period resolved on today, cut to the data. */
+  /**
+   * What every section reads unless pinned: the page's Period resolved on today, cut to the data,
+   * on the page with its Cards' pins.
+   */
   reading: AnalyticsReading;
   /** Each preset's start date today, cut to the data as it would be read. */
   starts: Record<PeriodPreset, string>;
   sections: AnalyticsSections;
+}
+
+/**
+ * Each pinnable section's reading: over its Card Period when pinned (resolved from the same today
+ * and first Transaction, `cardReading`), the page's otherwise.
+ */
+function sectionReadings(
+  page: AnalyticsReading,
+  cardPeriods: CardPeriods,
+  dataStart: string | null,
+): (section: PinnableSection) => SectionReading {
+  return (section) => {
+    const preset = cardPeriods[section];
+    return preset === undefined
+      ? { reading: page, isPinned: false }
+      : { reading: cardReading(page, preset, dataStart), isPinned: true };
+  };
+}
+
+/** A pinnable section started over its reading, its result saying which one. */
+async function pinnable<Result>(
+  read: SectionReading,
+  load: (reading: AnalyticsReading) => Promise<Result>,
+): Promise<Pinnable<Result>> {
+  return { ...(await load(read.reading)), ...read };
 }
 
 /**
@@ -63,11 +110,25 @@ export interface AnalyticsView {
  * Period's income and expense, so they share those promises rather than run them again; Key
  * figures and Profit and loss share what their changes compare with (`loadComparison`). Spending
  * Insights reads its own months: the last complete one and those before it, whatever the Period.
+ *
+ * A pinned section (GLOSSARY: Card Period, ADR-0018; `cardPeriods`, none by default) is read over
+ * its own preset instead, resolved from the same today and first Transaction, so it is cut to the
+ * data like any Period; its result names the reading it was read over. Every Drill-down, pinned or
+ * not, leads back to the page with its Period and every pin (the readings' `page`).
  */
-export async function loadAnalytics(ctx: ServiceContext, period: Period): Promise<AnalyticsView> {
+export async function loadAnalytics(
+  ctx: ServiceContext,
+  period: Period,
+  cardPeriods: CardPeriods = NO_PINS,
+): Promise<AnalyticsView> {
   const today = swissToday();
   const dataStart = await loadDataStart(ctx);
-  const reading = readingOf(period, today, dataStart.firstTransaction);
+  const resolved = readingOf(period, today, dataStart.firstTransaction);
+  const reading: AnalyticsReading = {
+    ...resolved,
+    page: { period: resolved.period, cardPeriods },
+  };
+  const readingFor = sectionReadings(reading, cardPeriods, dataStart.firstTransaction);
   const balances = accountBalances(ctx, today);
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
@@ -83,7 +144,9 @@ export async function loadAnalytics(ctx: ServiceContext, period: Period): Promis
       recentTransactions: recentTransactions(ctx),
       netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
-      spendingByCategory: spendingByCategory(ctx, reading),
+      spendingByCategory: pinnable(readingFor('spending-by-category'), (read) =>
+        spendingByCategory(ctx, read),
+      ),
       profitAndLoss: profitAndLoss(ctx, reading, comparison),
       incomeVsExpense: incomeVsExpense(ctx, reading),
       categoriesPerInterval: categoriesPerInterval(ctx, reading),

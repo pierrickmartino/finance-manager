@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
 import {
   analyticsHref,
+  cardPeriodsFromParams,
   legacyPeriod,
   periodFromParams,
   periodPhrase,
@@ -21,7 +22,7 @@ import {
   SPENDING_BY_CATEGORY,
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
-import { CardSection } from './card-section';
+import { CardSection, PinnableCardSection } from './card-section';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
 import { NET_WORTH, NetWorthSection } from './net-worth';
@@ -37,7 +38,9 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
  * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Period in the URL: a
  * preset's `period`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
  * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
- * its nearest Period. The shell and the Period
+ * its nearest Period. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
+ * parameter each beside the Period (`spending-by-category=<slug>`); a bare visit has none, and a
+ * former link carries none. The shell and the Period
  * control render at once; each section streams in behind its own placeholder and error boundary
  * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
  *
@@ -51,6 +54,7 @@ export default async function AnalyticsPage({
     period?: string | string[];
     from?: string | string[];
     span?: string | string[];
+    [section: string]: string | string[] | undefined;
   }>;
 }) {
   const params = await searchParams;
@@ -59,14 +63,16 @@ export default async function AnalyticsPage({
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
+  const cardPeriods = cardPeriodsFromParams(params);
   const { sections, today, reading, starts } = await loadAnalytics(
     ctx,
     periodFromParams(params, swissToday()),
+    cardPeriods,
   );
   // The effective Period: no Period starts before the first Transaction (a custom date moves to it,
   // a preset keeps its name), and the control shows the start it is read from.
   const { period } = reading;
-  const retryHref = analyticsHref(period);
+  const retryHref = analyticsHref(period, cardPeriods);
 
   return (
     <section className="flex flex-col gap-5">
@@ -82,6 +88,7 @@ export default async function AnalyticsPage({
         phrase={periodPhrase(period, reading)}
         starts={starts}
         today={today}
+        cardPeriods={cardPeriods}
       />
       <div className="grid min-w-0 grid-cols-1 gap-5">
         {/* Key figures: four tiles in a row on wide screens, 2×2 below. */}
@@ -120,8 +127,9 @@ export default async function AnalyticsPage({
             />
           </StreamedSection>
           <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref} isCard>
-            <CardSection
+            <PinnableCardSection
               card={sections.spendingByCategory}
+              section="spending-by-category"
               empty="Nothing to show yet: no expense in these intervals."
             />
           </StreamedSection>

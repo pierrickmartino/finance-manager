@@ -1,5 +1,13 @@
 import { formatPeriod } from '@/lib/format';
-import { readStart, periodGrain, type Period } from '@/lib/analytics/period';
+import {
+  NO_PINS,
+  presetPeriod,
+  readStart,
+  periodGrain,
+  type AnalyticsPage,
+  type Period,
+  type PeriodPreset,
+} from '@/lib/analytics/period';
 import { periodSpan, periodsIn } from '../reporting/periods';
 import type { DateRange, TimeAxis } from '../reporting/query';
 
@@ -20,8 +28,13 @@ export interface AnalyticsInterval {
  * section never reads the Period itself.
  */
 export interface AnalyticsReading {
-  /** How it was chosen: what Analytics' URL and a Drill-down's way back carry. */
+  /** How it was chosen: the page's Period, or a pinned Card's own (GLOSSARY: Card Period). */
   period: Period;
+  /**
+   * The page it is read on: the page's Period and every Card's pin, what Analytics' URL and a
+   * Drill-down's way back carry, whichever Period the reading itself is over.
+   */
+  page: AnalyticsPage;
   /** The first day read. */
   from: string;
   /** The last day read: always today. */
@@ -50,8 +63,10 @@ export function readingOf(
   const from = readStart(period, today, dataStart);
   const grain = periodGrain(from, today);
   const keys = periodsIn({ from, to: today }, grain);
+  const effective: Period = period.kind === 'custom' ? { kind: 'custom', from } : period;
   return {
-    period: period.kind === 'custom' ? { kind: 'custom', from } : period,
+    period: effective,
+    page: { period: effective, cardPeriods: NO_PINS },
     from,
     to: today,
     grain,
@@ -63,4 +78,17 @@ export function readingOf(
       isPartial: index === 0 && periodSpan(key, grain).from < from,
     })),
   };
+}
+
+/**
+ * A pinned Card's reading (GLOSSARY: Card Period): its preset resolved on the page reading's today
+ * and the same first Transaction (`dataStart`), so it is cut to the data like any Period, while
+ * its Drill-downs still lead back to the page it sits on.
+ */
+export function cardReading(
+  page: AnalyticsReading,
+  preset: PeriodPreset,
+  dataStart: string | null = null,
+): AnalyticsReading {
+  return { ...readingOf(presetPeriod(preset), page.to, dataStart), page: page.page };
 }

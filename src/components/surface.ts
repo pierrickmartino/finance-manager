@@ -103,6 +103,11 @@ export const BADGE_CLASS = {
   neutral: `${BADGE_BASE} bg-sunken text-ink-soft`,
 } as const;
 export type BadgeTone = keyof typeof BADGE_CLASS;
+/**
+ * The mark of a Card pinned to its own Card Period on Analytics (GLOSSARY: Card Period): its
+ * preset's name in the accent, beside the Card's title. Only a pinned Card shows it.
+ */
+export const CARD_PERIOD_MARK_CLASS = `${BADGE_BASE} bg-accent-tint text-accent-ink`;
 
 // Buttons --------------------------------------------------------------------------------------
 

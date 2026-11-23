@@ -98,4 +98,54 @@ describe('Drill-down origin', () => {
       expect(originFromParams(params)).toEqual({ kind: 'analytics', period: DEFAULT_PERIOD });
     }
   });
+
+  it('carries every Card Period, prefixed `origin`, and links back to the page with each pin', () => {
+    const origin: DrillOrigin = {
+      kind: 'analytics',
+      period: presetPeriod('rolling-90-days'),
+      cardPeriods: { 'spending-by-category': 'this-year-and-last-2', 'net-worth': 'year-to-date' },
+    };
+    const params = Object.fromEntries(originToParams(origin));
+
+    expect(params).toEqual({
+      origin: 'analytics',
+      originPeriod: 'rolling-90-days',
+      originNetWorth: 'year-to-date',
+      originSpendingByCategory: 'this-year-and-last-2',
+    });
+    expect(originFromParams(params)).toEqual(origin);
+    expect(backLink(originFromParams(params))).toEqual({
+      href: '/analytics?period=rolling-90-days&net-worth=year-to-date&spending-by-category=this-year-and-last-2',
+      label: 'Back to Analytics',
+    });
+  });
+
+  it('keeps pins beside a custom Period on the way back', () => {
+    const params = {
+      origin: 'analytics',
+      originFrom: '2024-03-01',
+      originSpendingByCategory: 'year-to-date',
+    };
+
+    expect(backLink(originFromParams(params)).href).toBe(
+      '/analytics?from=2024-03-01&spending-by-category=year-to-date',
+    );
+  });
+
+  it('drops an unknown, non-pinnable or invalid pin on the way back', () => {
+    const params = {
+      origin: 'analytics',
+      originPeriod: 'year-to-date',
+      originKeyFigures: 'rolling-30-days',
+      originNetCashFlow: 'week',
+      originSpendingByCategory: 'quarter-to-date',
+      spendingByCategory: 'rolling-30-days',
+    };
+
+    expect(originFromParams(params)).toEqual({
+      kind: 'analytics',
+      period: presetPeriod('year-to-date'),
+      cardPeriods: { 'spending-by-category': 'quarter-to-date' },
+    });
+  });
 });

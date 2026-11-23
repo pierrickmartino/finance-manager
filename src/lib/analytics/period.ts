@@ -205,16 +205,78 @@ export function legacyPeriod({ period, span }: LegacyPeriodParams): Period | nul
   return isPeriodPreset(slug) ? presetPeriod(slug) : null;
 }
 
-/** A Period as search parameters: `period` for a preset, `from` for a custom start date. */
-export function periodToParams(period: Period): URLSearchParams {
-  return new URLSearchParams(
-    period.kind === 'preset' ? { period: period.preset } : { from: period.from },
-  );
+/**
+ * The sections of Analytics that can be pinned to their own Card Period (GLOSSARY: Card Period,
+ * ADR-0018), in the page's order, each by the search parameter its pin travels in. The Key
+ * figures, the spending insight, the most recent Transactions and the Account balances have none.
+ */
+export const PINNABLE_SECTIONS = [
+  'net-worth',
+  'net-cash-flow',
+  'spending-by-category',
+  'profit-and-loss',
+  'income-vs-expense',
+  'categories-per-interval',
+] as const;
+
+export type PinnableSection = (typeof PINNABLE_SECTIONS)[number];
+
+/** The Card Periods: each pinned section's Period preset. An unpinned section has no entry. */
+export type CardPeriods = Partial<Readonly<Record<PinnableSection, PeriodPreset>>>;
+
+/** Analytics as its URL reads it: the page's Period and its Cards' pins. */
+export interface AnalyticsPage {
+  period: Period;
+  cardPeriods: CardPeriods;
 }
 
-/** Analytics read over a Period. */
-export function analyticsHref(period: Period): string {
-  return `/analytics?${periodToParams(period)}`;
+/** No pins: every Card follows the page's Period, as on a bare visit. */
+export const NO_PINS: CardPeriods = {};
+
+/** The search parameters the Card Periods are read from: one per pinnable section. */
+export type CardPeriodParams = Readonly<Record<string, string | string[] | undefined>>;
+
+/**
+ * The Card Periods in Analytics' URL: `<section>=<slug>` pins that section to that preset. Any
+ * other parameter, a section that can't be pinned, or a value that is no Period preset is dropped.
+ */
+export function cardPeriodsFromParams(params: CardPeriodParams): CardPeriods {
+  const pins: Partial<Record<PinnableSection, PeriodPreset>> = {};
+  for (const section of PINNABLE_SECTIONS) {
+    const slug = first(params[section]);
+    if (isPeriodPreset(slug)) pins[section] = slug;
+  }
+  return pins;
+}
+
+/** The Card Periods with one section pinned to `preset`, or unpinned ("Same as page") for null. */
+export function withCardPeriod(
+  pins: CardPeriods,
+  section: PinnableSection,
+  preset: PeriodPreset | null,
+): CardPeriods {
+  const { [section]: _dropped, ...others } = pins;
+  return preset === null ? others : { ...others, [section]: preset };
+}
+
+/**
+ * A Period as search parameters, `period` for a preset, `from` for a custom start date, then each
+ * pin by its section, in the page's order. Nothing is dropped: a pin equal to the Period stays.
+ */
+export function periodToParams(period: Period, pins: CardPeriods = NO_PINS): URLSearchParams {
+  const params = new URLSearchParams(
+    period.kind === 'preset' ? { period: period.preset } : { from: period.from },
+  );
+  for (const section of PINNABLE_SECTIONS) {
+    const preset = pins[section];
+    if (preset !== undefined) params.set(section, preset);
+  }
+  return params;
+}
+
+/** Analytics read over a Period, with its Cards' pins. */
+export function analyticsHref(period: Period, pins: CardPeriods = NO_PINS): string {
+  return `/analytics?${periodToParams(period, pins)}`;
 }
 
 /** How a Period was chosen, in words: its preset's name, or Custom. */

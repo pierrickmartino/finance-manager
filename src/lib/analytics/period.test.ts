@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   analyticsHref,
+  cardPeriodsFromParams,
   legacyPeriod,
+  PINNABLE_SECTIONS,
   presetPeriod,
   presetStarts,
   periodCaption,
@@ -145,6 +147,79 @@ describe('the Period in the URL', () => {
     expect(analyticsHref({ kind: 'custom', from: '2024-03-01' })).toBe(
       '/analytics?from=2024-03-01',
     );
+  });
+});
+
+describe('the Card Periods in the URL', () => {
+  /** A URL's search parameters as the page reads them. */
+  const paramsOf = (href: string) =>
+    Object.fromEntries(new URL(href, 'http://localhost').searchParams);
+
+  it('reserves one parameter per pinnable section, named after it', () => {
+    expect(PINNABLE_SECTIONS).toEqual([
+      'net-worth',
+      'net-cash-flow',
+      'spending-by-category',
+      'profit-and-loss',
+      'income-vs-expense',
+      'categories-per-interval',
+    ]);
+  });
+
+  it('round-trips the page Period and its pins through an Analytics link', () => {
+    const pins = {
+      'spending-by-category': 'this-year-and-last-2',
+      'net-worth': 'year-to-date',
+    } as const;
+    const href = analyticsHref(preset('rolling-90-days'), pins);
+
+    expect(href).toBe(
+      '/analytics?period=rolling-90-days&net-worth=year-to-date&spending-by-category=this-year-and-last-2',
+    );
+    const params = paramsOf(href);
+    expect(periodFromParams(params, '2026-11-22')).toEqual(preset('rolling-90-days'));
+    expect(cardPeriodsFromParams(params)).toEqual(pins);
+  });
+
+  it('keeps pins beside a custom page Period', () => {
+    const href = analyticsHref(custom('2024-03-01'), { 'spending-by-category': 'year-to-date' });
+
+    expect(href).toBe('/analytics?from=2024-03-01&spending-by-category=year-to-date');
+    expect(periodFromParams(paramsOf(href), '2026-11-22')).toEqual(custom('2024-03-01'));
+    expect(cardPeriodsFromParams(paramsOf(href))).toEqual({
+      'spending-by-category': 'year-to-date',
+    });
+  });
+
+  it('keeps a pin equal to the page Period: a pick is a pin', () => {
+    const href = analyticsHref(preset('year-to-date'), { 'spending-by-category': 'year-to-date' });
+
+    expect(cardPeriodsFromParams(paramsOf(href))).toEqual({
+      'spending-by-category': 'year-to-date',
+    });
+  });
+
+  it('has no pins on a bare visit', () => {
+    expect(cardPeriodsFromParams({})).toEqual({});
+    expect(analyticsHref(preset('rolling-12-months'), {})).toBe(
+      '/analytics?period=rolling-12-months',
+    );
+  });
+
+  it('drops unknown sections, non-pinnable sections and values that are no Period preset', () => {
+    expect(
+      cardPeriodsFromParams({
+        period: 'year-to-date',
+        from: '2024-03-01',
+        'key-figures': 'year-to-date',
+        'spending-insights': 'year-to-date',
+        nonsense: 'year-to-date',
+        'net-worth': 'week',
+        'net-cash-flow': '',
+        'profit-and-loss': ['quarter-to-date', 'year-to-date'],
+        'spending-by-category': 'custom',
+      }),
+    ).toEqual({ 'profit-and-loss': 'quarter-to-date' });
   });
 });
 

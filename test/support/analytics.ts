@@ -4,7 +4,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { cellFromParams, queryFromParams } from '@/lib/reporting/widget-params';
 import { createAccount, type Account } from '@/server/services/accounts';
 import { createBank } from '@/server/services/banks';
-import type { Period } from '@/lib/analytics/period';
+import { NO_PINS, type CardPeriods, type Period } from '@/lib/analytics/period';
 import { loadAnalytics, type AnalyticsSections } from '@/server/services/analytics';
 import type { ServiceContext } from '@/server/services/context';
 import { listCellTransactions, type CellTransactionPage } from '@/server/services/reporting';
@@ -72,15 +72,17 @@ export async function seedEarlyStart(
 }
 
 /**
- * One section of Analytics over a Period, once every section has loaded: the page starts
- * them all, and none may outlive the test (its database is dropped after it).
+ * One section of Analytics over a Period (and its Cards' pins, none by default), once every
+ * section has loaded: the page starts them all, and none may outlive the test (its database is
+ * dropped after it).
  */
 export async function loadSection<Name extends keyof AnalyticsSections>(
   ctx: ServiceContext,
   period: Period,
   name: Name,
+  pins: CardPeriods = NO_PINS,
 ): Promise<Awaited<AnalyticsSections[Name]>> {
-  const { sections } = await loadAnalytics(ctx, period);
+  const { sections } = await loadAnalytics(ctx, period, pins);
   await Promise.allSettled(Object.values(sections));
   return await sections[name];
 }

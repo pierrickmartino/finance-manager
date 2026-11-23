@@ -52,13 +52,15 @@ interface WidgetCardProps {
   className?: string;
   /** Edit mode's actions on this Widget, at the top of its card. */
   toolbar?: ReactNode;
+  /** Drawn beside the card's title: an Analytics Card's Period mark and dropdown. */
+  titleAside?: ReactNode;
 }
 
 /**
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
+export function WidgetCard({ card, className = '', toolbar, titleAside }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const reading = readCard(card, money);
@@ -69,9 +71,18 @@ export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
     >
       {toolbar}
       <div>
-        <h2 id={`card-${card.id}`} className="font-medium">
-          {card.name}
-        </h2>
+        {titleAside ? (
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <h2 id={`card-${card.id}`} className="font-medium">
+              {card.name}
+            </h2>
+            {titleAside}
+          </div>
+        ) : (
+          <h2 id={`card-${card.id}`} className="font-medium">
+            {card.name}
+          </h2>
+        )}
         {reading.lead && (
           <>
             <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>

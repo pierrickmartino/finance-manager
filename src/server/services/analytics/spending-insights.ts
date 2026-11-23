@@ -39,7 +39,11 @@ const INSIGHT_MONTHS = 12;
  */
 function insightReading(reading: AnalyticsReading): AnalyticsReading {
   const from = monthStart(monthIndex(reading.to) - INSIGHT_MONTHS);
-  return { ...readingOf({ kind: 'custom', from }, reading.to), period: reading.period };
+  return {
+    ...readingOf({ kind: 'custom', from }, reading.to),
+    period: reading.period,
+    page: reading.page,
+  };
 }
 
 /** The Period's income and expense per interval, which the Key figures and Net worth share. */

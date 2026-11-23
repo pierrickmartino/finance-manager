@@ -12,6 +12,7 @@ import {
   type ClassifiedRow,
 } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
+import { presetPeriod } from '@/lib/analytics/period';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 import { readCard } from '@/lib/reporting/card';
@@ -183,5 +184,38 @@ describe('Spending by Category', () => {
     expect(card.isEmpty).toBe(true);
     expect(card.data!.columns).toEqual([]);
     expect(card.data!.rows).toHaveLength(5);
+  });
+
+  it('pinned, ranks the Categories over its own Period, each Drill-down over it and back to the page', async () => {
+    fixToday('2025-03-20');
+    await dataset(['Rent', 'Groceries', 'Books']);
+    const pins = { 'spending-by-category': 'year-to-date' } as const;
+
+    const card = await loadSection(t.ctx, MONTHLY, 'spendingByCategory', pins);
+
+    expect(card.isPinned).toBe(true);
+    expect(card.reading).toMatchObject({
+      period: presetPeriod('year-to-date'),
+      from: '2025-01-01',
+      to: '2025-03-20',
+      grain: 'month',
+    });
+    expect(card.data!.rows.map((row) => row.key)).toEqual(['2025-01', '2025-02', '2025-03']);
+    // Year to date: Rent -1'000.00, Groceries -900.00, Books -300.00 net of its refund.
+    expect(card.data!.total).toBe(-220_000);
+    for (const { value, href } of linkedValues(card.data!)) {
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: MONTHLY, cardPeriods: pins });
+      expect((await openDrill(t.ctx, href)).value).toBe(value);
+    }
+  });
+
+  it('unpinned, reads the page Period and says so', async () => {
+    fixToday('2025-03-20');
+    await dataset(['Rent']);
+
+    const card = await loadSection(t.ctx, MONTHLY, 'spendingByCategory');
+
+    expect(card.isPinned).toBe(false);
+    expect(card.reading).toMatchObject({ period: MONTHLY, from: '2024-03-21' });
   });
 });
