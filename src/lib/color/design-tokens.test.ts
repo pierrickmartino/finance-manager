@@ -10,6 +10,7 @@ import {
   mixSrgb,
   relativeLuminance,
 } from './contrast';
+import { TEXT_ON_RAMP_FILLS, type RampFill, type RampStop } from './ramp-fills';
 
 /*
  * The colour data itself (spec #239, ADR-0017): every token text pair passes AA. The values are
@@ -131,6 +132,37 @@ describe('white text on the deep steps of the ramp', () => {
       const ratio = contrastRatio(text, background);
       expect(ratio, `${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_TEXT);
     });
+  }
+});
+
+describe('text over a ramp gradient passes AA at every step of it', () => {
+  const card = () => token('surface');
+  const seen = (stop: RampStop) => mixSrgb(token(stop.token), card(), stop.alpha);
+
+  /** What a gradient shows at `at` (0–1 along it), laid over the card: stops blend in sRGB. */
+  function seenAt(fill: RampFill, at: number): string {
+    const next = fill.stops.findIndex((stop) => stop.at >= at);
+    const to = fill.stops[next === -1 ? fill.stops.length - 1 : next]!;
+    const from = fill.stops[Math.max(0, (next === -1 ? fill.stops.length : next) - 1)]!;
+    const share = to.at === from.at ? 1 : (at - from.at) / (to.at - from.at);
+    return mixSrgb(seen(to), seen(from), Math.min(1, Math.max(0, share)));
+  }
+
+  const SAMPLES = Array.from({ length: 21 }, (_, i) => i / 20);
+
+  for (const { name, fill, plate, texts } of TEXT_ON_RAMP_FILLS) {
+    for (const text of texts) {
+      it(`${text} on ${name}`, () => {
+        for (const at of SAMPLES) {
+          // A label on an opaque plate reads against the plate, wherever it sits on the fill.
+          const behind = plate ? token(plate) : seenAt(fill, at);
+          const ratio = contrastRatio(token(text), behind);
+          expect(ratio, `at ${at} on ${behind}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+            AA_TEXT,
+          );
+        }
+      });
+    }
   }
 });
 

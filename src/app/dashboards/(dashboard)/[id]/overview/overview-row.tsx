@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useFormatter } from '@/components/formatter-provider';
+import { cssGradient, RAMP_FILLS } from '@/lib/color/ramp-fills';
 import { BADGE_CLASS, HEADLINE_AMOUNT_CLASS, TILE_CLASS } from '@/components/surface';
 import { readCard, type CardFlow, type MonthFlow, type WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
@@ -181,7 +182,8 @@ export function NetWorthCard({
   return (
     <section
       aria-labelledby="overview-headline"
-      className={`${TILE_CLASS} flex flex-col bg-gradient-to-br from-ramp-5/30 to-surface ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
+      className={`${TILE_CLASS} flex flex-col ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
+      style={{ backgroundImage: cssGradient(RAMP_FILLS.netWorthTile) }}
     >
       <h2 id="overview-headline" className="font-medium">
         {headline.label}
