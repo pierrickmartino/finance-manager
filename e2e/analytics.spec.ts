@@ -71,14 +71,16 @@ async function seedGrocery(suffix: number): Promise<string> {
 }
 
 /**
- * An older Transaction on the seeded Account, early in 2021: no Span starts before the first
- * Transaction, so this lets every preset here read from the start it gives.
+ * An older Transaction on a seeded Account (by default seedSalary's), early in 2021: no Span
+ * starts before the first Transaction, so this lets every preset here read from the start it
+ * gives, whatever else the database holds. A test that reads a Span's periods needs it.
  */
-async function seedOldPurchase(suffix: number): Promise<void> {
+async function seedOldPurchase(
+  suffix: number,
+  accountName = `Analytics account ${suffix}`,
+): Promise<void> {
   await withServices(async (ctx) => {
-    const account = (await listAccounts(ctx)).find(
-      (item) => item.name === `Analytics account ${suffix}`,
-    );
+    const account = (await listAccounts(ctx)).find((item) => item.name === accountName);
     await createManualTransaction(ctx, {
       accountId: account!.id,
       bookingDate: '2021-01-05',
@@ -315,6 +317,9 @@ test('Spending Insights judges the last complete month whatever the Span and ope
       await editClassification(ctx, transaction.id, { categoryId: groceries.id });
     }
   });
+  await seedOldPurchase(suffix, `Insights account ${suffix}`);
+  // Income too: the insight reads income against expense, so it needs both.
+  await seedSalary(suffix);
 
   // Rolling 30 days holds no complete month, yet the insight still speaks of the last one.
   await page.goto('/analytics?span=rolling-30-days');
@@ -334,7 +339,9 @@ test('Spending Insights judges the last complete month whatever the Span and ope
 test('on a phone the Span control stays at the top and the heatmap scrolls inside its card', async ({
   page,
 }) => {
-  await seedSalary(Date.now());
+  const suffix = Date.now();
+  await seedSalary(suffix);
+  await seedOldPurchase(suffix);
   // Short, so the page scrolls past the control with one section.
   await page.setViewportSize({ width: 390, height: 420 });
   await page.goto('/analytics');
@@ -362,7 +369,11 @@ test('on a phone the Span control stays at the top and the heatmap scrolls insid
 test("Net worth reads today, with a point at the Span's start, each period end and today, and its change since the start", async ({
   page,
 }) => {
-  await seedSalary(Date.now());
+  const suffix = Date.now();
+  await seedSalary(suffix);
+  // An expense beside the income, so the tile draws its flow (Came in, Went out, Profit).
+  await seedGrocery(suffix);
+  await seedOldPurchase(suffix);
   const netWorth = region(page, 'Your net worth today');
 
   for (const [span, periods, current] of [
@@ -404,6 +415,7 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   const suffix = Date.now();
   const { description } = await seedSalary(suffix);
   const grocery = await seedGrocery(suffix);
+  await seedOldPurchase(suffix);
   const keyFigures = region(page, 'Key figures');
   const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
     keyFigures.getByRole('region', { name, exact: true }),
@@ -530,7 +542,9 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
 test('each Key figure carries a sparkline, hidden from assistive technology, that fits its tile', async ({
   page,
 }) => {
-  await seedSalary(Date.now());
+  const suffix = Date.now();
+  await seedSalary(suffix);
+  await seedOldPurchase(suffix);
   const keyFigures = region(page, 'Key figures');
   const tiles = ['Net worth', 'Income', 'Expense', 'Profit'].map((name) =>
     keyFigures.getByRole('region', { name, exact: true }),
@@ -662,7 +676,9 @@ async function seedPurchase(suffix: number): Promise<{ description: string; grou
 test('Spending by Category ranks the largest Categories and a Category opens its Drill-down', async ({
   page,
 }) => {
-  const { description, group } = await seedPurchase(Date.now());
+  const suffix = Date.now();
+  const { description, group } = await seedPurchase(suffix);
+  await seedOldPurchase(suffix, `Spending account ${suffix}`);
 
   await page.goto('/analytics?span=this-year-and-last-1');
   const section = region(page, 'Spending by Category');
@@ -684,7 +700,9 @@ test('Spending by Category ranks the largest Categories and a Category opens its
 test('Net cash flow has a bar per period, the current one partial, each opening its Drill-down', async ({
   page,
 }) => {
-  const { description } = await seedSalary(Date.now());
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  await seedOldPurchase(suffix);
   const flow = region(page, 'Net cash flow');
   const partial = (label: string) =>
     flow.getByRole('link', { name: new RegExp(`^${label} \\(partial\\): `) });
@@ -772,7 +790,11 @@ async function seedUnconverted(suffix: number): Promise<void> {
 }
 
 test('every section with figures left out for want of an FX rate says so', async ({ page }) => {
-  await seedUnconverted(Date.now());
+  const suffix = Date.now();
+  // Converted figures beside the left-out ones, over a Span reaching back to its start.
+  await seedSalary(suffix);
+  await seedOldPurchase(suffix);
+  await seedUnconverted(suffix);
   await page.goto('/analytics');
   const notes = page.getByText(/left out: no FX rate yet\./);
   const keyFigures = region(page, 'Key figures');
