@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { periodLabel } from '@/lib/analytics/period';
 import type { Formatter } from '@/lib/format';
 import {
   PROFIT_AND_LOSS,
@@ -106,9 +105,8 @@ interface ProfitAndLossSectionProps {
  * the statement reads over its own preset and compares with that preset's Comparison period.
  */
 export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLossSectionProps) {
-  const { rows, reading, isPinned } = await profitAndLoss;
+  const { rows, reading, isPinned, periodName } = await profitAndLoss;
   const hasComparison = rows.some((row) => row.change !== null);
-  const statementPeriod = isPinned ? periodLabel(reading.period) : 'the Period';
   return (
     <SectionCard
       name={PROFIT_AND_LOSS}
@@ -123,7 +121,7 @@ export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLoss
     >
       <table className="w-full max-w-2xl border-collapse text-sm">
         <caption className="sr-only">
-          {PROFIT_AND_LOSS} over {statementPeriod}
+          {PROFIT_AND_LOSS} over {periodName ?? 'the Period'}
         </caption>
         {hasComparison && (
           <thead>

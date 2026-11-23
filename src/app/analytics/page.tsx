@@ -120,20 +120,17 @@ export default async function AnalyticsPage({
             <CardSection
               card={sections.netCashFlow}
               section="net-cash-flow"
-              empty="Nothing to show yet: no Transactions in these intervals."
+              empty="no Transactions"
             />
           </StreamedSection>
           <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref} isCard>
-            <CardSection
-              card={sections.accountBalances}
-              empty="Nothing to show yet: no Accounts."
-            />
+            <CardSection card={sections.accountBalances} empty="no Accounts" />
           </StreamedSection>
           <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref} isCard>
             <CardSection
               card={sections.spendingByCategory}
               section="spending-by-category"
-              empty="Nothing to show yet: no expense in these intervals."
+              empty="no expense"
             />
           </StreamedSection>
         </div>
@@ -145,14 +142,14 @@ export default async function AnalyticsPage({
           <CardSection
             card={sections.incomeVsExpense}
             section="income-vs-expense"
-            empty="Nothing to show yet: no income, expense or Capital in these intervals."
+            empty="no income, expense or Capital"
           />
         </StreamedSection>
         <StreamedSection name={CATEGORIES_PER_INTERVAL} retryHref={retryHref} isCard>
           <CardSection
             card={sections.categoriesPerInterval}
             section="categories-per-interval"
-            empty="Nothing to show yet: no classified Transactions in these intervals."
+            empty="no classified Transactions"
           />
         </StreamedSection>
       </div>

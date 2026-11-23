@@ -224,4 +224,17 @@ describe('Spending by Category', () => {
     expect(card.isPinned).toBe(false);
     expect(card.reading).toMatchObject({ period: MONTHLY, from: '2024-03-21' });
   });
+
+  it('pinned, names its own Period in words for its sentence; unpinned, names none', async () => {
+    fixToday('2025-03-20');
+    await dataset(['Rent']);
+
+    const pinned = await loadSection(t.ctx, MONTHLY, 'spendingByCategory', {
+      'spending-by-category': 'this-year-and-last-1',
+    });
+    const unpinned = await loadSection(t.ctx, MONTHLY, 'spendingByCategory');
+
+    expect(pinned.periodName).toBe('This year and last 1');
+    expect(unpinned.periodName).toBeNull();
+  });
 });

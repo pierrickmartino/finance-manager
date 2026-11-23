@@ -234,6 +234,19 @@ describe('Net cash flow', () => {
     expect(labels(card.data!.rows)).toEqual(['2021', '2022', '2023', '2024', '2025']);
   });
 
+  it('pinned, names its own Period in words for its sentence; unpinned, names none', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const pinned = await loadSection(t.ctx, YEARLY, 'netCashFlow', {
+      'net-cash-flow': 'quarter-to-date',
+    });
+    const unpinned = await loadSection(t.ctx, YEARLY, 'netCashFlow');
+
+    expect(pinned.periodName).toBe('Quarter to date');
+    expect(unpinned.periodName).toBeNull();
+  });
+
   it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');
 

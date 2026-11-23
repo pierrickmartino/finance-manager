@@ -314,6 +314,19 @@ describe('Income vs. expense', () => {
     expect(labels(card.data!.columns)).toEqual(['2021', '2022', '2023', '2024', '2025']);
   });
 
+  it('pinned, names its own Period in words for its sentence; unpinned, names none', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const pinned = await loadSection(t.ctx, YEARLY, 'incomeVsExpense', {
+      'income-vs-expense': 'rolling-90-days',
+    });
+    const unpinned = await loadSection(t.ctx, YEARLY, 'incomeVsExpense');
+
+    expect(pinned.periodName).toBe('Rolling 90 days');
+    expect(unpinned.periodName).toBeNull();
+  });
+
   it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');
 

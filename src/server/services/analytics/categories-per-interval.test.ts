@@ -261,6 +261,19 @@ describe('Categories per interval', () => {
     expect(card.data!.columns).toHaveLength(5);
   });
 
+  it('pinned, names its own Period in words for its sentence; unpinned, names none', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const pinned = await loadSection(t.ctx, QUARTERLY, 'categoriesPerInterval', {
+      'categories-per-interval': 'this-year-and-last-4',
+    });
+    const unpinned = await loadSection(t.ctx, QUARTERLY, 'categoriesPerInterval');
+
+    expect(pinned.periodName).toBe('This year and last 4');
+    expect(unpinned.periodName).toBeNull();
+  });
+
   it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');
     await dataset();

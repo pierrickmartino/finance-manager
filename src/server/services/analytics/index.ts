@@ -1,5 +1,6 @@
 import {
   NO_PINS,
+  PERIOD_PRESET_LABELS,
   presetStarts,
   type CardPeriods,
   type PinnableSection,
@@ -44,6 +45,11 @@ import { cardReading, readingOf, type AnalyticsReading } from './reading';
 export interface SectionReading {
   reading: AnalyticsReading;
   isPinned: boolean;
+  /**
+   * The pinned Period in words, its preset's name ("Year to date"), for wherever the section's
+   * sentence or captions speak of its Period; null while it follows the page's.
+   */
+  periodName: string | null;
 }
 
 /** A pinnable section's result: its figures, and the reading they were read over. */
@@ -87,8 +93,12 @@ function sectionReadings(
   return (section) => {
     const preset = page.page.cardPeriods[section];
     return preset === undefined
-      ? { reading: page, isPinned: false }
-      : { reading: cardReading(page, preset, dataStart), isPinned: true };
+      ? { reading: page, isPinned: false, periodName: null }
+      : {
+          reading: cardReading(page, preset, dataStart),
+          isPinned: true,
+          periodName: PERIOD_PRESET_LABELS[preset],
+        };
   };
 }
 

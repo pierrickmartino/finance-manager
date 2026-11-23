@@ -5,7 +5,10 @@ import { CardPeriod } from './card-period';
 import { SectionCard, SectionEmpty } from './section';
 
 interface CardSectionBase {
-  /** Why there is nothing to show, when nothing the section reports falls in the Period. */
+  /**
+   * What is missing when nothing the section reports falls in its Period ("no expense"): the quiet
+   * line says it of "these intervals", or of a pinned Card's own Period by name.
+   */
   empty: string;
   className?: string;
 }
@@ -29,7 +32,8 @@ type CardSectionProps = CardSectionBase &
  * is read over the reading its result names.
  */
 export async function CardSection({ card, section, empty, className = '' }: CardSectionProps) {
-  const { reading, isPinned, ...loaded }: AnalyticsCard & Partial<SectionReading> = await card;
+  const { reading, isPinned, periodName, ...loaded }: AnalyticsCard & Partial<SectionReading> =
+    await card;
   const titleAside = section && reading && (
     <SectionCardPeriod
       name={loaded.name}
@@ -49,14 +53,17 @@ export async function CardSection({ card, section, empty, className = '' }: Card
           counted: loaded.source === 'account_balances' ? 'Account' : 'Transaction',
         }}
       >
-        <SectionEmpty>{empty}</SectionEmpty>
+        <SectionEmpty>
+          Nothing to show yet: {empty}
+          {section && (periodName ? ` over ${periodName}` : ' in these intervals')}.
+        </SectionEmpty>
       </SectionCard>
     );
   }
   return <WidgetCard card={loaded} className={`min-w-0 ${className}`} titleAside={titleAside} />;
 }
 
-interface SectionCardPeriodProps extends SectionReading {
+interface SectionCardPeriodProps extends Pick<SectionReading, 'reading' | 'isPinned'> {
   /** The section's name, which names its dropdown. */
   name: string;
   section: PinnableSection;
