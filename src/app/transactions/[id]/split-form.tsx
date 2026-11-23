@@ -208,7 +208,8 @@ function SplitLineFields({
       <span className="col-span-2 flex items-center gap-1.5 text-xs text-muted md:col-span-1">
         <span
           aria-hidden="true"
-          className={`h-2.5 w-2.5 shrink-0 rounded-full ${lineColor(index)}`}
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: lineColor(index) }}
         />
         <span>
           <span className="md:sr-only">Line </span>

@@ -20,7 +20,7 @@ export function DashboardTabs({
           href={`/dashboards/${dashboard.id}`}
           aria-current={dashboard.id === currentId ? 'page' : undefined}
           className={`rounded-md px-3 py-1 ${
-            dashboard.id === currentId ? 'bg-ink text-white' : 'text-ink-soft hover:bg-sunken'
+            dashboard.id === currentId ? 'bg-ink text-on-ink' : 'text-ink-soft hover:bg-sunken'
           }`}
         >
           {dashboard.name}

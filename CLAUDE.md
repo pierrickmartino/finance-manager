@@ -14,4 +14,4 @@ Single-context: one root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain
 
 ### Design system
 
-Styling any page or component: read `docs/design-system.md` first, then style with its tokens and the `src/components/surface.ts` primitives. The app is light only.
+Styling any page or component: read `docs/design-system.md` first, then style with its tokens and the `src/components/surface.ts` primitives. The app is dark only (ADR-0017).

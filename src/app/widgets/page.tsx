@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getServiceContext } from '@/server/app-context';
 import { listDashboards } from '@/server/services/dashboards';
 import { AXIS_LABELS, listWidgets, MEASURE_LABELS } from '@/server/services/reporting';
-import { PAGE_TITLE_CLASS } from '@/components/surface';
+import { PAGE_TITLE_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/surface';
 
 export const metadata: Metadata = { title: 'Widgets · Finance Manager' };
 
@@ -18,10 +18,7 @@ export default async function WidgetsPage() {
     <section className="flex flex-col gap-6">
       <div className="flex items-baseline justify-between gap-3">
         <h1 className={PAGE_TITLE_CLASS}>Widgets</h1>
-        <Link
-          href="/widgets/new"
-          className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-white hover:bg-ink-hover"
-        >
+        <Link href="/widgets/new" className={PRIMARY_BUTTON_CLASS}>
           New Widget
         </Link>
       </div>

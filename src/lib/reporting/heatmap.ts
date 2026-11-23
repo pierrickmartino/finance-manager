@@ -3,23 +3,33 @@ import type { ChartSource, RowTree } from './chart-data';
 
 /**
  * A table Widget on its Dashboard card: the engine's rows × columns grid as a heatmap, each
- * cell shaded by its size against the largest cell (ADR-0009's navy). Rows run largest total
+ * cell shaded by its size against the largest cell (ADR-0009, now in the ramp). Rows run largest total
  * first; every cell keeps its drill-down link. The component only draws what this returns.
  */
 
+/** The token the shades are mixed from, into the card's `surface`. */
+export const HEAT_HUE = 'ramp-3' as const;
+
+/** The token of the running period's dashed outline, drawn just outside its cells. */
+export const HEAT_PARTIAL_OUTLINE = 'ramp-1' as const;
+
+/** The token a level's number is written in: near-white `ink`, or navy `paper`. */
+export type HeatText = 'ink' | 'paper';
+
 /**
- * The shades, lightest first: how much of `hero-mid` is mixed into the card's white. Stepped,
- * not continuous, so the text on each shade passes AA: ink up to the fourth step (≥ 4.6:1),
- * white from the fifth (≥ 5.3:1). Between those two a continuous shade would fail both.
+ * The shades, quietest first: how much of `HEAT_HUE` is mixed into the dark card, so the
+ * largest cell is the brightest. Stepped, not continuous, so the number on each shade passes
+ * AA: `ink` on the first five (≥ 5.0:1), navy `paper` on the full hue (5.1:1). Between those
+ * two a continuous shade would fail both. Checked by src/lib/color/design-tokens.test.ts.
  */
-export const HEAT_LEVELS = [
-  { mix: 8, isDark: false },
-  { mix: 25, isDark: false },
-  { mix: 42, isDark: false },
-  { mix: 60, isDark: false },
-  { mix: 80, isDark: true },
-  { mix: 100, isDark: true },
-] as const;
+export const HEAT_LEVELS: readonly { mix: number; text: HeatText }[] = [
+  { mix: 8, text: 'ink' },
+  { mix: 24, text: 'ink' },
+  { mix: 40, text: 'ink' },
+  { mix: 56, text: 'ink' },
+  { mix: 72, text: 'ink' },
+  { mix: 100, text: 'paper' },
+];
 
 export interface HeatmapColumn {
   /** Short, for the narrow column head: "Oct" for "Oct 2026". */

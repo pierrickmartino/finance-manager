@@ -71,6 +71,14 @@ function tooltipStyle(palette: ChartPalette) {
   };
 }
 
+/** The legend: a swatch per series in its colour, its name in a text token, never the series colour. */
+function legendProps(palette: ChartPalette) {
+  return {
+    wrapperStyle: { fontSize: 12 },
+    formatter: (value: string) => <span style={{ color: palette.text }}>{value}</span>,
+  };
+}
+
 interface ChartProps {
   data: ChartSource;
   title: string;
@@ -92,9 +100,7 @@ export function LineWidgetChart({ data, title }: ChartProps) {
           <YAxis tickFormatter={format.tick} width={72} {...axisProps(palette)} />
           <ReferenceLine y={0} stroke={palette.text} strokeOpacity={0.4} />
           <Tooltip formatter={(value) => format.value(Number(value))} {...tooltipStyle(palette)} />
-          {chart.series.length > 1 && (
-            <Legend wrapperStyle={{ fontSize: 12, color: palette.text }} />
-          )}
+          {chart.series.length > 1 && <Legend {...legendProps(palette)} />}
           {chart.series.map((series) => (
             <Line
               key={series.key}
@@ -159,9 +165,7 @@ export function StackedBarWidgetChart({ data, title }: ChartProps) {
             cursor={{ fill: palette.grid, fillOpacity: 0.4 }}
             {...tooltipStyle(palette)}
           />
-          {chart.series.length > 1 && (
-            <Legend wrapperStyle={{ fontSize: 12, color: palette.text }} />
-          )}
+          {chart.series.length > 1 && <Legend {...legendProps(palette)} />}
           {chart.series.map((series) => (
             <Bar
               key={series.key}
@@ -284,7 +288,7 @@ export function SingleNumberWidget({ data, title }: ChartProps) {
   return (
     <div className="flex h-full flex-col justify-center">
       {value === null ? (
-        <span className="text-3xl text-faint">—</span>
+        <span className="text-3xl text-muted">—</span>
       ) : (
         <Link
           href={href}

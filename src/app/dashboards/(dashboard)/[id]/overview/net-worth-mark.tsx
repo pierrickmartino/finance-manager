@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
+import { gradientFill, RampGradient, useRampGradientIds } from '@/components/ramp-gradient';
+import { cssGradient, PLOT_LABEL, RAMP_FILLS, type RampFill } from '@/lib/color/ramp-fills';
 import type { LineMarker, NetWorthBand, PeriodValue } from '@/lib/reporting/card';
 import {
   alongLine,
@@ -17,29 +19,31 @@ import type { AccountKind } from '@/server/services/accounts/input';
 
 /**
  * The Net worth card's mark (docs/design-system.md, "Charts"): a band per account kind,
- * current, savings and 3a stacked above zero and loans below, under the navy Net worth line.
- * capital movements sit on the line as amber diamonds. Amounts in minor units, shown in CHF.
+ * current, savings and 3a stacked above zero and loans below, under the near-white Net worth
+ * line and the area under it. The bands above zero and the area are ramp gradients (fills
+ * only); the line, its points and its label stay flat. Capital movements sit on the line as diamonds in the cyan accent, the point of the
+ * chart. Amounts in minor units, shown in CHF.
  */
 
 type Money = (minor: number) => string;
 
-/** A band's fill, its hover dot and its legend swatch. */
-interface BandTone {
-  fill: string;
-  dot: string;
-  swatch: string;
-}
+/**
+ * A band's fill, its hover dot and its legend swatch: a ramp gradient filling both band and
+ * swatch, or, for debt, flat classes.
+ */
+type BandTone = { dot: string } & ({ gradient: RampFill } | { fill: string; swatch: string });
 
-/** Each kind's tone; a loan, below zero, is debt. */
+/** Each kind's tone; a loan, below zero, is debt, so `negative` and never the ramp. */
 const BAND_TONES: Record<AccountKind, BandTone> = {
-  current: { fill: 'fill-hero-mid', dot: 'bg-hero-mid', swatch: 'bg-hero-mid' },
-  savings: { fill: 'fill-hero-glow', dot: 'bg-hero-glow', swatch: 'bg-hero-glow' },
-  '3a': { fill: 'fill-hero-mist', dot: 'bg-hero-mist', swatch: 'bg-hero-mist' },
-  loan: { fill: 'fill-negative-tint', dot: 'bg-negative', swatch: 'bg-negative-tint' },
+  current: { gradient: RAMP_FILLS.currentBand, dot: 'bg-ramp-2' },
+  savings: { gradient: RAMP_FILLS.savingsBand, dot: 'bg-ramp-4' },
+  '3a': { gradient: RAMP_FILLS.pillarBand, dot: 'bg-ramp-5' },
+  loan: { fill: 'fill-negative/45', swatch: 'bg-negative/45', dot: 'bg-negative' },
 };
 
-/** The bands' fill opacity: a touch translucent, so they sit back behind the Net worth line. */
-const BAND_FILL_OPACITY = 0.85;
+/** The value label's plate and text, the pair `design-tokens.test.ts` checks over the bands. */
+const LABEL_TONE =
+  'bg-ink text-paper' satisfies `bg-${typeof PLOT_LABEL.plate} text-${typeof PLOT_LABEL.text}`;
 
 /** A loan is tracked by Balance snapshots: it holds flat until the next point, then steps. */
 const isStepped = (band: NetWorthBand): boolean => band.key === 'loan';
@@ -51,8 +55,13 @@ interface PlotProps {
   scale: Scale;
 }
 
-/** The drawing under the links: the bands, the zero line and the Net worth line. */
+/**
+ * The drawing under the links: the area under the Net worth line (seen where no band covers
+ * it), the bands, the zero line and the line itself.
+ */
 function NetWorthPlot({ points, bands, stacks, scale }: PlotProps) {
+  const idOf = useRampGradientIds();
+  const line = points.map((point, i) => `${scale.x(i)},${scale.y(point.value)}`);
   return (
     <svg
       viewBox="0 0 100 100"
@@ -60,14 +69,35 @@ function NetWorthPlot({ points, bands, stacks, scale }: PlotProps) {
       className="absolute inset-0 h-full w-full overflow-visible"
       aria-hidden
     >
-      {bands.map((band, b) => (
+      <defs>
+        <RampGradient id={idOf('area')} fill={RAMP_FILLS.netWorthArea} />
+        {bands.map((band) => {
+          const tone = BAND_TONES[band.key];
+          return (
+            'gradient' in tone && (
+              <RampGradient key={band.key} id={idOf(band.key)} fill={tone.gradient} />
+            )
+          );
+        })}
+      </defs>
+      {points.length > 1 && (
         <path
-          key={band.key}
-          d={bandPath(stacks[b]!, isStepped(band), scale)}
-          className={BAND_TONES[band.key].fill}
-          fillOpacity={BAND_FILL_OPACITY}
+          d={`M${scale.x(0)},${scale.y(0)} L${line.join(' L')} L${scale.x(points.length - 1)},${scale.y(0)} Z`}
+          fill={gradientFill(idOf('area'))}
         />
-      ))}
+      )}
+      {bands.map((band, b) => {
+        const tone = BAND_TONES[band.key];
+        return (
+          <path
+            key={band.key}
+            d={bandPath(stacks[b]!, isStepped(band), scale)}
+            {...('gradient' in tone
+              ? { fill: gradientFill(idOf(band.key)) }
+              : { className: tone.fill })}
+          />
+        );
+      })}
       <line
         x1={0}
         x2={100}
@@ -78,9 +108,9 @@ function NetWorthPlot({ points, bands, stacks, scale }: PlotProps) {
         vectorEffect="non-scaling-stroke"
       />
       <polyline
-        points={points.map((point, i) => `${scale.x(i)},${scale.y(point.value)}`).join(' ')}
+        points={line.join(' ')}
         fill="none"
-        className="stroke-hero-deep"
+        className="stroke-ink"
         strokeWidth={2}
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
@@ -148,14 +178,14 @@ function PointDots({ points, scale, money }: PointDotsProps) {
     >
       {i === latest && (
         <span
-          className={`absolute -top-2 -translate-y-full ${LABEL_SIDE_CLASS[labelSide(scale.x(i))]} rounded-lg bg-ink px-2 py-1 text-xs whitespace-nowrap text-paper`}
+          className={`absolute -top-2 -translate-y-full ${LABEL_SIDE_CLASS[labelSide(scale.x(i))]} rounded-lg px-2 py-1 text-xs whitespace-nowrap ${LABEL_TONE}`}
         >
           {money(point.value)}
         </span>
       )}
       <span
-        className={`h-2.5 w-2.5 rounded-full border-2 border-hero-deep group-hover:scale-125 ${
-          point.isPartial ? 'bg-surface' : 'bg-hero-deep'
+        className={`h-2.5 w-2.5 rounded-full border-2 border-ink group-hover:scale-125 ${
+          point.isPartial ? 'bg-surface' : 'bg-ink'
         }`}
       />
     </Link>
@@ -169,7 +199,7 @@ interface CapitalMarkerLinkProps {
   y: number;
 }
 
-/** A capital movement on the line: an amber diamond that opens its Transaction. */
+/** A capital movement on the line: a diamond in the accent that opens its Transaction. */
 function CapitalMarkerLink({ marker, x, y }: CapitalMarkerLinkProps) {
   return (
     <Link
@@ -179,8 +209,17 @@ function CapitalMarkerLink({ marker, x, y }: CapitalMarkerLinkProps) {
       className="group absolute z-10 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
       style={{ left: `${x}%`, top: `${y}%` }}
     >
-      <span className="h-2.5 w-2.5 rotate-45 border border-accent-ink bg-accent group-hover:scale-125" />
+      <span className="h-2.5 w-2.5 rotate-45 border border-paper bg-accent group-hover:scale-125" />
     </Link>
+  );
+}
+
+/** A band's legend swatch: its gradient, or its flat tone. */
+function Swatch({ tone }: { tone: BandTone }) {
+  return 'gradient' in tone ? (
+    <span className="h-2 w-2 rounded-sm" style={{ backgroundImage: cssGradient(tone.gradient) }} />
+  ) : (
+    <span className={`h-2 w-2 rounded-sm ${tone.swatch}`} />
   );
 }
 
@@ -198,7 +237,7 @@ function NetWorthLegend({ points, bands }: Pick<PlotProps, 'points' | 'bands'>) 
         <figcaption className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted" aria-hidden>
           {bands.map((band) => (
             <span key={band.key} className="flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-sm ${BAND_TONES[band.key].swatch}`} />
+              <Swatch tone={BAND_TONES[band.key]} />
               {band.label}
             </span>
           ))}

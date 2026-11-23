@@ -2,53 +2,60 @@
 
 /*
  * Finance Manager design system: the Dashboard Story's style, app-wide (docs/design-system.md).
- * "Midnight": ink and one amber accent on cool paper under a navy hero; Inter for everything,
- * Inter Tight for display; small radii. Light only, by choice: no dark theme, whatever the
- * system setting.
+ * Dark only, by choice (ADR-0017): a deep navy page, light ink and one cyan accent; Inter for
+ * everything, Inter Tight for display; small radii. No light theme, whatever the system setting.
  *
  * Tokens become Tailwind utilities: bg-paper, text-ink, border-rule, text-accent-ink, font-display…
  * Use these, never raw palette classes (zinc-*, emerald-*…), so the look stays in one place.
+ * Every text pair is checked for AA by src/lib/color/design-tokens.test.ts.
  */
 @theme {
   /* Neutrals: the page, what sits on it, and the ink written on both. */
-  --color-paper: #f7f8fa; /* page background */
-  --color-surface: #ffffff; /* cards, inputs, menus */
-  --color-sunken: #eef1f5; /* hover, selected rows, tracks; also behind the page panel */
-  --color-rule: #e1e5ec; /* borders and dividers */
-  --color-rule-strong: #cdd3dd; /* control borders */
-  --color-faint: #a1a9b8; /* placeholders, disabled, decorative marks (not body text) */
-  --color-muted: #66708a; /* secondary text: labels, hints, metadata (AA on paper and sunken) */
-  --color-ink-soft: #46506a; /* tertiary headings, quiet controls */
-  --color-ink: #141a2b; /* text and primary buttons */
-  --color-ink-hover: #2c3550; /* primary button hover */
+  --color-paper: #0a1020; /* page background: deep navy */
+  --color-surface: #111a2e; /* cards, inputs, menus: a step up from the page */
+  --color-sunken: #18233b; /* hover, selected rows, tracks, quiet fills */
+  --color-rule: #243150; /* borders and dividers */
+  --color-rule-strong: #3a4a72; /* control borders */
+  --color-faint: #56647f; /* placeholders, disabled, decorative marks (not body text) */
+  --color-muted: #94a1bd; /* secondary text: labels, hints, metadata (AA on paper, surface, sunken) */
+  --color-ink-soft: #c3cbdc; /* tertiary headings, quiet controls */
+  --color-ink: #eef2f8; /* text, and the primary button's near-white fill */
+  --color-ink-hover: #cfd8e8; /* primary button hover */
 
-  /* The accent: amber. The fill is too light for text or controls on white (2:1): use it on the
-     hero and for marks only. accent-ink is for text, links, the focus ring and controls. */
-  --color-accent: #f5a623;
-  --color-accent-ink: #9a5b00; /* AA on paper, surface and accent-tint */
-  --color-accent-tint: #fff5e3; /* selected navigation, highlighted rows */
+  /* The accent: cyan, the one colour that marks what is selected, focused or the point of a
+     chart. accent is the fill (the brand dot, marks); accent-ink is for text, links, the focus
+     ring and controls such as an on toggle: AA on paper, surface, sunken and accent-tint. */
+  --color-accent: #22d3ee;
+  --color-accent-ink: #4cdcf0;
+  --color-accent-tint: #0e3343; /* selected navigation, highlighted rows */
 
-  /* The hero: the navy band at the top of every signed-in page. Atmosphere only, never meaning:
-     the accent stays amber. */
-  --color-hero-deep: #0a1630;
-  --color-hero: #13254d; /* also text on the hero's white buttons (AA) */
-  --color-hero-mid: #284a8a;
-  --color-hero-glow: #4f78c4;
-  --color-hero-mist: #b7c7e6;
-  --color-on-hero: #ffffff; /* text and outlines on the hero */
+  /* The ramp: five flat steps from sky blue through blue to violet, ramp-1 first. Atmosphere
+     only, never meaning (cyan as the accent alone marks a state), so every step stays clearly
+     apart from the accent (ΔE ≥ 15): the marks of the Dashboard's and Analytics' cards, the
+     heatmap, the Net worth bands, the sparklines and the page and tile glows. */
+  --color-ramp-1: #44b2ff;
+  --color-ramp-2: #3b9cff;
+  --color-ramp-3: #4f7cff;
+  --color-ramp-4: #7a68ff;
+  --color-ramp-5: #a06bff;
+  --color-on-ramp: #ffffff; /* the bar's text and translucent fills; text on the dark ramp shades */
+  --color-on-ink: var(--color-paper); /* text on an ink fill: selected list items, Dashboard tabs */
+  /* The insight tile: a deep, flat step of the ramp's violet, so white text and its translucent
+     marks pass AA on it (on-ramp/60 ≥ 4.5:1), as glass (glass-insight) and opaque. */
+  --color-insight: color-mix(in srgb, var(--color-ramp-4) 40%, var(--color-surface));
 
-  /* Meaning, kept apart from the accent: never use these for decoration. */
-  --color-positive: #047857;
-  --color-positive-tint: #ecfdf5;
-  --color-negative: #be123c;
-  --color-negative-tint: #fff1f2;
-  /* Warning is terracotta, a red-orange well apart from the amber accent, so attention never
-     reads as a link or a selection. AA on surface (5.2:1) and on its tint (4.8:1). */
-  --color-warning: #c2410c;
-  --color-warning-tint: #fff4ed;
-  --color-warning-rule: #fdba74;
-  --color-info: #0369a1;
-  --color-info-tint: #f0f9ff;
+  /* Meaning, kept apart from the accent: never use these for decoration. positive is a
+     yellowish green, clear of teal and cyan; warning an orange, well apart from the cyan accent
+     so attention never reads as a link or a selection. */
+  --color-positive: #a3d94e;
+  --color-positive-tint: #1b2e17;
+  --color-negative: #ff7a8a;
+  --color-negative-tint: #3a1825;
+  --color-warning: #ff9d5c;
+  --color-warning-tint: #36210f;
+  --color-warning-rule: #8a4b1f;
+  --color-info: #9aa9ff;
+  --color-info-tint: #1c2350;
 
   /* Type: Inter for everything, Inter Tight for display (page titles, headline amounts). The
      font files come from next/font in the root layout, which sets --font-inter and
@@ -67,7 +74,7 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
   /*
    * Navigation motion (ADR-0012): how long a route navigation's view transition takes, and
@@ -75,6 +82,46 @@
    */
   --motion-duration-nav: 250ms;
   --motion-ease-nav: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /*
+   * Glass (ADR-0017): how much of a container's fill shows (the rest is the blurred page
+   * behind it), the blur itself, and the page's fixed glow. Plain variables, so the fallback
+   * below turns all of it off in one place.
+   */
+  --glass-opacity: 70%;
+  --glass-blur: blur(18px) saturate(140%);
+  --page-glow:
+    radial-gradient(
+      48rem 32rem at 88% -6rem,
+      color-mix(in srgb, var(--color-ramp-1) 11%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44rem 36rem at -6rem 100%,
+      color-mix(in srgb, var(--color-ramp-5) 10%, transparent),
+      transparent 70%
+    );
+}
+
+/*
+ * The opaque fallback: under reduced transparency, or where backdrop-filter is unsupported,
+ * every container's fill is opaque, nothing blurs and the page glow is not drawn. One rule,
+ * like reduced motion's; the two blocks say the same.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-opacity: 100%;
+    --glass-blur: none;
+    --page-glow: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-opacity: 100%;
+    --glass-blur: none;
+    --page-glow: none;
+  }
 }
 
 /* Every view transition defaults to the navigation motion; a named element may override it. */
@@ -94,43 +141,60 @@
   }
 }
 
-/* The hero's backdrop: deep navy at the top, lit from the top right, fading into the page. */
-@utility bg-hero {
-  background:
-    radial-gradient(120% 90% at 85% 10%, var(--color-hero-glow) 0%, transparent 55%),
-    radial-gradient(90% 120% at 0% 0%, var(--color-hero-deep) 0%, transparent 100%),
-    linear-gradient(
-      180deg,
-      var(--color-hero) 0%,
-      var(--color-hero-mid) 38%,
-      var(--color-hero-mist) 72%,
-      transparent 100%
-    );
-  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+/* Recent activity's spotlight, and its hover: deep, flat steps of the ramp's blue, under white
+   text (on-ramp/75 ≥ 5.4:1). */
+@utility bg-spotlight {
+  background-color: color-mix(in srgb, var(--color-ramp-3) 35%, var(--color-surface));
 }
 
-/* The Dashboard's insight card: the hero's navy, lit from the lower right. */
-@utility bg-insight {
-  background:
-    radial-gradient(120% 120% at 100% 100%, var(--color-hero-mist) 0%, transparent 45%),
-    radial-gradient(90% 90% at 70% 60%, var(--color-hero-deep) 0%, transparent 70%),
-    linear-gradient(135deg, var(--color-hero-mid), var(--color-hero-deep));
+@utility bg-spotlight-strong {
+  background-color: color-mix(in srgb, var(--color-ramp-3) 45%, var(--color-surface));
 }
 
-/* The period a Dashboard card points out (the latest full month): hatched navy. */
+/* The period a Dashboard card points out (the latest full month): hatched in the ramp. */
 @utility bg-hatch {
   background: repeating-linear-gradient(
     135deg,
-    var(--color-hero-deep) 0 3px,
-    var(--color-hero-glow) 3px 6px
+    var(--color-ramp-1) 0 3px,
+    var(--color-ramp-4) 3px 6px
   );
+}
+
+/*
+ * Glass, for containers only (cards, tiles, popovers, the dock, notices): a fill of the named
+ * colour that lets the blurred page show through (`glass-surface`, `glass-warning-tint`…).
+ * Opaque under the fallback above. Inputs, rows, badges and buttons stay solid.
+ */
+@utility glass-* {
+  background-color: color-mix(in srgb, --value(--color-*) var(--glass-opacity), transparent);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* The Dashboard's and Analytics' tiles only: a soft inner glow in the ramp's first step under a
+   small shadow. Atmosphere, so the ramp, never the accent (which marks a state). */
+@utility tile-glow {
+  box-shadow:
+    inset 0 0 2.5rem -0.75rem color-mix(in srgb, var(--color-ramp-1) 22%, transparent),
+    inset 0 1px 0 0 color-mix(in srgb, var(--color-ramp-1) 12%, transparent),
+    0 1px 3px 0 rgb(0 0 0 / 0.25);
 }
 
 body {
   @apply bg-paper text-ink antialiased;
 }
 
-/* One visible focus style everywhere, in the accent's ink (the fill is too light on white). */
+/* The page glow: drawn on the page behind everything, fixed, so it never moves on scroll. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--page-glow);
+}
+
+/* One visible focus style everywhere, in the accent's ink (AA on every dark surface). */
 :focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;

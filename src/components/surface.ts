@@ -21,47 +21,70 @@ export const TILE_AMOUNT_CLASS =
 
 // Surfaces -------------------------------------------------------------------------------------
 
+/**
+ * Glass, for containers only (ADR-0017): a translucent `surface` fill that blurs the page and
+ * its glow behind it, inside a thin luminous border. The card, tile, popover, dock and notice
+ * primitives use it; inputs, table rows, badges and buttons stay solid. Under reduced
+ * transparency, or without backdrop-filter, the fill is opaque (one rule in globals.css).
+ */
+export const GLASS_CLASS = 'border border-ink/12 glass-surface';
+/** GLASS_CLASS's thin luminous border alone, for glass of another fill (the insight tile). */
+const GLASS_BORDER_CLASS = 'border border-ink/12';
+/**
+ * The soft cyan inner glow of the Dashboard's and Analytics' tiles (with their small shadow),
+ * so the cards read for insight stand out from working lists. Tiles only: TILE_CLASS has it.
+ */
+export const TILE_GLOW_CLASS = 'tile-glow';
+
 /** A separate object on the page: a list, a detail panel, a Widget. Use by role, not for every block. */
-export const CARD_CLASS = 'rounded-xl border border-rule bg-surface shadow-sm';
+export const CARD_CLASS = `rounded-xl ${GLASS_CLASS} shadow-sm`;
 /**
  * A notice that asks for attention (stale FX rates, a Balance snapshot mismatch): warning text
- * on the warning tint, inside a warning rule. Give the element `role="alert"`.
+ * on warning-tint glass, inside a warning rule. Give the element `role="alert"`.
  */
 export const WARNING_NOTICE_CLASS =
-  'rounded-md border border-warning-rule bg-warning-tint px-3 py-2 text-warning';
+  'rounded-md border border-warning-rule glass-warning-tint px-3 py-2 text-warning';
 /**
  * A quiet notice about the view's own state, which asks for nothing (all N on this page are
- * selected): soft ink on a sunken fill. Not an alert: attention takes WARNING_NOTICE_CLASS.
+ * selected): soft ink on sunken glass. Not an alert: attention takes WARNING_NOTICE_CLASS.
  */
-export const INFO_NOTICE_CLASS = 'rounded-lg bg-sunken px-3 py-2 text-sm text-ink-soft';
+export const INFO_NOTICE_CLASS =
+  'rounded-lg border border-ink/12 glass-sunken px-3 py-2 text-sm text-ink-soft';
 /**
- * A dark toolbar floating over the page's bottom edge while something is selected (the
- * Transactions list's Bulk edit dock). Ink, so it reads as a tool above the page, not part of it.
+ * A glass toolbar floating over the page's bottom edge while something is selected (the
+ * Transactions list's Bulk edit dock): ringed in cyan above a deep shadow, so it reads as a
+ * tool above the page, not part of it.
  */
-export const DOCK_CLASS = 'rounded-xl bg-ink p-1.5 text-sm text-paper shadow-2xl';
+export const DOCK_CLASS =
+  'rounded-xl border border-accent/60 glass-surface p-1.5 text-sm text-ink shadow-2xl';
 /**
- * An action on DOCK_CLASS: paper text, a translucent paper fill on hover or while its popover
- * is open (`aria-expanded`), and the accent fill as its focus ring (accent-ink fails on ink).
+ * An action on DOCK_CLASS: ink text, a translucent ink fill on hover or while its popover is
+ * open (`aria-expanded`), and the global accent-ink focus ring, which passes on the dock.
  */
 export const DOCK_BUTTON_CLASS =
-  'flex items-center gap-2 rounded-md px-3 py-1.5 font-medium hover:bg-paper/10 aria-expanded:bg-paper/15 focus-visible:outline-accent disabled:opacity-50';
+  'flex items-center gap-2 rounded-md px-3 py-1.5 font-medium hover:bg-ink/10 aria-expanded:bg-ink/15 disabled:opacity-50';
 /** A popover over the page: a menu or picker opened from a toolbar or the dock. */
-export const POPOVER_CLASS = 'rounded-xl border border-rule bg-surface p-2 text-ink shadow-xl';
+export const POPOVER_CLASS = `rounded-xl ${GLASS_CLASS} p-2 text-ink shadow-xl`;
 /**
  * One tile of a row of exclusive choices (the Widget editor's source and visualisation): a
  * bordered surface, the chosen one ringed in ink. A link tile is chosen by
  * `aria-current="page"`, a `<label>` tile by its checked radio, which shows its focus ring.
  */
 export const CHOICE_TILE_CLASS =
-  'rounded-md border border-rule-strong bg-surface hover:border-faint aria-[current=page]:border-ink aria-[current=page]:ring-2 aria-[current=page]:ring-ink has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-info';
+  'rounded-md border border-rule-strong bg-surface hover:border-faint aria-[current=page]:border-ink aria-[current=page]:ring-2 aria-[current=page]:ring-ink has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent-ink';
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
-export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
+export const TILE_CLASS = `rounded-3xl ${GLASS_CLASS} ${TILE_GLOW_CLASS} p-5`;
+/**
+ * The insight tile (the Dashboard's and Analytics' spending insight): TILE_CLASS in the ramp's
+ * deep violet (`insight`) instead of `surface`, glass with the glow, under white `on-ramp` text.
+ */
+export const INSIGHT_TILE_CLASS = `rounded-3xl ${GLASS_BORDER_CLASS} glass-insight ${TILE_GLOW_CLASS} p-6 text-on-ramp`;
 
 /**
  * A quiet block standing in for content still loading (a card's chart, a line of text): a
- * sunken fill that pulses gently, still under reduced motion. Decorative: mark its container busy.
+ * `rule` fill that pulses gently, still under reduced motion. Decorative: mark its container busy.
  */
-export const PLACEHOLDER_CLASS = 'rounded-md bg-sunken motion-safe:animate-pulse';
+export const PLACEHOLDER_CLASS = 'rounded-md bg-rule motion-safe:animate-pulse';
 
 const BADGE_BASE = 'rounded-md px-2 py-0.5 text-xs font-medium';
 /**
@@ -77,15 +100,15 @@ export type BadgeTone = keyof typeof BADGE_CLASS;
 
 // Buttons --------------------------------------------------------------------------------------
 
-/** The page's main action. One per view where possible. */
+/** The page's main action, one per view where possible: a near-white ink fill under navy text. */
 export const PRIMARY_BUTTON_CLASS =
   'rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink-hover disabled:opacity-50';
 /**
  * The main action of the Dashboard Story's own views (Done in Edit mode, Save in the Widget
- * editor): the accent, darkened for AA, under paper text.
+ * editor): a cyan fill under navy text.
  */
 export const ACCENT_BUTTON_CLASS =
-  'rounded-md bg-accent-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink disabled:opacity-50';
+  'rounded-md bg-accent-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-accent disabled:opacity-50';
 /** Any other action; also links styled as buttons. */
 export const SECONDARY_BUTTON_CLASS =
   'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-sunken disabled:opacity-40';

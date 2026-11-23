@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
+import { cssGradient, RAMP_FILLS } from '@/lib/color/ramp-fills';
 import type { MonthFlow, PeriodValue, TickItem } from '@/lib/reporting/card';
 import { litTicks } from '@/lib/reporting/overview';
 
 /**
- * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the hero's navy,
+ * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the ramp,
  * with the latest full period hatched. Amounts in minor units, shown in CHF.
  */
 
@@ -49,8 +50,8 @@ export function DotMatrix({ months }: { months: MonthFlow[] }) {
             className="flex gap-0.5"
             title={`${month.label}: in ${money(month.income)}, out ${money(month.expense)}`}
           >
-            <DotColumn value={month.income} max={max} tone="bg-hero-deep" />
-            <DotColumn value={month.expense} max={max} tone="bg-hero-glow" />
+            <DotColumn value={month.income} max={max} tone="bg-ramp-1" />
+            <DotColumn value={month.expense} max={max} tone="bg-ramp-4" />
           </div>
         ))}
       </div>
@@ -63,10 +64,10 @@ export function DotMatrix({ months }: { months: MonthFlow[] }) {
       </div>
       <figcaption className="mt-3 flex gap-4 text-xs text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-hero-deep" /> In
+          <span className="h-2 w-2 rounded-full bg-ramp-1" /> In
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-hero-glow" /> Out
+          <span className="h-2 w-2 rounded-full bg-ramp-4" /> Out
         </span>
       </figcaption>
     </figure>
@@ -76,10 +77,14 @@ export function DotMatrix({ months }: { months: MonthFlow[] }) {
 /** How many periods the bars show: the latest half year reads at a glance. */
 const BAR_PERIODS = 6;
 
-function barTone(period: PeriodValue, index: number, isMarked: boolean): string {
-  if (isMarked) return 'bg-hatch';
-  if (period.value < 0) return 'bg-negative-tint';
-  return index % 2 ? 'bg-hero-mist/50' : 'bg-sunken';
+/**
+ * A bar's look: the marked one hatched, one below zero translucent `negative`, the rest the
+ * ramp's gradient (atmosphere only: the hatching alone says which period is pointed out).
+ */
+function barTone(period: PeriodValue, isMarked: boolean): { className: string; image?: string } {
+  if (isMarked) return { className: 'bg-hatch' };
+  if (period.value < 0) return { className: 'bg-negative/50' };
+  return { className: '', image: cssGradient(RAMP_FILLS.trendBar) };
 }
 
 /**
@@ -93,27 +98,33 @@ export function MonthBars({ periods }: { periods: PeriodValue[] }) {
   const max = Math.max(1, ...shown.map((period) => Math.abs(period.value)));
   return (
     <div className="flex h-52 items-end gap-3 pt-8">
-      {shown.map((period, i) => (
-        <Link
-          key={period.label}
-          href={period.href}
-          aria-label={`${period.label}${period.isPartial ? ' (partial)' : ''}: ${money(period.value)}`}
-          className="group flex h-full flex-1 flex-col items-center justify-end gap-2"
-        >
-          <span className="relative flex w-full flex-1 items-end">
-            {i === marked && (
-              <span className="absolute -top-1 left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2 py-1 text-xs whitespace-nowrap text-paper">
-                {money(period.value)}
-              </span>
-            )}
-            <span
-              className={`w-full rounded-xl group-hover:opacity-80 ${barTone(period, i, i === marked)}`}
-              style={{ height: `${Math.max(4, (Math.abs(period.value) / max) * 100)}%` }}
-            />
-          </span>
-          <span className="text-xs text-muted">{shortLabel(period.label)}</span>
-        </Link>
-      ))}
+      {shown.map((period, i) => {
+        const tone = barTone(period, i === marked);
+        return (
+          <Link
+            key={period.label}
+            href={period.href}
+            aria-label={`${period.label}${period.isPartial ? ' (partial)' : ''}: ${money(period.value)}`}
+            className="group flex h-full flex-1 flex-col items-center justify-end gap-2"
+          >
+            <span className="relative flex w-full flex-1 items-end">
+              {i === marked && (
+                <span className="absolute -top-1 left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2 py-1 text-xs whitespace-nowrap text-paper">
+                  {money(period.value)}
+                </span>
+              )}
+              <span
+                className={`w-full rounded-xl group-hover:opacity-80 ${tone.className}`}
+                style={{
+                  height: `${Math.max(4, (Math.abs(period.value) / max) * 100)}%`,
+                  backgroundImage: tone.image,
+                }}
+              />
+            </span>
+            <span className="text-xs text-muted">{shortLabel(period.label)}</span>
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -153,7 +164,7 @@ export function TickList({ items }: { items: TickItem[] }) {
               {Array.from({ length: TICKS }, (_, i) => (
                 <span
                   key={i}
-                  className={`h-4 w-1.5 rounded-sm ${i < lit ? 'bg-hero-mid' : 'bg-rule'}`}
+                  className={`h-4 w-1.5 rounded-sm ${i < lit ? 'bg-ramp-3' : 'bg-rule'}`}
                 />
               ))}
             </span>

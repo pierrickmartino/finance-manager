@@ -135,7 +135,12 @@ interface RowProps {
 function Row({ transaction, previewHref, detailHref, isPreviewed, isTicked, onTick }: RowProps) {
   const fmt = useFormatter();
   const name = transactionName(transaction);
-  const rowClass = isTicked ? 'bg-accent-tint' : isPreviewed ? 'xl:bg-sunken' : 'hover:bg-paper';
+  // Rows stay solid on the glass card, so a dense list stays crisp.
+  const rowClass = isTicked
+    ? 'bg-accent-tint'
+    : isPreviewed
+      ? 'bg-surface xl:bg-sunken'
+      : 'bg-surface hover:bg-paper';
   return (
     <TransactionMorph transactionId={transaction.id} part="row">
       <tr className={rowClass}>

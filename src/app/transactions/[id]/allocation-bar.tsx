@@ -1,16 +1,5 @@
+import { CHART_PALETTE } from '@/app/dashboards/chart-palette';
 import type { SplitAllocation } from './split-lines';
-
-/** The chart palette's categorical order (../../dashboards/chart-palette.ts). */
-const LINE_COLORS = [
-  'bg-[#2a78d6]',
-  'bg-[#eb6834]',
-  'bg-[#1baf7a]',
-  'bg-[#eda100]',
-  'bg-[#e87ba4]',
-  'bg-[#008300]',
-  'bg-[#6250d6]',
-  'bg-[#e34948]',
-];
 
 const STATUS_CLASS: Record<SplitAllocation['status'], string> = {
   balanced: 'text-positive',
@@ -26,9 +15,13 @@ const STATUS_LABEL: Record<SplitAllocation['status'], string> = {
   invalid: 'an amount is not valid',
 };
 
-/** The colour a Split line has in the bar, so the line and its segment match. */
+/**
+ * The colour a Split line has in the bar, so the line and its segment match: the chart
+ * palette's categorical order, repeating after its last hue.
+ */
 export function lineColor(index: number): string {
-  return LINE_COLORS[index % LINE_COLORS.length] ?? 'bg-[#2a78d6]';
+  const { series } = CHART_PALETTE;
+  return series[index % series.length] ?? series[0];
 }
 
 interface AllocationBarProps {
@@ -65,8 +58,11 @@ export function AllocationBar({ totalMinor, allocation, formatAmount }: Allocati
         {parts.map((minor, index) => (
           <div
             key={index}
-            className={`${lineColor(index)} border-r-2 border-surface last:border-r-0`}
-            style={{ width: `${(Math.abs(minor) / scale) * 100}%` }}
+            className="border-r-2 border-surface last:border-r-0"
+            style={{
+              width: `${(Math.abs(minor) / scale) * 100}%`,
+              backgroundColor: lineColor(index),
+            }}
           />
         ))}
       </div>

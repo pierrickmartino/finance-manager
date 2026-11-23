@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from './icon';
 import { isActive, overflowGroups } from './navigation';
-import { HERO_PILL_ACTIVE, HERO_PILL_CLASS, HERO_PILL_IDLE } from './hero-styles';
+import { BAR_PILL_ACTIVE, BAR_PILL_CLASS, BAR_PILL_IDLE } from './bar-styles';
+import { GLASS_CLASS } from '../surface';
 
 const GROUPS = overflowGroups();
 
@@ -48,7 +49,7 @@ export function MoreMenu({ pathname }: { pathname: string }) {
         aria-expanded={isOpen}
         aria-controls={panelId}
         onClick={() => setIsOpen((open) => !open)}
-        className={`${HERO_PILL_CLASS} ${isCurrent ? HERO_PILL_ACTIVE : HERO_PILL_IDLE}`}
+        className={`${BAR_PILL_CLASS} ${isCurrent ? BAR_PILL_ACTIVE : BAR_PILL_IDLE}`}
       >
         <Icon name="menu" className="h-3.5 w-3.5" />
         More
@@ -56,7 +57,7 @@ export function MoreMenu({ pathname }: { pathname: string }) {
       {isOpen && (
         <div
           id={panelId}
-          className="absolute top-9 right-0 z-40 grid w-[28rem] grid-cols-2 gap-4 rounded-2xl border border-rule bg-surface p-4 shadow-2xl"
+          className={`absolute top-9 right-0 z-40 grid w-[28rem] grid-cols-2 gap-4 rounded-2xl ${GLASS_CLASS} p-4 shadow-2xl`}
         >
           {GROUPS.map((group) => {
             const labelId = `${panelId}-${group.label.toLowerCase()}`;
