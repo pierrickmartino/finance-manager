@@ -51,15 +51,13 @@ interface WidgetCardProps {
   className?: string;
   /** Edit mode's actions on this Widget, at the top of its card. */
   toolbar?: ReactNode;
-  /** Draws the lead figure a size down, for pages that set several cards side by side (Analytics). */
-  isCompact?: boolean;
 }
 
 /**
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ card, className = '', toolbar, isCompact = false }: WidgetCardProps) {
+export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const reading = readCard(card, money);
@@ -76,9 +74,8 @@ export function WidgetCard({ card, className = '', toolbar, isCompact = false }:
         {reading.lead && (
           <>
             <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>
-            <p
-              className={`font-display tracking-tight tabular-nums ${isCompact ? 'text-xl' : 'text-3xl'}`}
-            >
+            {/* A size down on a narrow Card (Analytics' thirds, small board cells), full from @md. */}
+            <p className="font-display text-xl tracking-tight tabular-nums @md:text-3xl">
               <FigureLink href={reading.lead.href}>{reading.lead.detail}</FigureLink>
             </p>
           </>
