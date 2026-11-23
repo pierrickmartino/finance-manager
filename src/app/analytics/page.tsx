@@ -15,11 +15,11 @@ import { swissToday } from '@/server/services/fx/dates';
 import {
   ACCOUNT_BALANCES,
   CATEGORIES_PER_INTERVAL,
-  INCOME_VS_EXPENSE,
   KEY_FIGURES,
   loadAnalytics,
   NET_CASH_FLOW,
   PROFIT_AND_LOSS,
+  PROFIT_PER_INTERVAL,
   SPENDING_BY_CATEGORY,
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
@@ -41,7 +41,7 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
  * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
  * its nearest Period. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
  * parameter each beside the Period (`net-worth=<slug>`, `net-cash-flow=<slug>`,
- * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `income-vs-expense=<slug>`,
+ * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `profit-per-interval=<slug>`,
  * `categories-per-interval=<slug>`); a bare visit has none, and a former link carries none. The
  * shell and the Period control render at once; each section streams in behind its own placeholder and error boundary
  * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
@@ -138,10 +138,10 @@ export default async function AnalyticsPage({
         <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
           <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
         </StreamedSection>
-        <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref} isCard>
+        <StreamedSection name={PROFIT_PER_INTERVAL} retryHref={retryHref} isCard>
           <CardSection
-            card={sections.incomeVsExpense}
-            section="income-vs-expense"
+            card={sections.profitPerInterval}
+            section="profit-per-interval"
             empty="no income, expense or Capital"
           />
         </StreamedSection>

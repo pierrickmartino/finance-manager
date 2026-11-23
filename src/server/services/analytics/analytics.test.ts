@@ -169,7 +169,7 @@ describe('the reading', () => {
     });
     expect(intervals.slice(1, -1).every((p) => !p.isPartial && !p.isToDate)).toBe(true);
     // Every per-interval card covers the Period at its grain, both ends set apart.
-    const columns = sections.incomeVsExpense.data!.columns;
+    const columns = sections.profitPerInterval.data!.columns;
     const rows = sections.netCashFlow.data!.rows;
     expect(keys(columns)).toEqual(keys(intervals));
     expect(keys(rows)).toEqual(keys(intervals));
@@ -259,7 +259,7 @@ describe('a Card Period', () => {
     // The others, and the Key figures, read the page's Period.
     const pageIntervals = ['2025-01', '2025-02', '2025-03'];
     expect(keys(sections.netCashFlow.data!.rows)).toEqual(pageIntervals);
-    for (const card of [sections.incomeVsExpense, sections.categoriesPerInterval]) {
+    for (const card of [sections.profitPerInterval, sections.categoriesPerInterval]) {
       expect(keys(card.data!.columns)).toEqual(pageIntervals);
     }
     expect(sections.netCashFlow.data!.total).toBe(-6_000);
