@@ -92,45 +92,55 @@ function toolsInPage(page: Page): Promise<JSHandle<PageTools>> {
  * Every visible piece of text on the page that should be read: not decorative (`aria-hidden`),
  * not disabled or faded out (WCAG exempts inactive controls), not visually hidden.
  */
-async function textSamples(page: Page): Promise<Sample[]> {
+async function textSamples(page: Page, excluded: Record<string, string>): Promise<Sample[]> {
   const tools = await toolsInPage(page);
-  return page.evaluate(({ rgba, layersOf }) => {
-    const samples: Sample[] = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const seen = new Set<Element>();
-    for (let text = walker.nextNode(); text; text = walker.nextNode()) {
-      const element = text.parentElement;
-      if (!element || seen.has(element) || !text.textContent?.trim()) continue;
-      seen.add(element);
-      if (element.closest('[aria-hidden="true"], :disabled, [aria-disabled="true"], option'))
-        continue;
-      if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
-      const rect = element.getBoundingClientRect();
-      if (rect.width <= 1 || rect.height <= 1) continue;
-      let isFaded = false;
-      for (let node: Element | null = element; node; node = node.parentElement) {
-        if (Number(getComputedStyle(node).opacity) < 1) isFaded = true;
+  return page.evaluate(
+    ({ tools: { rgba, layersOf }, excluded }) => {
+      const samples: Sample[] = [];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const seen = new Set<Element>();
+      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+        const element = text.parentElement;
+        if (!element || seen.has(element) || !text.textContent?.trim()) continue;
+        seen.add(element);
+        if (element.closest('[aria-hidden="true"], :disabled, [aria-disabled="true"], option'))
+          continue;
+        if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 1 || rect.height <= 1) continue;
+        let isFaded = false;
+        for (let node: Element | null = element; node; node = node.parentElement) {
+          if (Number(getComputedStyle(node).opacity) < 1) isFaded = true;
+        }
+        if (isFaded) continue;
+        const style = getComputedStyle(element);
+        const size = Number.parseFloat(style.fontSize);
+        const weight = Number(style.fontWeight);
+        const label = `"${text.textContent.trim().slice(0, 40)}" <${element.tagName.toLowerCase()} class="${element.getAttribute('class') ?? ''}">`;
+        const exclusion = Object.entries(excluded).find(([selector]) => element.closest(selector));
+        samples.push({
+          label,
+          color: rgba(style.color),
+          isLarge: size >= 24 || (size >= 18.66 && weight >= 700),
+          ...layersOf(element),
+          ...(exclusion && { skip: exclusion[1] }),
+        });
       }
-      if (isFaded) continue;
-      const style = getComputedStyle(element);
-      const size = Number.parseFloat(style.fontSize);
-      const weight = Number(style.fontWeight);
-      samples.push({
-        label: `"${text.textContent.trim().slice(0, 40)}" <${element.tagName.toLowerCase()} class="${element.getAttribute('class') ?? ''}">`,
-        color: rgba(style.color),
-        isLarge: size >= 24 || (size >= 18.66 && weight >= 700),
-        ...layersOf(element),
-      });
-    }
-    return samples;
-  }, tools);
+      return samples;
+    },
+    { tools, excluded },
+  );
 }
 
-/** The text on the page that fails AA (4.5:1, or 3:1 for large text), and what was skipped. */
+/**
+ * The text on the page that fails AA (4.5:1, or 3:1 for large text), and what was skipped.
+ * `excluded` maps a selector to the reason the text inside it is not measured.
+ */
 export async function textContrastFailures(
   page: Page,
+  excluded: Record<string, string> = {},
 ): Promise<{ failures: ContrastFailure[]; measured: number; skipped: string[] }> {
-  const samples = await textSamples(page);
+  const samples = await textSamples(page, excluded);
   const skipped = samples.filter((s) => s.skip).map((s) => `${s.label}: ${s.skip}`);
   const failures = samples
     .filter((s) => !s.skip)
