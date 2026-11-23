@@ -209,6 +209,10 @@ _Avoid_: Quick range, shortcut
 Income minus expense over a span of time, with Capital left out. It is negative when more went out than came in.
 _Avoid_: Kept, net profit, savings, net, surplus
 
+**Net cash flow**:
+All the money that moved in and out over a span of time, Transfers left out: Profit plus Capital plus what is still Unclassified. It is negative when more went out than came in.
+_Avoid_: Net incl. Capital, net profit, net result, bottom line
+
 **Comparison span**:
 The stretch a Span's figures are compared with. For a Span to date of a calendar period (quarter, year, or years), it is the same stretch of the previous one, a short month compared up to its last day; for any other Span, the stretch of the same number of days just before it.
 _Avoid_: Baseline, previous period, last period
