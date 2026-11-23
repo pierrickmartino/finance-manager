@@ -90,7 +90,7 @@ export function WidgetCard({ card, className = '', toolbar, isCompact = false }:
       )}
       <CardBody mark={reading.mark} money={money} />
       {reading.facts.length > 0 && (
-        <dl className="grid grid-cols-2 gap-3 border-t border-rule pt-3">
+        <dl className="grid grid-cols-1 gap-3 border-t border-rule pt-3 @2xs:grid-cols-2 @2xl:grid-cols-3">
           {reading.facts.map((fact) => (
             <div key={fact.label}>
               <dt className="text-xs text-muted">{fact.label}</dt>

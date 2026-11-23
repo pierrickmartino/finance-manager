@@ -678,6 +678,121 @@ test("a ring Card lays out from its own width, not the window's: list below on a
   expect(await ringListPlacement(card('Wide ring'))).toBe('beside');
 });
 
+/** How many columns a Card's facts sit in: the facts on the first one's line. */
+async function factColumns(card: Locator): Promise<number> {
+  const tops = await card
+    .locator('dl > div')
+    .evaluateAll((facts) => facts.map((fact) => fact.getBoundingClientRect().top));
+  if (tops.length === 0) throw new Error('No facts');
+  return tops.filter((top) => Math.abs(top - tops[0]!) < 1).length;
+}
+
+/** The space between a bars Card's first two bars, in pixels. */
+async function barGap(card: Locator): Promise<number> {
+  const bars = card.getByRole('link', { name: /: CHF/ });
+  const first = await bars.nth(0).boundingBox();
+  const second = await bars.nth(1).boundingBox();
+  if (!first || !second) throw new Error('Fewer than two bars');
+  return second.x - (first.x + first.width);
+}
+
+test("a Card's facts, ticks and bars follow its own width; a narrow Card still shows every item", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const names = [`Rent ${suffix}`, `Food ${suffix}`, `Fun ${suffix}`];
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Density bank ${suffix}` });
+    const accounts = [];
+    for (const name of names) {
+      accounts.push(
+        await createAccount(ctx, {
+          bankId: bank.id,
+          name,
+          currency: 'CHF',
+          iban: null,
+          kind: 'current',
+          importFormat: null,
+          openingBalanceMinor: 0,
+        }),
+      );
+    }
+    const today = swissToday();
+    for (const [index, account] of accounts.entries()) {
+      for (const daysAgo of [70, 40, 10]) {
+        await createManualTransaction(ctx, {
+          accountId: account.id,
+          bookingDate: addDays(today, -daysAgo),
+          amountMinor: -(index + 1) * 10_000 - daysAgo * 100,
+          description: 'Density spend',
+        });
+      }
+    }
+    const dateRange = { kind: 'fixed' as const, from: addDays(today, -80), to: today };
+    const accountIds = accounts.map((account) => account.id);
+    const dashboard = await createDashboardRecord(ctx, { name: `Density ${suffix}` });
+    // Three series make a stacked bar a ranking, with three facts. At 1280 a 3-of-12 Card is
+    // about 251px inside, 4-of-12 about 355px and 8-of-12 about 773px.
+    const ranking = (name: string, layout: { x: number; y: number; w: number; h: number }) =>
+      addWidget(ctx, dashboard.id, {
+        name,
+        visualisation: 'stacked_bar',
+        query: { dateRange, rows: 'month', columns: 'account', filters: { accountIds } },
+        layout,
+      });
+    await ranking('Narrow ranking', { x: 0, y: 0, w: 3, h: 10 });
+    await ranking('Medium ranking', { x: 3, y: 0, w: 4, h: 10 });
+    await ranking('Wide ranking', { x: 0, y: 10, w: 8, h: 10 });
+    // One series: bars per month.
+    const bars = (name: string, layout: { x: number; y: number; w: number; h: number }) =>
+      addWidget(ctx, dashboard.id, {
+        name,
+        visualisation: 'stacked_bar',
+        query: { dateRange, rows: 'month', columns: null, filters: { accountIds } },
+        layout,
+      });
+    await bars('Narrow bars', { x: 0, y: 20, w: 3, h: 8 });
+    await bars('Wide bars', { x: 3, y: 20, w: 8, h: 8 });
+    return dashboard.id;
+  });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/dashboards/${dashboardId}`);
+  const card = (name: string) =>
+    page.getByRole('region', { name, exact: true }).and(page.locator('[aria-labelledby^="card-"]'));
+  for (const name of ['Narrow ranking', 'Medium ranking', 'Wide ranking']) {
+    await expect(card(name).locator('dl > div')).toHaveCount(3);
+  }
+
+  // Facts: one column below @2xs, two from @2xs, three from @2xl.
+  expect(await factColumns(card('Narrow ranking'))).toBe(1);
+  expect(await factColumns(card('Medium ranking'))).toBe(2);
+  expect(await factColumns(card('Wide ranking'))).toBe(3);
+
+  // Ticks: the meter is hidden below @2xs; every item's name and percent still show.
+  for (const [name, isMeterShown] of [
+    ['Narrow ranking', false],
+    ['Medium ranking', true],
+  ] as const) {
+    const items = card(name).getByRole('listitem');
+    await expect(items).toHaveCount(3);
+    for (const account of names) {
+      const item = items.filter({ hasText: account });
+      await expect(item).toBeVisible();
+      await expect(item.getByText(/^\d+%$/)).toBeVisible();
+      await expect(item.locator('[aria-hidden]')).toBeVisible({ visible: isMeterShown });
+    }
+  }
+
+  // Bars: closer together below @xs, every period still shown.
+  const narrowBars = card('Narrow bars').getByRole('link', { name: /: CHF/ });
+  const wideBars = card('Wide bars').getByRole('link', { name: /: CHF/ });
+  await expect(wideBars).not.toHaveCount(0);
+  await expect(narrowBars).toHaveCount(await wideBars.count());
+  for (const bar of await narrowBars.all()) await expect(bar).toBeVisible();
+  expect(await barGap(card('Narrow bars'))).toBeLessThan(await barGap(card('Wide bars')));
+});
+
 /** The cards and parts of the Story still waiting on their query. */
 function placeholders(page: Page) {
   return page.locator('[aria-busy="true"]');
