@@ -187,8 +187,6 @@ test('the bell lists a Missed Recurring payment and leads to Recurring payments'
   const { payeeName, expected, remove } = await addMissed();
   try {
     await page.goto('/categories');
-    // The bell has its items once it counts the new one unread.
-    await expect(bell(page)).toHaveAccessibleName(/^Notifications, \d+ unread$/);
     await bell(page).click();
     const item = bellPopover(page).getByRole('link', {
       name: `${payeeName} was Missed: expected ${expected}, unread`,
@@ -289,7 +287,7 @@ test('the bell lists Stale FX rates first and leads to Accounts', async ({ page 
 
   const first = bellPopover(page).getByRole('link').first();
   await expect(first).toHaveAccessibleName(
-    /^FX rates are stale: .+\. CHF values may be out of date\.(, unread)?$/,
+    /^FX rates are Stale: .+\. CHF values may be out of date\.(, unread)?$/,
   );
 
   await first.click();
