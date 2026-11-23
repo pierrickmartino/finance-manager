@@ -3,11 +3,11 @@ import { shareParts } from './card';
 
 /**
  * The ring a Donut Widget's card draws (ADR-0009): its parts as slices, largest first and
- * clockwise from the top, each a step of the ramp's navy, darkest first; "Other" comes last in
- * a neutral grey. Sized by magnitude, labelled with the signed value.
+ * clockwise from the top, each a step of the ramp, `ramp-1` first (sky blue through violet);
+ * "Other" comes last in a neutral grey. Sized by magnitude, labelled with the signed value.
  */
 
-/** How many navy tones the ramp has: one per named part (seven plus "Other", see MAX_SERIES). */
+/** How many tones the ring draws from the ramp: one per named part (seven plus "Other", see MAX_SERIES). */
 export const RING_TONES = 7;
 
 export interface RingSlice {
@@ -20,7 +20,7 @@ export interface RingSlice {
   isOther: boolean;
   /** Its sign goes against the whole's: a refund among expenses, a fee among income. */
   isCounter: boolean;
-  /** Its place on the navy ramp, 0 darkest; unused for "Other". */
+  /** Its place on the ring's tones, 0 (`ramp-1`) for the largest; unused for "Other". */
   tone: number;
   /** Radians, clockwise from the top. */
   start: number;

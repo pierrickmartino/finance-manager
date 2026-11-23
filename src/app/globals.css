@@ -29,16 +29,20 @@
   --color-accent-ink: #4cdcf0;
   --color-accent-tint: #0e3343; /* selected navigation, highlighted rows */
 
-  /* The ramp: five flat steps from cyan through blue to violet, ramp-1 first. Atmosphere only,
-     never meaning (cyan as the accent alone marks a state): the marks of the Dashboard's and
-     Analytics' cards, the heatmap, the Net worth bands and the sparklines. */
-  --color-ramp-1: #2bc4f0;
+  /* The ramp: five flat steps from sky blue through blue to violet, ramp-1 first. Atmosphere
+     only, never meaning (cyan as the accent alone marks a state), so every step stays clearly
+     apart from the accent (ΔE ≥ 15): the marks of the Dashboard's and Analytics' cards, the
+     heatmap, the Net worth bands, the sparklines and the page and tile glows. */
+  --color-ramp-1: #44b2ff;
   --color-ramp-2: #3b9cff;
   --color-ramp-3: #4f7cff;
   --color-ramp-4: #7a68ff;
   --color-ramp-5: #a06bff;
   --color-on-ramp: #ffffff; /* the bar's text and translucent fills; text on the dark ramp shades */
-  --color-on-ink: #0a1020; /* text on an ink fill: selected list items, the Dashboard tabs */
+  --color-on-ink: var(--color-paper); /* text on an ink fill: selected list items, Dashboard tabs */
+  /* The insight tile: a deep, flat step of the ramp's violet, so white text and its translucent
+     marks pass AA on it (on-ramp/60 ≥ 4.5:1), as glass (glass-insight) and opaque. */
+  --color-insight: color-mix(in srgb, var(--color-ramp-4) 40%, var(--color-surface));
 
   /* Meaning, kept apart from the accent: never use these for decoration. positive is a
      yellowish green, clear of teal and cyan; warning an orange, well apart from the cyan accent
@@ -89,7 +93,7 @@
   --page-glow:
     radial-gradient(
       48rem 32rem at 88% -6rem,
-      color-mix(in srgb, var(--color-accent) 11%, transparent),
+      color-mix(in srgb, var(--color-ramp-1) 11%, transparent),
       transparent 70%
     ),
     radial-gradient(
@@ -137,12 +141,6 @@
   }
 }
 
-/* The Dashboard's insight card: a deep, flat step of the ramp's violet, so white text and its
-   translucent marks pass AA on it (on-ramp/60 ≥ 4.7:1). */
-@utility bg-insight {
-  background-color: color-mix(in srgb, var(--color-ramp-4) 40%, var(--color-surface));
-}
-
 /* Recent activity's spotlight, and its hover: deep, flat steps of the ramp's blue, under white
    text (on-ramp/75 ≥ 5.4:1). */
 @utility bg-spotlight {
@@ -173,11 +171,12 @@
   backdrop-filter: var(--glass-blur);
 }
 
-/* The Dashboard's and Analytics' tiles only: a soft cyan inner glow under a small shadow. */
+/* The Dashboard's and Analytics' tiles only: a soft inner glow in the ramp's first step under a
+   small shadow. Atmosphere, so the ramp, never the accent (which marks a state). */
 @utility tile-glow {
   box-shadow:
-    inset 0 0 2.5rem -0.75rem color-mix(in srgb, var(--color-accent) 22%, transparent),
-    inset 0 1px 0 0 color-mix(in srgb, var(--color-accent) 12%, transparent),
+    inset 0 0 2.5rem -0.75rem color-mix(in srgb, var(--color-ramp-1) 22%, transparent),
+    inset 0 1px 0 0 color-mix(in srgb, var(--color-ramp-1) 12%, transparent),
     0 1px 3px 0 rgb(0 0 0 / 0.25);
 }
 

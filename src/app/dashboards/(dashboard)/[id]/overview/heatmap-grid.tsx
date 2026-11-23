@@ -7,6 +7,7 @@ import {
   compactValue,
   HEAT_HUE,
   HEAT_LEVELS,
+  HEAT_PARTIAL_OUTLINE,
   type HeatText,
   toHeatmap,
   toTreeHeatmap,
@@ -39,17 +40,21 @@ function useText(data: ChartSource, isSigned: boolean): Text {
   };
 }
 
-/** `HEAT_HUE` as a CSS variable, spelt out so the stylesheet keeps the token. */
-const HUE_VAR: Record<typeof HEAT_HUE, string> = { 'ramp-3': 'var(--color-ramp-3)' };
+/** `HEAT_HUE` as a CSS variable, for the inline shades. */
+const HUE_VAR = `var(--color-${HEAT_HUE})`;
 
-const shade = (mix: number) =>
-  `color-mix(in srgb, ${HUE_VAR[HEAT_HUE]} ${mix}%, var(--color-surface))`;
+const shade = (mix: number) => `color-mix(in srgb, ${HUE_VAR} ${mix}%, var(--color-surface))`;
 
 /** A level's number: light on the quiet shades, navy on the brightest (HEAT_LEVELS). */
 const TEXT_CLASS: Record<HeatText, string> = { ink: 'text-ink', paper: 'text-paper' };
 
-/** The running period, outlined just outside its cells, on the card (HEAT_PARTIAL_OUTLINE). */
-const PARTIAL_OUTLINE = 'outline-2 outline-offset-0 outline-ramp-1 outline-dashed';
+/** `HEAT_PARTIAL_OUTLINE`'s outline class, spelt out in full so Tailwind generates it. */
+const OUTLINE_COLOUR: Record<typeof HEAT_PARTIAL_OUTLINE, string> = {
+  'ramp-1': 'outline-ramp-1',
+};
+
+/** The running period, outlined just outside its cells, on the card. */
+const PARTIAL_OUTLINE = `outline-2 outline-offset-0 ${OUTLINE_COLOUR[HEAT_PARTIAL_OUTLINE]} outline-dashed`;
 
 function ColumnHeads({ columns, hasTotal }: { columns: HeatmapColumn[]; hasTotal: boolean }) {
   return (

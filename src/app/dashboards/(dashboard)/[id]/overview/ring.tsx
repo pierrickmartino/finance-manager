@@ -7,7 +7,7 @@ import { ringArcPath, ringSlices, type RingSlice } from '@/lib/reporting/ring';
 
 /**
  * A Donut Widget's mark on its card (docs/design-system.md, "Charts"): a ring of its parts in
- * the ramp's navy, the total in the hole, and beside it a list of every part with its amount
+ * the ramp (sky blue through violet), the total in the hole, and beside it a list of every part with its amount
  * and share. Pointing at a slice or a row, or focusing a row, shows that part in the hole.
  */
 
@@ -17,7 +17,10 @@ const SLICE_GAP = 0.012;
 /** At or above this share a part is the whole ring, drawn as a circle. */
 const WHOLE = 0.999;
 
-/** The navy ramp, darkest first (`RING_TONES` long); full class names for Tailwind. */
+/**
+ * The ramp, `ramp-1` (sky blue) for the largest part through violet, then violet's translucent
+ * steps (`RING_TONES` long); full class names for Tailwind.
+ */
 const FILLS = [
   'fill-ramp-1',
   'fill-ramp-2',

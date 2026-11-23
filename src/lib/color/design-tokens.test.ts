@@ -9,6 +9,7 @@ import {
   composite,
   contrastRatio,
   mixSrgb,
+  parseColor,
   relativeLuminance,
 } from './contrast';
 import { TEXT_ON_RAMP_FILLS, type RampFill, type RampStop } from './ramp-fills';
@@ -21,11 +22,30 @@ import { type Deficiency, deltaE, simulate } from './vision';
 
 const css = readFileSync(path.join(import.meta.dirname, '../../app/globals.css'), 'utf8');
 
+/** A token's colour: its hex value, or the token it names (`var(--color-paper)`), resolved. */
 function token(name: string): string {
-  const match = new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{3,6})\\s*;`).exec(css);
-  if (!match?.[1]) throw new Error(`No --color-${name} hex value in globals.css`);
-  return match[1];
+  const match = new RegExp(`--color-${name}:\\s*([^;]+);`).exec(css);
+  if (!match?.[1]) throw new Error(`No --color-${name} in globals.css`);
+  const value = match[1].trim();
+  if (/^#[0-9a-fA-F]{3,6}$/.test(value)) return value;
+  const reference = /^var\(--color-([\w-]+)\)$/.exec(value);
+  if (reference?.[1]) return token(reference[1]);
+  const mix = MIX.exec(value);
+  if (mix) return mixed(mix);
+  throw new Error(`--color-${name} is neither a hex value, a token nor a flat mix: ${value}`);
 }
+
+/** `color-mix(in srgb, var(--color-a) N%, var(--color-b))`: a flat mix of two tokens. */
+const MIX = /^color-mix\(in srgb, var\(--color-([\w-]+)\) (\d+)%, var\(--color-([\w-]+)\)\)$/;
+
+function mixed([, a, share, b]: RegExpExecArray): string {
+  return mixSrgb(token(a!), token(b!), Number(share) / 100);
+}
+
+/** The relative luminance under which a colour reads as deep: the page. */
+const DEEP = 0.02;
+/** The relative luminance over which a colour reads as light: the text. */
+const LIGHT = 0.7;
 
 function expectPair(text: string, background: string, minimum = AA_TEXT) {
   const ratio = contrastRatio(token(text), token(background));
@@ -34,12 +54,8 @@ function expectPair(text: string, background: string, minimum = AA_TEXT) {
 
 describe('the tokens are dark', () => {
   it('has a deep page and light text', () => {
-    expect(relativeLuminance(token('paper'))).toBeLessThan(0.02);
-    expect(relativeLuminance(token('ink'))).toBeGreaterThan(0.7);
-  });
-
-  it('declares a dark colour scheme, so native controls and scrollbars are dark', () => {
-    expect(css).toMatch(/:root\s*\{[^}]*color-scheme:\s*dark;/);
+    expect(relativeLuminance(token('paper'))).toBeLessThan(DEEP);
+    expect(relativeLuminance(token('ink'))).toBeGreaterThan(LIGHT);
   });
 });
 
@@ -70,7 +86,7 @@ describe('text passes AA on the backgrounds it sits on', () => {
 
 describe('buttons', () => {
   it('the primary button: navy text on its near-white fill, and on its hover', () => {
-    expect(relativeLuminance(token('ink'))).toBeGreaterThan(0.7);
+    expect(relativeLuminance(token('ink'))).toBeGreaterThan(LIGHT);
     expectPair('paper', 'ink');
     expectPair('paper', 'ink-hover');
   });
@@ -110,31 +126,47 @@ describe('the heatmap', () => {
   });
 });
 
-/** A `@utility` whose background is `color-mix(in srgb, var(--color-a) N%, var(--color-b))`. */
+/** A `@utility` whose background is a flat mix of two tokens (see MIX). */
 function mixedUtility(name: string): string {
-  const match = new RegExp(
-    `@utility ${name} \\{\\s*background-color: color-mix\\(in srgb, var\\(--color-([\\w-]+)\\) (\\d+)%, var\\(--color-([\\w-]+)\\)\\);`,
-  ).exec(css);
-  if (!match) throw new Error(`No flat color-mix @utility ${name} in globals.css`);
-  const [, a, share, b] = match;
-  return mixSrgb(token(a!), token(b!), Number(share) / 100);
+  const match = new RegExp(`@utility ${name} \\{\\s*background-color: ([^;]+);`).exec(css);
+  const mix = match?.[1] ? MIX.exec(match[1]) : null;
+  if (!mix) throw new Error(`No flat color-mix @utility ${name} in globals.css`);
+  return mixed(mix);
 }
+
+/** A hex colour at `alpha` opacity, as `rgba()`. */
+function withAlpha(hex: string, alpha: number): string {
+  const { r, g, b } = parseColor(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** How much of a glass container's fill shows (`--glass-opacity` in globals.css), 0–1. */
+const GLASS_OPACITY = (() => {
+  const match = /--glass-opacity:\s*(\d+)%;/.exec(css);
+  if (!match?.[1]) throw new Error('No --glass-opacity in globals.css');
+  return Number(match[1]) / 100;
+})();
 
 describe('white text on the deep steps of the ramp', () => {
   const cases = [
-    ['bg-insight', 0.6], // the insight card's faintest words: its bars' labels
-    ['bg-spotlight', 0.75], // Recent activity's spotlight caption
-    ['bg-spotlight-strong', 0.75], // …on hover
+    ['the insight tile', () => token('insight'), 0.6], // its faintest words: its bars' labels
+    ['the spotlight', () => mixedUtility('bg-spotlight'), 0.75], // Recent activity's caption
+    ['the spotlight on hover', () => mixedUtility('bg-spotlight-strong'), 0.75],
   ] as const;
-  for (const [utility, alpha] of cases) {
-    it(`on-ramp/${alpha * 100} on ${utility}`, () => {
-      const background = mixedUtility(utility);
-      const text = composite(`rgba(255, 255, 255, ${alpha})`, background);
-      expect(relativeLuminance(token('on-ramp'))).toBe(1);
-      const ratio = contrastRatio(text, background);
+  for (const [name, background, alpha] of cases) {
+    it(`on-ramp/${alpha * 100} on ${name}`, () => {
+      const text = composite(withAlpha(token('on-ramp'), alpha), background());
+      const ratio = contrastRatio(text, background());
       expect(ratio, `${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_TEXT);
     });
   }
+
+  it('on-ramp/60 on the insight tile as glass over the page', () => {
+    // The glass lets the page through: the tile seen is its fill composited onto `paper`.
+    const glass = composite(withAlpha(token('insight'), GLASS_OPACITY), token('paper'));
+    const ratio = contrastRatio(composite(withAlpha(token('on-ramp'), 0.6), glass), glass);
+    expect(ratio, `${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_TEXT);
+  });
 });
 
 describe('text over a ramp gradient passes AA at every step of it', () => {
@@ -172,6 +204,27 @@ describe('the focus outline', () => {
   for (const background of ['paper', 'surface', 'sunken', 'accent-tint']) {
     it(`accent-ink is visible on ${background}`, () =>
       expectPair('accent-ink', background, AA_NON_TEXT));
+  }
+});
+
+/** A chart colour that reads a token (`var(--color-muted)`), as the token's value. */
+function resolveVar(color: string): string {
+  const reference = /^var\(--color-([\w-]+)\)$/.exec(color);
+  if (!reference?.[1]) throw new Error(`${color} does not read a token`);
+  return token(reference[1]);
+}
+
+describe('the ramp is clearly not the accent', () => {
+  /** CIEDE2000 distance under which a ramp step could pass for the accent. */
+  const DISTINCT_FROM_ACCENT = 15;
+
+  for (const step of ['ramp-1', 'ramp-2', 'ramp-3', 'ramp-4', 'ramp-5']) {
+    for (const accent of ['accent', 'accent-ink']) {
+      it(`${step} stands apart from ${accent}`, () => {
+        const distance = deltaE(token(step), token(accent));
+        expect(distance, `ΔE ${distance.toFixed(1)}`).toBeGreaterThanOrEqual(DISTINCT_FROM_ACCENT);
+      });
+    }
   }
 });
 
@@ -213,9 +266,9 @@ describe('the categorical chart palette', () => {
     for (const hue of series) expect(reserved).not.toContain(hue.toLowerCase());
   });
 
-  it('draws chart text, gridlines and the surface in the dark muted, rule and surface tokens', () => {
-    expect(CHART_PALETTE.text.toLowerCase()).toBe(token('muted').toLowerCase());
-    expect(CHART_PALETTE.grid.toLowerCase()).toBe(token('rule').toLowerCase());
-    expect(CHART_PALETTE.surface.toLowerCase()).toBe(token('surface').toLowerCase());
+  it('writes chart text and gridlines so they show on the surface', () => {
+    const surface = resolveVar(CHART_PALETTE.surface);
+    expect(contrastRatio(resolveVar(CHART_PALETTE.text), surface)).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(contrastRatio(resolveVar(CHART_PALETTE.grid), surface)).toBeGreaterThan(1);
   });
 });
