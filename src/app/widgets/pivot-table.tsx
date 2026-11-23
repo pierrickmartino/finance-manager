@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFormatter } from '@/components/formatter-provider';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import type { ReportHeader } from '@/server/services/reporting';
@@ -33,6 +34,15 @@ export function PivotTable({
 }) {
   const fmt = useFormatter();
   const [isFullScreen, setFullScreen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const wasFullScreen = useRef(isFullScreen);
+
+  // Full screen moves the table out to the page (below), which remounts it: keep the focus on
+  // the toggle across the move.
+  useEffect(() => {
+    if (wasFullScreen.current !== isFullScreen) toggle.current?.focus();
+    wasFullScreen.current = isFullScreen;
+  }, [isFullScreen]);
 
   useEffect(() => {
     if (!isFullScreen) return;
@@ -62,7 +72,7 @@ export function PivotTable({
     </td>
   );
 
-  return (
+  const table = (
     <section
       aria-label="Pivot table"
       className={
@@ -74,6 +84,7 @@ export function PivotTable({
       <div className="flex items-center justify-between gap-3">
         {isCompact && !isFullScreen ? <span /> : <h2 className={SECTION_TITLE_CLASS}>{title}</h2>}
         <button
+          ref={toggle}
           type="button"
           onClick={() => setFullScreen(!isFullScreen)}
           className="rounded-md border border-rule-strong px-3 py-1 text-sm hover:bg-sunken"
@@ -160,4 +171,7 @@ export function PivotTable({
       )}
     </section>
   );
+  // A glass card's backdrop blur would hold a `fixed` view inside the card: full screen is
+  // drawn on the page itself.
+  return isFullScreen ? createPortal(table, document.body) : table;
 }

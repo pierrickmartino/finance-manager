@@ -5,6 +5,13 @@ import { createManualTransaction } from '../src/server/services/transactions/man
 import { SIGNED_OUT } from './support/auth';
 import { focusOutline, pageColours, textContrastFailures } from './support/contrast';
 import { openHomeDashboard } from './support/dashboards';
+import {
+  applyNoBackdropFilterFallback,
+  emulateReducedTransparency,
+  fillOf,
+  glassCount,
+  pageGlow,
+} from './support/glass';
 import { withServices } from './support/services';
 
 /*
@@ -140,4 +147,137 @@ test('the focus outline passes AA on the page, on a card and on the Bulk edit do
   }
   // One focus style everywhere: the accent.
   expect(outlines.size).toBe(1);
+});
+
+/*
+ * Glass (ticket #245): containers are see-through and blur the page behind them, the
+ * Dashboard's and Analytics' tiles alone add an inner glow, and inputs and table rows stay
+ * solid. Under reduced transparency, or without backdrop-filter, every container is opaque and
+ * the page's fixed glow is not drawn.
+ */
+
+/** A page's containers by kind: tiles glow, other containers don't, solid parts are opaque. */
+interface GlassPage {
+  name: string;
+  open: (page: Page) => Promise<unknown>;
+  /** Tiles of the Dashboard and Analytics: glass with the inner glow. */
+  tiles?: (page: Page) => Locator[];
+  /** Other containers, each found by something inside it: glass without the glow. */
+  containers?: (page: Page) => Locator[];
+  /** Inputs and table rows: opaque, with a fill of their own. */
+  solid?: (page: Page) => Locator[];
+}
+
+/** Analytics' Net worth Key figure: a tile. */
+function keyFigureTile(page: Page): Locator {
+  return page
+    .getByRole('region', { name: 'Key figures' })
+    .getByRole('region', { name: 'Net worth', exact: true });
+}
+
+const GLASS_PAGES: GlassPage[] = [
+  {
+    name: 'Analytics',
+    open: (page) => page.goto('/analytics'),
+    tiles: (page) => [keyFigureTile(page)],
+  },
+  {
+    name: 'a Dashboard',
+    open: openHomeDashboard,
+    tiles: (page) => [page.locator('section[aria-labelledby="overview-headline"]')],
+  },
+  {
+    name: 'the Transactions list with the Bulk edit dock open',
+    open: openListWithDock,
+    containers: (page) => [
+      page.getByRole('table', { name: 'Transactions' }),
+      page.getByRole('form', { name: 'Search Transactions' }),
+      page.getByRole('button', { name: 'Clear selection' }),
+    ],
+    solid: (page) => [
+      page.getByRole('table', { name: 'Transactions' }).locator('tbody tr').first(),
+      page.getByRole('textbox', { name: 'Search' }),
+    ],
+  },
+  {
+    name: 'Settings',
+    open: (page) => page.goto('/settings'),
+    containers: (page) => [page.getByText('Number format', { exact: true })],
+  },
+];
+
+for (const { name, open, tiles, containers, solid } of GLASS_PAGES) {
+  test(`containers on ${name} are glass over the page glow, inputs and rows solid`, async ({
+    page,
+  }) => {
+    await open(page);
+    await settle(page);
+
+    for (const tile of tiles?.(page) ?? []) {
+      const fill = await fillOf(tile);
+      expect(fill.alpha, 'a tile is see-through').toBeLessThan(1);
+      expect(fill.alpha, 'a tile still has a fill').toBeGreaterThan(0.3);
+      expect(fill.isBlurred, 'a tile blurs the page').toBe(true);
+      expect(fill.hasInnerGlow, 'a tile glows').toBe(true);
+    }
+    for (const container of containers?.(page) ?? []) {
+      const fill = await fillOf(container);
+      expect(fill.alpha, 'a container is see-through').toBeLessThan(1);
+      expect(fill.alpha, 'a container still has a fill').toBeGreaterThan(0.3);
+      expect(fill.isBlurred, 'a container blurs the page').toBe(true);
+      expect(fill.hasInnerGlow, 'only tiles glow').toBe(false);
+    }
+    for (const part of solid?.(page) ?? []) {
+      const fill = await fillOf(part, { isOwn: true });
+      expect(fill.alpha, 'inputs and rows are opaque').toBe(1);
+      expect(fill.isBlurred).toBe(false);
+    }
+    // Drawn on the page, fixed, so it stays put when the page scrolls.
+    expect(await pageGlow(page)).toEqual({ isDrawn: true, isFixed: true });
+  });
+
+  test(`under reduced transparency, containers on ${name} are opaque with no page glow`, async ({
+    page,
+  }) => {
+    await emulateReducedTransparency(page);
+    await open(page);
+    await settle(page);
+
+    expect(
+      await page.evaluate(() => matchMedia('(prefers-reduced-transparency: reduce)').matches),
+    ).toBe(true);
+    for (const container of [...(tiles?.(page) ?? []), ...(containers?.(page) ?? [])]) {
+      expect((await fillOf(container)).alpha, 'a container is opaque').toBe(1);
+    }
+    expect(await glassCount(page), 'nothing blurs the page').toBe(0);
+    expect((await pageGlow(page)).isDrawn).toBe(false);
+  });
+
+  test(`the text on ${name} passes AA on the opaque fallback surface`, async ({ page }) => {
+    await emulateReducedTransparency(page);
+    await open(page);
+    await settle(page);
+
+    const { failures, measured } = await textContrastFailures(page, CARDS_RETUNED_BY_242);
+
+    expect(measured).toBeGreaterThan(10);
+    expect(failures).toEqual([]);
+  });
+}
+
+test('without backdrop-filter support, containers are opaque with no page glow', async ({
+  page,
+}) => {
+  await page.goto('/analytics');
+  await settle(page);
+
+  expect(
+    await applyNoBackdropFilterFallback(page),
+    'the stylesheet has a fallback',
+  ).toBeGreaterThan(0);
+
+  const tile = keyFigureTile(page);
+  expect((await fillOf(tile)).alpha).toBe(1);
+  expect(await glassCount(page)).toBe(0);
+  expect((await pageGlow(page)).isDrawn).toBe(false);
 });
