@@ -2,29 +2,33 @@
 
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
+import type { Formatter } from '@/lib/format';
 import { transactionCountLabel } from '@/lib/text';
 import type { AttentionItem } from '@/server/services/attention';
+import { useFormatter } from '../formatter-provider';
 import { BADGE_CLASS, POPOVER_CLASS } from '../surface';
 import { BAR_ICON_BUTTON_CLASS } from './bar-styles';
 import { useBellOpen } from './bell-open';
+import { completenessLine } from './completeness-line';
 import { Icon } from './icon';
 import { useAttentionItems } from './use-attention-items';
 
 /** The item's line, worded as its own page words it. */
-function itemLine(item: AttentionItem): string {
+function itemLine(item: AttentionItem, fmt: Formatter): string {
   switch (item.kind) {
     case 'fx-rates':
       return `FX rates are stale: ${item.reason}. CHF values may be out of date.`;
-    case 'unclassified': {
-      const verb = item.count === 1 ? 'is' : 'are';
-      return `${transactionCountLabel(item.count)} ${verb} Unclassified`;
-    }
+    case 'completeness':
+      return completenessLine(item, fmt);
+    case 'unclassified':
+      return `${transactionCountLabel(item.count)} ${item.count === 1 ? 'is' : 'are'} Unclassified`;
   }
 }
 
 /** The item's badge, in its tone: what kind of attention it asks for. */
 const BADGES: Record<AttentionItem['kind'], string> = {
   'fx-rates': 'Stale',
+  completeness: 'Completeness',
   unclassified: 'Unclassified',
 };
 
@@ -148,6 +152,7 @@ function BellContent({
   /** Called when an item's link is followed: the popover closes. */
   onFollow: () => void;
 }) {
+  const fmt = useFormatter();
   if (items === null) return <p className="px-2 pb-1 text-sm text-muted">Loading</p>;
   if (items.length === 0) {
     return <p className="px-2 pb-1 text-sm text-ink-soft">Nothing needs attention</p>;
@@ -156,12 +161,13 @@ function BellContent({
     <ul>
       {items.map((item) => {
         const isUnread = unread.has(itemKey(item));
+        const line = itemLine(item, fmt);
         return (
           <li key={itemKey(item)}>
             <Link
               href={item.href}
               onClick={onFollow}
-              aria-label={isUnread ? `${itemLine(item)}, unread` : itemLine(item)}
+              aria-label={isUnread ? `${line}, unread` : line}
               className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken hover:text-ink ${isUnread ? 'font-medium text-ink' : 'text-ink-soft'}`}
             >
               {/* The unread marker, the dot's own mark; a read item keeps its place. */}
@@ -169,7 +175,7 @@ function BellContent({
                 aria-hidden="true"
                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${isUnread ? 'bg-accent' : ''}`}
               />
-              <span className="flex-1">{itemLine(item)}</span>
+              <span className="flex-1">{line}</span>
               <span aria-hidden="true" className={BADGE_CLASS[item.tone]}>
                 {BADGES[item.kind]}
               </span>

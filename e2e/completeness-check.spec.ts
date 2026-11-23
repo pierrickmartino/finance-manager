@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { archiveAccount, createAccount, listAccounts } from '../src/server/services/accounts';
+import { createAccount, listAccounts } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import { recordBalanceSnapshot } from '../src/server/services/balance-snapshots';
-import { checkCompleteness } from '../src/server/services/completeness';
 import type { ServiceContext } from '../src/server/services/context';
 import { addDays, swissToday } from '../src/server/services/fx/dates';
 import { commitImport, previewImport } from '../src/server/services/imports';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
+import { restoreAccounts, setAsideCheckedAccounts } from './support/attention';
 import { openHomeDashboard } from './support/dashboards';
 import { withServices } from './support/services';
 
@@ -27,26 +27,6 @@ function camtFile(from: string, to: string): { fileName: string; content: Uint8A
   </Stmt></BkToCstmrStmt>
 </Document>`;
   return { fileName: 'completeness.xml', content: new TextEncoder().encode(xml) };
-}
-
-/**
- * Archives every Account the check lists now, so the test controls every checked Account: the
- * E2E database is shared by the run, and earlier specs leave imported Accounts whose data is
- * Stale by now. Returns their ids, for `restoreAccounts`.
- */
-async function setAsideCheckedAccounts(ctx: ServiceContext): Promise<string[]> {
-  const entries = await checkCompleteness(ctx, { today: swissToday() });
-  const ids = entries.map((entry) => entry.account.id);
-  for (const id of ids) await archiveAccount(ctx, id);
-  return ids;
-}
-
-/**
- * Un-archives the Accounts `setAsideCheckedAccounts` archived, leaving other specs' data as it
- * found it. No service un-archives an Account, so this clean-up is SQL.
- */
-async function restoreAccounts(ctx: ServiceContext, ids: string[]): Promise<void> {
-  await ctx.db.query('UPDATE account SET archived_at = NULL WHERE id = ANY($1::uuid[])', [ids]);
 }
 
 /** A CHF Account with an Import format and, until something is imported, no data. */

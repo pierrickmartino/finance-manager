@@ -101,9 +101,8 @@ describe('Attention items', () => {
         unread: true,
       },
     ]);
-    expect(items[0]).toMatchObject({
-      count: (await getClassificationProgress(t.ctx)).unclassified,
-    });
+    const { unclassified } = await getClassificationProgress(t.ctx);
+    expect(items[0]).toMatchObject({ count: unclassified });
   });
 
   it('counts a split Transaction with an Unclassified Split line, as the Unclassified view does', async () => {
@@ -125,9 +124,8 @@ describe('Attention items', () => {
     const items = await listAttentionItems(t.ctx, { today: TODAY });
 
     expect(items).toMatchObject([{ kind: 'unclassified', count: 1 }]);
-    expect(items[0]).toMatchObject({
-      count: (await getClassificationProgress(t.ctx)).unclassified,
-    });
+    const { unclassified } = await getClassificationProgress(t.ctx);
+    expect(items[0]).toMatchObject({ count: unclassified });
   });
 
   it('lists nothing once every Transaction is classified', async () => {

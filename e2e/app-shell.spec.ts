@@ -1,10 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createAccount } from '../src/server/services/accounts';
+import { archiveAccount, createAccount } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import { createCategory, createCategoryGroup } from '../src/server/services/categories';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { SIGNED_OUT } from './support/auth';
-import { classifyEverything, freshenFxRates, type RestoreFxRates } from './support/attention';
+import {
+  classifyEverything,
+  freshenFxRates,
+  restoreAccounts,
+  setAsideCheckedAccounts,
+} from './support/attention';
 import { withServices } from './support/services';
 
 test('the top bar marks the current page among its pills', async ({ page }) => {
@@ -212,16 +217,50 @@ test('the bell lists Stale FX rates first and leads to Accounts', async ({ page 
   await expect(page.getByRole('alert').filter({ hasText: 'FX rates are stale' })).toBeVisible();
 });
 
+test('an Account failing the Completeness check has its line, linking to the Account', async ({
+  page,
+}) => {
+  const name = `Bell import ${Date.now()}`;
+  const accountId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `${name} bank` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      name,
+      currency: 'CHF',
+      kind: 'current',
+      importFormat: 'camt053',
+      openingBalanceMinor: 0,
+    });
+    return account.id;
+  });
+  try {
+    await page.goto('/categories');
+    await bell(page).click();
+
+    await bellPopover(page)
+      .getByRole('link', { name: new RegExp(`^${name} has no Import yet`) })
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`/accounts/${accountId}$`));
+  } finally {
+    // Archived, it is no longer checked: later specs never see it.
+    await withServices((ctx) => archiveAccount(ctx, accountId));
+  }
+});
+
 test('with nothing to act on, the bell says Nothing needs attention', async ({ page }) => {
-  // The E2E database is shared by the whole run: classify whatever earlier specs left, and
-  // fetch today's FX rates (put back afterwards, for the specs that seed their own).
-  const restoreFxRates = await withServices<RestoreFxRates>(async (ctx) => {
+  // The E2E database is shared by the whole run: classify whatever earlier specs left, set
+  // aside the Accounts the Completeness check lists and fetch today's FX rates, all put back
+  // once the test is done.
+  const { setAside, restoreFxRates } = await withServices(async (ctx) => {
     const group = await createCategoryGroup(ctx, { name: `Bell ${Date.now()}`, type: 'expense' });
     const category = await createCategory(ctx, { groupId: group.id, name: 'Everything' });
     await classifyEverything(ctx, category.id);
-    return freshenFxRates(ctx);
+    return {
+      setAside: await setAsideCheckedAccounts(ctx),
+      restoreFxRates: await freshenFxRates(ctx),
+    };
   });
-
   try {
     await page.goto('/categories');
     await bell(page).click();
@@ -230,7 +269,10 @@ test('with nothing to act on, the bell says Nothing needs attention', async ({ p
     await expect(bellPopover(page)).toContainText('Nothing needs attention');
     await expect(bellPopover(page).getByRole('link')).toHaveCount(0);
   } finally {
-    await withServices(restoreFxRates);
+    await withServices(async (ctx) => {
+      await restoreAccounts(ctx, setAside);
+      await restoreFxRates(ctx);
+    });
   }
 });
 
