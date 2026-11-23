@@ -162,9 +162,18 @@ describe('the Card Periods in the URL', () => {
       'net-cash-flow',
       'spending-by-category',
       'profit-and-loss',
-      'income-vs-expense',
+      'profit-per-interval',
       'categories-per-interval',
     ]);
+  });
+
+  it('drops a pin on income-vs-expense while no section goes by that id', () => {
+    expect(
+      cardPeriodsFromParams({
+        'income-vs-expense': 'year-to-date',
+        'profit-per-interval': 'rolling-90-days',
+      }),
+    ).toEqual({ 'profit-per-interval': 'rolling-90-days' });
   });
 
   it('round-trips the page Period and its pins through an Analytics link', () => {

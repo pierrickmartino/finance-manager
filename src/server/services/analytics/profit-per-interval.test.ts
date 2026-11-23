@@ -20,7 +20,10 @@ import { linkTransfer, splitLineSide, transactionSide } from '../transfers';
 import { readCard } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 
-/** Analytics' Income vs. expense table (spec #170, user stories 34-37, 39, 41-44). */
+/**
+ * Analytics' Profit per interval table (spec #170, user stories 34-37, 39, 41-44), the former
+ * Income vs. expense heatmap (renamed by spec #270, ADR-0020).
+ */
 
 const t = setupTestDatabase();
 
@@ -76,15 +79,15 @@ async function dataset(): Promise<void> {
 
 const money = String;
 
-describe('Income vs. expense', () => {
+describe('Profit per interval', () => {
   it('is a heatmap card: a row per type, then Profit and Net cash flow, per interval and in Total', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense');
+    const card = await loadSection(t.ctx, MONTHLY, 'profitPerInterval');
     const data = card.data!;
 
-    expect(card.name).toBe('Income vs. expense');
+    expect(card.name).toBe('Profit per interval');
     expect(card.isEmpty).toBe(false);
     expect(readCard(card, money).kind).toBe('grid');
     expect(labels(data.columns)).toEqual([
@@ -140,7 +143,7 @@ describe('Income vs. expense', () => {
       sides: [splitLineSide(lines.splitLines[0]!.id), transactionSide(credit!)],
     });
 
-    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense');
+    const card = await loadSection(t.ctx, MONTHLY, 'profitPerInterval');
     const data = card.data!;
 
     const empty = Array<null>(10).fill(null);
@@ -172,7 +175,7 @@ describe('Income vs. expense', () => {
       { bookingDate: '2025-01-14', amountMinor: 7_000 },
     ]);
 
-    const data = (await loadSection(t.ctx, MONTHLY, 'incomeVsExpense')).data!;
+    const data = (await loadSection(t.ctx, MONTHLY, 'profitPerInterval')).data!;
 
     const empty = Array<null>(10).fill(null);
     const unclassified = data.rows.findIndex((row) => row.key === 'unclassified');
@@ -195,7 +198,7 @@ describe('Income vs. expense', () => {
     const barclays = await seedAccount(t.ctx, 'Barclays', 'GBP');
     await seedClassified(t.ctx, barclays, [{ bookingDate: '2025-02-12', amountMinor: -3_000 }]);
 
-    const data = (await loadSection(t.ctx, MONTHLY, 'incomeVsExpense')).data!;
+    const data = (await loadSection(t.ctx, MONTHLY, 'profitPerInterval')).data!;
 
     expect(data.rows.map((row) => row.key)).toContain('unclassified');
   });
@@ -204,7 +207,7 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense');
+    const card = await loadSection(t.ctx, MONTHLY, 'profitPerInterval');
 
     // Income and Expense net to a total Income isn't a share of: the card names the largest row.
     expect(readCard(card, money).lead).toMatchObject({
@@ -217,8 +220,8 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = (await loadSection(t.ctx, QUARTERLY, 'incomeVsExpense')).data!;
-    const years = (await loadSection(t.ctx, YEARLY, 'incomeVsExpense')).data!;
+    const quarters = (await loadSection(t.ctx, QUARTERLY, 'profitPerInterval')).data!;
+    const years = (await loadSection(t.ctx, YEARLY, 'profitPerInterval')).data!;
 
     const expense = (data: ChartSource) => data.rows.findIndex((row) => row.key === 'expense');
     expect(labels(quarters.columns)).toEqual([
@@ -235,7 +238,7 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, QUARTERLY, 'incomeVsExpense');
+    const card = await loadSection(t.ctx, QUARTERLY, 'profitPerInterval');
 
     const values = linkedValues(card.data!);
     // 5 rows of 5 quarters, 5 row totals, 5 column totals and the total.
@@ -252,9 +255,9 @@ describe('Income vs. expense', () => {
   it('pinned, reads its own Period by quarter while the page reads months, each Drill-down over it', async () => {
     fixToday('2025-03-20');
     await dataset();
-    const pins = { 'income-vs-expense': 'this-year-and-last-1' } as const;
+    const pins = { 'profit-per-interval': 'this-year-and-last-1' } as const;
 
-    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense', pins);
+    const card = await loadSection(t.ctx, MONTHLY, 'profitPerInterval', pins);
     const data = card.data!;
 
     expect(card.isPinned).toBe(true);
@@ -286,8 +289,8 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, YEARLY, 'incomeVsExpense', {
-      'income-vs-expense': 'rolling-90-days',
+    const card = await loadSection(t.ctx, YEARLY, 'profitPerInterval', {
+      'profit-per-interval': 'rolling-90-days',
     });
     const data = card.data!;
 
@@ -305,7 +308,7 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, YEARLY, 'incomeVsExpense', {
+    const card = await loadSection(t.ctx, YEARLY, 'profitPerInterval', {
       'net-cash-flow': 'rolling-90-days',
     });
 
@@ -318,10 +321,10 @@ describe('Income vs. expense', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const pinned = await loadSection(t.ctx, YEARLY, 'incomeVsExpense', {
-      'income-vs-expense': 'rolling-90-days',
+    const pinned = await loadSection(t.ctx, YEARLY, 'profitPerInterval', {
+      'profit-per-interval': 'rolling-90-days',
     });
-    const unpinned = await loadSection(t.ctx, YEARLY, 'incomeVsExpense');
+    const unpinned = await loadSection(t.ctx, YEARLY, 'profitPerInterval');
 
     expect(pinned.periodName).toBe('Rolling 90 days');
     expect(unpinned.periodName).toBeNull();
@@ -330,7 +333,7 @@ describe('Income vs. expense', () => {
   it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');
 
-    const card = await loadSection(t.ctx, YEARLY, 'incomeVsExpense');
+    const card = await loadSection(t.ctx, YEARLY, 'profitPerInterval');
 
     expect(card.isEmpty).toBe(true);
     expect(card.data!.rowTotals.every((total) => total === null)).toBe(true);

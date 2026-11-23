@@ -20,7 +20,7 @@ import {
 import type { AnalyticsReading } from './reading';
 
 /**
- * Analytics' Income vs. expense, drawn as the Dashboard's heatmap card: Income, Expense and
+ * Analytics' Profit per interval, drawn as the Dashboard's heatmap card: Income, Expense and
  * Capital per interval of the Period, then Profit (Income − Expense), Unclassified (only when the
  * Period has any) and Net cash flow (Profit + Capital + Unclassified), each with its Total.
  * Signed CHF amounts, as booked: expense is negative and a refund nets within it. Figures go
@@ -29,13 +29,13 @@ import type { AnalyticsReading } from './reading';
  * every flow the report holds, as the Net cash flow section reads it.
  */
 
-export const INCOME_VS_EXPENSE = 'Income vs. expense';
+export const PROFIT_PER_INTERVAL = 'Profit per interval';
 
-export type IncomeVsExpenseRow =
+export type ProfitPerIntervalRow =
   'income' | 'expense' | 'capital' | 'profit' | 'unclassified' | 'netCashFlow';
 
 interface RowDefinition {
-  key: IncomeVsExpenseRow;
+  key: ProfitPerIntervalRow;
   label: string;
   /** The Category group types the row adds up. */
   types: readonly GroupTypeKey[];
@@ -57,7 +57,7 @@ const ROWS: readonly RowDefinition[] = [
   { key: 'netCashFlow', label: 'Net cash flow', types: ['income', 'expense', 'capital', null] },
 ];
 
-export async function incomeVsExpense(
+export async function profitPerInterval(
   ctx: ServiceContext,
   reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
@@ -76,8 +76,8 @@ export async function incomeVsExpense(
     }),
   );
   return analyticsCard({
-    id: 'income-vs-expense',
-    name: INCOME_VS_EXPENSE,
+    id: 'profit-per-interval',
+    name: PROFIT_PER_INTERVAL,
     visualisation: 'table',
     rows: 'categoryGroupType',
     data: intervalRowsSource(reading, rows, report),

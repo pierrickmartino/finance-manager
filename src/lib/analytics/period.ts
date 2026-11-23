@@ -215,7 +215,7 @@ export const PINNABLE_SECTIONS = [
   'net-cash-flow',
   'spending-by-category',
   'profit-and-loss',
-  'income-vs-expense',
+  'profit-per-interval',
   'categories-per-interval',
 ] as const;
 
