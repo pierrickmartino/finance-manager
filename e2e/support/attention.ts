@@ -1,4 +1,7 @@
+import { archiveAccount } from '../../src/server/services/accounts';
+import { checkCompleteness } from '../../src/server/services/completeness';
 import type { ServiceContext } from '../../src/server/services/context';
+import { swissToday } from '../../src/server/services/fx/dates';
 import {
   editClassification,
   listTransactions,
@@ -40,4 +43,25 @@ export async function classifyEverything(ctx: ServiceContext, categoryId: string
     }
   }
   throw new Error('Transactions are still Unclassified');
+}
+
+/**
+ * Archives every Account the Completeness check lists now, so a test controls every checked
+ * Account (and the bell has no Completeness item): the E2E database is shared by the run, and
+ * earlier specs leave imported Accounts whose data is Stale by now. Returns their ids, for
+ * `restoreAccounts`.
+ */
+export async function setAsideCheckedAccounts(ctx: ServiceContext): Promise<string[]> {
+  const entries = await checkCompleteness(ctx, { today: swissToday() });
+  const ids = entries.map((entry) => entry.account.id);
+  for (const id of ids) await archiveAccount(ctx, id);
+  return ids;
+}
+
+/**
+ * Un-archives the Accounts `setAsideCheckedAccounts` archived, leaving other specs' data as it
+ * found it. No service un-archives an Account, so this clean-up is SQL.
+ */
+export async function restoreAccounts(ctx: ServiceContext, ids: string[]): Promise<void> {
+  await ctx.db.query('UPDATE account SET archived_at = NULL WHERE id = ANY($1::uuid[])', [ids]);
 }
