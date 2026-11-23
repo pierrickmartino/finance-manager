@@ -4,7 +4,7 @@ import { createBank } from '../src/server/services/banks';
 import { createCategory, createCategoryGroup } from '../src/server/services/categories';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { SIGNED_OUT } from './support/auth';
-import { classifyEverything } from './support/attention';
+import { classifyEverything, freshenFxRates, type RestoreFxRates } from './support/attention';
 import { withServices } from './support/services';
 
 test('the top bar marks the current page among its pills', async ({ page }) => {
@@ -109,7 +109,9 @@ test('the bell lists the Unclassified Transactions and leads to Unclassified', a
     name: /^\d+ Transactions? (is|are) Unclassified(, unread)?$/,
   });
   await expect(item).toBeVisible();
-  await expect(bellPopover(page)).toHaveAccessibleName('Needs attention 1');
+  // Other kinds (the E2E database's FX rates are Stale) may be listed too.
+  const count = await bellPopover(page).getByRole('link').count();
+  await expect(bellPopover(page)).toHaveAccessibleName(`Needs attention ${count}`);
 
   await item.click();
   await expect(page).toHaveURL(/\/unclassified$/);
@@ -195,20 +197,41 @@ test('the bell works from the keyboard, and Escape gives focus back to it', asyn
   await expect(bell(page)).toBeFocused();
 });
 
-test('with nothing to act on, the bell says Nothing needs attention', async ({ page }) => {
-  // The E2E database is shared by the whole run: classify whatever earlier specs left.
-  await withServices(async (ctx) => {
-    const group = await createCategoryGroup(ctx, { name: `Bell ${Date.now()}`, type: 'expense' });
-    const category = await createCategory(ctx, { groupId: group.id, name: 'Everything' });
-    await classifyEverything(ctx, category.id);
-  });
-
+test('the bell lists Stale FX rates first and leads to Accounts', async ({ page }) => {
+  // The E2E database has no fresh FX rates: none, or only those a spec seeds for past dates.
   await page.goto('/categories');
   await bell(page).click();
 
-  await expect(bellPopover(page)).toHaveAccessibleName('Needs attention 0');
-  await expect(bellPopover(page)).toContainText('Nothing needs attention');
-  await expect(bellPopover(page).getByRole('link')).toHaveCount(0);
+  const first = bellPopover(page).getByRole('link').first();
+  await expect(first).toHaveAccessibleName(
+    /^FX rates are stale: .+\. CHF values may be out of date\.(, unread)?$/,
+  );
+
+  await first.click();
+  await expect(page).toHaveURL(/\/accounts$/);
+  await expect(page.getByRole('alert').filter({ hasText: 'FX rates are stale' })).toBeVisible();
+});
+
+test('with nothing to act on, the bell says Nothing needs attention', async ({ page }) => {
+  // The E2E database is shared by the whole run: classify whatever earlier specs left, and
+  // fetch today's FX rates (put back afterwards, for the specs that seed their own).
+  const restoreFxRates = await withServices<RestoreFxRates>(async (ctx) => {
+    const group = await createCategoryGroup(ctx, { name: `Bell ${Date.now()}`, type: 'expense' });
+    const category = await createCategory(ctx, { groupId: group.id, name: 'Everything' });
+    await classifyEverything(ctx, category.id);
+    return freshenFxRates(ctx);
+  });
+
+  try {
+    await page.goto('/categories');
+    await bell(page).click();
+
+    await expect(bellPopover(page)).toHaveAccessibleName('Needs attention 0');
+    await expect(bellPopover(page)).toContainText('Nothing needs attention');
+    await expect(bellPopover(page).getByRole('link')).toHaveCount(0);
+  } finally {
+    await withServices(restoreFxRates);
+  }
 });
 
 test.describe('signed out', () => {

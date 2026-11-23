@@ -12,12 +12,21 @@ import { useAttentionItems } from './use-attention-items';
 
 /** The item's line, worded as its own page words it. */
 function itemLine(item: AttentionItem): string {
-  const verb = item.count === 1 ? 'is' : 'are';
-  return `${transactionCountLabel(item.count)} ${verb} Unclassified`;
+  switch (item.kind) {
+    case 'fx-rates':
+      return `FX rates are stale: ${item.reason}. CHF values may be out of date.`;
+    case 'unclassified': {
+      const verb = item.count === 1 ? 'is' : 'are';
+      return `${transactionCountLabel(item.count)} ${verb} Unclassified`;
+    }
+  }
 }
 
 /** The item's badge, in its tone: what kind of attention it asks for. */
-const BADGES: Record<AttentionItem['kind'], string> = { unclassified: 'Unclassified' };
+const BADGES: Record<AttentionItem['kind'], string> = {
+  'fx-rates': 'Stale',
+  unclassified: 'Unclassified',
+};
 
 /** An item's identity, kind plus subject: its key in the list. */
 function itemKey(item: AttentionItem): string {

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { withTransaction } from '@/server/db/transaction';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
+import { fxRatesKind, type FxRatesAttentionItem } from './fx-rates';
 import type { AttentionKind, FormedAttentionItem } from './kind';
 import { unclassifiedKind, type UnclassifiedAttentionItem } from './unclassified';
 
@@ -16,11 +17,12 @@ import { unclassifiedKind, type UnclassifiedAttentionItem } from './unclassified
  * to `KINDS`, in display order.
  */
 
+export type { FxRatesAttentionItem } from './fx-rates';
 export type { AttentionTone } from './kind';
 export type { UnclassifiedAttentionItem } from './unclassified';
 
 /** An Attention item of any kind, as its kind lists it. */
-export type ListedAttentionItem = UnclassifiedAttentionItem;
+export type ListedAttentionItem = FxRatesAttentionItem | UnclassifiedAttentionItem;
 
 /** An Attention item, and whether it is unread: new, or worse, since the bell was last opened. */
 export type AttentionItem = ListedAttentionItem & { unread: boolean };
@@ -29,7 +31,7 @@ export type AttentionItem = ListedAttentionItem & { unread: boolean };
  * Every kind, in display order: FX rates, Completeness by severity, Missed, Price increase,
  * Unclassified.
  */
-const KINDS: readonly AttentionKind<ListedAttentionItem>[] = [unclassifiedKind];
+const KINDS: readonly AttentionKind<ListedAttentionItem>[] = [fxRatesKind, unclassifiedKind];
 
 const input = z.object({ today: z.iso.date() });
 
