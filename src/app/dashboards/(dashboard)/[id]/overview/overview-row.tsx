@@ -10,6 +10,7 @@ import {
   INSIGHT_TILE_CLASS,
   TILE_CLASS,
 } from '@/components/surface';
+import { TitleRow } from '@/components/title-row';
 import { readCard, type CardFlow, type MonthFlow, type WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { plural } from '@/lib/reporting/drill-summary';
@@ -193,18 +194,11 @@ export function NetWorthCard({
       className={`${TILE_CLASS} flex flex-col ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
       style={{ backgroundImage: cssGradient(RAMP_FILLS.netWorthTile) }}
     >
-      {titleAside ? (
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <h2 id="overview-headline" className="font-medium">
-            {headline.label}
-          </h2>
-          {titleAside}
-        </div>
-      ) : (
+      <TitleRow aside={titleAside}>
         <h2 id="overview-headline" className="font-medium">
           {headline.label}
         </h2>
-      )}
+      </TitleRow>
       <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-3">
         <Link href={headline.href} className={`${HEADLINE_AMOUNT_CLASS} shrink-0 hover:underline`}>
           {money(headline.value)}

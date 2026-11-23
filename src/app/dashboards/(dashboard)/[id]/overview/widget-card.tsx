@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { WIDGET_CARD_CLASS } from '@/components/surface';
+import { TitleRow } from '@/components/title-row';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
 import { CARD_LEAD_SIZE_CLASS } from './card-layout';
@@ -71,18 +72,11 @@ export function WidgetCard({ card, className = '', toolbar, titleAside }: Widget
     >
       {toolbar}
       <div>
-        {titleAside ? (
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <h2 id={`card-${card.id}`} className="font-medium">
-              {card.name}
-            </h2>
-            {titleAside}
-          </div>
-        ) : (
+        <TitleRow aside={titleAside}>
           <h2 id={`card-${card.id}`} className="font-medium">
             {card.name}
           </h2>
-        )}
+        </TitleRow>
         {reading.lead && (
           <>
             <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>

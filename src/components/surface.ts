@@ -108,6 +108,11 @@ export type BadgeTone = keyof typeof BADGE_CLASS;
  * preset's name in the accent, beside the Card's title. Only a pinned Card shows it.
  */
 export const CARD_PERIOD_MARK_CLASS = `${BADGE_BASE} bg-accent-tint text-accent-ink`;
+/**
+ * A title with something beside it (an Analytics Card's Period mark and dropdown): the title on
+ * the left, the aside on the right, wrapping onto two lines when narrow. `TitleRow` draws it.
+ */
+export const TITLE_ROW_CLASS = 'flex flex-wrap items-center justify-between gap-x-3 gap-y-1';
 
 // Buttons --------------------------------------------------------------------------------------
 

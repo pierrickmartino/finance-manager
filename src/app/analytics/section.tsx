@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from 'react';
 import { PLACEHOLDER_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
+import { TitleRow } from '@/components/title-row';
 import { plural } from '@/lib/reporting/drill-summary';
 import { SectionErrorBoundary } from './section-error-boundary';
 import { SECTION_CLASS, sectionFrameClass } from './section-frame';
@@ -34,17 +35,11 @@ export function SectionCard({
   titleAside,
   children,
 }: SectionCardProps) {
-  const title = <h2 className={SECTION_TITLE_CLASS}>{name}</h2>;
   return (
     <section aria-label={name} className={`${SECTION_CLASS} ${className}`}>
-      {titleAside ? (
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          {title}
-          {titleAside}
-        </div>
-      ) : (
-        title
-      )}
+      <TitleRow aside={titleAside}>
+        <h2 className={SECTION_TITLE_CLASS}>{name}</h2>
+      </TitleRow>
       {unconverted && unconverted.count > 0 && <UnconvertedNote {...unconverted} />}
       {children}
     </section>
