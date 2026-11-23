@@ -834,3 +834,20 @@ test('every section with figures left out for want of an FX rate says so', async
   // And the three Key figures and three Profit and loss rows it weighs on.
   await expect(notes).toHaveCount(7 + 3 + 3);
 });
+
+test('on a wide screen the third-width sections draw their lead a size down, from their own width', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  await seedSalary(suffix);
+  await seedGrocery(suffix);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/analytics');
+  // About 355px inside at 1280, under the Card's lead threshold (28rem): the smaller size.
+  for (const name of ['Net cash flow', 'Account balances in CHF', 'Spending by Category']) {
+    const lead = region(page, name).locator('h2 ~ p.font-display');
+    await expect(lead).toBeVisible();
+    expect(await lead.evaluate((el) => getComputedStyle(el).fontSize)).toBe('20px');
+  }
+});

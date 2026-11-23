@@ -601,6 +601,11 @@ async function ringListPlacement(card: Locator): Promise<'below' | 'beside'> {
   throw new Error('The list overlaps the ring');
 }
 
+/** The computed font size of a Card's lead figure, the line under its headline. */
+async function leadFontSize(card: Locator): Promise<string> {
+  return card.locator('h2 ~ p.font-display').evaluate((el) => getComputedStyle(el).fontSize);
+}
+
 test("a ring Card lays out from its own width, not the window's: list below on a narrow Card, beside on a wide one", async ({
   page,
 }) => {
@@ -669,6 +674,9 @@ test("a ring Card lays out from its own width, not the window's: list below on a
   }
   expect(await ringListPlacement(card('Narrow ring'))).toBe('below');
   expect(await ringListPlacement(card('Wide ring'))).toBe('beside');
+  // The lead figure: a size down on the narrow Card, full size on the wide one.
+  expect(await leadFontSize(card('Narrow ring'))).toBe('20px');
+  expect(await leadFontSize(card('Wide ring'))).toBe('30px');
 
   // Edit mode draws the same Cards at the same widths, so the same way.
   await page.getByRole('link', { name: 'Edit Dashboard' }).click();
@@ -676,6 +684,8 @@ test("a ring Card lays out from its own width, not the window's: list below on a
   await boardIsStill(page);
   expect(await ringListPlacement(card('Narrow ring'))).toBe('below');
   expect(await ringListPlacement(card('Wide ring'))).toBe('beside');
+  expect(await leadFontSize(card('Narrow ring'))).toBe('20px');
+  expect(await leadFontSize(card('Wide ring'))).toBe('30px');
 });
 
 /** How many columns a Card's facts sit in: the facts on the first one's line. */
