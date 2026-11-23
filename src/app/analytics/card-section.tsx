@@ -30,5 +30,5 @@ export async function CardSection({ card, empty, className = '' }: CardSectionPr
       </SectionCard>
     );
   }
-  return <WidgetCard card={loaded} className={`min-w-0 ${className}`} isCompact />;
+  return <WidgetCard card={loaded} className={`min-w-0 ${className}`} />;
 }

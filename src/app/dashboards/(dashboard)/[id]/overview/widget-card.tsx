@@ -4,9 +4,10 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
-import { TILE_CLASS } from '@/components/surface';
+import { WIDGET_CARD_CLASS } from '@/components/surface';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
+import { CARD_LEAD_SIZE_CLASS } from './card-layout';
 import { HeatmapGrid } from './heatmap-grid';
 import { DotMatrix, EmptyChart, MonthBars, TickList } from './marks';
 import { NetWorthLine } from './net-worth-mark';
@@ -51,22 +52,20 @@ interface WidgetCardProps {
   className?: string;
   /** Edit mode's actions on this Widget, at the top of its card. */
   toolbar?: ReactNode;
-  /** Draws the lead figure a size down, for pages that set several cards side by side (Analytics). */
-  isCompact?: boolean;
 }
 
 /**
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ card, className = '', toolbar, isCompact = false }: WidgetCardProps) {
+export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const reading = readCard(card, money);
   return (
     <section
       aria-labelledby={`card-${card.id}`}
-      className={`${TILE_CLASS} flex flex-col gap-4 ${className}`}
+      className={`${WIDGET_CARD_CLASS} flex flex-col gap-4 ${className}`}
     >
       {toolbar}
       <div>
@@ -77,7 +76,8 @@ export function WidgetCard({ card, className = '', toolbar, isCompact = false }:
           <>
             <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>
             <p
-              className={`font-display tracking-tight tabular-nums ${isCompact ? 'text-xl' : 'text-3xl'}`}
+              data-testid="card-lead"
+              className={`font-display tracking-tight tabular-nums ${CARD_LEAD_SIZE_CLASS}`}
             >
               <FigureLink href={reading.lead.href}>{reading.lead.detail}</FigureLink>
             </p>
@@ -90,7 +90,7 @@ export function WidgetCard({ card, className = '', toolbar, isCompact = false }:
       )}
       <CardBody mark={reading.mark} money={money} />
       {reading.facts.length > 0 && (
-        <dl className="grid grid-cols-2 gap-3 border-t border-rule pt-3">
+        <dl className="grid grid-cols-1 gap-3 border-t border-rule pt-3 @2xs:grid-cols-2 @2xl:grid-cols-3">
           {reading.facts.map((fact) => (
             <div key={fact.label}>
               <dt className="text-xs text-muted">{fact.label}</dt>

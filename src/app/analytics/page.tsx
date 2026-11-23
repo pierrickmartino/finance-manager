@@ -102,19 +102,19 @@ export default async function AnalyticsPage({
         {/* Net cash flow, Account balances and Spending by Category side by side on wide screens,
             one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref}>
+          <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
             <CardSection
               card={sections.netCashFlow}
               empty="Nothing to show yet: no Transactions in these periods."
             />
           </StreamedSection>
-          <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref}>
+          <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref} isCard>
             <CardSection
               card={sections.accountBalances}
               empty="Nothing to show yet: no Accounts."
             />
           </StreamedSection>
-          <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref}>
+          <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref} isCard>
             <CardSection
               card={sections.spendingByCategory}
               empty="Nothing to show yet: no expense in these periods."
@@ -125,13 +125,13 @@ export default async function AnalyticsPage({
         <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
           <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
         </StreamedSection>
-        <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
+        <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref} isCard>
           <CardSection
             card={sections.incomeVsExpense}
             empty="Nothing to show yet: no income, expense or Capital in these periods."
           />
         </StreamedSection>
-        <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref}>
+        <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref} isCard>
           <CardSection
             card={sections.categoriesPerPeriod}
             empty="Nothing to show yet: no classified Transactions in these periods."

@@ -97,7 +97,7 @@ export function MonthBars({ periods }: { periods: PeriodValue[] }) {
   const marked = shown.length - 1;
   const max = Math.max(1, ...shown.map((period) => Math.abs(period.value)));
   return (
-    <div className="flex h-52 items-end gap-3 pt-8">
+    <div className="flex h-52 items-end gap-1.5 pt-8 @xs:gap-3">
       {shown.map((period, i) => {
         const tone = barTone(period, i === marked);
         return (
@@ -155,12 +155,12 @@ export function TickList({ items }: { items: TickItem[] }) {
       {items.map((item) => {
         const lit = litTicks(item.share, TICKS);
         const row = (
-          <span className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-2xl bg-paper px-4 py-3 hover:bg-sunken">
+          <span className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl bg-paper px-4 py-3 hover:bg-sunken @2xs:grid-cols-[1fr_auto_auto]">
             <span className="min-w-0">
               <span className="block truncate font-medium">{item.title}</span>
               <span className="block truncate text-xs text-muted">{item.detail}</span>
             </span>
-            <span className="flex gap-0.5" aria-hidden>
+            <span className="hidden gap-0.5 @2xs:flex" aria-hidden>
               {Array.from({ length: TICKS }, (_, i) => (
                 <span
                   key={i}
