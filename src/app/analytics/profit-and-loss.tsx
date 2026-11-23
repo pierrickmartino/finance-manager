@@ -1,12 +1,15 @@
 import Link from 'next/link';
+import { periodLabel } from '@/lib/analytics/period';
 import type { Formatter } from '@/lib/format';
 import {
   PROFIT_AND_LOSS,
   type AnalyticsProfitAndLoss,
+  type Pinnable,
   type ProfitAndLossRow,
   type ProfitAndLossRowId,
 } from '@/server/services/analytics';
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
+import { SectionCardPeriod } from './card-section';
 import { ChangeLine } from './key-figure-change';
 import { SectionCard, UnconvertedNote } from './section';
 
@@ -90,7 +93,7 @@ function StatementRow({ row, fmt, hasComparison }: StatementRowProps) {
 }
 
 interface ProfitAndLossSectionProps {
-  profitAndLoss: Promise<AnalyticsProfitAndLoss>;
+  profitAndLoss: Promise<Pinnable<AnalyticsProfitAndLoss>>;
   fmt: Formatter;
 }
 
@@ -99,15 +102,28 @@ interface ProfitAndLossSectionProps {
  * a row per figure from Income down to Net cash flow, highlighted at its foot. Expense reads
  * positive; each amount opens the Transactions behind it. Beside it, when the Account data
  * reaches back that far, each row's amount over the Comparison period and its change line, which
- * opens the Transactions of both stretches.
+ * opens the Transactions of both stretches. Its header holds its Card Period (GLOSSARY): pinned,
+ * the statement reads over its own preset and compares with that preset's Comparison period.
  */
 export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLossSectionProps) {
-  const { rows } = await profitAndLoss;
+  const { rows, reading, isPinned } = await profitAndLoss;
   const hasComparison = rows.some((row) => row.change !== null);
+  const over = isPinned ? periodLabel(reading.period) : 'the Period';
   return (
-    <SectionCard name={PROFIT_AND_LOSS}>
+    <SectionCard
+      name={PROFIT_AND_LOSS}
+      titleAside={
+        <SectionCardPeriod
+          name={PROFIT_AND_LOSS}
+          section="profit-and-loss"
+          read={{ reading, isPinned }}
+        />
+      }
+    >
       <table className="w-full max-w-2xl border-collapse text-sm">
-        <caption className="sr-only">{PROFIT_AND_LOSS} over the Period</caption>
+        <caption className="sr-only">
+          {PROFIT_AND_LOSS} over {over}
+        </caption>
         {hasComparison && (
           <thead>
             <tr className="text-muted">
