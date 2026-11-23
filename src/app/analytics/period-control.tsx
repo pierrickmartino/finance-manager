@@ -10,11 +10,12 @@ import {
   isPeriodPreset,
   PERIOD_PRESET_LABELS,
   PERIOD_PRESETS,
-  PINNABLE_SECTIONS,
+  cardPeriodsToParams,
   type CardPeriods,
   type Period,
   type PeriodPreset,
 } from '@/lib/analytics/period';
+import { HiddenFields } from './hidden-fields';
 
 interface PeriodControlProps {
   period: Period;
@@ -126,10 +127,7 @@ export function PeriodControl({
           className={INPUT_CLASS}
         />
       </div>
-      {PINNABLE_SECTIONS.map((section) => {
-        const pin = cardPeriods[section];
-        return pin && <input key={section} type="hidden" name={section} value={pin} />;
-      })}
+      <HiddenFields params={cardPeriodsToParams(cardPeriods)} />
       <button type="submit" className={SECONDARY_BUTTON_CLASS}>
         Show
       </button>

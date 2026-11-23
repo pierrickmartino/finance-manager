@@ -138,7 +138,10 @@ describe('Spending by Category', () => {
     const reading = readCard(card, money);
 
     for (const { value, href } of linkedValues(card.data!)) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', period: MONTHLY });
+      expect(originOf(href)).toEqual({
+        kind: 'analytics',
+        page: { period: MONTHLY, cardPeriods: {} },
+      });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
     const items = reading.mark.type === 'ticks' ? reading.mark.items : [];
@@ -204,7 +207,10 @@ describe('Spending by Category', () => {
     // Year to date: Rent -1'000.00, Groceries -900.00, Books -300.00 net of its refund.
     expect(card.data!.total).toBe(-220_000);
     for (const { value, href } of linkedValues(card.data!)) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', period: MONTHLY, cardPeriods: pins });
+      expect(originOf(href)).toEqual({
+        kind: 'analytics',
+        page: { period: MONTHLY, cardPeriods: pins },
+      });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });

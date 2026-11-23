@@ -150,7 +150,10 @@ describe('Key figures', () => {
     const both = await openDrill(t.ctx, profit.href);
     expect(both.sumChfMinor).toBe(265_000);
     expect(both.total).toBe(8);
-    expect(originOf(profit.href)).toEqual({ kind: 'analytics', period: MONTHLY });
+    expect(originOf(profit.href)).toEqual({
+      kind: 'analytics',
+      page: { period: MONTHLY, cardPeriods: {} },
+    });
   });
 
   it('over Quarter to date and Year to date, reads them and opens their Transactions, Net worth unchanged', async () => {
@@ -182,7 +185,10 @@ describe('Key figures', () => {
       for (const figure of section.figures.slice(1)) {
         const sign = figure.id === 'expense' ? -1 : 1;
         expect(await drilled(figure), figure.label).toBe(sign * figure.value);
-        expect(originOf(figure.href)).toEqual({ kind: 'analytics', period });
+        expect(originOf(figure.href)).toEqual({
+          kind: 'analytics',
+          page: { period, cardPeriods: {} },
+        });
       }
       expect(section.figures[0]!.href).toBe('/accounts?date=2025-05-20');
     }

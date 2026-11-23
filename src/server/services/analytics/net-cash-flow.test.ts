@@ -157,7 +157,10 @@ describe('Net cash flow', () => {
     for (const view of [MONTHLY, QUARTERLY, YEARLY]) {
       const card = await loadSection(t.ctx, view, 'netCashFlow');
       for (const { value, href } of linkedValues(card.data!)) {
-        expect(originOf(href)).toEqual({ kind: 'analytics', period: view });
+        expect(originOf(href)).toEqual({
+          kind: 'analytics',
+          page: { period: view, cardPeriods: {} },
+        });
         expect((await openDrill(t.ctx, href)).value).toBe(value);
       }
       // An interval with no Transaction reads 0 on the card.
@@ -191,7 +194,10 @@ describe('Net cash flow', () => {
     expect(average).toMatchObject({ label: 'Monthly average', value: '30000' });
     expect((await openDrill(t.ctx, average.href)).value).toBe(30_000);
     for (const { value, href } of linkedValues(card.data!)) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', period: YEARLY, cardPeriods: pins });
+      expect(originOf(href)).toEqual({
+        kind: 'analytics',
+        page: { period: YEARLY, cardPeriods: pins },
+      });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });

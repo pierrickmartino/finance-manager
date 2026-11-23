@@ -11,6 +11,7 @@ import {
   periodGrain,
   periodPhrase,
   periodStart,
+  unpinnedPage,
   type Period,
 } from './period';
 
@@ -143,10 +144,10 @@ describe('the Period in the URL', () => {
   });
 
   it('links Analytics with a preset by its slug, and a custom Period by its start date', () => {
-    expect(analyticsHref(preset('quarter-to-date'))).toBe('/analytics?period=quarter-to-date');
-    expect(analyticsHref({ kind: 'custom', from: '2024-03-01' })).toBe(
-      '/analytics?from=2024-03-01',
+    expect(analyticsHref(unpinnedPage(preset('quarter-to-date')))).toBe(
+      '/analytics?period=quarter-to-date',
     );
+    expect(analyticsHref(unpinnedPage(custom('2024-03-01')))).toBe('/analytics?from=2024-03-01');
   });
 });
 
@@ -171,7 +172,7 @@ describe('the Card Periods in the URL', () => {
       'spending-by-category': 'this-year-and-last-2',
       'net-worth': 'year-to-date',
     } as const;
-    const href = analyticsHref(preset('rolling-90-days'), pins);
+    const href = analyticsHref({ period: preset('rolling-90-days'), cardPeriods: pins });
 
     expect(href).toBe(
       '/analytics?period=rolling-90-days&net-worth=year-to-date&spending-by-category=this-year-and-last-2',
@@ -182,7 +183,10 @@ describe('the Card Periods in the URL', () => {
   });
 
   it('keeps pins beside a custom page Period', () => {
-    const href = analyticsHref(custom('2024-03-01'), { 'spending-by-category': 'year-to-date' });
+    const href = analyticsHref({
+      period: custom('2024-03-01'),
+      cardPeriods: { 'spending-by-category': 'year-to-date' },
+    });
 
     expect(href).toBe('/analytics?from=2024-03-01&spending-by-category=year-to-date');
     expect(periodFromParams(paramsOf(href), '2026-11-22')).toEqual(custom('2024-03-01'));
@@ -192,7 +196,10 @@ describe('the Card Periods in the URL', () => {
   });
 
   it('keeps a pin equal to the page Period: a pick is a pin', () => {
-    const href = analyticsHref(preset('year-to-date'), { 'spending-by-category': 'year-to-date' });
+    const href = analyticsHref({
+      period: preset('year-to-date'),
+      cardPeriods: { 'spending-by-category': 'year-to-date' },
+    });
 
     expect(cardPeriodsFromParams(paramsOf(href))).toEqual({
       'spending-by-category': 'year-to-date',
@@ -201,7 +208,7 @@ describe('the Card Periods in the URL', () => {
 
   it('has no pins on a bare visit', () => {
     expect(cardPeriodsFromParams({})).toEqual({});
-    expect(analyticsHref(preset('rolling-12-months'), {})).toBe(
+    expect(analyticsHref({ period: preset('rolling-12-months'), cardPeriods: {} })).toBe(
       '/analytics?period=rolling-12-months',
     );
   });

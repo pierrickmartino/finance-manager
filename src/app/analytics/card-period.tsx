@@ -15,6 +15,7 @@ import {
   type PeriodPreset,
   type PinnableSection,
 } from '@/lib/analytics/period';
+import { HiddenFields } from './hidden-fields';
 
 interface CardPeriodProps {
   /** The Card's name, which names its dropdown: "Period for Spending by Category". */
@@ -26,7 +27,7 @@ interface CardPeriodProps {
   pinned: PeriodPreset | null;
 }
 
-/** The dropdown's value for following the page's Period. */
+/** The dropdown's option for following the page's Period: the `null` choice. */
 const SAME_AS_PAGE = '';
 
 /**
@@ -37,12 +38,15 @@ const SAME_AS_PAGE = '';
  */
 export function CardPeriod({ name, section, page, pinned }: CardPeriodProps) {
   const id = useId();
-  const [choice, setChoice] = useState<string>(pinned ?? SAME_AS_PAGE);
-  const kept = periodToParams(page.period, withCardPeriod(page.cardPeriods, section, null));
+  const [choice, setChoice] = useState<PeriodPreset | null>(pinned);
+  const pageWithoutThisPin = periodToParams({
+    period: page.period,
+    cardPeriods: withCardPeriod(page.cardPeriods, section, null),
+  });
   const onChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const { value, form } = event.currentTarget;
     // Rendered before submitting, so "Same as page" sends no parameter for this Card.
-    flushSync(() => setChoice(value));
+    flushSync(() => setChoice(isPeriodPreset(value) ? value : null));
     form?.requestSubmit();
   };
 
@@ -59,16 +63,14 @@ export function CardPeriod({ name, section, page, pinned }: CardPeriodProps) {
           {PERIOD_PRESET_LABELS[pinned]}
         </span>
       )}
-      {[...kept].map(([field, value]) => (
-        <input key={field} type="hidden" name={field} value={value} />
-      ))}
+      <HiddenFields params={pageWithoutThisPin} />
       <label htmlFor={`${id}-period`} className="sr-only">
         Period for {name}
       </label>
       <select
         id={`${id}-period`}
-        name={isPeriodPreset(choice) ? section : undefined}
-        value={choice}
+        name={choice === null ? undefined : section}
+        value={choice ?? SAME_AS_PAGE}
         onChange={onChange}
         className={`${INPUT_CLASS} max-w-full text-xs`}
       >

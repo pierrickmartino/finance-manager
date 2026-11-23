@@ -183,7 +183,10 @@ describe('Spending Insights', () => {
       // "See the Transactions": the latest complete interval's income and expense.
       const latest = await openDrill(t.ctx, flow!.latestHref);
       expect(latest.value).toBe(complete.at(-1)!.net);
-      expect(originOf(flow!.latestHref!)).toEqual({ kind: 'analytics', period: view });
+      expect(originOf(flow!.latestHref!)).toEqual({
+        kind: 'analytics',
+        page: { period: view, cardPeriods: {} },
+      });
       // The change's working: every complete interval's spending, subtotalled per interval.
       const working = await openDrill(t.ctx, flow!.changeHref);
       expect(working.sumChfMinor).toBe(0 - complete.reduce((sum, month) => sum + month.expense, 0));

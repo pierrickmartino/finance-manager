@@ -184,7 +184,7 @@ export function flowChange(
   const { reading, report } = comparison;
   return periodChange(comparison, [value, earlier], {
     goodDirection: FLOW_GOOD_DIRECTIONS[id],
-    href: analyticsDrillUrl(reading, report.query, FLOW_CELLS[id]),
+    href: analyticsDrillUrl(reading.page, report.query, FLOW_CELLS[id]),
   });
 }
 

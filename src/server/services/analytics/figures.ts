@@ -1,4 +1,5 @@
-import { analyticsDrillUrl, analyticsOrigin } from '@/lib/analytics/links';
+import { analyticsDrillUrl } from '@/lib/analytics/links';
+import { analyticsDrillOrigin } from '@/lib/reporting/drill-origin';
 import type { WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { drillLinks, toChartSource } from '@/lib/reporting/pivot-source';
@@ -102,7 +103,7 @@ function markIncomplete(report: ReportTable, reading: AnalyticsReading): ReportT
  */
 export function reportSource(report: ReportTable, reading: AnalyticsReading): ChartSource {
   const marked = markIncomplete(report, reading);
-  return toChartSource(marked, drillLinks(marked, analyticsOrigin(reading)));
+  return toChartSource(marked, drillLinks(marked, analyticsDrillOrigin(reading.page)));
 }
 
 /** The sum of some figures; null when every one is null. */
@@ -179,7 +180,7 @@ export function intervalRowsSource(
   rows: readonly IntervalRow[],
   report: ReportTable,
 ): ChartSource {
-  const href = ({ query, cell }: DrillRef) => analyticsDrillUrl(reading, query, cell);
+  const href = ({ query, cell }: DrillRef) => analyticsDrillUrl(reading.page, query, cell);
   const { intervals } = reading;
   const totals = new Map(report.columns.map((column, c) => [column.key, report.columnTotals[c]]));
   return {

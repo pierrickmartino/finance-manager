@@ -179,7 +179,7 @@ export async function profitAndLoss(
     const [value, earlier] = [valueOf(totals), valueOf(earlierTotals)];
     const change = periodChange(comparison, [value, earlier], {
       goodDirection,
-      href: analyticsDrillUrl(reading, both, bothCell(definition)),
+      href: analyticsDrillUrl(reading.page, both, bothCell(definition)),
     });
     return {
       id,
@@ -187,7 +187,7 @@ export async function profitAndLoss(
       value,
       href: isUnclassified
         ? unclassifiedList
-        : analyticsDrillUrl(reading, report.query, periodCell(definition)),
+        : analyticsDrillUrl(reading.page, report.query, periodCell(definition)),
       unconverted: counts[index]?.unconverted ?? 0,
       earlier: change === null ? null : earlier,
       change,

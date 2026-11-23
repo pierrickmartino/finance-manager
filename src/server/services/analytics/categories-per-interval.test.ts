@@ -189,7 +189,10 @@ describe('Categories per interval', () => {
       const intervals = data.columns.length;
       expect(values).toHaveLength(7 * (intervals + 1) + intervals + 1);
       for (const { value, href } of values) {
-        expect(originOf(href)).toEqual({ kind: 'analytics', period: view });
+        expect(originOf(href)).toEqual({
+          kind: 'analytics',
+          page: { period: view, cardPeriods: {} },
+        });
         expect((await openDrill(t.ctx, href)).value).toBe(value);
       }
     },
@@ -222,7 +225,10 @@ describe('Categories per interval', () => {
     expect(data.cells[groceries]).toEqual([null, null, null, -999, -39_400]);
     expect(data.rowTotals[groceries]).toBe(-40_399);
     for (const { value, href } of linkedValues(data)) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', period: page, cardPeriods: pins });
+      expect(originOf(href)).toEqual({
+        kind: 'analytics',
+        page: { period: page, cardPeriods: pins },
+      });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });

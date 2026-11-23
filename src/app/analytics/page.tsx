@@ -7,6 +7,7 @@ import {
   legacyPeriod,
   periodFromParams,
   periodPhrase,
+  unpinnedPage,
 } from '@/lib/analytics/period';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
@@ -22,7 +23,7 @@ import {
   SPENDING_BY_CATEGORY,
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
-import { CardSection, PinnableCardSection } from './card-section';
+import { CardSection } from './card-section';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
 import { NET_WORTH, NetWorthSection } from './net-worth';
@@ -60,7 +61,7 @@ export default async function AnalyticsPage({
 }) {
   const params = await searchParams;
   const legacy = legacyPeriod(params);
-  if (legacy) redirect(analyticsHref(legacy));
+  if (legacy) redirect(analyticsHref(unpinnedPage(legacy)));
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
@@ -73,7 +74,7 @@ export default async function AnalyticsPage({
   // The effective Period: no Period starts before the first Transaction (a custom date moves to it,
   // a preset keeps its name), and the control shows the start it is read from.
   const { period } = reading;
-  const retryHref = analyticsHref(period, cardPeriods);
+  const retryHref = analyticsHref(reading.page);
 
   return (
     <section className="flex flex-col gap-5">
@@ -83,7 +84,7 @@ export default async function AnalyticsPage({
       </header>
       <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
       <PeriodControl
-        key={analyticsHref(period)}
+        key={analyticsHref(unpinnedPage(period))}
         period={period}
         from={reading.from}
         phrase={periodPhrase(period, reading)}
@@ -116,7 +117,7 @@ export default async function AnalyticsPage({
             one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
-            <PinnableCardSection
+            <CardSection
               card={sections.netCashFlow}
               section="net-cash-flow"
               empty="Nothing to show yet: no Transactions in these intervals."
@@ -129,7 +130,7 @@ export default async function AnalyticsPage({
             />
           </StreamedSection>
           <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref} isCard>
-            <PinnableCardSection
+            <CardSection
               card={sections.spendingByCategory}
               section="spending-by-category"
               empty="Nothing to show yet: no expense in these intervals."
@@ -141,14 +142,14 @@ export default async function AnalyticsPage({
           <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
         </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref} isCard>
-          <PinnableCardSection
+          <CardSection
             card={sections.incomeVsExpense}
             section="income-vs-expense"
             empty="Nothing to show yet: no income, expense or Capital in these intervals."
           />
         </StreamedSection>
         <StreamedSection name={CATEGORIES_PER_INTERVAL} retryHref={retryHref} isCard>
-          <PinnableCardSection
+          <CardSection
             card={sections.categoriesPerInterval}
             section="categories-per-interval"
             empty="Nothing to show yet: no classified Transactions in these intervals."

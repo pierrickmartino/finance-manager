@@ -172,7 +172,7 @@ describe('Profit and loss', () => {
       drilled.push([row.label, page.sumChfMinor]);
       expect(originOf(row.href), row.label).toEqual({
         kind: 'analytics',
-        period: SINCE_MID_FEBRUARY,
+        page: { period: SINCE_MID_FEBRUARY, cardPeriods: {} },
       });
     }
     // Expense opens what went out, booked negative.
@@ -369,7 +369,7 @@ describe('Profit and loss change', () => {
       both.push([row.id, page.sumChfMinor]);
       expect(originOf(row.change!.href), row.id).toEqual({
         kind: 'analytics',
-        period: presetPeriod('quarter-to-date'),
+        page: { period: presetPeriod('quarter-to-date'), cardPeriods: {} },
       });
     }
     expect(both).toEqual([
@@ -491,7 +491,10 @@ describe('Profit and loss pinned to its own Card Period', () => {
 
     const { rows } = (await pageWith(SINCE_MID_FEBRUARY, QUARTER_TO_DATE)).profitAndLoss;
 
-    const origin = { kind: 'analytics', period: SINCE_MID_FEBRUARY, cardPeriods: QUARTER_TO_DATE };
+    const origin = {
+      kind: 'analytics',
+      page: { period: SINCE_MID_FEBRUARY, cardPeriods: QUARTER_TO_DATE },
+    };
     const drilled: [string, number | null][] = [];
     const both: [string, number | null][] = [];
     for (const row of rows) {
@@ -594,8 +597,10 @@ describe('Profit and loss pinned to its own Card Period', () => {
     expect(income.change).toMatchObject({ amount: 90_000, label: 'vs 1 Jan – 19 Feb' });
     expect(originOf(incomeRow.href)).toEqual({
       kind: 'analytics',
-      period: presetPeriod('quarter-to-date'),
-      cardPeriods: { 'spending-by-category': 'rolling-30-days' },
+      page: {
+        period: presetPeriod('quarter-to-date'),
+        cardPeriods: { 'spending-by-category': 'rolling-30-days' },
+      },
     });
   });
 });

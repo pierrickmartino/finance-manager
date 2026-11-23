@@ -241,7 +241,10 @@ describe('Income vs. expense', () => {
     // 5 rows of 5 quarters, 5 row totals, 5 column totals and the total.
     expect(values).toHaveLength(5 * 5 + 5 + 5 + 1);
     for (const { value, href } of values) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', period: QUARTERLY });
+      expect(originOf(href)).toEqual({
+        kind: 'analytics',
+        page: { period: QUARTERLY, cardPeriods: {} },
+      });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });
@@ -271,7 +274,10 @@ describe('Income vs. expense', () => {
     // February 2024's groceries are outside the page's Rolling 12 months, inside the pin.
     expect(data.cells[expense]).toEqual([-999, null, null, null, -44_400]);
     for (const { value, href } of linkedValues(data)) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', period: MONTHLY, cardPeriods: pins });
+      expect(originOf(href)).toEqual({
+        kind: 'analytics',
+        page: { period: MONTHLY, cardPeriods: pins },
+      });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });

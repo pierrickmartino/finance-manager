@@ -108,7 +108,7 @@ interface ProfitAndLossSectionProps {
 export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLossSectionProps) {
   const { rows, reading, isPinned } = await profitAndLoss;
   const hasComparison = rows.some((row) => row.change !== null);
-  const over = isPinned ? periodLabel(reading.period) : 'the Period';
+  const statementPeriod = isPinned ? periodLabel(reading.period) : 'the Period';
   return (
     <SectionCard
       name={PROFIT_AND_LOSS}
@@ -123,7 +123,7 @@ export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLoss
     >
       <table className="w-full max-w-2xl border-collapse text-sm">
         <caption className="sr-only">
-          {PROFIT_AND_LOSS} over {over}
+          {PROFIT_AND_LOSS} over {statementPeriod}
         </caption>
         {hasComparison && (
           <thead>

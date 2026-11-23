@@ -5,8 +5,7 @@ import {
   PINNABLE_SECTIONS,
   periodFromParams,
   periodToParams,
-  type CardPeriods,
-  type Period,
+  type AnalyticsPage,
 } from '@/lib/analytics/period';
 import { swissToday } from '@/lib/dates';
 import type { WidgetQueryInput } from '@/server/services/reporting/query';
@@ -27,8 +26,8 @@ export type DrillOrigin =
   | { kind: 'widget'; id: string }
   | { kind: 'editor' }
   | { kind: 'recurringPayment' }
-  /** Analytics, with its Card Periods (GLOSSARY): present only when some Card is pinned. */
-  | { kind: 'analytics'; period: Period; cardPeriods?: CardPeriods };
+  /** Analytics: its page's Period and its Card Periods (GLOSSARY). */
+  | { kind: 'analytics'; page: AnalyticsPage };
 
 /** A Recurring payment's charges, opened from the Recurring payments page. */
 export const RECURRING_PAYMENT: DrillOrigin = { kind: 'recurringPayment' };
@@ -55,11 +54,9 @@ function analyticsParams(params: UrlParams): Record<string, string | string[] | 
   );
 }
 
-/** Analytics with its pins as an origin: no `cardPeriods` when no Card is pinned. */
-export function analyticsDrillOrigin(period: Period, cardPeriods: CardPeriods): DrillOrigin {
-  return Object.keys(cardPeriods).length === 0
-    ? { kind: 'analytics', period }
-    : { kind: 'analytics', period, cardPeriods };
+/** Analytics as an origin: its page's Period and every Card's pin. */
+export function analyticsDrillOrigin(page: AnalyticsPage): DrillOrigin {
+  return { kind: 'analytics', page };
 }
 
 /** The `origin` and `originId` parameters of an origin; none for the editor. */
@@ -69,7 +66,7 @@ export function originToParams(origin: DrillOrigin): URLSearchParams {
   params.set('origin', origin.kind);
   if (origin.kind === 'recurringPayment') return params;
   if (origin.kind === 'analytics') {
-    for (const [name, value] of periodToParams(origin.period, origin.cardPeriods)) {
+    for (const [name, value] of periodToParams(origin.page)) {
       params.set(originName(name), value);
     }
     return params;
@@ -85,10 +82,10 @@ export function originFromParams(params: UrlParams): DrillOrigin {
   if (kind === 'recurringPayment') return RECURRING_PAYMENT;
   if (kind === 'analytics') {
     const analytics = analyticsParams(params);
-    return analyticsDrillOrigin(
-      periodFromParams(analytics, swissToday()),
-      cardPeriodsFromParams(analytics),
-    );
+    return analyticsDrillOrigin({
+      period: periodFromParams(analytics, swissToday()),
+      cardPeriods: cardPeriodsFromParams(analytics),
+    });
   }
   if ((kind !== 'dashboard' && kind !== 'widget') || !UUID.safeParse(id).success) return EDITOR;
   return { kind, id };
@@ -117,9 +114,6 @@ export function backLink(
     case 'recurringPayment':
       return { href: '/recurring-payments', label: 'Back to Recurring payments' };
     case 'analytics':
-      return {
-        href: analyticsHref(origin.period, origin.cardPeriods),
-        label: 'Back to Analytics',
-      };
+      return { href: analyticsHref(origin.page), label: 'Back to Analytics' };
   }
 }

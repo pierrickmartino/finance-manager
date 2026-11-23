@@ -1,9 +1,9 @@
 import { formatPeriod } from '@/lib/format';
 import {
-  NO_PINS,
   presetPeriod,
   readStart,
   periodGrain,
+  unpinnedPage,
   type AnalyticsPage,
   type Period,
   type PeriodPreset,
@@ -66,7 +66,7 @@ export function readingOf(
   const effective: Period = period.kind === 'custom' ? { kind: 'custom', from } : period;
   return {
     period: effective,
-    page: { period: effective, cardPeriods: NO_PINS },
+    page: unpinnedPage(effective),
     from,
     to: today,
     grain,
@@ -88,7 +88,7 @@ export function readingOf(
 export function cardReading(
   page: AnalyticsReading,
   preset: PeriodPreset,
-  dataStart: string | null = null,
+  dataStart: string | null,
 ): AnalyticsReading {
   return { ...readingOf(presetPeriod(preset), page.to, dataStart), page: page.page };
 }

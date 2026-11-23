@@ -315,7 +315,10 @@ describe('Key figures change', () => {
       { key: '2025-05', sumChfMinor: 95_000 },
       { key: '2025-01', sumChfMinor: 80_000 },
     ]);
-    expect(originOf(profit.change!.href)).toEqual({ kind: 'analytics', period: QUARTER_TO_DATE });
+    expect(originOf(profit.change!.href)).toEqual({
+      kind: 'analytics',
+      page: { period: QUARTER_TO_DATE, cardPeriods: {} },
+    });
   });
 
   it('over Year to date, opens both stretches a year apart', async () => {
