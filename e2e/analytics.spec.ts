@@ -35,7 +35,7 @@ import {
 /**
  * Analytics (spec #170, #204): the Period control, and each section drawn as the Dashboard's own
  * card: Net worth, Spending Insights, Recent transactions, Net cash flow, Account balances in
- * CHF, Spending by Category, and the Income vs. expense and Categories per interval heatmaps.
+ * CHF, Spending by Category, and the Profit per interval and Categories per interval heatmaps.
  * Each Card's own Period is card-period.spec.ts.
  */
 
@@ -59,7 +59,7 @@ test('picking a Period preset fills in its date, reads every section over it, an
   await seedOldPurchase(suffix);
   const control = periodControl(page);
   const preset = control.getByLabel('Period', { exact: true });
-  const name = 'Income vs. expense';
+  const name = 'Profit per interval';
   const income = region(page, 'Key figures').getByRole('region', { name: 'Income', exact: true });
   const incomeCaption = (period: string) => income.getByText(period, { exact: true });
 
@@ -76,7 +76,7 @@ test('picking a Period preset fills in its date, reads every section over it, an
       heatmap(page, name).getByRole('rowheader', { name: row, exact: true }),
     ).toBeVisible();
   }
-  // Profit and loss: the whole Period's statement, just before Income vs. expense (a row's name
+  // Profit and loss: the whole Period's statement, just before Profit per interval (a row's name
   // may carry its note on what other tests' data leaves out).
   for (const row of ['Income', 'Expense', 'Profit', 'Capital', 'Net cash flow']) {
     await expect(
@@ -140,7 +140,7 @@ test('typing a start date switches the Period to Custom, reads every section fro
   const control = periodControl(page);
   const preset = control.getByLabel('Period', { exact: true });
   const date = control.getByLabel('From', { exact: true });
-  const name = 'Income vs. expense';
+  const name = 'Profit per interval';
 
   await page.goto('/analytics');
   await date.fill(from);
@@ -266,7 +266,7 @@ test('on a phone the Period control stays at the top and the heatmap scrolls ins
   // Short, so the page scrolls past the control with one section.
   await page.setViewportSize({ width: 390, height: 420 });
   await page.goto('/analytics');
-  await expect(heatmap(page, 'Income vs. expense')).toBeVisible();
+  await expect(heatmap(page, 'Profit per interval')).toBeVisible();
 
   const control = periodControl(page);
   const top = (await control.boundingBox())!.y;
@@ -279,7 +279,7 @@ test('on a phone the Period control stays at the top and the heatmap scrolls ins
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(pageOverflows).toBe(false);
-  for (const name of ['Income vs. expense', 'Categories per interval']) {
+  for (const name of ['Profit per interval', 'Categories per interval']) {
     const scroller = region(page, name).locator('figure');
     expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
       true,
@@ -699,7 +699,7 @@ test('every section with figures left out for want of an FX rate says so', async
     'Net cash flow',
     'Account balances in CHF',
     'Spending by Category',
-    'Income vs. expense',
+    'Profit per interval',
     'Categories per interval',
   ]) {
     await expect(region(page, name).getByText(/left out: no FX rate yet\./)).toBeVisible();

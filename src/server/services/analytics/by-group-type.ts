@@ -6,7 +6,7 @@ import type { WidgetQueryInput } from '../reporting/query';
 /**
  * Reading the Net cash flow section's flows by Category group type: every non-Transfer flow,
  * Capital included, a row per type, Unclassified Transactions (no Category) in the `null` row.
- * Profit and loss and Income vs. expense read it; both show Unclassified only when the Period has
+ * Profit and loss and Profit per interval read it; both show Unclassified only when the Period has
  * some Unclassified Transactions (`hasTransactions`).
  */
 

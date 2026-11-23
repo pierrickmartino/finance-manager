@@ -64,7 +64,7 @@ test("pinning Spending by Category reads it over its own Period, which it keeps 
       .getByRole('region', { name: 'Income', exact: true })
       .getByText('Rolling 90 days', { exact: true }),
   ).toBeVisible();
-  expect((await columns(page, 'Income vs. expense')).length).toBeLessThanOrEqual(5);
+  expect((await columns(page, 'Profit per interval')).length).toBeLessThanOrEqual(5);
 
   // A pick equal to the page's Period is a pin too, and the page's Period moving leaves it be.
   await periodControl(page).getByLabel('Period', { exact: true }).selectOption('year-to-date');
@@ -133,7 +133,7 @@ test('a hand-edited pin on a Card without a dropdown, or an invalid one, is igno
   await expect(region(page, 'Key figures').getByLabel(/^Period for /)).toHaveCount(0);
 });
 
-test('pinning Categories per interval reads it by year while the page reads months, and Net cash flow and Income vs. expense pin beside it', async ({
+test('pinning Categories per interval reads it by year while the page reads months, and Net cash flow and Profit per interval pin beside it', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -146,7 +146,7 @@ test('pinning Categories per interval reads it by year while the page reads mont
   const allPinned = {
     period: 'rolling-90-days',
     'net-cash-flow': 'this-year-and-last-1',
-    'income-vs-expense': 'this-year-and-last-1',
+    'profit-per-interval': 'this-year-and-last-1',
     'categories-per-interval': 'this-year-and-last-4',
   };
 
@@ -165,9 +165,9 @@ test('pinning Categories per interval reads it by year while the page reads mont
   await expect(cardPeriodMark(page, name)).toHaveText('Pinned to This year and last 4');
   await expect(group.getByRole('link', { name: partialYear })).toBeVisible();
   expect(await columns(page, name)).toHaveLength(6);
-  expect((await columns(page, 'Income vs. expense')).length).toBeLessThanOrEqual(5);
+  expect((await columns(page, 'Profit per interval')).length).toBeLessThanOrEqual(5);
 
-  // Net cash flow and Income vs. expense pin too, by quarter, each keeping the other pins.
+  // Net cash flow and Profit per interval pin too, by quarter, each keeping the other pins.
   await cardPeriod(page, 'Net cash flow').selectOption('this-year-and-last-1');
   await expect
     .poll(() => searchOf(page))
@@ -178,11 +178,11 @@ test('pinning Categories per interval reads it by year while the page reads mont
     });
   await expect(cardPeriodMark(page, 'Net cash flow')).toHaveText('Pinned to This year and last 1');
   await expect(region(page, 'Net cash flow').getByText(/^Quarterly average$/)).toBeVisible();
-  await cardPeriod(page, 'Income vs. expense').selectOption('this-year-and-last-1');
+  await cardPeriod(page, 'Profit per interval').selectOption('this-year-and-last-1');
   await expect.poll(() => searchOf(page)).toEqual(allPinned);
-  await expect(cardPeriodMark(page, 'Income vs. expense')).toBeVisible();
+  await expect(cardPeriodMark(page, 'Profit per interval')).toBeVisible();
   await expect
-    .poll(async () => (await columns(page, 'Income vs. expense')).length)
+    .poll(async () => (await columns(page, 'Profit per interval')).length)
     .toBe(QUARTERS + 1);
 
   // The current year's subtotal opens its Transactions, and the way back keeps every pin.
