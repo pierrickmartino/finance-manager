@@ -75,6 +75,12 @@ export const CHOICE_TILE_CLASS =
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = `rounded-3xl ${GLASS_CLASS} ${TILE_GLOW_CLASS} p-5`;
 /**
+ * A Widget's Card (loaded, loading or failed): TILE_CLASS that is also an inline-size container,
+ * so what's inside lays out from the Card's own width (`@md:` etc.), not the window's. Only for
+ * Widget Cards: containment changes how an element sizes itself, so TILE_CLASS stays plain.
+ */
+export const WIDGET_CARD_CLASS = `${TILE_CLASS} @container`;
+/**
  * The insight tile (the Dashboard's and Analytics' spending insight): TILE_CLASS in the ramp's
  * deep violet (`insight`) instead of `surface`, glass with the glow, under white `on-ramp` text.
  */

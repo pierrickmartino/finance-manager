@@ -76,7 +76,7 @@ export function DonutRing({ data, money }: { data: ChartSource; money: Money }) 
     setActive((current) => (isPointing ? index : current === index ? null : current));
 
   return (
-    <figure className="flex flex-wrap items-center gap-6">
+    <figure className="flex flex-col items-center gap-6 @md:flex-row">
       <div className="relative mx-auto shrink-0" style={{ width: RING.size, height: RING.size }}>
         <svg viewBox={`0 0 ${RING.size} ${RING.size}`} className="h-full w-full" aria-hidden>
           {/* The hole: a whole-ring circle would otherwise fill it. */}
@@ -118,7 +118,7 @@ export function DonutRing({ data, money }: { data: ChartSource; money: Money }) 
           )}
         </div>
       </div>
-      <ul className="flex min-w-48 flex-1 flex-col">
+      <ul className="flex w-full flex-col @md:w-auto @md:flex-1">
         {slices.map((slice, i) => (
           <li
             key={slice.label}

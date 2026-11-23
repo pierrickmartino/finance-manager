@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createAccount } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import {
@@ -9,6 +9,7 @@ import { addDays, swissToday } from '../src/server/services/fx/dates';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import {
   arrangeCard,
+  boardIsStill,
   cardBox,
   dragCard,
   nextAction,
@@ -588,6 +589,93 @@ test("a Donut Widget's card is a ring with the total inside; pointing at a part 
 
   await rentRow.click();
   await expect(page).toHaveURL(/\/widgets\/drill/);
+});
+
+/** Where a ring Card's list sits: below the ring, or beside it. */
+async function ringListPlacement(card: Locator): Promise<'below' | 'beside'> {
+  const ring = await card.locator('figure > div').first().boundingBox();
+  const list = await card.locator('figure > ul').boundingBox();
+  if (!ring || !list) throw new Error('No ring or list');
+  if (list.y >= ring.y + ring.height) return 'below';
+  if (list.x >= ring.x + ring.width) return 'beside';
+  throw new Error('The list overlaps the ring');
+}
+
+test("a ring Card lays out from its own width, not the window's: list below on a narrow Card, beside on a wide one", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Widths bank ${suffix}` });
+    const account = (name: string) =>
+      createAccount(ctx, {
+        bankId: bank.id,
+        name,
+        currency: 'CHF',
+        iban: null,
+        kind: 'current',
+        importFormat: null,
+        openingBalanceMinor: 0,
+      });
+    const rent = await account(`Rent ${suffix}`);
+    const food = await account(`Food ${suffix}`);
+    const today = swissToday();
+    for (const [accountId, amountMinor] of [
+      [rent.id, -75_000],
+      [food.id, -25_000],
+    ] as const) {
+      await createManualTransaction(ctx, {
+        accountId,
+        bookingDate: addDays(today, -3),
+        amountMinor,
+        description: 'Widths spend',
+      });
+    }
+    const query = {
+      dateRange: { kind: 'fixed' as const, from: addDays(today, -10), to: today },
+      rows: 'account' as const,
+      columns: null,
+      filters: { accountIds: [rent.id, food.id] },
+    };
+    const dashboard = await createDashboardRecord(ctx, { name: `Widths ${suffix}` });
+    // A 4-of-12 Card (about 355px inside at 1280) and an 8-of-12 one (about 773px).
+    await addWidget(ctx, dashboard.id, {
+      name: 'Narrow ring',
+      visualisation: 'donut',
+      query,
+      layout: { x: 0, y: 0, w: 4, h: 9 },
+    });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Wide ring',
+      visualisation: 'donut',
+      query,
+      layout: { x: 4, y: 0, w: 8, h: 9 },
+    });
+    return dashboard.id;
+  });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/dashboards/${dashboardId}`);
+  const card = (name: string) =>
+    page.getByRole('region', { name, exact: true }).and(page.locator('[aria-labelledby^="card-"]'));
+  await expect(card('Narrow ring').locator('figure > ul')).toBeVisible();
+  await expect(card('Wide ring').locator('figure > ul')).toBeVisible();
+
+  // The Card is the size container its inside follows.
+  for (const name of ['Narrow ring', 'Wide ring']) {
+    expect(await card(name).evaluate((el) => getComputedStyle(el).containerType)).toBe(
+      'inline-size',
+    );
+  }
+  expect(await ringListPlacement(card('Narrow ring'))).toBe('below');
+  expect(await ringListPlacement(card('Wide ring'))).toBe('beside');
+
+  // Edit mode draws the same Cards at the same widths, so the same way.
+  await page.getByRole('link', { name: 'Edit Dashboard' }).click();
+  await expect(page.getByText('Editing', { exact: true })).toBeVisible();
+  await boardIsStill(page);
+  expect(await ringListPlacement(card('Narrow ring'))).toBe('below');
+  expect(await ringListPlacement(card('Wide ring'))).toBe('beside');
 });
 
 /** The cards and parts of the Story still waiting on their query. */

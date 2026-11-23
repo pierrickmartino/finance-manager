@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
-import { TILE_CLASS } from '@/components/surface';
+import { WIDGET_CARD_CLASS } from '@/components/surface';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
 import { HeatmapGrid } from './heatmap-grid';
@@ -66,7 +66,7 @@ export function WidgetCard({ card, className = '', toolbar, isCompact = false }:
   return (
     <section
       aria-labelledby={`card-${card.id}`}
-      className={`${TILE_CLASS} flex flex-col gap-4 ${className}`}
+      className={`${WIDGET_CARD_CLASS} flex flex-col gap-4 ${className}`}
     >
       {toolbar}
       <div>

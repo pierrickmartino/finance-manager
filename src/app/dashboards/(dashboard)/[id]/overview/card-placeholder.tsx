@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { PLACEHOLDER_CLASS, TILE_CLASS } from '@/components/surface';
+import { PLACEHOLDER_CLASS, TILE_CLASS, WIDGET_CARD_CLASS } from '@/components/surface';
 import type { PlaceholderShape } from '@/lib/reporting/card';
 
 /** The quiet mark standing in for a card's chart, shaped like the one it will draw. */
@@ -70,7 +70,7 @@ export function WidgetCardPlaceholder({ name, shape, height }: WidgetCardPlaceho
     <section
       aria-label={name}
       aria-busy="true"
-      className={`${TILE_CLASS} flex h-(--placeholder-height) flex-col gap-4 overflow-hidden lg:h-full`}
+      className={`${WIDGET_CARD_CLASS} flex h-(--placeholder-height) flex-col gap-4 overflow-hidden lg:h-full`}
       style={{ '--placeholder-height': `${height}px` } as CSSProperties}
     >
       <div>
