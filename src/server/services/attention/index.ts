@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { withTransaction } from '@/server/db/transaction';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
+import { completenessKind, type CompletenessAttentionItem } from './completeness';
+import { fxRatesKind, type FxRatesAttentionItem } from './fx-rates';
 import type { AttentionKind, FormedAttentionItem } from './kind';
 import {
   missedKind,
@@ -22,13 +24,19 @@ import { unclassifiedKind, type UnclassifiedAttentionItem } from './unclassified
  * to `KINDS`, in display order.
  */
 
+export type { CompletenessAttentionItem } from './completeness';
+export type { FxRatesAttentionItem } from './fx-rates';
 export type { AttentionTone } from './kind';
 export type { MissedAttentionItem, PriceIncreaseAttentionItem } from './recurring';
 export type { UnclassifiedAttentionItem } from './unclassified';
 
 /** An Attention item of any kind, as its kind lists it. */
 export type ListedAttentionItem =
-  MissedAttentionItem | PriceIncreaseAttentionItem | UnclassifiedAttentionItem;
+  | FxRatesAttentionItem
+  | CompletenessAttentionItem
+  | MissedAttentionItem
+  | PriceIncreaseAttentionItem
+  | UnclassifiedAttentionItem;
 
 /** An Attention item, and whether it is unread: new, or worse, since the bell was last opened. */
 export type AttentionItem = ListedAttentionItem & { unread: boolean };
@@ -38,6 +46,8 @@ export type AttentionItem = ListedAttentionItem & { unread: boolean };
  * Unclassified.
  */
 const KINDS: readonly AttentionKind<ListedAttentionItem>[] = [
+  fxRatesKind,
+  completenessKind,
   missedKind,
   priceIncreaseKind,
   unclassifiedKind,

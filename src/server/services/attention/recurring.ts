@@ -22,7 +22,7 @@ export interface MissedAttentionItem {
 
 /** A Recurring payment whose latest charge is dearer than the one before. */
 export interface PriceIncreaseAttentionItem {
-  kind: 'price_increase';
+  kind: 'price-increase';
   /** The Recurring payment, as `subjectsOf` names it. */
   subject: string;
   payeeName: string;
@@ -124,7 +124,7 @@ export const priceIncreaseKind = attentionKind<PriceIncreaseAttentionItem, strin
     return payments
       .filter(({ payment }) => payment.flags.includes('price_increase'))
       .map(({ payment, subject }) => ({
-        kind: 'price_increase',
+        kind: 'price-increase',
         subject,
         payeeName: payment.payee.name,
         currency: payment.currency,

@@ -70,7 +70,7 @@ const each = (dates: string[], amount: number) => dates.map((date) => ({ date, a
 /** The Recurring payment items listed on `today`, leaving out other kinds. */
 async function recurringItems(today = TODAY) {
   const items = await listAttentionItems(t.ctx, { today });
-  return items.filter((item) => item.kind === 'missed' || item.kind === 'price_increase');
+  return items.filter((item) => item.kind === 'missed' || item.kind === 'price-increase');
 }
 
 describe('Recurring payment Attention items', () => {
@@ -102,7 +102,7 @@ describe('Recurring payment Attention items', () => {
 
     expect(items).toEqual([
       {
-        kind: 'price_increase',
+        kind: 'price-increase',
         subject: expect.any(String),
         payeeName: 'Spotify',
         currency: 'CHF',
@@ -122,7 +122,32 @@ describe('Recurring payment Attention items', () => {
       { date: DATES[2]!, amount: -2490 },
     ]);
 
-    expect((await recurringItems()).map((item) => item.kind)).toEqual(['missed', 'price_increase']);
+    expect((await recurringItems()).map((item) => item.kind)).toEqual(['missed', 'price-increase']);
+  });
+
+  it('lists Missed items after FX rates, then Price increase items, then Unclassified', async () => {
+    const card = await account();
+    await charge(card, 'Spotify', [
+      ...each(['2025-01-10', '2025-02-10', '2025-03-10'], -1290),
+      { date: '2025-04-10', amount: -1490 },
+    ]);
+    await charge(card, 'Netflix', each(DATES, -2190));
+    await createManualTransaction(t.ctx, {
+      accountId: card.id,
+      bookingDate: '2025-04-15',
+      amountMinor: -4_50,
+      description: 'Kiosk',
+    });
+
+    const items = await listAttentionItems(t.ctx, { today: TODAY });
+
+    // No FX rate was ever fetched, so FX rates are Stale too.
+    expect(items.map((item) => item.kind)).toEqual([
+      'fx-rates',
+      'missed',
+      'price-increase',
+      'unclassified',
+    ]);
   });
 
   describe('leaves out', () => {
@@ -175,7 +200,7 @@ describe('Recurring payment Attention items', () => {
 
       expect((await recurringItems()).map((item) => item.kind)).toEqual([
         'missed',
-        'price_increase',
+        'price-increase',
       ]);
     });
   });
@@ -240,11 +265,11 @@ describe('Recurring payment Attention items', () => {
         { date: '2025-04-10', amount: -1490 },
       ]);
       await markAttentionSeen(t.ctx, { today: TODAY });
-      expect(await unread('2025-04-25')).toEqual([{ kind: 'price_increase', unread: false }]);
+      expect(await unread('2025-04-25')).toEqual([{ kind: 'price-increase', unread: false }]);
 
       await charge(spotify, 'Spotify', [{ date: '2025-05-10', amount: -1690 }]);
 
-      expect(await unread('2025-05-12')).toEqual([{ kind: 'price_increase', unread: true }]);
+      expect(await unread('2025-05-12')).toEqual([{ kind: 'price-increase', unread: true }]);
     });
 
     it('drops a Price increase once the next charge comes at the same price', async () => {

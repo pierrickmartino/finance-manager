@@ -9,30 +9,35 @@ import { useFormatter } from '../formatter-provider';
 import { BADGE_CLASS, POPOVER_CLASS } from '../surface';
 import { BAR_ICON_BUTTON_CLASS } from './bar-styles';
 import { useBellOpen } from './bell-open';
+import { completenessLine } from './completeness-line';
 import { Icon } from './icon';
 import { useAttentionItems } from './use-attention-items';
 
 /** The item's line, worded as its own page words it, dates and amounts in the user's formats. */
 function itemLine(item: AttentionItem, fmt: Formatter): string {
   switch (item.kind) {
+    case 'fx-rates':
+      return `FX rates are stale: ${item.reason}. CHF values may be out of date.`;
+    case 'completeness':
+      return completenessLine(item, fmt);
     case 'missed':
       return `${item.payeeName} was Missed: expected ${fmt.date(item.expectedDate)}`;
-    case 'price_increase': {
+    case 'price-increase': {
       const from = fmt.amount(item.previousAmountMinor, { currency: item.currency });
       const to = fmt.amount(item.lastAmountMinor, { currency: item.currency });
       return `${item.payeeName} is up from ${from} to ${to}`;
     }
-    case 'unclassified': {
-      const verb = item.count === 1 ? 'is' : 'are';
-      return `${transactionCountLabel(item.count)} ${verb} Unclassified`;
-    }
+    case 'unclassified':
+      return `${transactionCountLabel(item.count)} ${item.count === 1 ? 'is' : 'are'} Unclassified`;
   }
 }
 
 /** The item's badge, in its tone: what kind of attention it asks for. */
 const BADGES: Record<AttentionItem['kind'], string> = {
+  'fx-rates': 'Stale',
+  completeness: 'Completeness',
   missed: 'Missed',
-  price_increase: 'Price increase',
+  'price-increase': 'Price increase',
   unclassified: 'Unclassified',
 };
 

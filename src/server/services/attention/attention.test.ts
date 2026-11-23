@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestDatabase } from '@test/support/db';
 import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup } from '../categories';
+import { addDays } from '@/lib/dates';
+import { backfillRates, getRateStatus, type EcbRateSource } from '../fx';
 import { editClassification } from '../transactions';
 import { createManualTransaction } from '../transactions/manual';
 import { splitTransaction } from '../transactions/split';
@@ -13,6 +15,34 @@ import { listAttentionItems, markAttentionSeen } from '.';
 const t = setupTestDatabase();
 
 const TODAY = '2025-11-20';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** Freezes "now", which the FX rate status reads (pg keeps working: only Date is faked). */
+function setNow(iso: string): void {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date(iso) });
+}
+
+/** An ECB that publishes 0.9324 CHF per EUR every day up to `lastDay`, and nothing after. */
+function ecbUntil(lastDay: string): EcbRateSource {
+  return {
+    async fetchReferenceRates({ from, to }) {
+      const days = [];
+      for (let day = from; day <= to && day <= lastDay; day = addDays(day, 1)) {
+        days.push({ date: day, perEur: { CHF: '0.9324' } });
+      }
+      return days;
+    },
+  };
+}
+
+/** Fetches rates up to `day`, at noon that day, and leaves the clock there. */
+async function fetchRatesOn(day: string): Promise<void> {
+  setNow(`${day}T12:00:00Z`);
+  await backfillRates(t.ctx, ecbUntil(day), { from: addDays(day, -3), to: day });
+}
 
 async function manualAccount(name: string): Promise<Account> {
   const bank = await createBank(t.ctx, { name: `${name} bank` });
@@ -47,7 +77,10 @@ async function groceries() {
 }
 
 describe('Attention items', () => {
-  it('lists nothing when there is no data', async () => {
+  // Fresh FX rates, so only the kind under test lists an item.
+  beforeEach(() => fetchRatesOn(TODAY));
+
+  it('lists nothing when nothing needs attention', async () => {
     expect(await listAttentionItems(t.ctx, { today: TODAY })).toEqual([]);
   });
 
@@ -68,7 +101,8 @@ describe('Attention items', () => {
         unread: true,
       },
     ]);
-    expect(items[0]).toHaveProperty('count', (await getClassificationProgress(t.ctx)).unclassified);
+    const { unclassified } = await getClassificationProgress(t.ctx);
+    expect(items[0]).toMatchObject({ count: unclassified });
   });
 
   it('counts a split Transaction with an Unclassified Split line, as the Unclassified view does', async () => {
@@ -90,7 +124,8 @@ describe('Attention items', () => {
     const items = await listAttentionItems(t.ctx, { today: TODAY });
 
     expect(items).toMatchObject([{ kind: 'unclassified', count: 1 }]);
-    expect(items[0]).toHaveProperty('count', (await getClassificationProgress(t.ctx)).unclassified);
+    const { unclassified } = await getClassificationProgress(t.ctx);
+    expect(items[0]).toMatchObject({ count: unclassified });
   });
 
   it('lists nothing once every Transaction is classified', async () => {
@@ -160,5 +195,109 @@ describe('Attention items', () => {
   it('refuses a today that is not a date', async () => {
     await expect(listAttentionItems(t.ctx, { today: 'tomorrow' })).rejects.toThrow();
     await expect(markAttentionSeen(t.ctx, { today: 'tomorrow' })).rejects.toThrow();
+  });
+});
+
+describe('FX rates item', () => {
+  it('lists one FX rates item, linking to Accounts, when no rates were ever fetched', async () => {
+    setNow(`${TODAY}T12:00:00Z`);
+
+    expect(await listAttentionItems(t.ctx, { today: TODAY })).toEqual([
+      {
+        kind: 'fx-rates',
+        subject: null,
+        reason: 'No FX rates have been fetched yet',
+        latestRateDate: null,
+        href: '/accounts',
+        tone: 'warning',
+        unread: true,
+      },
+    ]);
+  });
+
+  it('lists the FX rates item first when the newest rate is too old', async () => {
+    await fetchRatesOn('2025-11-03');
+    await addTransactions(await manualAccount('Current'), [-1_00]);
+    setNow(`${TODAY}T12:00:00Z`);
+
+    const items = await listAttentionItems(t.ctx, { today: TODAY });
+
+    expect(items.map((item) => item.kind)).toEqual(['fx-rates', 'unclassified']);
+    expect(items[0]).toMatchObject({
+      reason: (await getRateStatus(t.ctx)).staleReason,
+      latestRateDate: '2025-11-03',
+      href: '/accounts',
+    });
+  });
+
+  it('lists the FX rates item when no fetch has succeeded for too long', async () => {
+    await fetchRatesOn('2025-11-17');
+    setNow(`${TODAY}T12:00:00Z`);
+
+    expect(await listAttentionItems(t.ctx, { today: TODAY })).toMatchObject([
+      {
+        kind: 'fx-rates',
+        reason: (await getRateStatus(t.ctx)).staleReason,
+        latestRateDate: '2025-11-17',
+      },
+    ]);
+  });
+
+  it('lists no FX rates item while the rates are fresh', async () => {
+    await fetchRatesOn(TODAY);
+
+    expect(await listAttentionItems(t.ctx, { today: TODAY })).toEqual([]);
+  });
+
+  describe('read and unread', () => {
+    async function fxUnread(): Promise<boolean[]> {
+      const items = await listAttentionItems(t.ctx, { today: TODAY });
+      return items.map((item) => item.unread);
+    }
+
+    it('keeps the same Stale state read after the bell is opened', async () => {
+      await fetchRatesOn('2025-11-17');
+      setNow(`${TODAY}T12:00:00Z`);
+      await markAttentionSeen(t.ctx, { today: TODAY });
+
+      // A day on, the newest rate is too old as well: still Stale on the same rate.
+      const tomorrow = addDays(TODAY, 1);
+      setNow(`${tomorrow}T12:00:00Z`);
+
+      expect(await listAttentionItems(t.ctx, { today: tomorrow })).toMatchObject([
+        { kind: 'fx-rates', latestRateDate: '2025-11-17', unread: false },
+      ]);
+    });
+
+    it('marks the FX rates item unread when Stale again on a later newest rate', async () => {
+      await fetchRatesOn('2025-11-03');
+      setNow(`${TODAY}T12:00:00Z`);
+      await markAttentionSeen(t.ctx, { today: TODAY });
+
+      // A fetch now finds rates up to the 10th only: newer, but still too old.
+      await backfillRates(t.ctx, ecbUntil('2025-11-10'), { from: '2025-11-01', to: TODAY });
+
+      expect(await listAttentionItems(t.ctx, { today: TODAY })).toMatchObject([
+        { kind: 'fx-rates', latestRateDate: '2025-11-10', unread: true },
+      ]);
+    });
+
+    it('marks the FX rates item unread when rates appear but are already Stale', async () => {
+      setNow(`${TODAY}T12:00:00Z`);
+      await markAttentionSeen(t.ctx, { today: TODAY });
+
+      await backfillRates(t.ctx, ecbUntil('2025-11-10'), { from: '2025-11-01', to: TODAY });
+
+      expect(await fxUnread()).toEqual([true]);
+    });
+
+    it('drops the FX rates item once the rates are fresh', async () => {
+      setNow(`${TODAY}T12:00:00Z`);
+      await markAttentionSeen(t.ctx, { today: TODAY });
+
+      await fetchRatesOn(TODAY);
+
+      expect(await fxUnread()).toEqual([]);
+    });
   });
 });
