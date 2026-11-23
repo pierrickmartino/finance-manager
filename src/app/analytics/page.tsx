@@ -102,7 +102,7 @@ export default async function AnalyticsPage({
         {/* The overview: three side by side on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_WORTH} retryHref={retryHref}>
-            <NetWorthSection netWorth={sections.netWorth} reading={reading} />
+            <NetWorthSection netWorth={sections.netWorth} />
           </StreamedSection>
           <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
             <SpendingInsightsSection flow={sections.spendingInsights} />

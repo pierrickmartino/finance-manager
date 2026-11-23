@@ -823,6 +823,68 @@ test('a hand-edited pin on a Card without a dropdown, or an invalid one, is igno
   await expect(region(page, 'Key figures').getByLabel(/^Period for /)).toHaveCount(0);
 });
 
+test("pinning Net worth runs its line and change from its own Period's start, the Key figures still reading the page's, until Same as page", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  await seedSalary(suffix);
+  await seedGrocery(suffix);
+  await seedOldPurchase(suffix);
+  const name = 'Net worth';
+  const netWorth = region(page, 'Your net worth today');
+  const picker = netWorth.getByLabel(`Period for ${name}`, { exact: true });
+  const mark = netWorth.getByTestId('card-period-mark');
+  const start = STARTS['year-to-date'];
+  const startLabel = periodDates({ from: start, to: start });
+  const trendOver = (from: string) =>
+    netWorth.getByRole('group', { name: `Net worth, ${periodDates({ from, to: TODAY })}` });
+  const change = netWorth
+    .getByRole('list', { name: 'Change in Net worth' })
+    .getByRole('link')
+    .first();
+
+  // Unpinned: it follows the page's Period and shows no mark.
+  await page.goto('/analytics?period=rolling-90-days');
+  await expect(trendOver(STARTS['rolling-90-days'])).toBeVisible();
+  await expect(picker).toHaveValue('');
+  await expect(mark).toHaveCount(0);
+
+  // Pinned to Year to date: its line from the year's first day, a point per month to today, and
+  // its change since that day.
+  await picker.selectOption('year-to-date');
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'rolling-90-days', 'net-worth': 'year-to-date' });
+  await expect(mark).toHaveText('Pinned to Year to date');
+  const trend = trendOver(start);
+  await expect(trend.getByRole('link')).toHaveCount(Number(MONTH) + 1);
+  await expect(trend.getByRole('link').first()).toHaveAccessibleName(
+    new RegExp(`^${startLabel}: `),
+  );
+  await expect(change).toHaveAccessibleName(
+    new RegExp(`^Period: .* since the start of ${startLabel}$`),
+  );
+  await expect(netWorth.getByText(/profit over \d+ month/)).toBeVisible();
+  // The Key figures still read Rolling 90 days.
+  await expect(
+    region(page, 'Key figures')
+      .getByRole('region', { name: 'Income', exact: true })
+      .getByText('Rolling 90 days', { exact: true }),
+  ).toBeVisible();
+
+  // Its change opens the Accounts as of the day before its start; back, the pin is kept.
+  await change.click();
+  await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${LAST_YEAR}-12-31$`));
+  await page.goBack();
+  await expect(mark).toHaveText('Pinned to Year to date');
+
+  // Same as page: the pin and its mark go, and the line reads the page's Period again.
+  await picker.selectOption({ label: 'Same as page' });
+  await expect.poll(() => searchOf(page)).toEqual({ period: 'rolling-90-days' });
+  await expect(mark).toHaveCount(0);
+  await expect(trendOver(STARTS['rolling-90-days'])).toBeVisible();
+});
+
 test('Net cash flow has a bar per interval, the current one partial, each opening its Drill-down', async ({
   page,
 }) => {

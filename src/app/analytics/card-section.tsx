@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { analyticsHref, type PinnableSection } from '@/lib/analytics/period';
-import type { AnalyticsCard, Pinnable } from '@/server/services/analytics';
+import type { AnalyticsCard, Pinnable, SectionReading } from '@/server/services/analytics';
 import { WidgetCard } from '../dashboards/(dashboard)/[id]/overview/widget-card';
 import { CardPeriod } from './card-period';
 import { SectionCard, SectionEmpty } from './section';
@@ -49,16 +49,29 @@ export async function PinnableCardSection({
 }: PinnableCardSectionProps) {
   const { reading, isPinned, ...loaded } = await card;
   const aside = (
+    <SectionCardPeriod name={loaded.name} section={section} reading={reading} isPinned={isPinned} />
+  );
+  return <LoadedCard card={loaded} empty={empty} className={className} titleAside={aside} />;
+}
+
+interface SectionCardPeriodProps extends SectionReading {
+  /** The Card's name, which names its dropdown. */
+  name: string;
+  section: PinnableSection;
+}
+
+/** A pinnable section's Period mark and dropdown, from the reading its result names. */
+export function SectionCardPeriod({ name, section, reading, isPinned }: SectionCardPeriodProps) {
+  return (
     // Keyed by the page's URL, so back and forward show the pick that URL holds.
     <CardPeriod
       key={analyticsHref(reading.page.period, reading.page.cardPeriods)}
-      name={loaded.name}
+      name={name}
       section={section}
       page={reading.page}
       pinned={isPinned && reading.period.kind === 'preset' ? reading.period.preset : null}
     />
   );
-  return <LoadedCard card={loaded} empty={empty} className={className} titleAside={aside} />;
 }
 
 /** A section's loaded Card: a quiet line when nothing falls in its Period, the Card otherwise. */
