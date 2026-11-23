@@ -6,9 +6,11 @@ import { categoriesPerPeriod } from './categories-per-period';
 import { loadDataStart } from './data-start';
 import type { AnalyticsCard } from './figures';
 import { incomeVsExpense } from './income-vs-expense';
+import { loadComparison } from './key-figure-change';
 import { netCashFlow } from './net-cash-flow';
 import { keyFigures, type AnalyticsKeyFigures } from './key-figures';
 import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
+import { profitAndLoss, type AnalyticsProfitAndLoss } from './profit-and-loss';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { spendingByCategory } from './spending-by-category';
 import { lastCompleteMonthInsights, spendingInsights } from './spending-insights';
@@ -37,6 +39,7 @@ export interface AnalyticsSections {
   netCashFlow: Promise<AnalyticsCard>;
   accountBalances: Promise<AnalyticsCard>;
   spendingByCategory: Promise<AnalyticsCard>;
+  profitAndLoss: Promise<AnalyticsProfitAndLoss>;
   incomeVsExpense: Promise<AnalyticsCard>;
   categoriesPerPeriod: Promise<AnalyticsCard>;
 }
@@ -57,7 +60,8 @@ export interface AnalyticsView {
  * keeps its name, and the reading carries the effective Span). The sections' promises are not
  * awaited here: the page awaits each where it shows it. Net worth reads the Account balances and
  * the Span's income and expense, and Key figures the Account balances, Net worth's trend and the
- * Span's income and expense, so they share those promises rather than run them again. Spending
+ * Span's income and expense, so they share those promises rather than run them again; Key
+ * figures and Profit and loss share what their changes compare with (`loadComparison`). Spending
  * Insights reads its own months: the last complete one and those before it, whatever the Span.
  */
 export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<AnalyticsView> {
@@ -67,18 +71,20 @@ export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<An
   const balances = accountBalances(ctx, today);
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
+  const comparison = loadComparison(ctx, reading, dataStart.accountData);
   return {
     today,
     reading,
     starts: presetStarts(today, dataStart.firstTransaction),
     sections: {
-      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, dataStart),
+      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, comparison),
       netWorth: netWorth(reading, { trend, balances, flow }),
       spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
       netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
       spendingByCategory: spendingByCategory(ctx, reading),
+      profitAndLoss: profitAndLoss(ctx, reading, comparison),
       incomeVsExpense: incomeVsExpense(ctx, reading),
       categoriesPerPeriod: categoriesPerPeriod(ctx, reading),
     },
@@ -90,11 +96,17 @@ export type { AnalyticsCard, SectionStatus } from './figures';
 export type { AnalyticsKeyFigures, KeyFigure, KeyFigureId } from './key-figures';
 export type { KeyFigureChange } from './key-figure-change';
 export type { AnalyticsNetWorth } from './net-worth';
+export type {
+  AnalyticsProfitAndLoss,
+  ProfitAndLossRow,
+  ProfitAndLossRowId,
+} from './profit-and-loss';
 export type { RecentTransactions } from './recent-transactions';
 export { ACCOUNT_BALANCES } from './account-balances';
 export { CATEGORIES_PER_PERIOD } from './categories-per-period';
 export { INCOME_VS_EXPENSE } from './income-vs-expense';
 export { KEY_FIGURES } from './key-figures';
 export { NET_CASH_FLOW } from './net-cash-flow';
+export { PROFIT_AND_LOSS } from './profit-and-loss';
 export { SPENDING_BY_CATEGORY } from './spending-by-category';
 export { SPENDING_INSIGHTS } from './spending-insights';

@@ -12,6 +12,7 @@ import {
   KEY_FIGURES,
   loadAnalytics,
   NET_CASH_FLOW,
+  PROFIT_AND_LOSS,
   SPENDING_BY_CATEGORY,
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
@@ -19,6 +20,7 @@ import { CardSection } from './card-section';
 import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
 import { NET_WORTH, NetWorthSection } from './net-worth';
+import { ProfitAndLossSection } from './profit-and-loss';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
 import { SpanControl } from './span-control';
@@ -119,6 +121,10 @@ export default async function AnalyticsPage({
             />
           </StreamedSection>
         </div>
+        {/* The whole Span's statement, then its periods. */}
+        <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
+          <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
+        </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref}>
           <CardSection
             card={sections.incomeVsExpense}

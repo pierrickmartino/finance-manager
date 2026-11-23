@@ -77,6 +77,16 @@ describe('text passes AA on the backgrounds it sits on', () => {
     expectPair('accent-ink', 'accent-tint');
   });
 
+  it('negative and warning on accent-tint (a highlighted row: Profit and loss Net cash flow)', () => {
+    expectPair('negative', 'accent-tint');
+    expectPair('warning', 'accent-tint');
+  });
+
+  it('positive and muted on accent-tint (Net cash flow change line, Profit and loss)', () => {
+    expectPair('positive', 'accent-tint');
+    expectPair('muted', 'accent-tint');
+  });
+
   for (const tone of ['positive', 'negative', 'warning', 'info']) {
     it(`${tone} on its tint (badges, notices)`, () => expectPair(tone, `${tone}-tint`));
   }
