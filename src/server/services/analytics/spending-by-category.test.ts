@@ -11,7 +11,7 @@ import {
   seedEarlyStart,
   type ClassifiedRow,
 } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup } from '../categories';
 import { readCard } from '@/lib/reporting/card';
@@ -83,7 +83,7 @@ const money = String;
 const empty = Array<null>(10).fill(null);
 
 describe('Spending by Category', () => {
-  it('is a ranking card of the 6 largest Expense Categories over the Span, with their share of all spending', async () => {
+  it('is a ranking card of the 6 largest Expense Categories over the Period, with their share of all spending', async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -110,14 +110,14 @@ describe('Spending by Category', () => {
     expect(reading.lead).toMatchObject({ headline: 'Rent leads', detail: '-100000' });
   });
 
-  it('names the heaviest and lightest periods and the average of the complete ones', async () => {
+  it('names the heaviest and lightest intervals and the average of the complete ones', async () => {
     fixToday('2025-03-20');
     await dataset();
 
     const card = await loadSection(t.ctx, MONTHLY, 'spendingByCategory');
 
     // January -2'270.00, February -2'400.00, March to date -980.00; the months before, nothing.
-    // The average leaves out March 2025 to date and March 2024, cut short at the Span's start:
+    // The average leaves out March 2025 to date and March 2024, cut short at the Period's start:
     // -4'670.00 over 11 months, rounded half away from zero.
     expect(readCard(card, money).facts.map(({ label, value }) => [label, value])).toEqual([
       ['Heaviest month: Feb 2025', '-240000'],
@@ -129,7 +129,7 @@ describe('Spending by Category', () => {
     expect(card.data!.rows.at(-1)).toMatchObject({ key: '2025-03', isPartial: true });
   });
 
-  it('opens a Drill-down behind every Category, period and fact, back to Analytics', async () => {
+  it('opens a Drill-down behind every Category, interval and fact, back to Analytics', async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -137,7 +137,7 @@ describe('Spending by Category', () => {
     const reading = readCard(card, money);
 
     for (const { value, href } of linkedValues(card.data!)) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', span: MONTHLY });
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: MONTHLY });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
     const items = reading.mark.type === 'ticks' ? reading.mark.items : [];
@@ -149,7 +149,7 @@ describe('Spending by Category', () => {
     expect(facts.map((page) => page.value)).toEqual([-240_000, -98_000, -42_455]);
   });
 
-  it('reads the Span by quarter, the current quarter to date', async () => {
+  it('reads the Period by quarter, the current quarter to date', async () => {
     fixToday('2025-03-20');
     await dataset(['Rent', 'Groceries', 'Books']);
 
@@ -165,7 +165,7 @@ describe('Spending by Category', () => {
     expect(data.cells.map((row) => row[0])).toEqual([...Array<null>(4).fill(null), -100_000]);
   });
 
-  it('is drawn as bars per period, as on the Dashboard, with fewer than 3 Expense Categories', async () => {
+  it('is drawn as bars per interval, as on the Dashboard, with fewer than 3 Expense Categories', async () => {
     fixToday('2025-03-20');
     await dataset(['Rent', 'Groceries']);
 
@@ -175,7 +175,7 @@ describe('Spending by Category', () => {
     expect(card.data!.cells.map((row) => row[0])).toEqual([...empty, -50_000, null, -50_000]);
   });
 
-  it('is empty when no expense falls in the Span', async () => {
+  it('is empty when no expense falls in the Period', async () => {
     fixToday('2025-03-20');
 
     const card = await loadSection(t.ctx, YEARLY, 'spendingByCategory');

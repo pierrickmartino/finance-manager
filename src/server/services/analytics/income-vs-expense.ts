@@ -11,8 +11,8 @@ import {
 import {
   analyticsCard,
   cellOf,
-  periodRow,
-  periodRowsSource,
+  intervalRow,
+  intervalRowsSource,
   statusOf,
   sumOf,
   type AnalyticsCard,
@@ -21,8 +21,8 @@ import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Income vs. expense, drawn as the Dashboard's heatmap card: Income, Expense and
- * Capital per period of the Span, then Profit (Income − Expense), Unclassified (only when the
- * Span has any) and Net cash flow (Profit + Capital + Unclassified), each with its Total.
+ * Capital per interval of the Period, then Profit (Income − Expense), Unclassified (only when the
+ * Period has any) and Net cash flow (Profit + Capital + Unclassified), each with its Total.
  * Signed CHF amounts, as booked: expense is negative and a refund nets within it. Figures go
  * by Category group type; Transfers (whole Transactions and Split-line sides) are left out and
  * Split lines count by their own Category (the reporting engine's base rows). Net cash flow is
@@ -62,17 +62,17 @@ export async function incomeVsExpense(
   reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
   const report = await runWidgetQuery(ctx, byGroupType(reading.range, reading.grain));
-  // Unclassified shows when the Span has any Unclassified Transactions, even netting to zero.
+  // Unclassified shows when the Period has any Unclassified Transactions, even netting to zero.
   const hasUnclassified = hasTransactions(await cellCount(ctx, report, UNCLASSIFIED_CELL));
   const cell = cellOf(report);
   const shown = ROWS.filter(({ key }) => key !== 'unclassified' || hasUnclassified);
   const rows = shown.map(({ key, label, types, selector }) =>
-    periodRow(reading, {
+    intervalRow(reading, {
       key,
       label,
       query: report.query,
       selector,
-      valueAt: (period) => sumOf(types.map((type) => cell(type, period))),
+      valueAt: (interval) => sumOf(types.map((type) => cell(type, interval))),
     }),
   );
   return analyticsCard({
@@ -80,7 +80,7 @@ export async function incomeVsExpense(
     name: INCOME_VS_EXPENSE,
     visualisation: 'table',
     rows: 'categoryGroupType',
-    data: periodRowsSource(reading, rows, report),
+    data: intervalRowsSource(reading, rows, report),
     status: statusOf(report),
   });
 }

@@ -4,7 +4,7 @@ import type { ChartSource } from '@/lib/reporting/chart-data';
 import { cellFromParams, queryFromParams } from '@/lib/reporting/widget-params';
 import { createAccount, type Account } from '@/server/services/accounts';
 import { createBank } from '@/server/services/banks';
-import type { Span } from '@/lib/analytics/span';
+import type { Period } from '@/lib/analytics/period';
 import { loadAnalytics, type AnalyticsSections } from '@/server/services/analytics';
 import type { ServiceContext } from '@/server/services/context';
 import { listCellTransactions, type CellTransactionPage } from '@/server/services/reporting';
@@ -58,9 +58,9 @@ export async function seedClassified(
 }
 
 /**
- * Seeds a Transaction of nothing long before the tests' Spans (by default before This year and
+ * Seeds a Transaction of nothing long before the tests' Periods (by default before This year and
  * last 4 on the usual today, 20 March 2025), so a preset is read from the start it gives rather
- * than cut to the first Transaction (ADR-0016). It falls in no Span and counts in no figure, but
+ * than cut to the first Transaction (ADR-0016). It falls in no Period and counts in no figure, but
  * the Account data reaches back to it.
  */
 export async function seedEarlyStart(
@@ -72,15 +72,15 @@ export async function seedEarlyStart(
 }
 
 /**
- * One section of Analytics over a Span, once every section has loaded: the page starts
+ * One section of Analytics over a Period, once every section has loaded: the page starts
  * them all, and none may outlive the test (its database is dropped after it).
  */
 export async function loadSection<Name extends keyof AnalyticsSections>(
   ctx: ServiceContext,
-  span: Span,
+  period: Period,
   name: Name,
 ): Promise<Awaited<AnalyticsSections[Name]>> {
-  const { sections } = await loadAnalytics(ctx, span);
+  const { sections } = await loadAnalytics(ctx, period);
   await Promise.allSettled(Object.values(sections));
   return await sections[name];
 }

@@ -1,6 +1,6 @@
 import { accountsHref } from '@/lib/accounts/links';
 import { analyticsDrillUrl } from '@/lib/analytics/links';
-import { spanCaption } from '@/lib/analytics/span';
+import { periodCaption } from '@/lib/analytics/period';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
@@ -20,7 +20,7 @@ import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Key figures (spec #225, #204): the four tiles that open the page. Net worth today,
- * loans counting against it, whatever the Span; then the whole Span, captioned with it:
+ * loans counting against it, whatever the Period; then the whole Period, captioned with it:
  * Income, Expense and Profit (GLOSSARY: Profit). Income and Expense count only the Income and
  * Expense Category groups, signed so a refund nets within Expense; Capital, Transfers and
  * Unclassified Transactions are left out, as in Spending Insights, so the tiles agree with the
@@ -45,7 +45,7 @@ export interface KeyFigureUnconverted {
 export interface KeyFigure {
   id: KeyFigureId;
   label: string;
-  /** When the figure stands: "Today", or the Span ("Rolling 90 days", "1 Jan 2024 – today"). */
+  /** When the figure stands: "Today", or the Period ("Rolling 90 days", "1 Jan 2024 – today"). */
   caption: string;
   /** CHF minor units. Expense is what went out, net of refunds, as a positive amount. */
   value: number;
@@ -56,7 +56,7 @@ export interface KeyFigure {
   unconverted: KeyFigureUnconverted;
   /** Against the figure's earlier value; null when there is none to compare with. */
   change: KeyFigureChange | null;
-  /** Its recent trend, a point per period of the Span; the current one partial. */
+  /** Its recent trend, a point per interval of the Period; the current one partial. */
   sparkline: SparklinePoint[];
 }
 
@@ -78,12 +78,12 @@ type FlowType = 'income' | 'expense';
  */
 function runFlow(
   ctx: ServiceContext,
-  span: DateSpan,
+  period: DateSpan,
   types: readonly FlowType[] = ['income', 'expense'],
 ): Promise<ReportTable> {
   return runWidgetQuery(ctx, {
     filters: { categoryGroupTypes: [...types] },
-    dateRange: { kind: 'fixed', from: span.from, to: span.to },
+    dateRange: { kind: 'fixed', from: period.from, to: period.to },
     rows: 'categoryGroupType',
     columns: null,
   });
@@ -96,21 +96,20 @@ export async function keyFigures(
   comparisonLoad: Promise<Comparison>,
 ): Promise<AnalyticsKeyFigures> {
   const { from, to: today } = reading;
-  const span = { from, to: today };
+  const period = { from, to: today };
   // Each type alone too, for what it leaves out: an unconverted expense is no Income's concern.
-  const [flow, incomeOnly, expenseOnly, comparison, balances, trend, perPeriod] = await Promise.all(
-    [
-      runFlow(ctx, span),
-      runFlow(ctx, span, ['income']),
-      runFlow(ctx, span, ['expense']),
+  const [flow, incomeOnly, expenseOnly, comparison, balances, trend, perInterval] =
+    await Promise.all([
+      runFlow(ctx, period),
+      runFlow(ctx, period, ['income']),
+      runFlow(ctx, period, ['expense']),
       comparisonLoad,
       sections.balances,
       sections.trend,
       sections.flow,
-    ],
-  );
-  const sparklines = flowSparklines(perPeriod.data, reading);
-  const caption = spanCaption(reading.span, span);
+    ]);
+  const sparklines = flowSparklines(perInterval.data, reading);
+  const caption = periodCaption(reading.period, period);
   const drill = (cell: CellRef) => analyticsDrillUrl(reading, flow.query, cell);
   const values = flowFigures(typeTotal(flow, 'income'), typeTotal(flow, 'expense'));
   const leftOut: Record<FlowFigureId, number> = {

@@ -9,14 +9,14 @@ import {
   seedEarlyStart,
 } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
-import { presetSpan, type Span } from '@/lib/analytics/span';
+import { presetPeriod, type Period } from '@/lib/analytics/period';
 import { readTransactionSearch } from '@/app/transactions/search';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { listTransactions, splitTransaction } from '../transactions';
 import { linkTransfer, splitLineSide, transactionSide } from '../transfers';
 import type { ProfitAndLossRow } from './profit-and-loss';
 
-/** Analytics' Profit and loss over the Span (spec #247, ticket #249). */
+/** Analytics' Profit and loss over the Period (spec #247, ticket #249). */
 
 const t = setupTestDatabase();
 
@@ -42,7 +42,7 @@ async function categories() {
 
 /**
  * Today is 20 May 2025, read from 15 February. Salaries of 500.00 on 10 February (before the
- * Span), 500.00 in February and 1,000.00 in April; groceries of 200.00 in April, 300.00 in May
+ * Period), 500.00 in February and 1,000.00 in April; groceries of 200.00 in April, 300.00 in May
  * and a 50.00 refund; a split purchase in March, 200.00 of groceries and 100.00 moved to
  * savings (a Transfer Split line); a property purchase of 2,000.00 and a sale of shares for
  * 800.00 (Capital, two groups); an Unclassified payment of 70.00; and a Transfer of 500.00 out
@@ -82,7 +82,7 @@ async function dataset(): Promise<void> {
   });
 }
 
-const SINCE_MID_FEBRUARY: Span = { kind: 'custom', from: '2025-02-15' };
+const SINCE_MID_FEBRUARY: Period = { kind: 'custom', from: '2025-02-15' };
 
 const amounts = (rows: readonly ProfitAndLossRow[]) => rows.map((row) => [row.label, row.value]);
 
@@ -100,13 +100,13 @@ async function listed(href: string): Promise<{ total: number; sum: number }> {
 }
 
 describe('Profit and loss', () => {
-  it('reads Income, Expense, Profit, Capital, Unclassified and Net cash flow over the Span', async () => {
+  it('reads Income, Expense, Profit, Capital, Unclassified and Net cash flow over the Period', async () => {
     fixToday('2025-05-20');
     await dataset();
 
     const { rows } = await loadSection(t.ctx, SINCE_MID_FEBRUARY, 'profitAndLoss');
 
-    // 1,500.00 in (the 10 February salary falls before the Span). Expense: 200.00 + 300.00 −
+    // 1,500.00 in (the 10 February salary falls before the Period). Expense: 200.00 + 300.00 −
     // 50.00 refund + the split's 200.00 of groceries, shown positive. Capital nets the property
     // purchase and the share sale. The Transfer and the Split line moved to savings count nowhere.
     expect(amounts(rows)).toEqual([
@@ -127,13 +127,13 @@ describe('Profit and loss', () => {
     ]);
   });
 
-  it('has Net cash flow equal to the Net cash flow section over the same Span', async () => {
+  it('has Net cash flow equal to the Net cash flow section over the same Period', async () => {
     fixToday('2025-05-20');
     await dataset();
 
-    for (const span of [SINCE_MID_FEBRUARY, presetSpan('quarter-to-date')]) {
-      const { rows } = await loadSection(t.ctx, span, 'profitAndLoss');
-      const section = await loadSection(t.ctx, span, 'netCashFlow');
+    for (const period of [SINCE_MID_FEBRUARY, presetPeriod('quarter-to-date')]) {
+      const { rows } = await loadSection(t.ctx, period, 'profitAndLoss');
+      const section = await loadSection(t.ctx, period, 'netCashFlow');
       const [profit, capital, unclassified, net] = (
         ['profit', 'capital', 'unclassified', 'netCashFlow'] as const
       ).map((id) => rowOf(rows, id)?.value ?? 0);
@@ -143,11 +143,11 @@ describe('Profit and loss', () => {
     }
   });
 
-  it('follows the Span: Quarter to date leaves February and March out', async () => {
+  it('follows the Period: Quarter to date leaves February and March out', async () => {
     fixToday('2025-05-20');
     await dataset();
 
-    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+    const { rows } = await loadSection(t.ctx, presetPeriod('quarter-to-date'), 'profitAndLoss');
 
     expect(amounts(rows)).toEqual([
       ['Income', 100_000],
@@ -159,7 +159,7 @@ describe('Profit and loss', () => {
     ]);
   });
 
-  it('opens each row: its Drill-down over the Span, and the Unclassified Transactions list', async () => {
+  it('opens each row: its Drill-down over the Period, and the Unclassified Transactions list', async () => {
     fixToday('2025-05-20');
     await dataset();
 
@@ -171,7 +171,7 @@ describe('Profit and loss', () => {
       drilled.push([row.label, page.sumChfMinor]);
       expect(originOf(row.href), row.label).toEqual({
         kind: 'analytics',
-        span: SINCE_MID_FEBRUARY,
+        period: SINCE_MID_FEBRUARY,
       });
     }
     // Expense opens what went out, booked negative.
@@ -231,11 +231,11 @@ describe('Profit and loss', () => {
     ]);
   });
 
-  it('counts a first period cut short only from the Span start', async () => {
+  it('counts a first interval cut short only from the Period start', async () => {
     fixToday('2025-05-20');
     const { salary, groceries, property } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
-    // The Span starts on 15 February, mid-month: the 14th falls before it, the 15th in it.
+    // The Period starts on 15 February, mid-month: the 14th falls before it, the 15th in it.
     await seedClassified(t.ctx, ubs, [
       { bookingDate: '2025-02-14', amountMinor: 70_000, classify: salary },
       { bookingDate: '2025-02-15', amountMinor: 40_000, classify: salary },
@@ -259,10 +259,10 @@ describe('Profit and loss', () => {
     ]);
   });
 
-  it('shows CHF 0 rows for a Span with no Transactions', async () => {
+  it('shows CHF 0 rows for a Period with no Transactions', async () => {
     fixToday('2025-05-20');
 
-    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+    const { rows } = await loadSection(t.ctx, presetPeriod('quarter-to-date'), 'profitAndLoss');
 
     expect(amounts(rows)).toEqual([
       ['Income', 0],
@@ -312,7 +312,7 @@ const changes = (rows: readonly ProfitAndLossRow[]) =>
   );
 
 describe('Profit and loss change', () => {
-  it('compares each row with the Comparison span, Capital and Unclassified neutral', async () => {
+  it('compares each row with the Comparison period, Capital and Unclassified neutral', async () => {
     // 15 Feb – 20 May against the 95 days before: only the 10 February salary falls there.
     fixToday('2025-05-20');
     await dataset();
@@ -343,7 +343,7 @@ describe('Profit and loss change', () => {
     fixToday('2025-05-20');
     await quarters();
 
-    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+    const { rows } = await loadSection(t.ctx, presetPeriod('quarter-to-date'), 'profitAndLoss');
 
     expect(changes(rows)).toEqual([
       ['income', 90_000, 9, true],
@@ -360,7 +360,7 @@ describe('Profit and loss change', () => {
     fixToday('2025-05-20');
     await quarters();
 
-    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+    const { rows } = await loadSection(t.ctx, presetPeriod('quarter-to-date'), 'profitAndLoss');
 
     const both: [string, number | null][] = [];
     for (const row of rows) {
@@ -368,7 +368,7 @@ describe('Profit and loss change', () => {
       both.push([row.id, page.sumChfMinor]);
       expect(originOf(row.change!.href), row.id).toEqual({
         kind: 'analytics',
-        span: presetSpan('quarter-to-date'),
+        period: presetPeriod('quarter-to-date'),
       });
     }
     expect(both).toEqual([
@@ -381,18 +381,18 @@ describe('Profit and loss change', () => {
     ]);
   });
 
-  it('has no change on any row when the Account data does not reach back to the Comparison span', async () => {
+  it('has no change on any row when the Account data does not reach back to the Comparison period', async () => {
     fixToday('2025-05-20');
     const { salary, property } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
-    // The data starts on 5 April: after the Comparison span's start, 1 January.
+    // The data starts on 5 April: after the Comparison period's start, 1 January.
     await seedClassified(t.ctx, ubs, [
       { bookingDate: '2025-04-05', amountMinor: 1_000, classify: salary },
       { bookingDate: '2025-05-15', amountMinor: -3_000, classify: property },
       { bookingDate: '2025-05-16', amountMinor: -2_000 },
     ]);
 
-    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+    const { rows } = await loadSection(t.ctx, presetPeriod('quarter-to-date'), 'profitAndLoss');
 
     expect(rows.map((row) => [row.id, row.earlier, row.change])).toEqual([
       ['income', null, null],

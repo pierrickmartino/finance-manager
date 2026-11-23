@@ -3,8 +3,8 @@ import { sparkline } from '@/lib/reporting/net-worth-headline';
 /**
  * A Key figure's sparkline (spec #225, ticket #230), drawn as the Net worth headline's trend:
  * fitted between its own low and high in a 100 × 100 box, filled down to its foot. A partial
- * current period is set apart: its last segment dashed, its point a hollow dot; so is a Span's
- * first period cut short at its start (ADR-0016): its first segment dashed.
+ * current interval is set apart: its last segment dashed, its point a hollow dot; so is a Period's
+ * first interval cut short at its start (ADR-0016): its first segment dashed.
  */
 
 export interface FigureSparklineInput {
@@ -13,9 +13,9 @@ export interface FigureSparklineInput {
 }
 
 export interface FigureSparklineShape {
-  /** The line through the settled periods; empty when there are none. */
+  /** The line through the settled intervals; empty when there are none. */
   solid: string;
-  /** The segments into the partial periods, first and last; null when none is partial. */
+  /** The segments into the partial intervals, first and last; null when none is partial. */
   partial: string | null;
   /** The whole line closed down to the box's bottom, to fill under it. */
   area: string;

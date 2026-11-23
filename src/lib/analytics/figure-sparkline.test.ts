@@ -6,7 +6,7 @@ import { figureSparkline } from './figure-sparkline';
 const point = (value: number, isPartial = false) => ({ label: `${value}`, value, isPartial });
 
 describe("a Key figure's sparkline", () => {
-  it('draws the settled periods solid and the partial one as a dashed last segment', () => {
+  it('draws the settled intervals solid and the partial one as a dashed last segment', () => {
     const shape = figureSparkline([point(0), point(50), point(100, true)])!;
 
     // Fitted between its own low (at the foot, less padding) and high (at the top).
@@ -16,7 +16,7 @@ describe("a Key figure's sparkline", () => {
     expect(shape.last).toEqual({ x: 100, y: 10, isPartial: true });
   });
 
-  it('draws the whole line solid when no period is partial', () => {
+  it('draws the whole line solid when no interval is partial', () => {
     const shape = figureSparkline([point(0), point(50), point(100)])!;
 
     expect(shape.solid).toBe('M0,90 L50,50 L100,10');
@@ -24,7 +24,7 @@ describe("a Key figure's sparkline", () => {
     expect(shape.last.isPartial).toBe(false);
   });
 
-  it("sets a Span's cut-short first period apart too: its first segment dashed", () => {
+  it("sets a Period's cut-short first interval apart too: its first segment dashed", () => {
     const shape = figureSparkline([
       point(0, true),
       point(25),
@@ -37,7 +37,7 @@ describe("a Key figure's sparkline", () => {
     expect(shape.partial).toBe('M0,90 L25,70 M75,30 L100,10');
   });
 
-  it('draws no solid line when both of only two periods are partial', () => {
+  it('draws no solid line when both of only two intervals are partial', () => {
     const shape = figureSparkline([point(0, true), point(100, true)])!;
 
     expect(shape.solid).toBe('');

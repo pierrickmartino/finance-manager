@@ -158,7 +158,7 @@ interface NetWorthCardProps {
   /** Accounts left out of the trend for want of an FX rate. */
   unconvertedCount?: number;
   /**
-   * The change chips, in place of the trend's own 1M, 1Y and 2Y (Analytics: since the Span's
+   * The change chips, in place of the trend's own 1M, 1Y and 2Y (Analytics: since the Period's
    * start).
    */
   changes?: readonly ChangeChip[];

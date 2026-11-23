@@ -5,16 +5,16 @@ import { isIncomplete, type AnalyticsReading } from './reading';
 
 /**
  * The sparklines of Analytics' Key figures (spec #225, ticket #230): Income, Expense and Profit
- * a point per period of the Span, read off Spending Insights' income and expense;
- * Net worth the points of the Net worth trend, each period end of the Span then today. The
- * Span's incomplete periods are partial (ADR-0016): drawn set apart, never read as a drop.
+ * a point per interval of the Period, read off Spending Insights' income and expense;
+ * Net worth the points of the Net worth trend, each interval end of the Period then today. The
+ * Period's incomplete intervals are partial (ADR-0016): drawn set apart, never read as a drop.
  */
 
 /** One point of a sparkline: CHF minor units. */
 export interface SparklinePoint {
   label: string;
   value: number;
-  /** The current period, to date. */
+  /** The current interval, to date. */
   isPartial: boolean;
 }
 
@@ -29,28 +29,31 @@ function valueAt(data: ChartSource | null, rowKey: string, columnKey: string): n
 }
 
 /**
- * Income, Expense and Profit in each period of the Span, from Spending Insights' data
- * (periods down, Category group types across). A period it leaves out, before its first data,
+ * Income, Expense and Profit in each interval of the Period, from Spending Insights' data
+ * (intervals down, Category group types across). An interval it leaves out, before its first data,
  * spent and earned nothing. Expense is what went out, as a positive amount.
  */
 export function flowSparklines(
   flow: ChartSource | null,
   reading: AnalyticsReading,
 ): FlowSparklines {
-  const periods = reading.periods.map((period) => ({
-    period,
-    figures: flowFigures(valueAt(flow, period.key, 'income'), valueAt(flow, period.key, 'expense')),
+  const intervals = reading.intervals.map((interval) => ({
+    interval,
+    figures: flowFigures(
+      valueAt(flow, interval.key, 'income'),
+      valueAt(flow, interval.key, 'expense'),
+    ),
   }));
   const line = (id: keyof FlowFigures): SparklinePoint[] =>
-    periods.map(({ period, figures }) => ({
-      label: period.label,
+    intervals.map(({ interval, figures }) => ({
+      label: interval.label,
       value: figures[id],
-      isPartial: isIncomplete(period),
+      isPartial: isIncomplete(interval),
     }));
   return { income: line('income'), expense: line('expense'), profit: line('profit') };
 }
 
-/** Net worth's points: the Net worth trend's, the Span's start, each period end, then today. */
+/** Net worth's points: the Net worth trend's, the Period's start, each interval end, then today. */
 export function netWorthSparkline(trend: ReportTable): SparklinePoint[] {
   return trend.rows.map((row, r) => ({
     label: row.label,

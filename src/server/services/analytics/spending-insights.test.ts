@@ -7,9 +7,9 @@ import {
   seedAccount,
   seedClassified,
 } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 
-import { presetSpan, SPAN_PRESETS, spanLabel, type Span } from '@/lib/analytics/span';
+import { presetPeriod, PERIOD_PRESETS, periodLabel, type Period } from '@/lib/analytics/period';
 import { readCard } from '@/lib/reporting/card';
 import { spendingBars, spendingInsight } from '@/lib/reporting/overview';
 import { setupTestDatabase } from '@test/support/db';
@@ -73,7 +73,7 @@ const DATASET: Booking[] = [
 const money = String;
 
 /** The insight the Dashboard's insight card tells from a section's flow, and the flow itself. */
-async function insightAt(view: Span) {
+async function insightAt(view: Period) {
   const card = await loadSection(t.ctx, view, 'spendingInsights');
   const { flow } = readCard(card, money);
   return { card, flow, insight: flow && spendingInsight(flow.months, flow.period) };
@@ -101,28 +101,28 @@ describe('Spending Insights', () => {
     });
   });
 
-  it('judges the last complete month under every Span, whatever its start or grain', async () => {
+  it('judges the last complete month under every Period, whatever its start or grain', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
     const monthly = await insightAt(MONTHLY);
-    const spans: Span[] = [
-      ...SPAN_PRESETS.map(presetSpan),
+    const periods: Period[] = [
+      ...PERIOD_PRESETS.map(presetPeriod),
       { kind: 'custom', from: '2025-03-01' },
       { kind: 'custom', from: '2023-01-01' },
     ];
 
-    for (const span of spans) {
-      const { flow, insight } = await insightAt(span);
+    for (const period of periods) {
+      const { flow, insight } = await insightAt(period);
       // Rolling 30 days holds no complete month, This year and last 4 reads by year: the insight
       // still names February 2025, against the months before it.
-      expect(flow?.period, spanLabel(span)).toBe('month');
-      expect(insight, spanLabel(span)).toEqual(monthly.insight);
-      expect(insight?.detail[0], spanLabel(span)).toBe('Feb 2025 came in ');
+      expect(flow?.period, periodLabel(period)).toBe('month');
+      expect(insight, periodLabel(period)).toEqual(monthly.insight);
+      expect(insight?.detail[0], periodLabel(period)).toBe('Feb 2025 came in ');
     }
   });
 
-  it('charts the complete periods from the first with data, against the average of the ones before the latest', async () => {
+  it('charts the complete intervals from the first with data, against the average of the ones before the latest', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
@@ -148,9 +148,9 @@ describe('Spending Insights', () => {
     });
   });
 
-  it('gives no insight with fewer than two complete months with data, under every Span', async () => {
+  it('gives no insight with fewer than two complete months with data, under every Period', async () => {
     fixToday('2025-03-20');
-    // February is the only complete month with data, whatever the Span's grain.
+    // February is the only complete month with data, whatever the Period's grain.
     await seed([
       { date: '2025-02-11', amount: -40_000 },
       { date: '2025-02-25', amount: 100_000 },
@@ -159,7 +159,7 @@ describe('Spending Insights', () => {
 
     for (const view of [MONTHLY, QUARTERLY, YEARLY]) {
       const { card, insight } = await insightAt(view);
-      expect(insight, spanLabel(view)).toBeNull();
+      expect(insight, periodLabel(view)).toBeNull();
       expect(card.isEmpty).toBe(false);
     }
   });
@@ -173,23 +173,23 @@ describe('Spending Insights', () => {
     expect(flow).toBeNull();
   });
 
-  it('opens a Drill-down behind the change and the last complete month, back to the same Span', async () => {
+  it('opens a Drill-down behind the change and the last complete month, back to the same Period', async () => {
     fixToday('2025-03-20');
     await seed(DATASET);
 
     for (const view of [MONTHLY, QUARTERLY, YEARLY]) {
       const { card, flow } = await insightAt(view);
       const complete = flow!.months.filter((month) => !month.isPartial);
-      // "See the Transactions": the latest complete period's income and expense.
+      // "See the Transactions": the latest complete interval's income and expense.
       const latest = await openDrill(t.ctx, flow!.latestHref);
       expect(latest.value).toBe(complete.at(-1)!.net);
-      expect(originOf(flow!.latestHref!)).toEqual({ kind: 'analytics', span: view });
-      // The change's working: every complete period's spending, subtotalled per period.
+      expect(originOf(flow!.latestHref!)).toEqual({ kind: 'analytics', period: view });
+      // The change's working: every complete interval's spending, subtotalled per interval.
       const working = await openDrill(t.ctx, flow!.changeHref);
       expect(working.sumChfMinor).toBe(0 - complete.reduce((sum, month) => sum + month.expense, 0));
       const current = card.data!.rows.at(-1)!;
       expect(current.isPartial).toBe(true);
-      expect(working.subtotals?.map((period) => period.key)).not.toContain(current.key);
+      expect(working.subtotals?.map((interval) => interval.key)).not.toContain(current.key);
     }
   });
 });

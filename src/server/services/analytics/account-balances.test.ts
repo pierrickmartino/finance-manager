@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, loadSection, seedAccount, seedClassified } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { readCard } from '@/lib/reporting/card';
@@ -73,7 +73,7 @@ describe('Account balances in CHF', () => {
     });
   });
 
-  it('is identical whatever the Span', async () => {
+  it('is identical whatever the Period', async () => {
     fixToday('2025-03-20');
     await dataset();
 

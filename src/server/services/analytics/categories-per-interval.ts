@@ -11,36 +11,36 @@ import type { WidgetQuery } from '../reporting/query';
 import {
   analyticsCard,
   cellOf,
-  periodRow,
-  periodRowsSource,
+  intervalRow,
+  intervalRowsSource,
   statusOf,
   sumOf,
   type AnalyticsCard,
-  type PeriodRow,
+  type IntervalRow,
 } from './figures';
 import type { AnalyticsReading } from './reading';
 
 /**
- * Analytics' Categories per period, drawn as the Dashboard's heatmap card: each Category group
+ * Analytics' Categories per interval, drawn as the Dashboard's heatmap card: each Category group
  * of the three types (Income groups first, then Expense, then Capital) as a subtotal row, then
- * its Categories ("Group › Category"), per period of the Span and in Total. The rows carry
+ * its Categories ("Group › Category"), per interval of the Period and in Total. The rows carry
  * their tree (a section per type, each group over its Categories), so the card draws them
  * indented under their group instead of ranked by size. Categories with
- * nothing booked in the Span are hidden, and so is a group left with none. Signed CHF
+ * nothing booked in the Period are hidden, and so is a group left with none. Signed CHF
  * amounts, as booked: a refund nets within its Category, Split lines count by their own
  * Category and Transfers are left out (the reporting engine's base rows).
  */
 
-export const CATEGORIES_PER_PERIOD = 'Categories per period';
+export const CATEGORIES_PER_INTERVAL = 'Categories per interval';
 
 /** A group's subtotal row and its Categories' rows, with each Category's own name. */
 interface GroupRows {
   group: CategoryGroup;
-  subtotal: PeriodRow;
-  categories: { row: PeriodRow; name: string }[];
+  subtotal: IntervalRow;
+  categories: { row: IntervalRow; name: string }[];
 }
 
-/** A group's subtotal then its Categories, or null when none has anything in the Span. */
+/** A group's subtotal then its Categories, or null when none has anything in the Period. */
 function groupRows(
   reading: AnalyticsReading,
   report: ReportTable,
@@ -52,12 +52,12 @@ function groupRows(
   if (shown.length === 0) return null;
   const categories = shown.map((category) => ({
     name: category.name,
-    row: periodRow(reading, {
+    row: intervalRow(reading, {
       key: category.id,
       label: `${group.name} › ${category.name}`,
       query: report.query,
       selector: category.id,
-      valueAt: (period) => cell(category.id, period),
+      valueAt: (interval) => cell(category.id, interval),
     }),
   }));
   // No selector picks several Categories: the subtotal drills the query narrowed to the group.
@@ -65,19 +65,19 @@ function groupRows(
     ...report.query,
     filters: { ...report.query.filters, categoryGroupIds: [group.id] },
   };
-  const subtotal = periodRow(reading, {
+  const subtotal = intervalRow(reading, {
     key: `group:${group.id}`,
     label: group.name,
     query: groupQuery,
-    valueAt: (period) => sumOf(shown.map((category) => cell(category.id, period))),
+    valueAt: (interval) => sumOf(shown.map((category) => cell(category.id, interval))),
   });
   return { group, subtotal, categories };
 }
 
 /** The groups' rows flattened in order, and their tree by row index: a section per type. */
-function treeOf(groups: readonly GroupRows[]): { rows: PeriodRow[]; tree: RowTree } {
-  const rows: PeriodRow[] = [];
-  const add = (row: PeriodRow) => rows.push(row) - 1;
+function treeOf(groups: readonly GroupRows[]): { rows: IntervalRow[]; tree: RowTree } {
+  const rows: IntervalRow[] = [];
+  const add = (row: IntervalRow) => rows.push(row) - 1;
   const placed = groups.map((entry) => ({
     type: entry.group.type,
     group: {
@@ -94,7 +94,7 @@ function treeOf(groups: readonly GroupRows[]): { rows: PeriodRow[]; tree: RowTre
 
 const typeRank = (group: CategoryGroup) => CATEGORY_GROUP_TYPES.indexOf(group.type);
 
-export async function categoriesPerPeriod(
+export async function categoriesPerInterval(
   ctx: ServiceContext,
   reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
@@ -113,11 +113,11 @@ export async function categoriesPerPeriod(
     .filter((entry): entry is GroupRows => entry !== null);
   const { rows, tree } = treeOf(shown);
   return analyticsCard({
-    id: 'categories-per-period',
-    name: CATEGORIES_PER_PERIOD,
+    id: 'categories-per-interval',
+    name: CATEGORIES_PER_INTERVAL,
     visualisation: 'table',
     rows: 'category',
-    data: { ...periodRowsSource(reading, rows, report), rowTree: tree },
+    data: { ...intervalRowsSource(reading, rows, report), rowTree: tree },
     status: statusOf(report),
   });
 }

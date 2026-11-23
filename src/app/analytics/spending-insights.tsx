@@ -6,7 +6,7 @@ import { SectionCard, SectionEmpty } from './section';
 
 /**
  * Analytics' Spending Insights, once its figures arrive, drawn as the Dashboard's insight card:
- * the last complete month's spending against the months before it, whatever the Span
+ * the last complete month's spending against the months before it, whatever the Period
  * (ADR-0016), each complete month's bar, and its Transactions. Without two complete months to
  * compare, a quiet line says why instead.
  */

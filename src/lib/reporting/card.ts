@@ -377,7 +377,7 @@ const PERIOD_WORDS = {
   year: { noun: 'year', adjective: 'Yearly' },
 } as const satisfies Record<TimeAxis, PeriodWords>;
 
-/** What an average reads when there is nothing to average (GLOSSARY: Span, ADR-0016). */
+/** What an average reads when there is nothing to average (GLOSSARY: Period, ADR-0016). */
 const NO_AVERAGE = '—';
 
 /**

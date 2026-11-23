@@ -7,7 +7,7 @@ import { sectionFrameClass } from './section-frame';
 interface SectionErrorBoundaryProps {
   /** The section's name, so the failed section still says which it is. */
   name: string;
-  /** Analytics over the same Span, to load again. */
+  /** Analytics over the same Period, to load again. */
   retryHref: string;
   /** The section is drawn as a Widget's Card: it fails in a Card frame (`WIDGET_CARD_CLASS`). */
   isCard: boolean;

@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
-import { analyticsHref, legacySpan, spanFromParams, spanPhrase } from '@/lib/analytics/span';
+import {
+  analyticsHref,
+  legacyPeriod,
+  periodFromParams,
+  periodPhrase,
+} from '@/lib/analytics/period';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
 import { swissToday } from '@/server/services/fx/dates';
 import {
   ACCOUNT_BALANCES,
-  CATEGORIES_PER_PERIOD,
+  CATEGORIES_PER_INTERVAL,
   INCOME_VS_EXPENSE,
   KEY_FIGURES,
   loadAnalytics,
@@ -23,15 +28,16 @@ import { NET_WORTH, NetWorthSection } from './net-worth';
 import { ProfitAndLossSection } from './profit-and-loss';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
-import { SpanControl } from './span-control';
+import { PeriodControl } from './period-control';
 import { SpendingInsightsSection } from './spending-insights';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 
 /**
- * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Span in the URL: a
- * preset's `span`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
- * after today); a former `period` link redirects to its nearest Span. The shell and the Span
+ * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Period in the URL: a
+ * preset's `period`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
+ * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
+ * its nearest Period. The shell and the Period
  * control render at once; each section streams in behind its own placeholder and error boundary
  * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
  *
@@ -42,39 +48,38 @@ export default async function AnalyticsPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    span?: string | string[];
-    from?: string | string[];
     period?: string | string[];
+    from?: string | string[];
+    span?: string | string[];
   }>;
 }) {
   const params = await searchParams;
-  const legacy =
-    params.span === undefined && params.from === undefined ? legacySpan(params.period) : null;
+  const legacy = legacyPeriod(params);
   if (legacy) redirect(analyticsHref(legacy));
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
   const { sections, today, reading, starts } = await loadAnalytics(
     ctx,
-    spanFromParams(params, swissToday()),
+    periodFromParams(params, swissToday()),
   );
-  // The effective Span: no Span starts before the first Transaction (a custom date moves to it,
+  // The effective Period: no Period starts before the first Transaction (a custom date moves to it,
   // a preset keeps its name), and the control shows the start it is read from.
-  const { span } = reading;
-  const retryHref = analyticsHref(span);
+  const { period } = reading;
+  const retryHref = analyticsHref(period);
 
   return (
     <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
-        <p className="text-muted">Your finances over the Span you choose, up to today.</p>
+        <p className="text-muted">Your finances over the Period you choose, up to today.</p>
       </header>
       <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
-      <SpanControl
-        key={analyticsHref(span)}
-        span={span}
+      <PeriodControl
+        key={analyticsHref(period)}
+        period={period}
         from={reading.from}
-        phrase={spanPhrase(span, reading)}
+        phrase={periodPhrase(period, reading)}
         starts={starts}
         today={today}
       />
@@ -105,7 +110,7 @@ export default async function AnalyticsPage({
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
             <CardSection
               card={sections.netCashFlow}
-              empty="Nothing to show yet: no Transactions in these periods."
+              empty="Nothing to show yet: no Transactions in these intervals."
             />
           </StreamedSection>
           <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref} isCard>
@@ -117,24 +122,24 @@ export default async function AnalyticsPage({
           <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref} isCard>
             <CardSection
               card={sections.spendingByCategory}
-              empty="Nothing to show yet: no expense in these periods."
+              empty="Nothing to show yet: no expense in these intervals."
             />
           </StreamedSection>
         </div>
-        {/* The whole Span's statement, then its periods. */}
+        {/* The whole Period's statement, then its intervals. */}
         <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
           <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
         </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref} isCard>
           <CardSection
             card={sections.incomeVsExpense}
-            empty="Nothing to show yet: no income, expense or Capital in these periods."
+            empty="Nothing to show yet: no income, expense or Capital in these intervals."
           />
         </StreamedSection>
-        <StreamedSection name={CATEGORIES_PER_PERIOD} retryHref={retryHref} isCard>
+        <StreamedSection name={CATEGORIES_PER_INTERVAL} retryHref={retryHref} isCard>
           <CardSection
-            card={sections.categoriesPerPeriod}
-            empty="Nothing to show yet: no classified Transactions in these periods."
+            card={sections.categoriesPerInterval}
+            empty="Nothing to show yet: no classified Transactions in these intervals."
           />
         </StreamedSection>
       </div>

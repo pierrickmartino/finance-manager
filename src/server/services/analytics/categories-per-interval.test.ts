@@ -10,7 +10,7 @@ import {
   seedClassified,
   seedEarlyStart,
 } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
@@ -18,7 +18,7 @@ import { splitTransaction } from '../transactions';
 import { linkTransfer, transactionSide } from '../transfers';
 import { readCard } from '@/lib/reporting/card';
 
-/** Analytics' Categories per period table (spec #170, ticket #172). */
+/** Analytics' Categories per interval table (spec #170, ticket #172). */
 
 const t = setupTestDatabase();
 
@@ -78,19 +78,19 @@ async function dataset(): Promise<void> {
 
 const money = String;
 
-describe('Categories per period', () => {
+describe('Categories per interval', () => {
   it('is a heatmap card of each group subtotal then its Categories with an amount, Income then Expense then Capital', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, MONTHLY, 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, MONTHLY, 'categoriesPerInterval');
     const data = card.data!;
 
-    expect(card.name).toBe('Categories per period');
+    expect(card.name).toBe('Categories per interval');
     expect(card.isEmpty).toBe(false);
     expect(readCard(card, money).kind).toBe('grid');
     expect(data.columns).toHaveLength(13);
-    // Cut short at the Span's start, and to date.
+    // Cut short at the Period's start, and to date.
     expect(data.columns[0]).toMatchObject({ label: 'Mar 2024', isPartial: true });
     expect(data.columns.at(-1)).toMatchObject({ label: 'Mar 2025', isPartial: true });
     // Bonus and Hotels have nothing booked, so they are hidden, and so is the Travel group.
@@ -123,7 +123,7 @@ describe('Categories per period', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const data = (await loadSection(t.ctx, MONTHLY, 'categoriesPerPeriod')).data!;
+    const data = (await loadSection(t.ctx, MONTHLY, 'categoriesPerInterval')).data!;
 
     // Row indexes into data.rows; a Category keeps its whole label there and its own name here.
     expect(data.rowTree).toEqual({
@@ -150,7 +150,7 @@ describe('Categories per period', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const card = await loadSection(t.ctx, MONTHLY, 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, MONTHLY, 'categoriesPerInterval');
     // Income and Expense net to a total Income isn't a share of: the card names the largest row.
     // Income is 900'000 of the rows' 1'907'800 in all, by magnitude: 47%.
     expect(readCard(card, money).lead).toMatchObject({
@@ -159,15 +159,15 @@ describe('Categories per period', () => {
     });
   });
 
-  it('reads the Span by quarter and by year', async () => {
+  it('reads the Period by quarter and by year', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const quarters = (await loadSection(t.ctx, QUARTERLY, 'categoriesPerPeriod')).data!;
-    const years = (await loadSection(t.ctx, YEARLY, 'categoriesPerPeriod')).data!;
+    const quarters = (await loadSection(t.ctx, QUARTERLY, 'categoriesPerInterval')).data!;
+    const years = (await loadSection(t.ctx, YEARLY, 'categoriesPerInterval')).data!;
 
     const groceries = 3;
-    // February 2024 is in both Spans (not in Rolling 12 months); the current period is to date.
+    // February 2024 is in both Periods (not in Rolling 12 months); the current interval is to date.
     expect(quarters.cells[groceries]).toEqual([-999, null, null, null, -39_400]);
     expect(quarters.rowTotals[groceries]).toBe(-40_399);
     expect(years.cells[groceries]).toEqual([null, null, null, -999, -39_400]);
@@ -180,26 +180,26 @@ describe('Categories per period', () => {
       fixToday('2025-03-20');
       await dataset();
 
-      const data = (await loadSection(t.ctx, view, 'categoriesPerPeriod')).data!;
+      const data = (await loadSection(t.ctx, view, 'categoriesPerInterval')).data!;
 
       const values = linkedValues(data);
-      // 3 subtotals and 4 Categories, each with a cell per period then Total; then the column
+      // 3 subtotals and 4 Categories, each with a cell per interval then Total; then the column
       // totals and the total.
-      const periods = data.columns.length;
-      expect(values).toHaveLength(7 * (periods + 1) + periods + 1);
+      const intervals = data.columns.length;
+      expect(values).toHaveLength(7 * (intervals + 1) + intervals + 1);
       for (const { value, href } of values) {
-        expect(originOf(href)).toEqual({ kind: 'analytics', span: view });
+        expect(originOf(href)).toEqual({ kind: 'analytics', period: view });
         expect((await openDrill(t.ctx, href)).value).toBe(value);
       }
     },
   );
 
-  it('is empty when no Transaction falls in the Span', async () => {
+  it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');
     await dataset();
     vi.setSystemTime(new Date('2035-03-20T09:00:00Z'));
 
-    const card = await loadSection(t.ctx, YEARLY, 'categoriesPerPeriod');
+    const card = await loadSection(t.ctx, YEARLY, 'categoriesPerInterval');
 
     expect(card.isEmpty).toBe(true);
     expect(card.data!.rows).toEqual([]);

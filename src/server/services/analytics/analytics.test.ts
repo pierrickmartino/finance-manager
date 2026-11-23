@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, openDrill, seedAccount, seedClassified } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
-import { DEFAULT_SPAN, presetSpan, type Span } from '@/lib/analytics/span';
+import { DEFAULT_PERIOD, presetPeriod, type Period } from '@/lib/analytics/period';
 import { createAccount } from '@/server/services/accounts';
 import { createBank } from '@/server/services/banks';
 import { loadAnalytics, type AnalyticsSections, type AnalyticsView } from '.';
 
-/** The page as a whole: the reading (the Span resolved once) every section reads. */
+/** The page as a whole: the reading (the Period resolved once) every section reads. */
 
 const t = setupTestDatabase();
 
@@ -26,11 +26,12 @@ async function settled(
 
 type Loaded = { [Name in keyof AnalyticsSections]: Awaited<AnalyticsSections[Name]> };
 
-const keys = (periods: { key: string | null }[]) => periods.map((period) => period.key);
-const custom = (from: string): Span => ({ kind: 'custom', from });
-const flags = (periods: { isPartial: boolean }[]) => periods.map((period) => period.isPartial);
+const keys = (intervals: { key: string | null }[]) => intervals.map((interval) => interval.key);
+const custom = (from: string): Period => ({ kind: 'custom', from });
+const flags = (intervals: { isPartial: boolean }[]) =>
+  intervals.map((interval) => interval.isPartial);
 
-describe('a custom Span', () => {
+describe('a custom Period', () => {
   it('reads from its start date to today, by the grain its length gives', async () => {
     fixToday('2025-03-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
@@ -38,12 +39,12 @@ describe('a custom Span', () => {
 
     const { reading } = await settled(await loadAnalytics(t.ctx, custom('2024-06-15')));
 
-    expect(reading).toMatchObject({ span: custom('2024-06-15'), from: '2024-06-15' });
+    expect(reading).toMatchObject({ period: custom('2024-06-15'), from: '2024-06-15' });
     expect(reading.grain).toBe('month');
-    expect(reading.periods[0]).toMatchObject({ key: '2024-06', isPartial: true });
+    expect(reading.intervals[0]).toMatchObject({ key: '2024-06', isPartial: true });
   });
 
-  it('is clamped to the first Transaction, and the effective Span returned', async () => {
+  it('is clamped to the first Transaction, and the effective Period returned', async () => {
     fixToday('2025-03-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
     await seedClassified(t.ctx, ubs, [
@@ -53,13 +54,13 @@ describe('a custom Span', () => {
 
     const { reading, sections } = await settled(await loadAnalytics(t.ctx, custom('2020-01-01')));
 
-    expect(reading).toMatchObject({ span: custom('2024-09-10'), from: '2024-09-10' });
+    expect(reading).toMatchObject({ period: custom('2024-09-10'), from: '2024-09-10' });
     expect(reading.grain).toBe('month');
-    expect(keys(reading.periods)).toEqual([
+    expect(keys(reading.intervals)).toEqual([
       ...['2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03'],
     ]);
-    // Every section reads the clamped Span.
-    expect(keys(sections.netCashFlow.data!.rows)).toEqual(keys(reading.periods));
+    // Every section reads the clamped Period.
+    expect(keys(sections.netCashFlow.data!.rows)).toEqual(keys(reading.intervals));
     expect(sections.netCashFlow.data!.total).toBe(2_000);
   });
 
@@ -77,7 +78,7 @@ describe('a custom Span', () => {
   });
 });
 
-describe('a preset Span', () => {
+describe('a preset Period', () => {
   it('starts no earlier than the first Transaction, keeping its preset name', async () => {
     fixToday('2025-03-20');
     // Opened long before its first Transaction, so the change lines reach back.
@@ -98,15 +99,15 @@ describe('a preset Span', () => {
     ]);
 
     const { reading, starts, sections } = await settled(
-      await loadAnalytics(t.ctx, presetSpan('this-year-and-last-4')),
+      await loadAnalytics(t.ctx, presetPeriod('this-year-and-last-4')),
     );
 
     expect(reading).toMatchObject({
-      span: presetSpan('this-year-and-last-4'),
+      period: presetPeriod('this-year-and-last-4'),
       from: '2024-09-10',
       grain: 'month',
     });
-    expect(keys(reading.periods)[0]).toBe('2024-09');
+    expect(keys(reading.intervals)[0]).toBe('2024-09');
     // Picking a preset fills in the start it is read from.
     expect(starts).toMatchObject({
       'this-year-and-last-4': '2024-09-10',
@@ -126,7 +127,7 @@ describe('a preset Span', () => {
     await seedClassified(t.ctx, ubs, [{ bookingDate: '2020-05-01', amountMinor: -1_000 }]);
 
     const { reading, sections } = await settled(
-      await loadAnalytics(t.ctx, presetSpan('year-to-date')),
+      await loadAnalytics(t.ctx, presetPeriod('year-to-date')),
     );
 
     expect(reading.from).toBe('2025-01-01');
@@ -140,37 +141,37 @@ describe('the reading', () => {
   it('opens on Rolling 12 months by month, its first month cut short and the last to date', async () => {
     fixToday('2025-03-20');
 
-    const { reading, sections } = await settled(await loadAnalytics(t.ctx, DEFAULT_SPAN));
-    const { periods } = reading;
+    const { reading, sections } = await settled(await loadAnalytics(t.ctx, DEFAULT_PERIOD));
+    const { intervals } = reading;
 
     expect(reading).toMatchObject({
-      span: presetSpan('rolling-12-months'),
+      period: presetPeriod('rolling-12-months'),
       from: '2024-03-21',
       to: '2025-03-20',
       grain: 'month',
     });
-    expect(keys(periods)).toEqual([
+    expect(keys(intervals)).toEqual([
       ...['2024-03', '2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09'],
       ...['2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03'],
     ]);
-    expect(periods[0]).toEqual({
+    expect(intervals[0]).toEqual({
       key: '2024-03',
       label: 'Mar 2024',
       isToDate: false,
       isPartial: true,
     });
-    expect(periods.at(-1)).toEqual({
+    expect(intervals.at(-1)).toEqual({
       key: '2025-03',
       label: 'Mar 2025',
       isToDate: true,
       isPartial: false,
     });
-    expect(periods.slice(1, -1).every((p) => !p.isPartial && !p.isToDate)).toBe(true);
-    // Every per-period card covers the Span at its grain, both ends set apart.
+    expect(intervals.slice(1, -1).every((p) => !p.isPartial && !p.isToDate)).toBe(true);
+    // Every per-interval card covers the Period at its grain, both ends set apart.
     const columns = sections.incomeVsExpense.data!.columns;
     const rows = sections.netCashFlow.data!.rows;
-    expect(keys(columns)).toEqual(keys(periods));
-    expect(keys(rows)).toEqual(keys(periods));
+    expect(keys(columns)).toEqual(keys(intervals));
+    expect(keys(rows)).toEqual(keys(intervals));
     for (const headers of [columns, rows, sections.spendingByCategory.data!.rows]) {
       expect(flags(headers)).toEqual([true, ...Array<boolean>(11).fill(false), true]);
     }
@@ -180,13 +181,13 @@ describe('the reading', () => {
     fixToday('2025-03-20');
 
     const quarterly = (
-      await settled(await loadAnalytics(t.ctx, presetSpan('this-year-and-last-1')))
+      await settled(await loadAnalytics(t.ctx, presetPeriod('this-year-and-last-1')))
     ).reading;
-    const yearly = (await settled(await loadAnalytics(t.ctx, presetSpan('this-year-and-last-4'))))
+    const yearly = (await settled(await loadAnalytics(t.ctx, presetPeriod('this-year-and-last-4'))))
       .reading;
 
     expect(quarterly).toMatchObject({ from: '2024-01-01', grain: 'quarter' });
-    expect(keys(quarterly.periods)).toEqual([
+    expect(keys(quarterly.intervals)).toEqual([
       '2024-Q1',
       '2024-Q2',
       '2024-Q3',
@@ -194,34 +195,34 @@ describe('the reading', () => {
       '2025-Q1',
     ]);
     expect(yearly).toMatchObject({ from: '2021-01-01', grain: 'year' });
-    expect(keys(yearly.periods)).toEqual(['2021', '2022', '2023', '2024', '2025']);
-    // Both start on a period's first day: nothing is cut short, the last is to date.
-    for (const { periods } of [quarterly, yearly]) {
-      expect(periods.map((p) => [p.isPartial, p.isToDate])).toEqual([
-        ...periods.slice(0, -1).map(() => [false, false]),
+    expect(keys(yearly.intervals)).toEqual(['2021', '2022', '2023', '2024', '2025']);
+    // Both start on an interval's first day: nothing is cut short, the last is to date.
+    for (const { intervals } of [quarterly, yearly]) {
+      expect(intervals.map((p) => [p.isPartial, p.isToDate])).toEqual([
+        ...intervals.slice(0, -1).map(() => [false, false]),
         [false, true],
       ]);
     }
   });
 
-  it("counts only the Span's days in its first period, so its periods add up to its total", async () => {
+  it("counts only the Period's days in its first interval, so its intervals add up to its total", async () => {
     fixToday('2025-03-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
     await seedClassified(t.ctx, ubs, [
-      // Before the Span: the same month, but not its days.
+      // Before the Period: the same month, but not its days.
       { bookingDate: '2024-03-20', amountMinor: -90_000 },
       { bookingDate: '2024-03-21', amountMinor: -10_000 },
       { bookingDate: '2024-07-15', amountMinor: 50_000 },
       { bookingDate: '2025-03-20', amountMinor: 3_000 },
     ]);
 
-    const { sections } = await settled(await loadAnalytics(t.ctx, DEFAULT_SPAN));
+    const { sections } = await settled(await loadAnalytics(t.ctx, DEFAULT_PERIOD));
     const data = sections.netCashFlow.data!;
 
     expect(data.rowTotals[0]).toBe(-10_000);
     expect(data.total).toBe(43_000);
     expect(data.rowTotals.reduce<number>((sum, value) => sum + (value ?? 0), 0)).toBe(43_000);
-    // The first period's Drill-down lists the Span's days of it only.
+    // The first interval's Drill-down lists the Period's days of it only.
     const page = await openDrill(t.ctx, data.hrefs.rowTotals[0]);
     expect(page.span).toEqual({ from: '2024-03-21', to: '2024-03-31' });
     expect(page.value).toBe(-10_000);

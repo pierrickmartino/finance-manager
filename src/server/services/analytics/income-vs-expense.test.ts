@@ -10,7 +10,7 @@ import {
   seedClassified,
   seedEarlyStart,
 } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
@@ -76,7 +76,7 @@ async function dataset(): Promise<void> {
 const money = String;
 
 describe('Income vs. expense', () => {
-  it('is a heatmap card: a row per type, then Profit and Net cash flow, per period and in Total', async () => {
+  it('is a heatmap card: a row per type, then Profit and Net cash flow, per interval and in Total', async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -90,8 +90,8 @@ describe('Income vs. expense', () => {
       ...['Mar 2024', 'Apr 2024', 'May 2024', 'Jun 2024', 'Jul 2024', 'Aug 2024', 'Sep 2024'],
       ...['Oct 2024', 'Nov 2024', 'Dec 2024', 'Jan 2025', 'Feb 2025', 'Mar 2025'],
     ]);
-    // March 2024 is cut short at the Span's start and the current month is still running: both
-    // drawn as the Dashboard draws a partial period.
+    // March 2024 is cut short at the Period's start and the current month is still running: both
+    // drawn as the Dashboard draws a partial interval.
     expect(data.columns.map((column) => column.isPartial)).toEqual([
       true,
       ...Array<boolean>(11).fill(false),
@@ -108,7 +108,7 @@ describe('Income vs. expense', () => {
       ['Profit', [...empty, 580_600, 580_000, 295_000], 1_455_600],
       ['Net cash flow', [...empty, 580_600, 70_000, 295_000], 945_600],
     ]);
-    // Nothing is Unclassified in the Span: no Unclassified row.
+    // Nothing is Unclassified in the Period: no Unclassified row.
     expect(data.rows.map((row) => row.key)).not.toContain('unclassified');
     expect(data.total).toBe(945_600);
   });
@@ -152,7 +152,7 @@ describe('Income vs. expense', () => {
       ['Net cash flow', [...empty, 573_600, 60_000, 316_500], 950_100],
     ]);
     expect(data.total).toBe(950_100);
-    // Net cash flow per period is the Net cash flow section's.
+    // Net cash flow per interval is the Net cash flow section's.
     const flow = (await loadSection(t.ctx, MONTHLY, 'netCashFlow')).data!;
     expect(data.cells.at(-1)).toEqual(flow.rowTotals);
     // Its Unclassified and Net cash flow values open the Transactions behind them.
@@ -212,7 +212,7 @@ describe('Income vs. expense', () => {
     });
   });
 
-  it('reads the Span by quarter and by year', async () => {
+  it('reads the Period by quarter and by year', async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -223,7 +223,7 @@ describe('Income vs. expense', () => {
     expect(labels(quarters.columns)).toEqual([
       ...['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024', 'Q1 2025'],
     ]);
-    // February 2024 is in both Spans (not in Rolling 12 months); the current period is to date.
+    // February 2024 is in both Periods (not in Rolling 12 months); the current interval is to date.
     expect(quarters.cells[expense(quarters)]).toEqual([-999, null, null, null, -44_400]);
     expect(quarters.rowTotals[expense(quarters)]).toBe(-45_399);
     expect(labels(years.columns)).toEqual(['2021', '2022', '2023', '2024', '2025']);
@@ -240,12 +240,12 @@ describe('Income vs. expense', () => {
     // 5 rows of 5 quarters, 5 row totals, 5 column totals and the total.
     expect(values).toHaveLength(5 * 5 + 5 + 5 + 1);
     for (const { value, href } of values) {
-      expect(originOf(href)).toEqual({ kind: 'analytics', span: QUARTERLY });
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: QUARTERLY });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
   });
 
-  it('is empty when no Transaction falls in the Span', async () => {
+  it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');
 
     const card = await loadSection(t.ctx, YEARLY, 'incomeVsExpense');

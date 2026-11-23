@@ -29,7 +29,7 @@ export interface Figure {
 
 /** What every section says besides its figures. */
 export interface SectionStatus {
-  /** Nothing the section reports falls in the Span. */
+  /** Nothing the section reports falls in the Period. */
   isEmpty: boolean;
   /** Transactions (Accounts, for balances) left out for want of an FX rate. */
   unconvertedCount: number;
@@ -82,11 +82,13 @@ export function analyticsCard(spec: AnalyticsCardSpec): AnalyticsCard {
 }
 
 /**
- * A report's headers with the reading's incomplete periods (its partial first and its to-date
+ * A report's headers with the reading's incomplete intervals (its partial first and its to-date
  * last) marked partial: over the reading's fixed range, the engine marks none of them.
  */
 function markIncomplete(report: ReportTable, reading: AnalyticsReading): ReportTable {
-  const incomplete = new Set(reading.periods.filter(isIncomplete).map((period) => period.key));
+  const incomplete = new Set(
+    reading.intervals.filter(isIncomplete).map((interval) => interval.key),
+  );
   const mark = (headers: readonly ReportHeader[]) =>
     headers.map((header) =>
       header.key !== null && incomplete.has(header.key) ? { ...header, isPartial: true } : header,
@@ -95,8 +97,8 @@ function markIncomplete(report: ReportTable, reading: AnalyticsReading): ReportT
 }
 
 /**
- * A report over the reading's periods, each value opening its Drill-down from Analytics, read
- * the same way; its incomplete periods are set apart.
+ * A report over the reading's intervals, each value opening its Drill-down from Analytics, read
+ * the same way; its incomplete intervals are set apart.
  */
 export function reportSource(report: ReportTable, reading: AnalyticsReading): ChartSource {
   const marked = markIncomplete(report, reading);
@@ -120,36 +122,36 @@ export function cellOf(report: ReportTable) {
   };
 }
 
-/** A row worked out by Analytics itself: a figure per period of the Span, then its Total. */
-export interface PeriodRow {
+/** A row worked out by Analytics itself: a figure per interval of the Period, then its Total. */
+export interface IntervalRow {
   key: string;
   label: string;
   cells: Figure[];
-  /** The whole Span, both incomplete periods included. */
+  /** The whole Period, both incomplete intervals included. */
   total: Figure;
 }
 
-export interface PeriodRowSpec {
+export interface IntervalRowSpec {
   key: string;
   label: string;
-  /** The query behind the row; its columns are the reading's periods. */
+  /** The query behind the row; its columns are the reading's intervals. */
   query: WidgetQuery;
   /** The row's selector on the query's rows; absent for the whole of them. */
   selector?: AxisSelector;
-  /** The row's value in one period of the Span. */
+  /** The row's value in one interval of the Period. */
   valueAt: (periodKey: string) => number | null;
 }
 
-/** A row of figures over the reading, each with its Drill-down: a cell per period, the Total. */
-export function periodRow(reading: AnalyticsReading, spec: PeriodRowSpec): PeriodRow {
+/** A row of figures over the reading, each with its Drill-down: a cell per interval, the Total. */
+export function intervalRow(reading: AnalyticsReading, spec: IntervalRowSpec): IntervalRow {
   const { query, selector } = spec;
-  const at = (period?: string): CellRef => ({
+  const at = (interval?: string): CellRef => ({
     ...(selector === undefined ? {} : { row: selector }),
-    ...(period === undefined ? {} : { column: period }),
+    ...(interval === undefined ? {} : { column: interval }),
   });
-  const cells = reading.periods.map((period) => ({
-    value: spec.valueAt(period.key),
-    drill: { query, cell: at(period.key) },
+  const cells = reading.intervals.map((interval) => ({
+    value: spec.valueAt(interval.key),
+    drill: { query, cell: at(interval.key) },
   }));
   return {
     key: spec.key,
@@ -159,40 +161,40 @@ export function periodRow(reading: AnalyticsReading, spec: PeriodRowSpec): Perio
   };
 }
 
-/** A reading's periods as a card's column headers, a partial or to-date one partial. */
-function periodHeaders(reading: AnalyticsReading): ReportHeader[] {
-  return reading.periods.map((period) => ({
-    key: period.key,
-    label: period.label,
-    isPartial: isIncomplete(period),
+/** A reading's intervals as a card's column headers, a partial or to-date one partial. */
+function intervalHeaders(reading: AnalyticsReading): ReportHeader[] {
+  return reading.intervals.map((interval) => ({
+    key: interval.key,
+    label: interval.label,
+    isPartial: isIncomplete(interval),
   }));
 }
 
 /**
- * Rows Analytics works out itself (a net, a subtotal) as a card's data, periods across. Each
- * column total and the total are the report's own: every row's Transactions in that period.
+ * Rows Analytics works out itself (a net, a subtotal) as a card's data, intervals across. Each
+ * column total and the total are the report's own: every row's Transactions in that interval.
  */
-export function periodRowsSource(
+export function intervalRowsSource(
   reading: AnalyticsReading,
-  rows: readonly PeriodRow[],
+  rows: readonly IntervalRow[],
   report: ReportTable,
 ): ChartSource {
   const href = ({ query, cell }: DrillRef) => analyticsDrillUrl(reading, query, cell);
-  const { periods } = reading;
+  const { intervals } = reading;
   const totals = new Map(report.columns.map((column, c) => [column.key, report.columnTotals[c]]));
   return {
     measure: 'sum',
     rows: rows.map((row) => ({ key: row.key, label: row.label, isPartial: false })),
-    columns: periodHeaders(reading),
+    columns: intervalHeaders(reading),
     cells: rows.map((row) => row.cells.map((cell) => cell.value)),
     rowTotals: rows.map((row) => row.total.value),
-    columnTotals: periods.map((period) => totals.get(period.key) ?? null),
+    columnTotals: intervals.map((interval) => totals.get(interval.key) ?? null),
     total: report.total,
     hrefs: {
       cells: rows.map((row) => row.cells.map((cell) => href(cell.drill))),
       rowTotals: rows.map((row) => href(row.total.drill)),
-      columnTotals: periods.map((period) =>
-        href({ query: report.query, cell: { column: period.key } }),
+      columnTotals: intervals.map((interval) =>
+        href({ query: report.query, cell: { column: interval.key } }),
       ),
       total: href({ query: report.query, cell: {} }),
     },

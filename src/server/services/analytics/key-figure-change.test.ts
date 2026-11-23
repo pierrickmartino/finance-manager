@@ -8,15 +8,15 @@ import {
   seedClassified,
   seedEarlyStart,
 } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
-import { presetSpan, type Span } from '@/lib/analytics/span';
+import { presetPeriod, type Period } from '@/lib/analytics/period';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import type { CellTransactionPage } from '../reporting';
 import type { KeyFigure, KeyFigureId } from './key-figures';
 
 /**
- * Key figures' change line against the Span's Comparison span (spec #225 stories 12-23, 31-32;
+ * Key figures' change line against the Period's Comparison period (spec #225 stories 12-23, 31-32;
  * #229; spec #204 stories 27-29, ticket #235).
  */
 
@@ -36,24 +36,24 @@ async function categories() {
   };
 }
 
-const QUARTER_TO_DATE = presetSpan('quarter-to-date');
-const YEAR_TO_DATE = presetSpan('year-to-date');
+const QUARTER_TO_DATE = presetPeriod('quarter-to-date');
+const YEAR_TO_DATE = presetPeriod('year-to-date');
 
 /** From 1 May 2025: on 20 May, compared with the 20 days before it, 11–30 April. */
-const SINCE_MAY: Span = { kind: 'custom', from: '2025-05-01' };
+const SINCE_MAY: Period = { kind: 'custom', from: '2025-05-01' };
 
 /** An Unclassified booking in March: the Account's data reaches back before April. */
 const SINCE_MARCH = { bookingDate: '2025-03-01', amountMinor: 1_000 };
 
-async function figuresAt(span: Span): Promise<Record<KeyFigureId, KeyFigure>> {
-  const section = await loadSection(t.ctx, span, 'keyFigures');
+async function figuresAt(period: Period): Promise<Record<KeyFigureId, KeyFigure>> {
+  const section = await loadSection(t.ctx, period, 'keyFigures');
   return Object.fromEntries(section.figures.map((figure) => [figure.id, figure])) as Record<
     KeyFigureId,
     KeyFigure
   >;
 }
 
-/** A Drill-down's period subtotals that hold Transactions: it lists empty months between too. */
+/** A Drill-down's interval subtotals that hold Transactions: it lists empty months between too. */
 const booked = (page: CellTransactionPage) =>
   (page.subtotals ?? []).filter((subtotal) => subtotal.sumChfMinor !== 0);
 
@@ -141,7 +141,7 @@ describe('Key figures change', () => {
       { bookingDate: '2026-11-22', amountMinor: 5_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt(presetSpan('this-year-and-last-2'));
+    const { income } = await figuresAt(presetPeriod('this-year-and-last-2'));
 
     expect(income.value).toBe(45_000);
     expect(income.change).toMatchObject({
@@ -162,7 +162,7 @@ describe('Key figures change', () => {
       { bookingDate: '2026-08-25', amountMinor: 50_000, classify: salary },
     ]);
 
-    const { income } = await figuresAt(presetSpan('rolling-90-days'));
+    const { income } = await figuresAt(presetPeriod('rolling-90-days'));
 
     expect(income.change).toMatchObject({
       amount: 20_000,
@@ -172,7 +172,7 @@ describe('Key figures change', () => {
     expect(both.sumChfMinor).toBe(80_000);
   });
 
-  it('compares a custom Span with as many days just before its start', async () => {
+  it('compares a custom Period with as many days just before its start', async () => {
     // 1–22 November: 22 days, against 10–31 October.
     fixToday('2026-11-22');
     const { salary } = await categories();
@@ -250,7 +250,7 @@ describe('Key figures change', () => {
     expect(expense.change).toMatchObject({ amount: 0, percent: null, direction: 'flat' });
   });
 
-  it('compares Net worth with the end of the previous period, opening the Accounts then', async () => {
+  it('compares Net worth with the end of the previous interval, opening the Accounts then', async () => {
     fixToday('2025-05-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
     await seedEarlyStart(t.ctx, ubs);
@@ -289,7 +289,7 @@ describe('Key figures change', () => {
       { bookingDate: '2024-12-31', amountMinor: 1_000 },
       { bookingDate: '2025-01-15', amountMinor: 100_000, classify: salary },
       { bookingDate: '2025-01-16', amountMinor: -20_000, classify: groceries },
-      // Between the Comparison span and the Span: in neither stretch.
+      // Between the Comparison period and the Period: in neither stretch.
       { bookingDate: '2025-03-10', amountMinor: 70_000, classify: salary },
       { bookingDate: '2025-03-11', amountMinor: -9_000, classify: groceries },
       { bookingDate: '2025-05-10', amountMinor: 120_000, classify: salary },
@@ -315,7 +315,7 @@ describe('Key figures change', () => {
       { key: '2025-05', sumChfMinor: 95_000 },
       { key: '2025-01', sumChfMinor: 80_000 },
     ]);
-    expect(originOf(profit.change!.href)).toEqual({ kind: 'analytics', span: QUARTER_TO_DATE });
+    expect(originOf(profit.change!.href)).toEqual({ kind: 'analytics', period: QUARTER_TO_DATE });
   });
 
   it('over Year to date, opens both stretches a year apart', async () => {
@@ -341,7 +341,7 @@ describe('Key figures change', () => {
     fixToday('2025-05-20');
     const { salary } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
-    // The data starts on 5 April: after the Comparison span's start, before April's end.
+    // The data starts on 5 April: after the Comparison period's start, before April's end.
     await seedClassified(t.ctx, ubs, [
       { bookingDate: '2025-04-05', amountMinor: 1_000, classify: salary },
       { bookingDate: '2025-05-15', amountMinor: 1_000, classify: salary },
@@ -357,14 +357,14 @@ describe('Key figures change', () => {
     expect(month.netWorth.change).toMatchObject({ amount: 1_000, label: 'vs 30 Apr' });
   });
 
-  it('has no Net worth change when the data starts in the current period', async () => {
+  it('has no Net worth change when the data starts in the current interval', async () => {
     fixToday('2025-05-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
     await seedClassified(t.ctx, ubs, [{ bookingDate: '2025-05-05', amountMinor: 1_000 }]);
 
     const month = await figuresAt(MONTHLY);
 
-    // The Span is cut to 5 May: Net worth would be compared with 30 April, before the data.
+    // The Period is cut to 5 May: Net worth would be compared with 30 April, before the data.
     expect(month.netWorth.change).toBeNull();
   });
 

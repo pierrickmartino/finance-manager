@@ -63,7 +63,7 @@ function SectionPlaceholder({ name, className = '', isCard }: SectionPlaceholder
 
 interface StreamedSectionProps {
   name: string;
-  /** Analytics over the same Span, for a failed section's "Try again". */
+  /** Analytics over the same Period, for a failed section's "Try again". */
   retryHref: string;
   /** Grid placement, shared by the placeholder and the loaded card. */
   className?: string;

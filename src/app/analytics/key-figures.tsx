@@ -69,7 +69,7 @@ interface KeyFiguresSectionProps {
 
 /**
  * Analytics' Key figures, once they arrive: Net worth today, then Income, Expense and Profit
- * over the current period to date, each a tile whose amount opens what is behind it.
+ * over the current interval to date, each a tile whose amount opens what is behind it.
  */
 export async function KeyFiguresSection({ keyFigures, fmt }: KeyFiguresSectionProps) {
   const { figures } = await keyFigures;

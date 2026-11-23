@@ -4,7 +4,7 @@ import { SectionCard, SectionEmpty } from './section';
 
 interface CardSectionProps {
   card: Promise<AnalyticsCard>;
-  /** Why there is nothing to show, when nothing the section reports falls in the Span. */
+  /** Why there is nothing to show, when nothing the section reports falls in the Period. */
   empty: string;
   className?: string;
 }
@@ -12,7 +12,7 @@ interface CardSectionProps {
 /**
  * A section of Analytics drawn as a Widget's card on the Dashboard Story (GLOSSARY: Card), once
  * its figures arrive: the same headline, chart and facts, each opening its Drill-down back to
- * Analytics. With nothing in the Span, a quiet line says so instead.
+ * Analytics. With nothing in the Period, a quiet line says so instead.
  */
 export async function CardSection({ card, empty, className = '' }: CardSectionProps) {
   const loaded = await card;

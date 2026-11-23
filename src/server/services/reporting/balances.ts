@@ -264,7 +264,7 @@ export interface NetWorthPoint extends ReportHeader {
 /**
  * Net worth at each of `points` (oldest first) on every Account, valued as a Net worth Widget's
  * points are (ADR-0014), by `axis`: the trend of a fixed stretch whose points the caller dates,
- * as Analytics' Span does (ADR-0016). With no Account, no points at all.
+ * as Analytics' Period does (ADR-0016). With no Account, no points at all.
  */
 export async function runNetWorthPoints(
   ctx: ServiceContext,

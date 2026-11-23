@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, loadSection, seedEarlyStart } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { seedTransactions } from '@test/support/transactions';
 import { archiveAccount, createAccount } from '../accounts';
 import { recordBalanceSnapshot } from '../balance-snapshots';
 import { createBank } from '../banks';
-import { presetSpan, type Span } from '@/lib/analytics/span';
+import { presetPeriod, type Period } from '@/lib/analytics/period';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { readHeadlineTrend } from '@/lib/reporting/net-worth-headline';
 import { headlineAmount } from '@/lib/reporting/overview';
@@ -78,8 +78,8 @@ const TODAY = 115_000 + 95_000 - 250_000;
 const END_OF_2024 = 94_000;
 
 /** What the Dashboard's Net worth card heads with, read from the section as it reads a Story. */
-async function headlineAt(span: Span, grain: TimeAxis) {
-  const netWorth = await loadSection(t.ctx, span, 'netWorth');
+async function headlineAt(period: Period, grain: TimeAxis) {
+  const netWorth = await loadSection(t.ctx, period, 'netWorth');
   return {
     netWorth,
     hero: headlineAmount(netWorth.cards, readHeadlineTrend(netWorth.trend, grain)),
@@ -90,7 +90,7 @@ const dated = (trend: ChartSource) =>
   trend.rows.map((row, r) => [row.label, trend.rowTotals[r], trend.hrefs.rowTotals[r]]);
 
 describe('Net worth', () => {
-  it("by month, has a point at the Span's start, each month end and today, each opening the Accounts then", async () => {
+  it("by month, has a point at the Period's start, each month end and today, each opening the Accounts then", async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -110,7 +110,7 @@ describe('Net worth', () => {
       ['Feb 2025', 120_000 + 95_000 - 250_000, '/accounts?date=2025-02-28'],
       ['Mar 2025', TODAY, '/accounts?date=2025-03-20'],
     ]);
-    // The start, then one point per month of the Span.
+    // The start, then one point per month of the Period.
     expect(netWorth.trend.rows).toHaveLength(14);
     expect(netWorth.trend.rows.at(-1)?.isPartial).toBe(true);
     expect(netWorth.change).toEqual({
@@ -121,11 +121,11 @@ describe('Net worth', () => {
     expect(netWorth.unconvertedCount).toBe(0);
   });
 
-  it("by month from mid-month, starts the line at the Span's first day (the day before's end), its change since then", async () => {
+  it("by month from mid-month, starts the line at the Period's first day (the day before's end), its change since then", async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    // From mid-February, after the first Transaction (10 Feb), so the Span is not clamped.
+    // From mid-February, after the first Transaction (10 Feb), so the Period is not clamped.
     const netWorth = await loadSection(t.ctx, { kind: 'custom', from: '2025-02-15' }, 'netWorth');
 
     // 14 February: Francs after its February gain, Euros at 0.94, the Mortgage at its opening.
@@ -142,7 +142,7 @@ describe('Net worth', () => {
     });
   });
 
-  it("by quarter, has a point at the Span's start, each quarter end and today, its change since the start", async () => {
+  it("by quarter, has a point at the Period's start, each quarter end and today, its change since the start", async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -169,7 +169,7 @@ describe('Net worth', () => {
     });
   });
 
-  it("by year, has a point at the Span's start, each year end and today, its change since the start", async () => {
+  it("by year, has a point at the Period's start, each year end and today, its change since the start", async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -191,7 +191,7 @@ describe('Net worth', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const netWorth = await loadSection(t.ctx, presetSpan('year-to-date'), 'netWorth');
+    const netWorth = await loadSection(t.ctx, presetPeriod('year-to-date'), 'netWorth');
 
     expect(dated(netWorth.trend)).toEqual([
       ['1 Jan 2025', END_OF_2024, '/accounts?date=2024-12-31'],
@@ -202,26 +202,26 @@ describe('Net worth', () => {
     expect(netWorth.change?.change).toBe(TODAY - END_OF_2024);
   });
 
-  it('reads the Account balances of today, whatever the Span', async () => {
+  it('reads the Account balances of today, whatever the Period', async () => {
     fixToday('2025-03-20');
     await dataset();
 
-    const spans: Span[] = [MONTHLY, QUARTERLY, YEARLY, { kind: 'custom', from: '2025-03-01' }];
+    const periods: Period[] = [MONTHLY, QUARTERLY, YEARLY, { kind: 'custom', from: '2025-03-01' }];
     const balances = await Promise.all(
-      spans.map(async (span) => (await loadSection(t.ctx, span, 'netWorth')).cards[0]),
+      periods.map(async (period) => (await loadSection(t.ctx, period, 'netWorth')).cards[0]),
     );
 
     for (const card of balances) expect(card).toEqual(balances[0]);
     expect(balances[0]?.data?.total).toBe(TODAY);
   });
 
-  it("over a single period, still draws a line: the Span's start, then today, its change since the start", async () => {
+  it("over a single interval, still draws a line: the Period's start, then today, its change since the start", async () => {
     fixToday('2025-03-20');
     await dataset();
 
     const netWorth = await loadSection(t.ctx, { kind: 'custom', from: '2025-03-01' }, 'netWorth');
 
-    // The start is labelled with the Span's first day: Net worth at the end of February.
+    // The start is labelled with the Period's first day: Net worth at the end of February.
     const START = 120_000 + 95_000 - 250_000;
     expect(dated(netWorth.trend)).toEqual([
       ['1 Mar 2025', START, '/accounts?date=2025-02-28'],
@@ -235,7 +235,7 @@ describe('Net worth', () => {
     });
   });
 
-  it("breaks down the Span's income and expense with the Account balances, as the Dashboard's card does", async () => {
+  it("breaks down the Period's income and expense with the Account balances, as the Dashboard's card does", async () => {
     fixToday('2025-03-20');
     await dataset();
 
