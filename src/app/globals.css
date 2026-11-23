@@ -78,6 +78,46 @@
    */
   --motion-duration-nav: 250ms;
   --motion-ease-nav: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /*
+   * Glass (ADR-0017): how much of a container's fill shows (the rest is the blurred page
+   * behind it), the blur itself, and the page's fixed glow. Plain variables, so the fallback
+   * below turns all of it off in one place.
+   */
+  --glass-opacity: 70%;
+  --glass-blur: blur(18px) saturate(140%);
+  --page-glow:
+    radial-gradient(
+      48rem 32rem at 88% -6rem,
+      color-mix(in srgb, var(--color-accent) 11%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44rem 36rem at -6rem 100%,
+      color-mix(in srgb, var(--color-ramp-5) 10%, transparent),
+      transparent 70%
+    );
+}
+
+/*
+ * The opaque fallback: under reduced transparency, or where backdrop-filter is unsupported,
+ * every container's fill is opaque, nothing blurs and the page glow is not drawn. One rule,
+ * like reduced motion's; the two blocks say the same.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-opacity: 100%;
+    --glass-blur: none;
+    --page-glow: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-opacity: 100%;
+    --glass-blur: none;
+    --page-glow: none;
+  }
 }
 
 /* Every view transition defaults to the navigation motion; a named element may override it. */
@@ -122,8 +162,37 @@
   );
 }
 
+/*
+ * Glass, for containers only (cards, tiles, popovers, the dock, notices): a fill of the named
+ * colour that lets the blurred page show through (`glass-surface`, `glass-warning-tint`…).
+ * Opaque under the fallback above. Inputs, rows, badges and buttons stay solid.
+ */
+@utility glass-* {
+  background-color: color-mix(in srgb, --value(--color-*) var(--glass-opacity), transparent);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* The Dashboard's and Analytics' tiles only: a soft cyan inner glow under a small shadow. */
+@utility tile-glow {
+  box-shadow:
+    inset 0 0 2.5rem -0.75rem color-mix(in srgb, var(--color-accent) 22%, transparent),
+    inset 0 1px 0 0 color-mix(in srgb, var(--color-accent) 12%, transparent),
+    0 1px 3px 0 rgb(0 0 0 / 0.25);
+}
+
 body {
   @apply bg-paper text-ink antialiased;
+}
+
+/* The page glow: drawn on the page behind everything, fixed, so it never moves on scroll. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--page-glow);
 }
 
 /* One visible focus style everywhere, in the accent's ink (AA on every dark surface). */

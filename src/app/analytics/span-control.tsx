@@ -79,7 +79,7 @@ export function SpanControl({ span, from, phrase, starts, today }: SpanControlPr
       scroll={false}
       aria-label="Span"
       data-testid="span-control"
-      className="sticky top-0 z-10 -mx-1 flex flex-wrap items-end gap-x-3 gap-y-2 bg-paper px-1 py-2"
+      className="sticky top-0 z-10 -mx-1 flex flex-wrap items-end gap-x-3 gap-y-2 glass-paper px-1 py-2"
     >
       {/* The field primitive's layout, but each label set beside its control (htmlFor) rather
           than wrapping it: a wrapping label would fold the chosen option into the select's

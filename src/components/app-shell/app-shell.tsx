@@ -100,7 +100,7 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
     : 'mx-auto w-full max-w-5xl px-4 py-8 md:px-6';
 
   return (
-    <div className="relative min-h-screen bg-paper">
+    <div className="relative min-h-screen">
       <div className="relative">
         {showNavigation && <TopBar pathname={pathname} onOpenMenu={() => setIsMenuOpen(true)} />}
         <main className={main}>{children}</main>
