@@ -3,7 +3,17 @@ import { transactionListHref } from '@/lib/transactions/links';
 import type { ServiceContext } from '../context';
 import { listCellTransactions, runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
+import { widgetQueryInput, type WidgetQuery, type WidgetQueryInput } from '../reporting/query';
+import { comparisonSpan } from './comparison-span';
+import type { DataStart } from './data-start';
 import { flowFigures } from './flow-figures';
+import {
+  bothStretchesRange,
+  spanChange,
+  type ComparisonWindow,
+  type GoodWay,
+  type KeyFigureChange,
+} from './key-figure-change';
 import type { AnalyticsReading } from './reading';
 
 /**
@@ -14,7 +24,8 @@ import type { AnalyticsReading } from './reading';
  * type (every non-Transfer flow, Capital included), so its Net cash flow is that section's total;
  * Transfers, whole or Split-line sides, are left out and Split lines count by their own Category.
  *
- * A row is the place its change against the Comparison span joins it.
+ * Each row's change against the Comparison span follows the Key figures' rule; Capital and
+ * Unclassified are neutral, so a property sale or a classification backlog is neither good nor bad.
  */
 
 export const PROFIT_AND_LOSS = 'Profit and loss';
@@ -34,6 +45,16 @@ export interface ProfitAndLossRow {
   href: string;
   /** Its Transactions left out for want of an FX rate. */
   unconverted: number;
+  /**
+   * Over the Comparison span, CHF minor units, as `value` is read; null when the Account data
+   * doesn't reach back to the Comparison span.
+   */
+  earlier: number | null;
+  /**
+   * Against its value over the Comparison span, opening the Transactions of both stretches; null
+   * when the Account data doesn't reach back to the Comparison span.
+   */
+  change: KeyFigureChange | null;
 }
 
 export interface AnalyticsProfitAndLoss {
@@ -52,6 +73,26 @@ const CELLS: Record<ProfitAndLossRowId, CellRef> = {
   capital: { row: 'capital' },
   unclassified: { row: null },
   netCashFlow: {},
+};
+
+/** Each row's cell of the both-stretches report, a column per Category group type. */
+const BOTH_CELLS: Record<ProfitAndLossRowId, CellRef> = {
+  income: { column: 'income', withPeriodSubtotals: true },
+  expense: { column: 'expense', withPeriodSubtotals: true },
+  profit: { column: { except: ['capital', null] }, withPeriodSubtotals: true },
+  capital: { column: 'capital', withPeriodSubtotals: true },
+  unclassified: { column: null, withPeriodSubtotals: true },
+  netCashFlow: { withPeriodSubtotals: true },
+};
+
+/** Which way each row is good: more spending never is; Capital and Unclassified neither way. */
+const GOOD_WAYS: Record<ProfitAndLossRowId, GoodWay> = {
+  income: 'up',
+  expense: 'down',
+  profit: 'up',
+  capital: 'neutral',
+  unclassified: 'neutral',
+  netCashFlow: 'up',
 };
 
 const LABELS: Record<ProfitAndLossRowId, string> = {
@@ -106,18 +147,48 @@ async function unconvertedIn(ctx: ServiceContext, report: ReportTable, cell: Cel
 const isShown = (row: ProfitAndLossRow) =>
   row.id !== 'unclassified' || row.value !== 0 || row.unconverted > 0;
 
+/** The Net cash flow section's query, by Category group type: every non-Transfer flow. */
+const byGroupType = (dateRange: WidgetQueryInput['dateRange']): WidgetQueryInput => ({
+  dateRange,
+  rows: 'categoryGroupType',
+  columns: null,
+  includeCapital: true,
+});
+
+/** The same flows over both stretches, by period of the grain: what a change line opens. */
+function bothStretchesQuery({ reading, span }: ComparisonWindow): WidgetQuery {
+  return widgetQueryInput.parse({
+    dateRange: bothStretchesRange(span, { from: reading.from, to: reading.to }),
+    rows: reading.grain,
+    columns: 'categoryGroupType',
+    includeCapital: true,
+  });
+}
+
 export async function profitAndLoss(
   ctx: ServiceContext,
   reading: AnalyticsReading,
+  dataStart: DataStart,
 ): Promise<AnalyticsProfitAndLoss> {
-  // The Net cash flow section's query, by Category group type: every non-Transfer flow.
-  const report = await runWidgetQuery(ctx, {
-    dateRange: reading.range,
-    rows: 'categoryGroupType',
-    columns: null,
-    includeCapital: true,
-  });
+  const window: ComparisonWindow = {
+    reading,
+    span: comparisonSpan(reading.span, { from: reading.from, to: reading.to }),
+    dataStart: dataStart.accountData,
+  };
+  const [report, earlierReport] = await Promise.all([
+    runWidgetQuery(ctx, byGroupType(reading.range)),
+    runWidgetQuery(ctx, byGroupType({ kind: 'fixed', ...window.span })),
+  ]);
   const values = valuesOf(report);
+  const earlier = valuesOf(earlierReport);
+  const both = bothStretchesQuery(window);
+  const changeOf = (id: ProfitAndLossRowId): Pick<ProfitAndLossRow, 'earlier' | 'change'> => {
+    const change = spanChange(window, [values[id], earlier[id]], {
+      goodWay: GOOD_WAYS[id],
+      href: analyticsDrillUrl(reading, both, BOTH_CELLS[id]),
+    });
+    return { earlier: change === null ? null : earlier[id], change };
+  };
   const unconverted = await Promise.all(ORDER.map((id) => unconvertedIn(ctx, report, CELLS[id])));
   const hrefOf = (id: ProfitAndLossRowId) =>
     id === 'unclassified'
@@ -129,6 +200,7 @@ export async function profitAndLoss(
     value: values[id],
     href: hrefOf(id),
     unconverted: unconverted[index] ?? 0,
+    ...changeOf(id),
   }));
   return { rows: rows.filter(isShown) };
 }

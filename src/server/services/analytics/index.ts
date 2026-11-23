@@ -81,7 +81,7 @@ export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<An
       netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
       spendingByCategory: spendingByCategory(ctx, reading),
-      profitAndLoss: profitAndLoss(ctx, reading),
+      profitAndLoss: profitAndLoss(ctx, reading, dataStart),
       incomeVsExpense: incomeVsExpense(ctx, reading),
       categoriesPerPeriod: categoriesPerPeriod(ctx, reading),
     },

@@ -251,3 +251,131 @@ describe('Profit and loss', () => {
     ]);
   });
 });
+
+/** What a row's change says, its link aside: [id, amount, %, good]. */
+const changes = (rows: readonly ProfitAndLossRow[]) =>
+  rows.map((row) =>
+    row.change === null
+      ? [row.id, null]
+      : [row.id, row.change.amount, row.change.percent, row.change.isGood],
+  );
+
+describe('Profit and loss change', () => {
+  it('compares each row with the Comparison span, Capital and Unclassified neutral', async () => {
+    // 15 Feb – 20 May against the 95 days before: only the 10 February salary falls there.
+    fixToday('2025-05-20');
+    await dataset();
+
+    const { rows } = await loadSection(t.ctx, SINCE_MID_FEBRUARY, 'profitAndLoss');
+
+    expect(changes(rows)).toEqual([
+      ['income', 100_000, 2, true],
+      // Nothing went out before: no %, and more spending is bad.
+      ['expense', 65_000, null, false],
+      ['profit', 35_000, 0.7, true],
+      ['capital', -120_000, null, null],
+      ['unclassified', -7_000, null, null],
+      ['netCashFlow', -92_000, -1.84, false],
+    ]);
+    expect(rows.map((row) => [row.id, row.earlier])).toEqual([
+      ['income', 50_000],
+      ['expense', 0],
+      ['profit', 50_000],
+      ['capital', 0],
+      ['unclassified', 0],
+      ['netCashFlow', 50_000],
+    ]);
+    expect(rowOf(rows, 'income').change?.label).toBe('vs 12 Nov 2024 – 14 Feb');
+  });
+
+  it('gives no % against a zero or negative earlier value, and Capital and Unclassified going up stay neutral', async () => {
+    fixToday('2025-05-20');
+    await quarters();
+
+    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+
+    expect(changes(rows)).toEqual([
+      ['income', 90_000, 9, true],
+      ['expense', 10_000, 1 / 3, false],
+      // A loss before: Profit is up, with no %.
+      ['profit', 80_000, null, true],
+      ['capital', 130_000, null, null],
+      ['unclassified', 3_000, null, null],
+      ['netCashFlow', 213_000, null, true],
+    ]);
+  });
+
+  it('opens the Transactions of both stretches of days, and none between them', async () => {
+    fixToday('2025-05-20');
+    await quarters();
+
+    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+
+    const both: [string, number | null][] = [];
+    for (const row of rows) {
+      const page = await openDrill(t.ctx, row.change?.href);
+      both.push([row.id, page.sumChfMinor]);
+      expect(originOf(row.change!.href), row.id).toEqual({
+        kind: 'analytics',
+        span: presetSpan('quarter-to-date'),
+      });
+    }
+    expect(both).toEqual([
+      ['income', 110_000],
+      ['expense', -70_000],
+      ['profit', 40_000],
+      ['capital', 30_000],
+      ['unclassified', -7_000],
+      ['netCashFlow', 63_000],
+    ]);
+  });
+
+  it('has no change on any row when the Account data does not reach back to the Comparison span', async () => {
+    fixToday('2025-05-20');
+    const { salary, property } = await categories();
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    // The data starts on 5 April: after the Comparison span's start, 1 January.
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2025-04-05', amountMinor: 1_000, classify: salary },
+      { bookingDate: '2025-05-15', amountMinor: -3_000, classify: property },
+      { bookingDate: '2025-05-16', amountMinor: -2_000 },
+    ]);
+
+    const { rows } = await loadSection(t.ctx, presetSpan('quarter-to-date'), 'profitAndLoss');
+
+    expect(rows.map((row) => [row.id, row.earlier, row.change])).toEqual([
+      ['income', null, null],
+      ['expense', null, null],
+      ['profit', null, null],
+      ['capital', null, null],
+      ['unclassified', null, null],
+      ['netCashFlow', null, null],
+    ]);
+  });
+});
+
+/**
+ * Quarter to date on 20 May 2025 (1 Apr – 20 May) against 1 Jan – 19 Feb. Before: 100.00 in,
+ * 300.00 of groceries (a loss), 500.00 into property and a 50.00 Unclassified payment. Now:
+ * 1,000.00 in, 400.00 of groceries, 800.00 from a share sale, a 20.00 Unclassified payment.
+ * March, between the stretches, holds bookings of every kind.
+ */
+async function quarters(): Promise<void> {
+  const { salary, groceries, property, shares } = await categories();
+  const ubs = await seedAccount(t.ctx, 'UBS');
+  await seedEarlyStart(t.ctx, ubs);
+  await seedClassified(t.ctx, ubs, [
+    { bookingDate: '2025-01-10', amountMinor: 10_000, classify: salary },
+    { bookingDate: '2025-01-11', amountMinor: -30_000, classify: groceries },
+    { bookingDate: '2025-02-01', amountMinor: -50_000, classify: property },
+    { bookingDate: '2025-02-19', amountMinor: -5_000 },
+    { bookingDate: '2025-03-05', amountMinor: 90_000, classify: salary },
+    { bookingDate: '2025-03-06', amountMinor: -9_000, classify: groceries },
+    { bookingDate: '2025-03-07', amountMinor: -40_000, classify: shares },
+    { bookingDate: '2025-03-08', amountMinor: -4_000 },
+    { bookingDate: '2025-04-10', amountMinor: 100_000, classify: salary },
+    { bookingDate: '2025-04-11', amountMinor: -40_000, classify: groceries },
+    { bookingDate: '2025-05-01', amountMinor: 80_000, classify: shares },
+    { bookingDate: '2025-05-02', amountMinor: -2_000 },
+  ]);
+}
