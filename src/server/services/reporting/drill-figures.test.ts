@@ -100,9 +100,11 @@ async function open(href: string | null | undefined): Promise<CellTransactionPag
     ...cellFromParams(params),
     pageSize: 200,
   });
-  // What the list shows adds up to the page's sum.
+  // What the list shows adds up to the page's sum (an empty list's is none).
   expect(page.transactions).toHaveLength(page.total);
-  expect(page.transactions.reduce((sum, item) => sum + item.chfMinor, 0)).toBe(page.sumChfMinor);
+  expect(page.transactions.reduce((sum, item) => sum + item.chfMinor, 0)).toBe(
+    page.sumChfMinor ?? 0,
+  );
   return page;
 }
 
@@ -261,6 +263,22 @@ describe('a Widget by day', () => {
         const value = point.values[series.key] ?? null;
         if (value !== null) expect((await open(point.hrefs[series.key])).value).toBe(value);
       }
+    }
+  });
+
+  it("draws a line flow's areas a point per day, each figure what its Drill-down works out", async () => {
+    await dataset();
+    const { mark } = readCard(await widget(januaryByDay, 'line'), money);
+    if (mark.type !== 'areas') throw new Error(`expected areas, got ${mark.type}`);
+
+    expect(mark.points).toHaveLength(31);
+    expect(mark.points[0]).toMatchObject({ key: '2025-01-01', label: '1 Jan 2025' });
+    for (const point of mark.points) {
+      // A quiet day opens no Transactions: its figures are nothing, not the whole range.
+      const sumOf = async (href: string) => (await open(href)).sumChfMinor ?? 0;
+      expect(await sumOf(point.incomeHref)).toBe(point.income);
+      expect(0 - (await sumOf(point.expenseHref))).toBe(point.expense);
+      expect(await sumOf(point.href)).toBe(point.income - point.expense);
     }
   });
 });

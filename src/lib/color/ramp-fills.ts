@@ -1,10 +1,10 @@
 /**
  * The ramp's gradients (docs/design-system.md, "Charts"; ADR-0017): cyan → blue → violet, in
  * fills only. They fill the sparklines, the Net worth card's bands and the area under its line,
- * the trend cards' bars, a line flow's two areas and the overview's Net worth tile. Never text, a line, a stroke or an
- * outline; never the heatmap (a stepped single hue) or a Capital diamond (the accent). They are
- * atmosphere and never mark a state: hatching, dashes and outlines still say "partial", and the
- * accent still marks the point.
+ * the trend cards' bars, a line flow's two areas and the overview's Net worth tile. Never
+ * text, a line, a stroke or an outline; never the heatmap (a stepped single hue) or a Capital
+ * diamond (the accent). They are atmosphere and never mark a state: hatching, dashes and
+ * outlines still say "partial", and the accent still marks the point.
  *
  * SVG marks draw them with `RampGradient` (src/components/ramp-gradient.tsx), HTML ones take
  * `cssGradient`. `design-tokens.test.ts` checks the text that sits on them (`TEXT_ON_RAMP_FILLS`).

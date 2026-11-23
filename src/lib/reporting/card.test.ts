@@ -360,6 +360,37 @@ describe('readCard: income vs. expense', () => {
     });
   });
 
+  it('draws a line flow by day as each day its own amounts, telling the flow in days', () => {
+    const days = source(
+      ['2025-03-01', '2025-03-02', '2025-03-03'],
+      ['Income', 'Expense'],
+      [
+        [5000_00, -40_00],
+        [null, null],
+        [null, -60_00],
+      ],
+      { lastIsPartial: true },
+    );
+
+    const reading = read(widget({ visualisation: 'line', data: days }));
+
+    expect(reading.lead).toMatchObject({ headline: 'Most came in: 2025-03-01' });
+    expect(reading.facts.map((fact) => fact.label)).toEqual([
+      'Most went out: 2025-03-03 (partial)',
+      'Kept per day, on average',
+    ]);
+    expect(reading.mark).toMatchObject({
+      type: 'areas',
+      isRunning: false,
+      points: [
+        { key: '2025-03-01', income: 5000_00, expense: 40_00, isPartial: false },
+        // A quiet day is nothing either way, its links its own.
+        { key: '2025-03-02', income: 0, expense: 0, incomeHref: 'cell:2025-03-02/Income' },
+        { key: '2025-03-03', income: 0, expense: 60_00, isPartial: true },
+      ],
+    });
+  });
+
   it('counts an empty cell as nothing', () => {
     const gaps = source(
       ['Jan', 'Feb'],
