@@ -71,10 +71,14 @@ function bell(page: Page) {
 function bellPopover(page: Page) {
   return page.getByRole('dialog', { name: /Needs attention/ });
 }
+function unreadDot(page: Page) {
+  return bell(page).getByTestId('unread-dot');
+}
 
-test('the bell lists the Unclassified Transactions and leads to Unclassified', async ({ page }) => {
-  const suffix = Date.now();
-  await withServices(async (ctx) => {
+/** Adds one Unclassified Transaction, on an Account of its own: the bell has news. */
+async function addUnclassified(label: string): Promise<string> {
+  const suffix = `${label} ${Date.now()}`;
+  return withServices(async (ctx) => {
     const bank = await createBank(ctx, { name: `Bell bank ${suffix}` });
     const account = await createAccount(ctx, {
       bankId: bank.id,
@@ -85,19 +89,24 @@ test('the bell lists the Unclassified Transactions and leads to Unclassified', a
       openingBalanceMinor: 0,
       openingDate: '2025-01-01',
     });
-    await createManualTransaction(ctx, {
+    const transaction = await createManualTransaction(ctx, {
       accountId: account.id,
       bookingDate: '2025-04-02',
       amountMinor: -4_50,
       description: `Bell kiosk ${suffix}`,
     });
+    return transaction.id;
   });
+}
+
+test('the bell lists the Unclassified Transactions and leads to Unclassified', async ({ page }) => {
+  await addUnclassified('list');
 
   await page.goto('/categories');
   await bell(page).click();
   await expect(bell(page)).toHaveAttribute('aria-expanded', 'true');
   const item = bellPopover(page).getByRole('link', {
-    name: /^\d+ Transactions? (is|are) Unclassified$/,
+    name: /^\d+ Transactions? (is|are) Unclassified(, unread)?$/,
   });
   await expect(item).toBeVisible();
   await expect(bellPopover(page)).toHaveAccessibleName('Needs attention 1');
@@ -105,6 +114,71 @@ test('the bell lists the Unclassified Transactions and leads to Unclassified', a
   await item.click();
   await expect(page).toHaveURL(/\/unclassified$/);
   await expect(bellPopover(page)).toBeHidden();
+});
+
+test('a dot shows what is unread until the bell is opened, and stays gone after a reload', async ({
+  page,
+}) => {
+  await addUnclassified('dot');
+
+  await page.goto('/categories');
+  await expect(bell(page)).toHaveAccessibleName('Notifications, 1 unread');
+  await expect(unreadDot(page)).toBeVisible();
+
+  await bell(page).click();
+  await expect(
+    bellPopover(page).getByRole('link', { name: /Unclassified, unread$/ }),
+  ).toBeVisible();
+  await expect(bell(page)).toHaveAccessibleName('Notifications');
+  await expect(unreadDot(page)).toHaveCount(0);
+
+  await page.reload();
+  await expect(bell(page)).toHaveAccessibleName('Notifications');
+  await expect(unreadDot(page)).toHaveCount(0);
+  await bell(page).click();
+  await expect(bellPopover(page).getByRole('link', { name: /Unclassified$/ })).toBeVisible();
+});
+
+test('the bell catches up on navigation, without a reload', async ({ page }) => {
+  await page.goto('/categories');
+  await bell(page).click();
+  await page.keyboard.press('Escape');
+  await expect(unreadDot(page)).toHaveCount(0);
+
+  await addUnclassified('navigation');
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Accounts' })
+    .click();
+
+  await expect(page).toHaveURL(/\/accounts$/);
+  await expect(bell(page)).toHaveAccessibleName('Notifications, 1 unread');
+  await expect(unreadDot(page)).toBeVisible();
+});
+
+test('classifying a Transaction updates the dot, without a reload', async ({ page }) => {
+  const categoryName = `Bell snacks ${Date.now()}`;
+  await withServices(async (ctx) => {
+    const group = await createCategoryGroup(ctx, {
+      name: `${categoryName} group`,
+      type: 'expense',
+    });
+    await createCategory(ctx, { groupId: group.id, name: categoryName });
+  });
+  await page.goto('/categories');
+  await bell(page).click();
+  await page.keyboard.press('Escape');
+  const transactionId = await addUnclassified('classify');
+
+  await page.goto(`/transactions/${transactionId}`);
+  await expect(unreadDot(page)).toBeVisible();
+  const form = page.getByRole('form', { name: 'Classification' });
+  await form.getByLabel('Category').selectOption({ label: categoryName });
+  await form.getByRole('button', { name: 'Save classification' }).click();
+
+  // Back to as many Unclassified as the bell showed: nothing is unread.
+  await expect(unreadDot(page)).toHaveCount(0);
+  await expect(bell(page)).toHaveAccessibleName('Notifications');
 });
 
 test('the bell works from the keyboard, and Escape gives focus back to it', async ({ page }) => {

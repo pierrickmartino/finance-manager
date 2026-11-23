@@ -7,6 +7,7 @@ import type { AttentionItem } from '@/server/services/attention';
 import { BADGE_CLASS, POPOVER_CLASS } from '../surface';
 import { BAR_ICON_BUTTON_CLASS } from './bar-styles';
 import { Icon } from './icon';
+import { useAttentionItems } from './use-attention-items';
 
 /** The item's line, worded as its own page words it. */
 function itemLine(item: AttentionItem): string {
@@ -17,6 +18,16 @@ function itemLine(item: AttentionItem): string {
 /** The item's badge, in its tone: what kind of attention it asks for. */
 const BADGES: Record<AttentionItem['kind'], string> = { unclassified: 'Unclassified' };
 
+/** An item's identity, kind plus subject: its key in the list. */
+function itemKey(item: AttentionItem): string {
+  return `${item.kind}:${item.subject ?? ''}`;
+}
+
+/** The bell's accessible name: what the dot says, in words. */
+function bellLabel(unreadCount: number): string {
+  return unreadCount === 0 ? 'Notifications' : `Notifications, ${unreadCount} unread`;
+}
+
 interface NotificationsBellProps {
   /** The current Attention items, in display order; null while they are still worked out. */
   items: readonly AttentionItem[] | null;
@@ -24,11 +35,15 @@ interface NotificationsBellProps {
 
 /**
  * The top bar's bell: opens a popover listing the current Attention items (GLOSSARY), each a
- * link to where it is fixed. Closes on Escape (focus back on the bell), a click outside it or
- * following a link, as the More menu does.
+ * link to where it is fixed. A dot on it shows that some are unread; opening it marks them all
+ * read and marks, in the list, the ones that were. Closes on Escape (focus back on the bell), a
+ * click outside it or following a link, as the More menu does.
  */
-export function NotificationsBell({ items }: NotificationsBellProps) {
+export function NotificationsBell({ items: served }: NotificationsBellProps) {
+  const { items, markSeen } = useAttentionItems(served);
   const [isOpen, setIsOpen] = useState(false);
+  // The items that were unread when the bell was opened: marked in the list while it is open.
+  const [unreadWhenOpened, setUnreadWhenOpened] = useState<ReadonlySet<string>>(new Set());
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -52,18 +67,39 @@ export function NotificationsBell({ items }: NotificationsBellProps) {
     };
   }, [isOpen]);
 
+  const unreadCount = items?.filter((item) => item.unread).length ?? 0;
+
+  function toggle() {
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+    setIsOpen(true);
+    // Still loading: nothing is listed yet, so nothing is marked read.
+    if (items === null) return;
+    setUnreadWhenOpened(new Set(items.filter((item) => item.unread).map(itemKey)));
+    markSeen();
+  }
+
   return (
     <div ref={rootRef} className="sm:relative">
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Notifications"
+        aria-label={bellLabel(unreadCount)}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        onClick={() => setIsOpen((open) => !open)}
-        className={BAR_ICON_BUTTON_CLASS}
+        onClick={toggle}
+        className={`relative ${BAR_ICON_BUTTON_CLASS}`}
       >
         <Icon name="bell" />
+        {unreadCount > 0 && (
+          <span
+            data-testid="unread-dot"
+            aria-hidden="true"
+            className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-accent ring-2 ring-paper"
+          />
+        )}
       </button>
       {isOpen && (
         // On a phone the popover spans the screen within its 16px gutters; wider, it hangs
@@ -83,7 +119,7 @@ export function NotificationsBell({ items }: NotificationsBellProps) {
               </span>
             )}
           </h2>
-          <BellContent items={items} onFollow={() => setIsOpen(false)} />
+          <BellContent items={items} unread={unreadWhenOpened} onFollow={() => setIsOpen(false)} />
         </div>
       )}
     </div>
@@ -92,8 +128,11 @@ export function NotificationsBell({ items }: NotificationsBellProps) {
 
 function BellContent({
   items,
+  unread,
   onFollow,
 }: NotificationsBellProps & {
+  /** The keys of the items to mark unread. */
+  unread: ReadonlySet<string>;
   /** Called when an item's link is followed: the popover closes. */
   onFollow: () => void;
 }) {
@@ -103,21 +142,29 @@ function BellContent({
   }
   return (
     <ul>
-      {items.map((item) => (
-        <li key={`${item.kind}:${item.subject ?? ''}`}>
-          <Link
-            href={item.href}
-            onClick={onFollow}
-            aria-label={itemLine(item)}
-            className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-ink-soft hover:bg-sunken hover:text-ink"
-          >
-            <span>{itemLine(item)}</span>
-            <span aria-hidden="true" className={BADGE_CLASS[item.tone]}>
-              {BADGES[item.kind]}
-            </span>
-          </Link>
-        </li>
-      ))}
+      {items.map((item) => {
+        const isUnread = unread.has(itemKey(item));
+        return (
+          <li key={itemKey(item)}>
+            <Link
+              href={item.href}
+              onClick={onFollow}
+              aria-label={isUnread ? `${itemLine(item)}, unread` : itemLine(item)}
+              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken hover:text-ink ${isUnread ? 'font-medium text-ink' : 'text-ink-soft'}`}
+            >
+              {/* The unread marker, the dot's own mark; a read item keeps its place. */}
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${isUnread ? 'bg-accent' : ''}`}
+              />
+              <span className="flex-1">{itemLine(item)}</span>
+              <span aria-hidden="true" className={BADGE_CLASS[item.tone]}>
+                {BADGES[item.kind]}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }
