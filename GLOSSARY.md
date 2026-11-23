@@ -90,6 +90,10 @@ _Avoid_: Hole, missing period
 The state of an imported Account whose data ends too long ago, counted from the last day its latest Import covers.
 _Avoid_: Outdated, old
 
+**Attention item**:
+A condition in the current data that asks the user to act, one per kind and subject: the FX rates are Stale; an Account fails the Completeness check (Stale, never imported, with Gaps, or not adding up to its Statement balance); Transactions are Unclassified; a Recurring payment is Missed or has a Price increase. It exists only while its condition holds and goes away by itself once fixed. It is never stored, and it links to where it is fixed.
+_Avoid_: Notification, alert, event, warning
+
 ### Classification
 
 **Category group**:
