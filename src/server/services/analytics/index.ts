@@ -9,6 +9,7 @@ import { incomeVsExpense } from './income-vs-expense';
 import { netCashFlow } from './net-cash-flow';
 import { keyFigures, type AnalyticsKeyFigures } from './key-figures';
 import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
+import { profitAndLoss, type AnalyticsProfitAndLoss } from './profit-and-loss';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { spendingByCategory } from './spending-by-category';
 import { lastCompleteMonthInsights, spendingInsights } from './spending-insights';
@@ -37,6 +38,7 @@ export interface AnalyticsSections {
   netCashFlow: Promise<AnalyticsCard>;
   accountBalances: Promise<AnalyticsCard>;
   spendingByCategory: Promise<AnalyticsCard>;
+  profitAndLoss: Promise<AnalyticsProfitAndLoss>;
   incomeVsExpense: Promise<AnalyticsCard>;
   categoriesPerPeriod: Promise<AnalyticsCard>;
 }
@@ -79,6 +81,7 @@ export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<An
       netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
       spendingByCategory: spendingByCategory(ctx, reading),
+      profitAndLoss: profitAndLoss(ctx, reading),
       incomeVsExpense: incomeVsExpense(ctx, reading),
       categoriesPerPeriod: categoriesPerPeriod(ctx, reading),
     },
@@ -90,11 +93,17 @@ export type { AnalyticsCard, SectionStatus } from './figures';
 export type { AnalyticsKeyFigures, KeyFigure, KeyFigureId } from './key-figures';
 export type { KeyFigureChange } from './key-figure-change';
 export type { AnalyticsNetWorth } from './net-worth';
+export type {
+  AnalyticsProfitAndLoss,
+  ProfitAndLossRow,
+  ProfitAndLossRowId,
+} from './profit-and-loss';
 export type { RecentTransactions } from './recent-transactions';
 export { ACCOUNT_BALANCES } from './account-balances';
 export { CATEGORIES_PER_PERIOD } from './categories-per-period';
 export { INCOME_VS_EXPENSE } from './income-vs-expense';
 export { KEY_FIGURES } from './key-figures';
 export { NET_CASH_FLOW } from './net-cash-flow';
+export { PROFIT_AND_LOSS } from './profit-and-loss';
 export { SPENDING_BY_CATEGORY } from './spending-by-category';
 export { SPENDING_INSIGHTS } from './spending-insights';

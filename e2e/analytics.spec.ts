@@ -164,6 +164,13 @@ test('picking a Span preset fills in its date, reads every section over it, and 
       heatmap(page, name).getByRole('rowheader', { name: row, exact: true }),
     ).toBeVisible();
   }
+  // Profit and loss: the whole Span's statement, just before Income vs. expense (a row's name
+  // may carry its note on what other tests' data leaves out).
+  for (const row of ['Income', 'Expense', 'Profit', 'Capital', 'Net cash flow']) {
+    await expect(
+      region(page, 'Profit and loss').getByRole('rowheader', { name: new RegExp(`^${row}`) }),
+    ).toBeVisible();
+  }
 
   // This year and last 1: by quarter, from 1 January last year.
   await preset.selectOption('this-year-and-last-1');
@@ -814,7 +821,16 @@ test('every section with figures left out for want of an FX rate says so', async
   ]) {
     await expect(region(page, name).getByText(/left out: no FX rate yet\./)).toBeVisible();
   }
+  // Profit and loss flags the rows it weighs on: Expense, Profit and Net cash flow.
+  const statement = region(page, 'Profit and loss');
+  for (const row of ['Expense', 'Profit', 'Net cash flow']) {
+    await expect(
+      statement
+        .getByRole('rowheader', { name: new RegExp(`^${row}`) })
+        .getByText(/left out: no FX rate yet\./),
+    ).toBeVisible();
+  }
   // Spending Insights too, whether it draws its insight or says why it can't yet.
-  // And the three Key figures it weighs on.
-  await expect(notes).toHaveCount(7 + 3);
+  // And the three Key figures and three Profit and loss rows it weighs on.
+  await expect(notes).toHaveCount(7 + 3 + 3);
 });
