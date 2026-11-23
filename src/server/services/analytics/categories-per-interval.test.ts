@@ -253,7 +253,7 @@ describe('Categories per interval', () => {
     await dataset();
 
     const card = await loadSection(t.ctx, QUARTERLY, 'categoriesPerInterval', {
-      'income-vs-expense': 'rolling-60-days',
+      'profit-per-interval': 'rolling-60-days',
     });
 
     expect(card.isPinned).toBe(false);

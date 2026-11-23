@@ -434,6 +434,7 @@ interface PeriodWords {
 }
 
 const PERIOD_WORDS = {
+  day: { noun: 'day', adjective: 'Daily' },
   month: { noun: 'month', adjective: 'Monthly' },
   quarter: { noun: 'quarter', adjective: 'Quarterly' },
   year: { noun: 'year', adjective: 'Yearly' },
@@ -470,12 +471,16 @@ function periodAverage(
 const averageText = (value: number | null, money: Money): string =>
   value === null ? NO_AVERAGE : money(value);
 
-/** The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`); months by default. */
+/**
+ * The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`, `2025-03-14`);
+ * months by default.
+ */
 function periodWords(data: ChartSource): PeriodWords {
   const keys = data.rows.map((row) => row.key).filter((key): key is string => key !== null);
   if (keys.length === 0) return PERIOD_WORDS.month;
   if (keys.every((key) => /^\d{4}$/.test(key))) return PERIOD_WORDS.year;
   if (keys.every((key) => /^\d{4}-Q[1-4]$/.test(key))) return PERIOD_WORDS.quarter;
+  if (keys.every((key) => /^\d{4}-\d{2}-\d{2}$/.test(key))) return PERIOD_WORDS.day;
   return PERIOD_WORDS.month;
 }
 

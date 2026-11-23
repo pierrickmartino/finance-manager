@@ -180,13 +180,19 @@ export const MONTH_NAMES = [
   'Nov',
   'Dec',
 ] as const;
-const PERIOD_KEY = /^(\d{4})(?:-(0[1-9]|1[0-2])|-Q([1-4]))?$/;
+const PERIOD_KEY = /^(\d{4})(?:-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?|-Q([1-4]))?$/;
 
-/** A reporting period key (month `YYYY-MM`, quarter `YYYY-Qn` or year `YYYY`) for display. */
+/**
+ * A reporting period key (day `YYYY-MM-DD`, month `YYYY-MM`, quarter `YYYY-Qn` or year `YYYY`)
+ * for display: "14 Mar 2025", "Mar 2025", "Q1 2025", "2025".
+ */
 export function formatPeriod(key: string): string {
   const match = PERIOD_KEY.exec(key);
-  if (!match) throw new Error(`Expected a period key (YYYY-MM, YYYY-Qn or YYYY), got "${key}"`);
-  const [, year, month, quarter] = match;
+  if (!match) {
+    throw new Error(`Expected a period key (YYYY-MM-DD, YYYY-MM, YYYY-Qn or YYYY), got "${key}"`);
+  }
+  const [, year, month, day, quarter] = match;
+  if (day) return `${Number(day)} ${MONTH_NAMES[Number(month) - 1]} ${year}`;
   if (month) return `${MONTH_NAMES[Number(month) - 1]} ${year}`;
   if (quarter) return `Q${quarter} ${year}`;
   return year!;

@@ -1,3 +1,4 @@
+import { addDays } from '@/lib/dates';
 import type { DateRange, TimeAxis } from './query';
 
 /** Inclusive ISO date span. */
@@ -6,7 +7,9 @@ export interface DateSpan {
   to: string;
 }
 
-const MONTHS_PER: Record<TimeAxis, number> = { month: 1, quarter: 3, year: 12 };
+/** The time axes made of whole months, and how many months each period holds. */
+type MonthAxis = Exclude<TimeAxis, 'day'>;
+const MONTHS_PER: Record<MonthAxis, number> = { month: 1, quarter: 3, year: 12 };
 
 interface YearMonth {
   year: number;
@@ -34,20 +37,22 @@ function lastDay(index: number): string {
 }
 
 /** Month index of the first month of the period containing `index`. */
-function periodStartIndex(index: number, unit: TimeAxis): number {
+function periodStartIndex(index: number, unit: MonthAxis): number {
   const size = MONTHS_PER[unit];
   return index - (index % size);
 }
 
 /** The period of `unit` that contains `date`, as an inclusive span. */
 export function periodOf(date: string, unit: TimeAxis): DateSpan {
+  if (unit === 'day') return { from: date, to: date };
   const start = periodStartIndex(monthIndex(parseYearMonth(date)), unit);
   return { from: firstDay(start), to: lastDay(start + MONTHS_PER[unit] - 1) };
 }
 
-/** Axis key of the period containing `date`: `2025-03`, `2025-Q1` or `2025`. */
+/** Axis key of the period containing `date`: `2025-03-14`, `2025-03`, `2025-Q1` or `2025`. */
 export function periodKey(date: string, unit: TimeAxis): string {
   const { year, month } = parseYearMonth(date);
+  if (unit === 'day') return date;
   if (unit === 'month') return date.slice(0, 7);
   if (unit === 'quarter') return `${year}-Q${Math.floor(month / 3) + 1}`;
   return String(year);
@@ -55,6 +60,7 @@ export function periodKey(date: string, unit: TimeAxis): string {
 
 /** The span a period key covers (inverse of `periodKey`). */
 export function periodSpan(key: string, unit: TimeAxis): DateSpan {
+  if (unit === 'day') return periodOf(key, 'day');
   if (unit === 'month') return periodOf(`${key}-01`, 'month');
   if (unit === 'quarter') {
     const quarter = Number(key.slice(6));
@@ -69,12 +75,20 @@ export function periodSpan(key: string, unit: TimeAxis): DateSpan {
 /** Every period of `unit` that overlaps the span, oldest first. */
 export function periodsIn(span: DateSpan, unit: TimeAxis): string[] {
   if (span.from > span.to) return [];
+  if (unit === 'day') return daysIn(span);
   const size = MONTHS_PER[unit];
   const first = periodStartIndex(monthIndex(parseYearMonth(span.from)), unit);
   const last = monthIndex(parseYearMonth(span.to));
   const keys: string[] = [];
   for (let index = first; index <= last; index += size) keys.push(periodKey(firstDay(index), unit));
   return keys;
+}
+
+/** Every day of the span, oldest first. */
+function daysIn({ from, to }: DateSpan): string[] {
+  const days: string[] = [];
+  for (let day = from; day <= to; day = addDays(day, 1)) days.push(day);
+  return days;
 }
 
 /** How many periods of `unit` overlap the span (0 for none): what an `average` divides by. */
@@ -106,15 +120,25 @@ export function resolveRange(range: DateRange, today: string): ResolvedRange {
   if (range.kind === 'fixed')
     return { range: { from: range.from, to: range.to }, partialPeriod: null };
 
-  const unit: TimeAxis = range.kind === 'last' ? range.unit : 'month';
+  const { unit, count } = range.kind === 'last' ? range : { unit: 'month' as const, count: null };
+  if (unit === 'day') return resolveLastDays(count ?? 0, range.includeCurrent, today);
   const current = periodOf(today, unit);
   const currentStart = periodStartIndex(monthIndex(parseYearMonth(today)), unit);
   const from =
-    range.kind === 'last'
-      ? firstDay(currentStart - range.count * MONTHS_PER[unit])
-      : `${today.slice(0, 4)}-01-01`;
+    count === null
+      ? `${today.slice(0, 4)}-01-01`
+      : firstDay(currentStart - count * MONTHS_PER[unit]);
   if (range.includeCurrent) {
     return { range: { from, to: today }, partialPeriod: { from: current.from, to: today } };
   }
   return { range: { from, to: lastDay(currentStart - 1) }, partialPeriod: null };
+}
+
+/** The last `count` complete days before today, and today itself when asked (partial). */
+function resolveLastDays(count: number, includeCurrent: boolean, today: string): ResolvedRange {
+  const from = addDays(today, -count);
+  if (includeCurrent) {
+    return { range: { from, to: today }, partialPeriod: { from: today, to: today } };
+  }
+  return { range: { from, to: addDays(today, -1) }, partialPeriod: null };
 }
