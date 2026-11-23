@@ -9,11 +9,12 @@ import {
   seedEarlyStart,
 } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
-import { presetPeriod, type Period } from '@/lib/analytics/period';
+import { NO_PINS, presetPeriod, type CardPeriods, type Period } from '@/lib/analytics/period';
 import { readTransactionSearch } from '@/app/transactions/search';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { listTransactions, splitTransaction } from '../transactions';
 import { linkTransfer, splitLineSide, transactionSide } from '../transfers';
+import { loadAnalytics } from '.';
 import type { ProfitAndLossRow } from './profit-and-loss';
 
 /** Analytics' Profit and loss over the Period (spec #247, ticket #249). */
@@ -430,3 +431,171 @@ async function quarters(): Promise<void> {
     { bookingDate: '2025-05-02', amountMinor: -2_000 },
   ]);
 }
+
+/** Profit and loss and the Key figures' Income, read together on one page with its Card Periods. */
+async function pageWith(period: Period, pins: CardPeriods = NO_PINS) {
+  const { sections } = await loadAnalytics(t.ctx, period, pins);
+  await Promise.allSettled(Object.values(sections));
+  const { figures } = await sections.keyFigures;
+  const income = figures.find((figure) => figure.id === 'income')!;
+  return { profitAndLoss: await sections.profitAndLoss, income };
+}
+
+describe('Profit and loss pinned to its own Card Period', () => {
+  const QUARTER_TO_DATE = { 'profit-and-loss': 'quarter-to-date' } as const;
+
+  it('reads every row over its own to-date preset, compared with the same stretch of the previous quarter, while the Key figures compare over the page', async () => {
+    fixToday('2025-05-20');
+    await quarters();
+
+    const { profitAndLoss, income } = await pageWith(SINCE_MID_FEBRUARY, QUARTER_TO_DATE);
+
+    expect(profitAndLoss.isPinned).toBe(true);
+    expect(profitAndLoss.reading).toMatchObject({
+      period: presetPeriod('quarter-to-date'),
+      from: '2025-04-01',
+      to: '2025-05-20',
+    });
+    const { rows } = profitAndLoss;
+    // 1 Apr – 20 May: 1,000.00 in, 400.00 of groceries, 800.00 from a share sale, 20.00 Unclassified.
+    expect(amounts(rows)).toEqual([
+      ['Income', 100_000],
+      ['Expense', 40_000],
+      ['Profit', 60_000],
+      ['Capital', 80_000],
+      ['Unclassified', -2_000],
+      ['Net cash flow', 138_000],
+    ]);
+    // Against 1 Jan – 19 Feb, the same stretch of the previous quarter.
+    expect(changes(rows)).toEqual([
+      ['income', 90_000, 9, true],
+      ['expense', 10_000, 1 / 3, false],
+      ['profit', 80_000, null, true],
+      ['capital', 130_000, null, null],
+      ['unclassified', 3_000, null, null],
+      ['netCashFlow', 213_000, null, true],
+    ]);
+    expect(rowOf(rows, 'income').change?.label).toBe('vs 1 Jan – 19 Feb');
+    expect(rowOf(rows, 'unclassified').href).toBe(
+      '/transactions?from=2025-04-01&to=2025-05-20&unclassified=true',
+    );
+
+    // The Key figures still compare 15 Feb – 20 May with the 95 days before.
+    expect(income.value).toBe(190_000);
+    expect(income.change).toMatchObject({ amount: 180_000, label: 'vs 12 Nov 2024 – 14 Feb' });
+  });
+
+  it('opens each row and each change line over its own Period, leading back to the page with its pin', async () => {
+    fixToday('2025-05-20');
+    await quarters();
+
+    const { rows } = (await pageWith(SINCE_MID_FEBRUARY, QUARTER_TO_DATE)).profitAndLoss;
+
+    const origin = { kind: 'analytics', period: SINCE_MID_FEBRUARY, cardPeriods: QUARTER_TO_DATE };
+    const drilled: [string, number | null][] = [];
+    const both: [string, number | null][] = [];
+    for (const row of rows) {
+      expect(originOf(row.change!.href), row.id).toEqual(origin);
+      both.push([row.id, (await openDrill(t.ctx, row.change!.href)).sumChfMinor]);
+      if (row.id === 'unclassified') continue;
+      expect(originOf(row.href), row.id).toEqual(origin);
+      drilled.push([row.id, (await openDrill(t.ctx, row.href)).sumChfMinor]);
+    }
+    expect(drilled).toEqual([
+      ['income', 100_000],
+      ['expense', -40_000],
+      ['profit', 60_000],
+      ['capital', 80_000],
+      ['netCashFlow', 138_000],
+    ]);
+    // Both stretches, 1 Jan – 19 Feb and 1 Apr – 20 May; March left out.
+    expect(both).toEqual([
+      ['income', 110_000],
+      ['expense', -70_000],
+      ['profit', 40_000],
+      ['capital', 30_000],
+      ['unclassified', -7_000],
+      ['netCashFlow', 63_000],
+    ]);
+  });
+
+  it('compares a pin that is not to date with as many days just before it', async () => {
+    fixToday('2025-05-20');
+    await quarters();
+
+    const { profitAndLoss, income } = await pageWith(presetPeriod('quarter-to-date'), {
+      'profit-and-loss': 'rolling-30-days',
+    });
+
+    // 21 Apr – 20 May: the share sale and a 20.00 Unclassified payment; against 22 Mar – 20 Apr,
+    // which holds the April salary and groceries.
+    const { rows } = profitAndLoss;
+    expect(rowOf(rows, 'income').change).toMatchObject({
+      amount: -100_000,
+      label: 'vs 22 Mar – 20 Apr',
+    });
+    expect(rows.map((row) => [row.id, row.earlier])).toEqual([
+      ['income', 100_000],
+      ['expense', 40_000],
+      ['profit', 60_000],
+      ['capital', 0],
+      ['unclassified', 0],
+      ['netCashFlow', 60_000],
+    ]);
+    // The Key figures compare the page's Quarter to date with 1 Jan – 19 Feb.
+    expect(income.change).toMatchObject({ amount: 90_000, label: 'vs 1 Jan – 19 Feb' });
+  });
+
+  it("leaves the comparison out when the Account data doesn't reach back to the pin's Comparison period, though it reaches back to the page's", async () => {
+    fixToday('2025-05-20');
+    const { salary, groceries } = await categories();
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    // The data starts on 5 January: Year to date is read from it, compared with the days before.
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2025-01-05', amountMinor: 30_000, classify: salary },
+      { bookingDate: '2025-04-10', amountMinor: 100_000, classify: salary },
+      { bookingDate: '2025-05-10', amountMinor: -20_000, classify: groceries },
+    ]);
+
+    const { profitAndLoss, income } = await pageWith(presetPeriod('rolling-30-days'), {
+      'profit-and-loss': 'year-to-date',
+    });
+
+    expect(profitAndLoss.reading).toMatchObject({ from: '2025-01-05' });
+    expect(amounts(profitAndLoss.rows)).toEqual([
+      ['Income', 130_000],
+      ['Expense', 20_000],
+      ['Profit', 110_000],
+      ['Capital', 0],
+      ['Net cash flow', 110_000],
+    ]);
+    expect(profitAndLoss.rows.every((row) => row.earlier === null && row.change === null)).toBe(
+      true,
+    );
+    // Rolling 30 days, 21 Apr – 20 May, against 22 Mar – 20 Apr: the data reaches back.
+    expect(income.change).toMatchObject({ amount: -100_000, label: 'vs 22 Mar – 20 Apr' });
+  });
+
+  it("unpinned, reads the page Period and shares the Key figures' comparison", async () => {
+    fixToday('2025-05-20');
+    await quarters();
+
+    const { profitAndLoss, income } = await pageWith(presetPeriod('quarter-to-date'), {
+      'spending-by-category': 'rolling-30-days',
+    });
+
+    expect(profitAndLoss.isPinned).toBe(false);
+    expect(profitAndLoss.reading).toMatchObject({
+      period: presetPeriod('quarter-to-date'),
+      from: '2025-04-01',
+    });
+    const incomeRow = rowOf(profitAndLoss.rows, 'income');
+    expect(incomeRow.change).toMatchObject({ amount: 90_000, label: 'vs 1 Jan – 19 Feb' });
+    expect(income.change).toMatchObject({ amount: 90_000, label: 'vs 1 Jan – 19 Feb' });
+    expect(originOf(incomeRow.href)).toEqual({
+      kind: 'analytics',
+      period: presetPeriod('quarter-to-date'),
+      cardPeriods: { 'spending-by-category': 'rolling-30-days' },
+    });
+  });
+});

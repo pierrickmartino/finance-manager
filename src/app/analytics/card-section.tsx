@@ -55,12 +55,16 @@ export async function PinnableCardSection({
 }
 
 interface SectionCardPeriodProps extends SectionReading {
-  /** The Card's name, which names its dropdown. */
+  /** The section's name, which names its dropdown. */
   name: string;
   section: PinnableSection;
 }
 
-/** A pinnable section's Period mark and dropdown, from the reading its result names. */
+/**
+ * A pinnable section's Card Period beside its title (GLOSSARY: Card Period): its dropdown, and its
+ * preset marked when pinned, from the reading its result names. Every pinnable section's header
+ * uses it: the Card sections, Net worth and Profit and loss.
+ */
 export function SectionCardPeriod({ name, section, reading, isPinned }: SectionCardPeriodProps) {
   return (
     // Keyed by the page's URL, so back and forward show the pick that URL holds.

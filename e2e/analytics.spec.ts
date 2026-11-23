@@ -1094,6 +1094,90 @@ test('every section with figures left out for want of an FX rate says so', async
   await expect(notes).toHaveCount(7 + 3 + 3);
 });
 
+test("pinning Profit and loss compares it with its own Comparison period, the Key figures' changes unmoved, through a Drill-down and back, until Same as page", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  await seedOldPurchase(suffix);
+  const name = 'Profit and loss';
+  const statement = region(page, name);
+  const picker = cardPeriod(page, name);
+  const statementRow = (row: string) =>
+    statement
+      .getByRole('row')
+      .filter({ has: page.getByRole('rowheader', { name: new RegExp(`^${row}`) }) });
+  const statementChange = (row: string) => statementRow(row).getByRole('link', { name: / vs / });
+  const keyFigureChange = (figure: string) =>
+    region(page, 'Key figures')
+      .getByRole('region', { name: figure, exact: true })
+      .getByRole('link', { name: / vs / });
+  const nameOf = async (link: ReturnType<Page['getByRole']>) =>
+    (await link.getAttribute('aria-label'))!;
+
+  // Unpinned: it shares the Key figures' comparison and shows no mark.
+  await page.goto('/analytics?period=rolling-90-days');
+  await expect(statementChange('Income')).toBeVisible();
+  await expect(picker).toHaveValue('');
+  await expect(cardPeriodMark(page, name)).toHaveCount(0);
+  const unpinned = await nameOf(statementChange('Income'));
+  const keyFigures = await Promise.all(
+    ['Income', 'Expense', 'Profit'].map(keyFigureChange).map(nameOf),
+  );
+  expect(unpinned).toBe(keyFigures[0]);
+
+  // Pinned to Year to date: compared with the same stretch of last year, the Key figures still
+  // compared over Rolling 90 days.
+  await picker.focus();
+  await picker.selectOption('year-to-date');
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'rolling-90-days', 'profit-and-loss': 'year-to-date' });
+  await expect(cardPeriodMark(page, name)).toHaveText('Pinned to Year to date');
+  for (const row of ['Income', 'Expense', 'Profit', 'Net cash flow']) {
+    await expect(statementChange(row)).toHaveAccessibleName(
+      new RegExp(` vs 1 Jan( – \\d+ \\w+)? ${LAST_YEAR}$`),
+    );
+  }
+  expect(
+    await Promise.all(['Income', 'Expense', 'Profit'].map(keyFigureChange).map(nameOf)),
+  ).toEqual(keyFigures);
+
+  // The page's Period moving leaves the pin be.
+  await periodControl(page).getByLabel('Period', { exact: true }).selectOption('rolling-30-days');
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'rolling-30-days', 'profit-and-loss': 'year-to-date' });
+  await expect(picker).toHaveValue('year-to-date');
+  await expect(statementChange('Income')).toHaveAccessibleName(
+    new RegExp(` vs 1 Jan( – \\d+ \\w+)? ${LAST_YEAR}$`),
+  );
+
+  // Income's Drill-down over Year to date, and back to the page with its Period and the pin.
+  await statementRow('Income')
+    .getByRole('link', { name: /^Income: / })
+    .click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*originProfitAndLoss=year-to-date/);
+  await expect(
+    page
+      .getByRole('table', { name: 'Drill-down Transactions' })
+      .getByText(description, { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'rolling-30-days', 'profit-and-loss': 'year-to-date' });
+  await expect(cardPeriodMark(page, name)).toBeVisible();
+
+  // Same as page: the pin and its mark go, and it shares the Key figures' comparison again.
+  await picker.selectOption({ label: 'Same as page' });
+  await expect.poll(() => searchOf(page)).toEqual({ period: 'rolling-30-days' });
+  await expect(cardPeriodMark(page, name)).toHaveCount(0);
+  await expect(statementChange('Income')).toHaveAccessibleName(
+    await nameOf(keyFigureChange('Income')),
+  );
+});
+
 test('on a wide screen the third-width sections draw their lead a size down, from their own width', async ({
   page,
 }) => {

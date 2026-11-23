@@ -40,10 +40,9 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
  * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
  * its nearest Period. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
  * parameter each beside the Period (`net-worth=<slug>`, `net-cash-flow=<slug>`,
- * `spending-by-category=<slug>`, `income-vs-expense=<slug>`, `categories-per-interval=<slug>`); a
- * bare visit has none, and a
- * former link carries none. The shell and the Period
- * control render at once; each section streams in behind its own placeholder and error boundary
+ * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `income-vs-expense=<slug>`,
+ * `categories-per-interval=<slug>`); a bare visit has none, and a former link carries none. The
+ * shell and the Period control render at once; each section streams in behind its own placeholder and error boundary
  * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
  *
  * Adding a section: its service module (src/server/services/analytics), and a `StreamedSection`

@@ -58,7 +58,7 @@ export interface AnalyticsSections {
   netCashFlow: Promise<Pinnable<AnalyticsCard>>;
   accountBalances: Promise<AnalyticsCard>;
   spendingByCategory: Promise<Pinnable<AnalyticsCard>>;
-  profitAndLoss: Promise<AnalyticsProfitAndLoss>;
+  profitAndLoss: Promise<Pinnable<AnalyticsProfitAndLoss>>;
   incomeVsExpense: Promise<Pinnable<AnalyticsCard>>;
   categoriesPerInterval: Promise<Pinnable<AnalyticsCard>>;
 }
@@ -115,7 +115,8 @@ async function pinnable<Result>(
  * its own preset instead, resolved from the same today and first Transaction, so it is cut to the
  * data like any Period; its result names the reading it was read over. Every Drill-down, pinned or
  * not, leads back to the page with its Period and every pin (the readings' `page`). A pinned Net
- * worth runs its own trend and income and expense; the Key figures keep the page's.
+ * worth runs its own trend and income and expense; the Key figures keep the page's. A pinned
+ * Profit and loss runs its own comparison, over its own Comparison period.
  */
 export async function loadAnalytics(
   ctx: ServiceContext,
@@ -157,7 +158,14 @@ export async function loadAnalytics(
       spendingByCategory: pinnable(readingFor('spending-by-category'), (read) =>
         spendingByCategory(ctx, read),
       ),
-      profitAndLoss: profitAndLoss(ctx, reading, comparison),
+      profitAndLoss: pinnable(readingFor('profit-and-loss'), (read) =>
+        // Pinned, it compares with its own Comparison period; unpinned, it shares the Key figures'.
+        profitAndLoss(
+          ctx,
+          read,
+          read === reading ? comparison : loadComparison(ctx, read, dataStart.accountData),
+        ),
+      ),
       incomeVsExpense: pinnable(readingFor('income-vs-expense'), (read) =>
         incomeVsExpense(ctx, read),
       ),
