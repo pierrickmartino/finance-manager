@@ -1,5 +1,5 @@
 import { RAMP_FILLS } from '@/lib/color/ramp-fills';
-import { RampGradient, url, useRampGradientIds } from './ramp-gradient';
+import { gradientFill, RampGradient, useRampGradientIds } from './ramp-gradient';
 
 /**
  * The sparkline's drawing (docs/design-system.md, "Charts"), shared by the Net worth headline
@@ -41,7 +41,7 @@ export function SparklineSvg({ area, line, partial }: SparklineSvgProps) {
       <defs>
         <RampGradient id={fill} fill={RAMP_FILLS.sparkline} />
       </defs>
-      <path d={area} fill={url(fill)} />
+      <path d={area} fill={gradientFill(fill)} />
       <path d={line} {...STROKE} />
       {partial && <path d={partial} {...STROKE} strokeDasharray="3 3" />}
     </svg>

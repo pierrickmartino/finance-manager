@@ -89,10 +89,17 @@ export const TEXT_ON_RAMP_FILLS: readonly TextOnRampFill[] = [
   })),
 ];
 
-const CSS_DIRECTION: Record<RampFill['direction'], string> = {
-  down: 'to bottom',
-  up: 'to top',
-  'down-right': 'to bottom right',
+/** Where a gradient runs, across its mark's box: as a CSS direction and as an SVG vector. */
+export interface RampDirection {
+  css: string;
+  vector: { x1: number; y1: number; x2: number; y2: number };
+}
+
+/** The one map of directions, so the HTML and SVG gradients always run the same way. */
+export const RAMP_DIRECTIONS: Record<RampFill['direction'], RampDirection> = {
+  down: { css: 'to bottom', vector: { x1: 0, y1: 0, x2: 0, y2: 1 } },
+  up: { css: 'to top', vector: { x1: 0, y1: 1, x2: 0, y2: 0 } },
+  'down-right': { css: 'to bottom right', vector: { x1: 0, y1: 0, x2: 1, y2: 1 } },
 };
 
 /** The fill as a CSS `background-image`, its steps read from the tokens. */
@@ -101,5 +108,5 @@ export function cssGradient(fill: RampFill): string {
     ({ token, alpha, at }) =>
       `color-mix(in srgb, var(--color-${token}) ${alpha * 100}%, transparent) ${at * 100}%`,
   );
-  return `linear-gradient(${CSS_DIRECTION[fill.direction]}, ${stops.join(', ')})`;
+  return `linear-gradient(${RAMP_DIRECTIONS[fill.direction].css}, ${stops.join(', ')})`;
 }

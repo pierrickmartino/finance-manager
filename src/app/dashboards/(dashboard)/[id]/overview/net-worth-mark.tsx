@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useFormatter } from '@/components/formatter-provider';
-import { RampGradient, url, useRampGradientIds } from '@/components/ramp-gradient';
+import { gradientFill, RampGradient, useRampGradientIds } from '@/components/ramp-gradient';
 import { cssGradient, PLOT_LABEL, RAMP_FILLS, type RampFill } from '@/lib/color/ramp-fills';
 import type { LineMarker, NetWorthBand, PeriodValue } from '@/lib/reporting/card';
 import {
@@ -83,7 +83,7 @@ function NetWorthPlot({ points, bands, stacks, scale }: PlotProps) {
       {points.length > 1 && (
         <path
           d={`M${scale.x(0)},${scale.y(0)} L${line.join(' L')} L${scale.x(points.length - 1)},${scale.y(0)} Z`}
-          fill={url(idOf('area'))}
+          fill={gradientFill(idOf('area'))}
         />
       )}
       {bands.map((band, b) => {
@@ -92,7 +92,9 @@ function NetWorthPlot({ points, bands, stacks, scale }: PlotProps) {
           <path
             key={band.key}
             d={bandPath(stacks[b]!, isStepped(band), scale)}
-            {...('gradient' in tone ? { fill: url(idOf(band.key)) } : { className: tone.fill })}
+            {...('gradient' in tone
+              ? { fill: gradientFill(idOf(band.key)) }
+              : { className: tone.fill })}
           />
         );
       })}
