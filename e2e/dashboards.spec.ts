@@ -18,6 +18,8 @@ import {
   stepWithKey,
   widgetCard,
 } from './support/dashboards';
+import { createDb } from '../src/server/db/client';
+import { databaseUrl } from '../test/support/postgres';
 import { withServices } from './support/services';
 import { viewTransitionMotionDuring } from './support/view-transitions';
 
@@ -741,4 +743,139 @@ test('a Widget whose query reports a problem says so in its own card; the others
   await expect(widgetCard(page, 'Gone wrong')).toContainText('From must not be after To');
   await expect(cardTitles(page)).toHaveText(['Still fine', 'Gone wrong']);
   await expect(placeholders(page)).toHaveCount(0);
+});
+
+/** Where a list sits next to its ring: below it, or beside it. */
+async function placementOf(ring: Locator, list: Locator): Promise<'below' | 'beside'> {
+  const ringBox = await ring.boundingBox();
+  const listBox = await list.boundingBox();
+  if (!ringBox || !listBox) throw new Error('No ring or list');
+  if (listBox.y >= ringBox.y + ringBox.height) return 'below';
+  if (listBox.x >= ringBox.x + ringBox.width) return 'beside';
+  throw new Error('The list overlaps the ring');
+}
+
+/** The height of the line a part takes, its margins included. */
+async function lineHeight(part: Locator): Promise<number> {
+  return part.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return (
+      el.getBoundingClientRect().height +
+      parseFloat(style.marginTop) +
+      parseFloat(style.marginBottom)
+    );
+  });
+}
+
+interface WaitingLayout {
+  placement: 'below' | 'beside';
+  leadLine: number;
+}
+
+test("a ring Card's placeholder is laid out like the loaded Card at its width: list below when narrow, beside when wide", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const dashboardId = await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Waiting bank ${suffix}` });
+    const account = (name: string) =>
+      createAccount(ctx, {
+        bankId: bank.id,
+        name,
+        currency: 'CHF',
+        iban: null,
+        kind: 'current',
+        importFormat: null,
+        openingBalanceMinor: 0,
+      });
+    const rent = await account(`Rent ${suffix}`);
+    const food = await account(`Food ${suffix}`);
+    const today = swissToday();
+    for (const [accountId, amountMinor] of [
+      [rent.id, -75_000],
+      [food.id, -25_000],
+    ] as const) {
+      await createManualTransaction(ctx, {
+        accountId,
+        bookingDate: addDays(today, -3),
+        amountMinor,
+        description: 'Waiting spend',
+      });
+    }
+    const query = {
+      dateRange: { kind: 'fixed' as const, from: addDays(today, -10), to: today },
+      rows: 'account' as const,
+      columns: null,
+      filters: { accountIds: [rent.id, food.id] },
+    };
+    const dashboard = await createDashboardRecord(ctx, { name: `Waiting ${suffix}` });
+    // A 4-of-12 Card (about 355px inside at 1280) and an 8-of-12 one (about 773px).
+    await addWidget(ctx, dashboard.id, {
+      name: 'Narrow ring',
+      visualisation: 'donut',
+      query,
+      layout: { x: 0, y: 0, w: 4, h: 9 },
+    });
+    await addWidget(ctx, dashboard.id, {
+      name: 'Wide ring',
+      visualisation: 'donut',
+      query,
+      layout: { x: 4, y: 0, w: 8, h: 9 },
+    });
+    return dashboard.id;
+  });
+  const names = ['Narrow ring', 'Wide ring'] as const;
+  const placeholder = (name: string) =>
+    page.getByRole('region', { name, exact: true }).and(page.locator('[aria-busy="true"]'));
+  const loaded = (name: string) =>
+    page.getByRole('region', { name, exact: true }).and(page.locator('[aria-labelledby^="card-"]'));
+
+  // Every Card's query waits on a lock of the Transactions, so the board stays on its placeholders.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const db = createDb(databaseUrl(process.env.E2E_DATABASE_NAME!));
+  const lock = await db.connect();
+  const waiting: Partial<Record<(typeof names)[number], WaitingLayout>> = {};
+  try {
+    await lock.query('BEGIN');
+    await lock.query('LOCK TABLE "transaction" IN ACCESS EXCLUSIVE MODE');
+    await page.goto(`/dashboards/${dashboardId}`, { waitUntil: 'commit' });
+    for (const name of names) {
+      const card = placeholder(name);
+      await expect(card).toBeVisible();
+      expect(await card.evaluate((el) => getComputedStyle(el).containerType)).toBe('inline-size');
+      // The header (name, headline and lead skeletons), then the ring's mark: ring, then list.
+      const header = card.locator(':scope > div').first();
+      const mark = card.locator(':scope > div').nth(1);
+      const lead = header.locator(':scope > div').nth(1);
+      waiting[name] = {
+        placement: await placementOf(
+          mark.locator(':scope > div').first(),
+          mark.locator(':scope > div').nth(1),
+        ),
+        leadLine: await lineHeight(lead),
+      };
+    }
+  } finally {
+    await lock.query('ROLLBACK');
+    lock.release();
+    await db.end();
+  }
+  const narrow = waiting['Narrow ring']!;
+  const wide = waiting['Wide ring']!;
+
+  // The placeholder's list sits where the loaded Card's will: below when narrow, beside when wide.
+  expect(narrow.placement).toBe('below');
+  expect(wide.placement).toBe('beside');
+  // Its lead skeleton follows the lead figure's threshold: a size down on the narrow Card.
+  expect(narrow.leadLine).toBeLessThan(wide.leadLine);
+
+  // Once the data arrives, each Card has its placeholder's layout and its lead the same line.
+  for (const name of names) {
+    const card = loaded(name);
+    await expect(card.locator('figure > ul')).toBeVisible();
+    expect(
+      await placementOf(card.locator('figure > div').first(), card.locator('figure > ul')),
+    ).toBe(waiting[name]!.placement);
+    expect(await lineHeight(card.locator('h2 ~ p.font-display'))).toBe(waiting[name]!.leadLine);
+  }
 });

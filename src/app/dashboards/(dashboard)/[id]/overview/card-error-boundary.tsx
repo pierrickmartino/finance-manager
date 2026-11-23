@@ -27,7 +27,8 @@ export class CardErrorBoundary extends Component<CardErrorBoundaryProps, { hasFa
     return (
       <section
         aria-label={this.props.name}
-        className={`${WIDGET_CARD_CLASS} flex flex-col gap-2 lg:h-full`}
+        // The loaded Card's frame and spacing: its name on top, the message where its mark would be.
+        className={`${WIDGET_CARD_CLASS} flex flex-col gap-4 lg:h-full`}
       >
         <h2 className="font-medium">{this.props.name}</h2>
         <p role="alert" className="text-sm text-negative">

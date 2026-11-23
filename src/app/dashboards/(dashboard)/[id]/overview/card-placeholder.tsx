@@ -8,14 +8,15 @@ function ShapeMark({ shape }: { shape: PlaceholderShape }) {
     case 'number':
       return <div className={`${PLACEHOLDER_CLASS} h-12 w-2/5`} />;
     case 'ring':
+      // The ring's size, and its list below it under @md and beside it from @md, as on the Card.
       return (
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center gap-6 @md:flex-row">
           <div
-            className={`${PLACEHOLDER_CLASS} grid size-28 shrink-0 place-items-center rounded-full`}
+            className={`${PLACEHOLDER_CLASS} grid size-40 shrink-0 place-items-center rounded-full`}
           >
-            <div className="size-16 rounded-full bg-surface" />
+            <div className="size-26 rounded-full bg-surface" />
           </div>
-          <TickRows count={3} />
+          <TickRows count={3} className="w-full @md:w-auto" />
         </div>
       );
     case 'ticks':
@@ -43,9 +44,9 @@ function ShapeMark({ shape }: { shape: PlaceholderShape }) {
   }
 }
 
-function TickRows({ count }: { count: number }) {
+function TickRows({ count, className = '' }: { count: number; className?: string }) {
   return (
-    <div className="flex flex-1 flex-col gap-3">
+    <div className={`flex flex-1 flex-col gap-3 ${className}`}>
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className={`${PLACEHOLDER_CLASS} h-4`} style={{ width: `${90 - i * 15}%` }} />
       ))}
@@ -75,7 +76,10 @@ export function WidgetCardPlaceholder({ name, shape, height }: WidgetCardPlaceho
     >
       <div>
         <h2 className="font-medium">{name}</h2>
-        <div className={`${PLACEHOLDER_CLASS} mt-2 h-4 w-3/5`} />
+        {/* The headline and the lead figure, each a line of the Card's own height: the lead's
+            line a size down under @md, full from @md, as the Card's lead (widget-card.tsx). */}
+        <div className={`${PLACEHOLDER_CLASS} mt-1.5 mb-0.5 h-4 w-3/5`} />
+        <div className={`${PLACEHOLDER_CLASS} my-1 h-5 w-2/5 @md:h-7`} />
         <span className="sr-only">Loading</span>
       </div>
       <ShapeMark shape={shape} />
