@@ -194,7 +194,7 @@ A Dashboard read as a grid of cards: an overview row (the headline amount, with 
 _Avoid_: Report, overview page, presentation
 
 **Card**:
-How one Widget is drawn on the Dashboard Story, or one section of Analytics: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per month, quarter or year, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data; a section of Analytics is drawn as the card of the Widget that would show the same figures, so the two pages read alike. A bars or line Widget whose two columns are its income and its expense is read as a flow.
+How one Widget is drawn on the Dashboard Story, or one section of Analytics: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per month, quarter or year, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data; a section of Analytics is drawn as the card of the Widget that would show the same figures, so the two pages read alike. A bars or line Widget whose two columns are its income and its expense is read as a flow: a bars flow is drawn as dots, a line flow as two overlapping areas, income and expense, whose gap is its Profit.
 _Avoid_: Chapter, tile
 
 **Analytics**:
