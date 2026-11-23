@@ -10,10 +10,10 @@ import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
 import { accountBalances } from './account-balances';
 import { categoriesPerInterval } from './categories-per-interval';
-import { loadDataStart } from './data-start';
-import type { AnalyticsCard } from './figures';
+import { loadDataStart, type DataStart } from './data-start';
+import type { AnalyticsCard, SharedSections } from './figures';
 import { incomeVsExpense } from './income-vs-expense';
-import { loadComparison } from './key-figure-change';
+import { loadComparison, type Comparison } from './key-figure-change';
 import { netCashFlow } from './net-cash-flow';
 import { keyFigures, type AnalyticsKeyFigures } from './key-figures';
 import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
@@ -82,11 +82,10 @@ export interface AnalyticsView {
  */
 function sectionReadings(
   page: AnalyticsReading,
-  cardPeriods: CardPeriods,
   dataStart: string | null,
 ): (section: PinnableSection) => SectionReading {
   return (section) => {
-    const preset = cardPeriods[section];
+    const preset = page.page.cardPeriods[section];
     return preset === undefined
       ? { reading: page, isPinned: false }
       : { reading: cardReading(page, preset, dataStart), isPinned: true };
@@ -96,9 +95,67 @@ function sectionReadings(
 /** A pinnable section started over its reading, its result saying which one. */
 async function pinnable<Result>(
   read: SectionReading,
-  load: (reading: AnalyticsReading) => Promise<Result>,
+  load: (read: SectionReading) => Promise<Result>,
 ): Promise<Pinnable<Result>> {
-  return { ...(await load(read.reading)), ...read };
+  return { ...(await load(read)), ...read };
+}
+
+/** The pinnable sections' promises. */
+type PinnableSections = Pick<
+  AnalyticsSections,
+  | 'netWorth'
+  | 'netCashFlow'
+  | 'spendingByCategory'
+  | 'profitAndLoss'
+  | 'incomeVsExpense'
+  | 'categoriesPerInterval'
+>;
+
+/** What the pinnable sections share with the Key figures while they follow the page. */
+interface PageShared {
+  sections: SharedSections;
+  comparison: Promise<Comparison>;
+}
+
+/**
+ * Starts the pinnable sections, each over its reading (`sectionReadings`). Unpinned, Net worth and
+ * Profit and loss share the Key figures' figures (`PageShared`); pinned, Net worth runs its own
+ * trend and income and expense, and Profit and loss its own comparison.
+ */
+function loadPinnableSections(
+  ctx: ServiceContext,
+  readingFor: (section: PinnableSection) => SectionReading,
+  shared: PageShared,
+  dataStart: DataStart,
+): PinnableSections {
+  const { balances } = shared.sections;
+  return {
+    netWorth: pinnable(readingFor('net-worth'), ({ reading, isPinned }) =>
+      netWorth(
+        reading,
+        isPinned
+          ? { trend: netWorthTrend(ctx, reading), balances, flow: spendingInsights(ctx, reading) }
+          : shared.sections,
+      ),
+    ),
+    netCashFlow: pinnable(readingFor('net-cash-flow'), ({ reading }) => netCashFlow(ctx, reading)),
+    spendingByCategory: pinnable(readingFor('spending-by-category'), ({ reading }) =>
+      spendingByCategory(ctx, reading),
+    ),
+    profitAndLoss: pinnable(readingFor('profit-and-loss'), ({ reading, isPinned }) =>
+      profitAndLoss(
+        ctx,
+        reading,
+        isPinned ? loadComparison(ctx, reading, dataStart.accountData) : shared.comparison,
+      ),
+    ),
+    incomeVsExpense: pinnable(readingFor('income-vs-expense'), ({ reading }) =>
+      incomeVsExpense(ctx, reading),
+    ),
+    categoriesPerInterval: pinnable(readingFor('categories-per-interval'), ({ reading }) =>
+      categoriesPerInterval(ctx, reading),
+    ),
+  };
 }
 
 /**
@@ -130,48 +187,24 @@ export async function loadAnalytics(
     ...resolved,
     page: { period: resolved.period, cardPeriods },
   };
-  const readingFor = sectionReadings(reading, cardPeriods, dataStart.firstTransaction);
   const balances = accountBalances(ctx, today);
-  const flow = spendingInsights(ctx, reading);
-  const trend = netWorthTrend(ctx, reading);
+  const sections: SharedSections = {
+    balances,
+    trend: netWorthTrend(ctx, reading),
+    flow: spendingInsights(ctx, reading),
+  };
   const comparison = loadComparison(ctx, reading, dataStart.accountData);
-  const netWorthReading = readingFor('net-worth');
+  const readingFor = sectionReadings(reading, dataStart.firstTransaction);
   return {
     today,
     reading,
     starts: presetStarts(today, dataStart.firstTransaction),
     sections: {
-      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, comparison),
-      netWorth: pinnable(netWorthReading, (read) =>
-        netWorth(
-          read,
-          // Pinned, it runs its own trend and flow; unpinned, it shares the Key figures'.
-          netWorthReading.isPinned
-            ? { trend: netWorthTrend(ctx, read), balances, flow: spendingInsights(ctx, read) }
-            : { trend, balances, flow },
-        ),
-      ),
+      keyFigures: keyFigures(ctx, reading, sections, comparison),
       spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
-      netCashFlow: pinnable(readingFor('net-cash-flow'), (read) => netCashFlow(ctx, read)),
       accountBalances: balances,
-      spendingByCategory: pinnable(readingFor('spending-by-category'), (read) =>
-        spendingByCategory(ctx, read),
-      ),
-      profitAndLoss: pinnable(readingFor('profit-and-loss'), (read) =>
-        // Pinned, it compares with its own Comparison period; unpinned, it shares the Key figures'.
-        profitAndLoss(
-          ctx,
-          read,
-          read === reading ? comparison : loadComparison(ctx, read, dataStart.accountData),
-        ),
-      ),
-      incomeVsExpense: pinnable(readingFor('income-vs-expense'), (read) =>
-        incomeVsExpense(ctx, read),
-      ),
-      categoriesPerInterval: pinnable(readingFor('categories-per-interval'), (read) =>
-        categoriesPerInterval(ctx, read),
-      ),
+      ...loadPinnableSections(ctx, readingFor, { sections, comparison }, dataStart),
     },
   };
 }
