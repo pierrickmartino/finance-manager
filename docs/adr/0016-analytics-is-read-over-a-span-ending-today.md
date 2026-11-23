@@ -1,8 +1,10 @@
 ---
-status: accepted (supersedes ADR-0015's Period view and Period window)
+status: accepted (supersedes ADR-0015's Period view and Period window; its "only control" partly superseded by ADR-0018: some Cards can be pinned to their own Period)
 ---
 
 # Analytics is read over a Span ending today
+
+> **Renamed since:** the Span is now called the **Period**, its months, quarters and years its **Intervals**, the Span preset the **Period preset** and the Comparison span the **Comparison period** (GLOSSARY). Its URL is `?period=<preset>`; former `?span=` links redirect. The text below keeps the words used when it was decided.
 
 Analytics' only control is now a Span: a start date, chosen from ten Span presets (Rolling 30, 60 and 90 days, Quarter to date, Year to date, Rolling 12 months, This year and last 1 to 4) or typed in, and always today as its end. The grain follows from the Span's length (months up to 13 months, quarters up to 24, years beyond), so there is no grain to choose and no combination that reads badly. The user wanted to see stretches the fixed "last 12 months / 8 quarters / 6 years" windows didn't cover, but every figure on the page is still a "how is it going up to now" figure: ending every Span today keeps Net worth, the Account balances and the "to date" period meaningful, and keeps one control on the page.
 

@@ -5,19 +5,19 @@ import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './fig
 import { readingOf, type AnalyticsReading } from './reading';
 
 /**
- * Analytics' income and expense per period: what the Dashboard's overview cards read from an
- * income-vs-expense Widget. Over the Span (`spendingInsights`), the Key figures and the Net
+ * Analytics' income and expense per interval: what the Dashboard's overview cards read from an
+ * income-vs-expense Widget. Over the Period (`spendingInsights`), the Key figures and the Net
  * worth card break down what came in, went out and was kept. The insight card (Spending
- * Insights, `lastCompleteMonthInsights`) does not follow the Span (ADR-0016): it sets the last
+ * Insights, `lastCompleteMonthInsights`) does not follow the Period (ADR-0016): it sets the last
  * complete month's spending against the months before it.
  *
- * Periods before the first one with income or expense are left out: they are no basis for a
- * judgement, but an empty period after it counts as spending nothing.
+ * Intervals before the first one with income or expense are left out: they are no basis for a
+ * judgement, but an empty interval after it counts as spending nothing.
  */
 
 export const SPENDING_INSIGHTS = 'Spending Insights';
 
-/** The report from its first period with income or expense on; all of it when none has any. */
+/** The report from its first interval with income or expense on; all of it when none has any. */
 function fromFirstData(report: ReportTable): ReportTable {
   const first = report.cells.findIndex((row) => row.some((value) => value !== null));
   if (first <= 0) return report;
@@ -33,16 +33,20 @@ function fromFirstData(report: ReportTable): ReportTable {
 const INSIGHT_MONTHS = 12;
 
 /**
- * What the insight reads, whatever the Span: by month, the INSIGHT_MONTHS complete months
- * before today's, then this month to date (never judged). It keeps the reading's Span, so its
- * Drill-downs lead back to the Span the page is read over.
+ * What the insight reads, whatever the Period: by month, the INSIGHT_MONTHS complete months
+ * before today's, then this month to date (never judged). It keeps the reading's Period, so its
+ * Drill-downs lead back to the Period the page is read over.
  */
 function insightReading(reading: AnalyticsReading): AnalyticsReading {
   const from = monthStart(monthIndex(reading.to) - INSIGHT_MONTHS);
-  return { ...readingOf({ kind: 'custom', from }, reading.to), span: reading.span };
+  return {
+    ...readingOf({ kind: 'custom', from }, reading.to),
+    period: reading.period,
+    page: reading.page,
+  };
 }
 
-/** The Span's income and expense per period, which the Key figures and Net worth share. */
+/** The Period's income and expense per interval, which the Key figures and Net worth share. */
 export async function spendingInsights(
   ctx: ServiceContext,
   reading: AnalyticsReading,
@@ -63,7 +67,7 @@ export async function spendingInsights(
   });
 }
 
-/** Spending Insights: the last complete month against the months before it, whatever the Span. */
+/** Spending Insights: the last complete month against the months before it, whatever the Period. */
 export function lastCompleteMonthInsights(
   ctx: ServiceContext,
   reading: AnalyticsReading,

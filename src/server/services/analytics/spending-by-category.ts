@@ -5,8 +5,8 @@ import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Spending by Category, drawn as the Dashboard's card for a stacked bar Widget: a
- * bar per period of the Span stacked by Expense Category, read from 3 Categories on as a
- * ranking of the 6 largest over the whole Span, with the heaviest and lightest periods.
+ * bar per interval of the Period stacked by Expense Category, read from 3 Categories on as a
+ * ranking of the 6 largest over the whole Period, with the heaviest and lightest intervals.
  * Signed CHF amounts, as booked: spending is negative and a refund nets within its Category.
  * Transfers are left out and Split lines count by their own Category (the reporting engine's
  * base rows).

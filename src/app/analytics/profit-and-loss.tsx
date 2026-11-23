@@ -3,10 +3,12 @@ import type { Formatter } from '@/lib/format';
 import {
   PROFIT_AND_LOSS,
   type AnalyticsProfitAndLoss,
+  type Pinnable,
   type ProfitAndLossRow,
   type ProfitAndLossRowId,
 } from '@/server/services/analytics';
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
+import { SectionCardPeriod } from './card-section';
 import { ChangeLine } from './key-figure-change';
 import { SectionCard, UnconvertedNote } from './section';
 
@@ -34,12 +36,12 @@ const LOOKS: Record<ProfitAndLossRowId, RowLook> = {
 interface StatementRowProps {
   row: ProfitAndLossRow;
   fmt: Formatter;
-  /** Whether the statement has a Comparison span column: the data reaches back to it. */
+  /** Whether the statement has a Comparison period column: the data reaches back to it. */
   hasComparison: boolean;
 }
 
 /**
- * A row's amount over the Comparison span, then its change line, which wraps on a phone; a
+ * A row's amount over the Comparison period, then its change line, which wraps on a phone; a
  * muted "—" for a row without one.
  */
 function ComparisonCell({ row, fmt }: Omit<StatementRowProps, 'hasComparison'>) {
@@ -57,7 +59,7 @@ function ComparisonCell({ row, fmt }: Omit<StatementRowProps, 'hasComparison'>) 
 
 /**
  * One row: its label (and what it leaves out), its amount opening what is behind it, then its
- * amount over the Comparison span and its change.
+ * amount over the Comparison period and its change.
  */
 function StatementRow({ row, fmt, hasComparison }: StatementRowProps) {
   const amount = fmt.amount(row.value, { currency: BASE_CURRENCY, isWhole: true });
@@ -90,33 +92,46 @@ function StatementRow({ row, fmt, hasComparison }: StatementRowProps) {
 }
 
 interface ProfitAndLossSectionProps {
-  profitAndLoss: Promise<AnalyticsProfitAndLoss>;
+  profitAndLoss: Promise<Pinnable<AnalyticsProfitAndLoss>>;
   fmt: Formatter;
 }
 
 /**
- * Analytics' Profit and loss, once it arrives (GLOSSARY: Profit and loss): the Span's statement,
+ * Analytics' Profit and loss, once it arrives (GLOSSARY: Profit and loss): the Period's statement,
  * a row per figure from Income down to Net cash flow, highlighted at its foot. Expense reads
  * positive; each amount opens the Transactions behind it. Beside it, when the Account data
- * reaches back that far, each row's amount over the Comparison span and its change line, which
- * opens the Transactions of both stretches.
+ * reaches back that far, each row's amount over the Comparison period and its change line, which
+ * opens the Transactions of both stretches. Its header holds its Card Period (GLOSSARY): pinned,
+ * the statement reads over its own preset and compares with that preset's Comparison period.
  */
 export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLossSectionProps) {
-  const { rows } = await profitAndLoss;
+  const { rows, reading, isPinned, periodName } = await profitAndLoss;
   const hasComparison = rows.some((row) => row.change !== null);
   return (
-    <SectionCard name={PROFIT_AND_LOSS}>
+    <SectionCard
+      name={PROFIT_AND_LOSS}
+      titleAside={
+        <SectionCardPeriod
+          name={PROFIT_AND_LOSS}
+          section="profit-and-loss"
+          reading={reading}
+          isPinned={isPinned}
+        />
+      }
+    >
       <table className="w-full max-w-2xl border-collapse text-sm">
-        <caption className="sr-only">{PROFIT_AND_LOSS} over the Span</caption>
+        <caption className="sr-only">
+          {PROFIT_AND_LOSS} over {periodName ?? 'the Period'}
+        </caption>
         {hasComparison && (
           <thead>
             <tr className="text-muted">
               <td />
               <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
-                Span
+                Period
               </th>
               <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
-                Comparison span
+                Comparison period
               </th>
             </tr>
           </thead>

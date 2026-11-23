@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from 'react';
 import { PLACEHOLDER_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
+import { TitleRow } from '@/components/title-row';
 import { plural } from '@/lib/reporting/drill-summary';
 import { SectionErrorBoundary } from './section-error-boundary';
 import { SECTION_CLASS, sectionFrameClass } from './section-frame';
@@ -21,14 +22,24 @@ interface SectionCardProps {
   className?: string;
   /** Shown under the title when its count is above zero. */
   unconverted?: Unconverted;
+  /** Drawn beside the title: a pinnable Card's Period mark and dropdown. */
+  titleAside?: ReactNode;
   children: ReactNode;
 }
 
 /** A loaded section: its card and title, then what its figures leave out, if anything. */
-export function SectionCard({ name, className = '', unconverted, children }: SectionCardProps) {
+export function SectionCard({
+  name,
+  className = '',
+  unconverted,
+  titleAside,
+  children,
+}: SectionCardProps) {
   return (
     <section aria-label={name} className={`${SECTION_CLASS} ${className}`}>
-      <h2 className={SECTION_TITLE_CLASS}>{name}</h2>
+      <TitleRow aside={titleAside}>
+        <h2 className={SECTION_TITLE_CLASS}>{name}</h2>
+      </TitleRow>
       {unconverted && unconverted.count > 0 && <UnconvertedNote {...unconverted} />}
       {children}
     </section>
@@ -63,7 +74,7 @@ function SectionPlaceholder({ name, className = '', isCard }: SectionPlaceholder
 
 interface StreamedSectionProps {
   name: string;
-  /** Analytics over the same Span, for a failed section's "Try again". */
+  /** Analytics over the same Period, for a failed section's "Try again". */
   retryHref: string;
   /** Grid placement, shared by the placeholder and the loaded card. */
   className?: string;

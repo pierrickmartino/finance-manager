@@ -5,7 +5,7 @@ import type { ServiceContext } from '../context';
  * needs it. Each date is null when there is nothing of it.
  */
 export interface DataStart {
-  /** The first Transaction's booking date: no Span starts before it. */
+  /** The first Transaction's booking date: no Period starts before it. */
   firstTransaction: string | null;
   /**
    * The first day any Account holds data, its opening date or its first Transaction: a change

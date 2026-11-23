@@ -6,14 +6,14 @@ import type { WidgetQueryInput } from '../reporting/query';
 /**
  * Reading the Net cash flow section's flows by Category group type: every non-Transfer flow,
  * Capital included, a row per type, Unclassified Transactions (no Category) in the `null` row.
- * Profit and loss and Income vs. expense read it; both show Unclassified only when the Span has
+ * Profit and loss and Income vs. expense read it; both show Unclassified only when the Period has
  * some Unclassified Transactions (`hasTransactions`).
  */
 
 /** A Category group type, as a key of the report's rows: `null` is Unclassified. */
 export type GroupTypeKey = 'income' | 'expense' | 'capital' | null;
 
-/** The query by Category group type over some dates, with a column per period or none. */
+/** The query by Category group type over some dates, with a column per interval or none. */
 export const byGroupType = (
   dateRange: WidgetQueryInput['dateRange'],
   columns: WidgetQueryInput['columns'] = null,

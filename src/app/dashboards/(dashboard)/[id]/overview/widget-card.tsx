@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { FieldError } from '@/components/form';
 import { useFormatter } from '@/components/formatter-provider';
 import { WIDGET_CARD_CLASS } from '@/components/surface';
+import { TitleRow } from '@/components/title-row';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
 import { CARD_LEAD_SIZE_CLASS } from './card-layout';
@@ -52,13 +53,15 @@ interface WidgetCardProps {
   className?: string;
   /** Edit mode's actions on this Widget, at the top of its card. */
   toolbar?: ReactNode;
+  /** Drawn beside the card's title: an Analytics Card's Period mark and dropdown. */
+  titleAside?: ReactNode;
 }
 
 /**
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
+export function WidgetCard({ card, className = '', toolbar, titleAside }: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const reading = readCard(card, money);
@@ -69,9 +72,11 @@ export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
     >
       {toolbar}
       <div>
-        <h2 id={`card-${card.id}`} className="font-medium">
-          {card.name}
-        </h2>
+        <TitleRow aside={titleAside}>
+          <h2 id={`card-${card.id}`} className="font-medium">
+            {card.name}
+          </h2>
+        </TitleRow>
         {reading.lead && (
           <>
             <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>

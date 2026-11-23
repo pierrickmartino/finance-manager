@@ -7,23 +7,28 @@ import { FIELD_LABEL_CLASS } from '@/components/form';
 import { INPUT_CLASS } from '@/components/named-list';
 import { SECONDARY_BUTTON_CLASS } from '@/components/surface';
 import {
-  isSpanPreset,
-  SPAN_PRESET_LABELS,
-  SPAN_PRESETS,
-  type Span,
-  type SpanPreset,
-} from '@/lib/analytics/span';
+  isPeriodPreset,
+  PERIOD_PRESET_LABELS,
+  PERIOD_PRESETS,
+  cardPeriodsToParams,
+  type CardPeriods,
+  type Period,
+  type PeriodPreset,
+} from '@/lib/analytics/period';
+import { HiddenFields } from './hidden-fields';
 
-interface SpanControlProps {
-  span: Span;
-  /** The Span's first day, as read: the date field shows it. */
+interface PeriodControlProps {
+  period: Period;
+  /** The Period's first day, as read: the date field shows it. */
   from: string;
-  /** The Span in words: "Rolling 90 days · 25 Aug – 22 Nov 2026". */
+  /** The Period in words: "Rolling 90 days · 25 Aug – 22 Nov 2026". */
   phrase: string;
   /** Each preset's start date today, so picking one fills in its date at once. */
-  starts: Record<SpanPreset, string>;
+  starts: Record<PeriodPreset, string>;
   /** Today: the latest start date the field takes. */
   today: string;
+  /** The Cards' pins, sent again as they are: changing the page's Period keeps every one. */
+  cardPeriods: CardPeriods;
 }
 
 const noSubscription = () => () => {};
@@ -41,23 +46,31 @@ function useIsHydrated(): boolean {
 const CUSTOM = 'custom';
 
 /**
- * Analytics' only control (GLOSSARY: Span, ADR-0016): a GET form of the Span presets (and
- * Custom) and the Span's start date, under the Span in words. Picking a preset fills in its date
+ * Analytics' only control (GLOSSARY: Period, ADR-0016): a GET form of the Period presets (and
+ * Custom) and the Period's start date, under the Period in words. Picking a preset fills in its date
  * and reads Analytics over it; typing a date switches the list to Custom, and Show reads
- * Analytics from it. Once hydrated, the form sends only `span` for a preset or only `from` for
+ * Analytics from it. Once hydrated, the form sends only `period` for a preset or only `from` for
  * Custom; without JavaScript it sends both, and the chosen preset wins unless Custom is
- * selected. It sticks to the top of the screen as the page scrolls, so the Span can change from
+ * selected. The Cards' pins ride along in hidden fields, so a pinned Card keeps its own Period
+ * (GLOSSARY: Card Period). It sticks to the top of the screen as the page scrolls, so the Period can change from
  * anywhere.
  */
-export function SpanControl({ span, from, phrase, starts, today }: SpanControlProps) {
+export function PeriodControl({
+  period,
+  from,
+  phrase,
+  starts,
+  today,
+  cardPeriods,
+}: PeriodControlProps) {
   const id = useId();
-  const [choice, setChoice] = useState<string>(span.kind === 'preset' ? span.preset : CUSTOM);
+  const [choice, setChoice] = useState<string>(period.kind === 'preset' ? period.preset : CUSTOM);
   const [start, setStart] = useState(from);
   const isHydrated = useIsHydrated();
   const isCustom = choice === CUSTOM;
   const onPreset = (event: ChangeEvent<HTMLSelectElement>) => {
     const { value, form } = event.currentTarget;
-    if (!isSpanPreset(value)) {
+    if (!isPeriodPreset(value)) {
       setChoice(value);
       return;
     }
@@ -77,25 +90,25 @@ export function SpanControl({ span, from, phrase, starts, today }: SpanControlPr
     <Form
       action="/analytics"
       scroll={false}
-      aria-label="Span"
-      data-testid="span-control"
+      aria-label="Period"
+      data-testid="period-control"
       className="sticky top-0 z-10 -mx-1 flex flex-wrap items-end gap-x-3 gap-y-2 glass-paper px-1 py-2"
     >
       {/* The field primitive's layout, but each label set beside its control (htmlFor) rather
           than wrapping it: a wrapping label would fold the chosen option into the select's
-          accessible name ("Span Rolling 12 months"). */}
+          accessible name ("Period Rolling 12 months"). */}
       <div className={FIELD_LABEL_CLASS}>
-        <label htmlFor={`${id}-span`}>Span</label>
+        <label htmlFor={`${id}-period`}>Period</label>
         <select
-          id={`${id}-span`}
-          name={isHydrated && isCustom ? undefined : 'span'}
+          id={`${id}-period`}
+          name={isHydrated && isCustom ? undefined : 'period'}
           value={choice}
           onChange={onPreset}
           className={INPUT_CLASS}
         >
-          {SPAN_PRESETS.map((preset) => (
+          {PERIOD_PRESETS.map((preset) => (
             <option key={preset} value={preset}>
-              {SPAN_PRESET_LABELS[preset]}
+              {PERIOD_PRESET_LABELS[preset]}
             </option>
           ))}
           <option value={CUSTOM}>Custom</option>
@@ -114,6 +127,7 @@ export function SpanControl({ span, from, phrase, starts, today }: SpanControlPr
           className={INPUT_CLASS}
         />
       </div>
+      <HiddenFields params={cardPeriodsToParams(cardPeriods)} />
       <button type="submit" className={SECONDARY_BUTTON_CLASS}>
         Show
       </button>

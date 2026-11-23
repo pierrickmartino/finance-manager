@@ -6,8 +6,8 @@ import {
   seedClassified,
   seedEarlyStart,
 } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
-import { spanLabel } from '@/lib/analytics/span';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
+import { periodLabel } from '@/lib/analytics/period';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import type { KeyFigure, KeyFigureId } from './key-figures';
@@ -64,7 +64,7 @@ const values = (figure: KeyFigure) => figure.sparkline.map((point) => point.valu
 const partials = (figure: KeyFigure) => figure.sparkline.map((point) => point.isPartial);
 
 describe('Key figures sparklines', () => {
-  it('by month, give Income, Expense and Profit a point per month of the Span, both Mays partial', async () => {
+  it('by month, give Income, Expense and Profit a point per month of the Period, both Mays partial', async () => {
     fixToday('2025-05-20');
     await dataset();
 
@@ -134,7 +134,7 @@ describe('Key figures sparklines', () => {
     expect(partials(year.income)).toEqual([false, false, false, false, true]);
   });
 
-  it("gives Net worth the Net worth trend's points: the Span's start, each period end, then today", async () => {
+  it("gives Net worth the Net worth trend's points: the Period's start, each interval end, then today", async () => {
     fixToday('2025-05-20');
     await dataset();
 
@@ -142,12 +142,12 @@ describe('Key figures sparklines', () => {
       const { netWorth } = byId((await loadSection(t.ctx, view, 'keyFigures')).figures);
       const { trend } = await loadSection(t.ctx, view, 'netWorth');
 
-      const label = spanLabel(view);
+      const label = periodLabel(view);
       expect(values(netWorth), label).toEqual(trend.rowTotals.map((total) => total ?? 0));
       expect(partials(netWorth), label).toEqual(trend.rows.map((row) => row.isPartial));
       expect(netWorth.sparkline.at(-1)!.isPartial, label).toBe(true);
     }
-    // By hand, by month: nothing at the Span's start (20 May 2024) nor until the December salary;
+    // By hand, by month: nothing at the Period's start (20 May 2024) nor until the December salary;
     // then each month end; then today, the property purchase counting in Net worth (it is no
     // expense).
     const { netWorth } = byId((await loadSection(t.ctx, MONTHLY, 'keyFigures')).figures);

@@ -63,7 +63,7 @@ export function NetWorthSparkline({
 /**
  * One change chip: its short label, the change and the point it is measured from, at the end of
  * `since` (a period, on the Dashboard) or at its start (`isSinceStart`: the first day of an
- * Analytics Span).
+ * Analytics Period).
  */
 export type ChangeChip = Pick<HeadlineChange, 'since' | 'change' | 'href'> & {
   label: string;
@@ -71,7 +71,7 @@ export type ChangeChip = Pick<HeadlineChange, 'since' | 'change' | 'href'> & {
 };
 
 /**
- * Net worth's change over 1M, 1Y and 2Y (or since an Analytics Span's start), each opening the
+ * Net worth's change over 1M, 1Y and 2Y (or since an Analytics Period's start), each opening the
  * Accounts as of the point it is measured from. Shown without the currency, which the amount
  * above already says.
  */

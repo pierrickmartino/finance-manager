@@ -5,8 +5,8 @@ import type { AnalyticsReading } from './reading';
 
 /**
  * Analytics' Net cash flow, drawn as the Dashboard's card for a line Widget: every flow in or
- * out of the household per period of the Span, signed CHF, with the best and weakest
- * periods. Capital is included (as on the starter Net cash flow Widget, so are uncategorised
+ * out of the household per interval of the Period, signed CHF, with the best and weakest
+ * intervals. Capital is included (as on the starter Net cash flow Widget, so are uncategorised
  * Transactions); Transfers are left out by the reporting engine's base rows.
  */
 

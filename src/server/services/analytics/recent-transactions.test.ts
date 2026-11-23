@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixToday, loadSection, seedAccount, seedClassified } from '@test/support/analytics';
-import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/spans';
+import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
 
 /** Analytics' Recent transactions (spec #170, user stories 23-24). */
@@ -15,7 +15,7 @@ const descriptions = (transactions: { rawDescription: string }[]) =>
   transactions.map((transaction) => transaction.rawDescription);
 
 describe('Recent transactions', () => {
-  it('lists the 6 latest Transactions, newest first, from before the Span too', async () => {
+  it('lists the 6 latest Transactions, newest first, from before the Period too', async () => {
     fixToday('2025-03-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
     await seedClassified(t.ctx, ubs, [
@@ -34,7 +34,7 @@ describe('Recent transactions', () => {
     expect(recent[0]).toMatchObject({ bookingDate: '2025-03-20', amountMinor: 600 });
   });
 
-  it('is identical whatever the Span', async () => {
+  it('is identical whatever the Period', async () => {
     fixToday('2025-03-20');
     const ubs = await seedAccount(t.ctx, 'UBS');
     await seedClassified(t.ctx, ubs, [

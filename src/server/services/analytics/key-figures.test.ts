@@ -8,9 +8,9 @@ import {
   seedClassified,
   seedEarlyStart,
 } from '@test/support/analytics';
-import { MONTHLY } from '@test/support/spans';
+import { MONTHLY } from '@test/support/periods';
 import { setupTestDatabase } from '@test/support/db';
-import { presetSpan, type Span } from '@/lib/analytics/span';
+import { presetPeriod, type Period } from '@/lib/analytics/period';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { linkTransfer, transactionSide } from '../transfers';
 import type { KeyFigure } from './key-figures';
@@ -71,10 +71,10 @@ async function dataset(): Promise<void> {
 const NET_WORTH_TODAY =
   80_000 + 50_000 - 40_000 + 100_000 - 20_000 - 30_000 + 5_000 + 120_000 - 200_000 - 7_000;
 
-const QUARTER_TO_DATE = presetSpan('quarter-to-date');
-const YEAR_TO_DATE = presetSpan('year-to-date');
+const QUARTER_TO_DATE = presetPeriod('quarter-to-date');
+const YEAR_TO_DATE = presetPeriod('year-to-date');
 /** From 1 May 2025: the dataset's April salary falls before it. */
-const SINCE_MAY: Span = { kind: 'custom', from: '2025-05-01' };
+const SINCE_MAY: Period = { kind: 'custom', from: '2025-05-01' };
 
 const amounts = (figures: readonly KeyFigure[]) =>
   figures.map((figure) => [figure.label, figure.value]);
@@ -86,7 +86,7 @@ async function drilled(figure: KeyFigure): Promise<number> {
 }
 
 describe('Key figures', () => {
-  it('gives Net worth today and the whole Span: income, expense and profit, captioned with it', async () => {
+  it('gives Net worth today and the whole Period: income, expense and profit, captioned with it', async () => {
     fixToday('2025-05-20');
     await dataset();
 
@@ -108,13 +108,13 @@ describe('Key figures', () => {
     ]);
   });
 
-  it("sums Income, Expense and Profit of the Span's periods, its first cut short", async () => {
+  it("sums Income, Expense and Profit of the Period's intervals, its first cut short", async () => {
     fixToday('2025-05-20');
     await dataset();
 
-    // 15 Feb – today: the February groceries (on the 11th) fall before the Span.
-    const span: Span = { kind: 'custom', from: '2025-02-15' };
-    const section = await loadSection(t.ctx, span, 'keyFigures');
+    // 15 Feb – today: the February groceries (on the 11th) fall before the Period.
+    const period: Period = { kind: 'custom', from: '2025-02-15' };
+    const section = await loadSection(t.ctx, period, 'keyFigures');
     const [, income, expense, profit] = section.figures as [KeyFigure, ...KeyFigure[]];
 
     expect(amounts(section.figures).slice(1)).toEqual([
@@ -150,7 +150,10 @@ describe('Key figures', () => {
     const both = await openDrill(t.ctx, profit.href);
     expect(both.sumChfMinor).toBe(265_000);
     expect(both.total).toBe(8);
-    expect(originOf(profit.href)).toEqual({ kind: 'analytics', span: MONTHLY });
+    expect(originOf(profit.href)).toEqual({
+      kind: 'analytics',
+      page: { period: MONTHLY, cardPeriods: {} },
+    });
   });
 
   it('over Quarter to date and Year to date, reads them and opens their Transactions, Net worth unchanged', async () => {
@@ -175,20 +178,23 @@ describe('Key figures', () => {
     ]);
     expect(quarter.figures[1]!.caption).toBe('Quarter to date');
     expect(year.figures[1]!.caption).toBe('Year to date');
-    for (const [span, section] of [
+    for (const [period, section] of [
       [QUARTER_TO_DATE, quarter],
       [YEAR_TO_DATE, year],
     ] as const) {
       for (const figure of section.figures.slice(1)) {
         const sign = figure.id === 'expense' ? -1 : 1;
         expect(await drilled(figure), figure.label).toBe(sign * figure.value);
-        expect(originOf(figure.href)).toEqual({ kind: 'analytics', span });
+        expect(originOf(figure.href)).toEqual({
+          kind: 'analytics',
+          page: { period, cardPeriods: {} },
+        });
       }
       expect(section.figures[0]!.href).toBe('/accounts?date=2025-05-20');
     }
   });
 
-  it('shows CHF 0 for a Span with no income, and a negative Profit', async () => {
+  it('shows CHF 0 for a Period with no income, and a negative Profit', async () => {
     fixToday('2025-05-20');
     const { salary, groceries } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
@@ -206,7 +212,7 @@ describe('Key figures', () => {
     expect(await drilled(profit)).toBe(-30_000);
   });
 
-  it('with no Accounts, has no Net worth to show and CHF 0 for the period', async () => {
+  it('with no Accounts, has no Net worth to show and CHF 0 for the interval', async () => {
     fixToday('2025-05-20');
 
     const section = await loadSection(t.ctx, MONTHLY, 'keyFigures');

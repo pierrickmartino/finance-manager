@@ -83,7 +83,7 @@ The standing check that every imported Account's data is current and has no Gaps
 _Avoid_: Data health, import check, freshness
 
 **Gap**:
-A span of days between two of an Account's Imports that no Import's statement period covers and no Manual transaction fills.
+A stretch of days between two of an Account's Imports that no Import's statement period covers and no Manual transaction fills.
 _Avoid_: Hole, missing period
 
 **Stale**:
@@ -190,36 +190,44 @@ A Dashboard read as a grid of cards: an overview row (the headline amount, with 
 _Avoid_: Report, overview page, presentation
 
 **Card**:
-How one Widget is drawn on the Dashboard Story, or one section of Analytics: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per period, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data; a section of Analytics is drawn as the card of the Widget that would show the same figures, so the two pages read alike. A bars or line Widget whose two columns are its income and its expense is read as a flow.
+How one Widget is drawn on the Dashboard Story, or one section of Analytics: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per month, quarter or year, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data; a section of Analytics is drawn as the card of the Widget that would show the same figures, so the two pages read alike. A bars or line Widget whose two columns are its income and its expense is read as a flow.
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The landing page: a single fixed page of reports, read over one Span at a time: the Key figures (Net worth today; Income, Expense and Profit over the Span) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Span, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read over one Period at a time, which some Cards may replace with their own Card Period: the Key figures (Net worth today; Income, Expense and Profit over the Period) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per Interval of the Period, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
-**Span**:
-The stretch of days Analytics is read over: from a start date, never before the first Transaction, to today. It is split into months, quarters or years by its length; its first period starts at the start date and its last is shown "to date", both set apart from complete ones. The spending insight always speaks of the last complete month, whatever the Span.
-_Avoid_: Date range, period window, period view, lookback
+**Period**:
+The stretch of days Analytics, or one of its Cards, is read over: from a start date, never before the first Transaction, to today. It is split into Intervals by its length; its first Interval starts at the start date and its last is shown "to date", both set apart from complete ones. The spending insight always speaks of the last complete month, whatever the Period.
+_Avoid_: Span, date range, period window, period view, lookback
 
-**Span preset**:
-A named way of choosing a Span's start date, such as "Rolling 90 days", "Year to date" or "This year and last 2". A Span chosen by preset moves with it as days pass; one chosen by date keeps its start date.
-_Avoid_: Quick range, shortcut
+**Interval**:
+One month, quarter or year a Period is split into, the same for the whole Period. Only its first and last may be partial; averages use complete ones only.
+_Avoid_: Period, bucket, step
+
+**Period preset**:
+A named way of choosing a Period's start date, such as "Rolling 90 days", "Year to date" or "This year and last 2". A Period chosen by preset moves with it as days pass; one chosen by date keeps its start date.
+_Avoid_: Span preset, quick range, shortcut
+
+**Card Period**:
+The Period preset one Card of Analytics is pinned to, in place of the page's Period, until set back to the page's. The Card is then read wholly over it: its Intervals, its Drill-downs and its Comparison period. The Key figures, the spending insight, the most recent Transactions and the Account balances have none.
+_Avoid_: Card Span, override, local period
 
 **Profit**:
-Income minus expense over a span of time, with Capital left out. It is negative when more went out than came in.
+Income minus expense over a stretch of time, with Capital left out. It is negative when more went out than came in.
 _Avoid_: Kept, net profit, savings, net, surplus
 
 **Net cash flow**:
-All the money that moved in and out over a span of time, Transfers left out: Profit plus Capital plus what is still Unclassified. It is negative when more went out than came in.
+All the money that moved in and out over a stretch of time, Transfers left out: Profit plus Capital plus what is still Unclassified. It is negative when more went out than came in.
 _Avoid_: Net incl. Capital, net profit, net result, bottom line
 
 **Profit and loss**:
-The statement of a Span on Analytics: its Income, Expense, Profit, Capital, Unclassified (when there is any) and Net cash flow, each beside its value over the Comparison span and the change. Capital and Unclassified are neither good nor bad.
+The statement of a Period on Analytics: its Income, Expense, Profit, Capital, Unclassified (when there is any) and Net cash flow, each beside its value over the Comparison period and the change. Capital and Unclassified are neither good nor bad.
 _Avoid_: P&L, income statement, statement, summary
 
-**Comparison span**:
-The stretch a Span's figures are compared with. For a Span to date of a calendar period (quarter, year, or years), it is the same stretch of the previous one, a short month compared up to its last day; for any other Span, the stretch of the same number of days just before it.
-_Avoid_: Baseline, previous period, last period
+**Comparison period**:
+The stretch a Period's figures are compared with. For a Period to date of a calendar quarter, year, or years, it is the same stretch of the previous one, a short month compared up to its last day; for any other Period, the stretch of the same number of days just before it.
+_Avoid_: Comparison span, baseline, previous period, last period
 
 **Edit mode**:
 The Dashboard Story's own board, edited in place: a Widget's card is dragged to a free place, resized in whole cells down to its smallest readable size, and pushes the cards in its way down. Gaps are kept, and every change is saved at once, without History. On narrow screens the board is one column in reading order, with no dragging or resizing: a card moves up or down instead, swapping places with its neighbour. From the keyboard, a focused card moves one cell with the arrow keys and resizes one cell with Shift+arrows.

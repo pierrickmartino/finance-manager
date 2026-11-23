@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-import { DEFAULT_SPAN, presetStarts, spanDates, spanPhrase } from '../src/lib/analytics/span';
+import { expect, test } from '@playwright/test';
+import { DEFAULT_PERIOD, periodDates, periodPhrase } from '../src/lib/analytics/period';
 import { formatPeriod } from '../src/lib/format';
 import { createAccount, listAccounts } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
@@ -9,148 +9,59 @@ import { editClassification } from '../src/server/services/transactions';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { leadFontSize } from './support/card-layout';
 import { withServices } from './support/services';
+import {
+  columns,
+  CURRENT_MONTH,
+  heatmap,
+  heatmapRow,
+  LAST_YEAR,
+  MONTH,
+  monthsAgo,
+  periodControl,
+  QUARTER,
+  QUARTERS,
+  region,
+  ROLLING_MONTHS,
+  ROLLING_START,
+  seedGrocery,
+  seedOldPurchase,
+  seedPurchase,
+  seedSalary,
+  STARTS,
+  TODAY,
+  YEAR,
+} from './support/analytics';
 
 /**
- * Analytics (spec #170, #204): the Span control, and each section drawn as the Dashboard's own
+ * Analytics (spec #170, #204): the Period control, and each section drawn as the Dashboard's own
  * card: Net worth, Spending Insights, Recent transactions, Net cash flow, Account balances in
- * CHF, Spending by Category, and the Income vs. expense and Categories per period heatmaps.
+ * CHF, Spending by Category, and the Income vs. expense and Categories per interval heatmaps.
+ * Each Card's own Period is card-period.spec.ts.
  */
-
-interface Seeded {
-  description: string;
-  account: string;
-}
-
-/**
- * A salary booked today, so it falls in the current period of every Span, on an Account holding
- * money since 2021, so Net worth has a value at every period end of every Span here.
- */
-async function seedSalary(suffix: number): Promise<Seeded> {
-  const description = `Analytics salary ${suffix}`;
-  await withServices(async (ctx) => {
-    const bank = await createBank(ctx, { name: `Analytics bank ${suffix}` });
-    const account = await createAccount(ctx, {
-      bankId: bank.id,
-      kind: 'current',
-      importFormat: null,
-      name: `Analytics account ${suffix}`,
-      currency: 'CHF',
-      openingBalanceMinor: 1_000_00,
-      openingDate: '2021-01-01',
-    });
-    const group = await createCategoryGroup(ctx, { name: `Pay ${suffix}`, type: 'income' });
-    const salary = await createCategory(ctx, { groupId: group.id, name: 'Salary' });
-    const transaction = await createManualTransaction(ctx, {
-      accountId: account.id,
-      bookingDate: swissToday(),
-      amountMinor: 4321_00,
-      description,
-    });
-    await editClassification(ctx, transaction.id, { categoryId: salary.id });
-  });
-  return { description, account: `Analytics bank ${suffix} · Analytics account ${suffix}` };
-}
-
-/** A grocery purchase booked today, in the current period of every Span; its description. */
-async function seedGrocery(suffix: number): Promise<string> {
-  const description = `Analytics groceries ${suffix}`;
-  await withServices(async (ctx) => {
-    const account = (await listAccounts(ctx)).find(
-      (item) => item.name === `Analytics account ${suffix}`,
-    );
-    const group = await createCategoryGroup(ctx, { name: `Living ${suffix}`, type: 'expense' });
-    const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
-    const transaction = await createManualTransaction(ctx, {
-      accountId: account!.id,
-      bookingDate: swissToday(),
-      amountMinor: -87_00,
-      description,
-    });
-    await editClassification(ctx, transaction.id, { categoryId: groceries.id });
-  });
-  return description;
-}
-
-/**
- * An older Transaction on a seeded Account (by default seedSalary's), early in 2021: no Span
- * starts before the first Transaction, so this lets every preset here read from the start it
- * gives, whatever else the database holds. A test that reads a Span's periods needs it.
- */
-async function seedOldPurchase(
-  suffix: number,
-  accountName = `Analytics account ${suffix}`,
-): Promise<void> {
-  await withServices(async (ctx) => {
-    const account = (await listAccounts(ctx)).find((item) => item.name === accountName);
-    await createManualTransaction(ctx, {
-      accountId: account!.id,
-      bookingDate: '2021-01-05',
-      amountMinor: -10_00,
-      description: `Analytics old purchase ${suffix}`,
-    });
-  });
-}
-
-const TODAY = swissToday();
-const [YEAR, MONTH] = TODAY.split('-') as [string, string];
-const LAST_YEAR = Number(YEAR) - 1;
-const QUARTER = `${YEAR}-Q${Math.ceil(Number(MONTH) / 3)}`;
-const CURRENT_MONTH = formatPeriod(`${YEAR}-${MONTH}`);
-const STARTS = presetStarts(TODAY);
-const ROLLING_START = STARTS['rolling-12-months'];
-/** Rolling 12 months reaches into 13 calendar months, unless it starts on a month's first day. */
-const ROLLING_MONTHS = ROLLING_START.endsWith('-01') ? 12 : 13;
-/** This year and last 1, by quarter: last year's four, then this year's up to the current one. */
-const QUARTERS = 4 + Math.ceil(Number(MONTH) / 3);
-
-/** Analytics' Span control: a form named "Span". */
-const spanControl = (page: Page) => page.getByRole('form', { name: 'Span' });
-
-/** A day `count` months before today's month, mid-month. */
-function monthsAgo(count: number): string {
-  const date = new Date(Date.UTC(Number(YEAR), Number(MONTH) - 1 - count, 15));
-  return date.toISOString().slice(0, 10);
-}
-
-const region = (page: Page, name: string) => page.getByRole('region', { name, exact: true });
-
-const heatmap = (page: Page, name: string) =>
-  region(page, name).getByRole('table', { name: 'Heatmap' });
-
-/** A heatmap's column headers: the periods (the running one starred), then Total. */
-async function columns(page: Page, name: string): Promise<string[]> {
-  return heatmap(page, name).getByRole('columnheader').allInnerTexts();
-}
-
-/** A heatmap's row by its header. */
-const heatmapRow = (page: Page, name: string, row: string) =>
-  heatmap(page, name)
-    .getByRole('row')
-    .filter({ has: page.getByRole('rowheader', { name: row, exact: true }) });
 
 test('/ lands on Analytics over Rolling 12 months, its dates in words', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/analytics$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
-  const control = spanControl(page);
-  await expect(control.getByLabel('Span', { exact: true })).toHaveValue('rolling-12-months');
+  const control = periodControl(page);
+  await expect(control.getByLabel('Period', { exact: true })).toHaveValue('rolling-12-months');
   await expect(control.getByLabel('From', { exact: true })).toHaveValue(ROLLING_START);
   await expect(
-    control.getByText(spanPhrase(DEFAULT_SPAN, { from: ROLLING_START, to: TODAY })),
+    control.getByText(periodPhrase(DEFAULT_PERIOD, { from: ROLLING_START, to: TODAY })),
   ).toBeVisible();
 });
 
-test('picking a Span preset fills in its date, reads every section over it, and a Drill-down returns to it', async ({
+test('picking a Period preset fills in its date, reads every section over it, and a Drill-down returns to it', async ({
   page,
 }) => {
   const suffix = Date.now();
   const { description } = await seedSalary(suffix);
   await seedOldPurchase(suffix);
-  const control = spanControl(page);
-  const preset = control.getByLabel('Span', { exact: true });
+  const control = periodControl(page);
+  const preset = control.getByLabel('Period', { exact: true });
   const name = 'Income vs. expense';
   const income = region(page, 'Key figures').getByRole('region', { name: 'Income', exact: true });
-  const incomeCaption = (span: string) => income.getByText(span, { exact: true });
+  const incomeCaption = (period: string) => income.getByText(period, { exact: true });
 
   // Rolling 12 months: a month each, the first cut short (unless it starts on the 1st) and the
   // current one starred as running, then Total.
@@ -165,7 +76,7 @@ test('picking a Span preset fills in its date, reads every section over it, and 
       heatmap(page, name).getByRole('rowheader', { name: row, exact: true }),
     ).toBeVisible();
   }
-  // Profit and loss: the whole Span's statement, just before Income vs. expense (a row's name
+  // Profit and loss: the whole Period's statement, just before Income vs. expense (a row's name
   // may carry its note on what other tests' data leaves out).
   for (const row of ['Income', 'Expense', 'Profit', 'Capital', 'Net cash flow']) {
     await expect(
@@ -175,7 +86,7 @@ test('picking a Span preset fills in its date, reads every section over it, and 
 
   // This year and last 1: by quarter, from 1 January last year.
   await preset.selectOption('this-year-and-last-1');
-  await expect(page).toHaveURL(/\/analytics\?span=this-year-and-last-1$/);
+  await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-1$/);
   await expect(control.getByLabel('From', { exact: true })).toHaveValue(`${LAST_YEAR}-01-01`);
   await expect(
     heatmap(page, name)
@@ -188,7 +99,7 @@ test('picking a Span preset fills in its date, reads every section over it, and 
 
   // This year and last 4: by year, the first four years before this one.
   await preset.selectOption('this-year-and-last-4');
-  await expect(page).toHaveURL(/\/analytics\?span=this-year-and-last-4$/);
+  await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-4$/);
   await expect(heatmap(page, name).getByRole('columnheader').nth(4)).toHaveText(`${YEAR}*`);
   headers = await columns(page, name);
   expect(headers).toHaveLength(5 + 1);
@@ -200,11 +111,11 @@ test('picking a Span preset fills in its date, reads every section over it, and 
     }),
   ).toBeVisible();
 
-  // A reload keeps the Span.
+  // A reload keeps the Period.
   await page.reload();
   await expect(preset).toHaveValue('this-year-and-last-4');
 
-  // The current year's income opens the Transactions behind it, with a way back to the Span.
+  // The current year's income opens the Transactions behind it, with a way back to the Period.
   await heatmap(page, name)
     .getByRole('link', { name: new RegExp(`^Income, ${YEAR} \\(partial\\): `) })
     .click();
@@ -213,11 +124,11 @@ test('picking a Span preset fills in its date, reads every section over it, and 
     page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?span=this-year-and-last-4$/);
+  await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-4$/);
   await expect(preset).toHaveValue('this-year-and-last-4');
 });
 
-test('typing a start date switches the Span to Custom, reads every section from it, and a Drill-down returns to it', async ({
+test('typing a start date switches the Period to Custom, reads every section from it, and a Drill-down returns to it', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -226,8 +137,8 @@ test('typing a start date switches the Span to Custom, reads every section from 
   await seedOldPurchase(suffix);
   const from = monthsAgo(2);
   const atFrom = new RegExp(`/analytics\\?from=${from}$`);
-  const control = spanControl(page);
-  const preset = control.getByLabel('Span', { exact: true });
+  const control = periodControl(page);
+  const preset = control.getByLabel('Period', { exact: true });
   const date = control.getByLabel('From', { exact: true });
   const name = 'Income vs. expense';
 
@@ -240,7 +151,7 @@ test('typing a start date switches the Span to Custom, reads every section from 
   await expect(preset).toHaveValue('custom');
   await expect(date).toHaveValue(from);
   await expect(
-    control.getByText(spanPhrase({ kind: 'custom', from }, { from, to: TODAY })),
+    control.getByText(periodPhrase({ kind: 'custom', from }, { from, to: TODAY })),
   ).toBeVisible();
   // Three months, the first cut short at the 15th and the current one running, then Total.
   await expect(heatmap(page, name).getByRole('columnheader')).toHaveCount(3 + 1);
@@ -257,7 +168,7 @@ test('typing a start date switches the Span to Custom, reads every section from 
   await page.reload();
   await expect(date).toHaveValue(from);
 
-  // The current month's income opens the Transactions behind it, with a way back to the Span.
+  // The current month's income opens the Transactions behind it, with a way back to the Period.
   await heatmap(page, name)
     .getByRole('link', { name: new RegExp(`^Income, ${CURRENT_MONTH} \\(partial\\): `) })
     .click();
@@ -271,23 +182,31 @@ test('typing a start date switches the Span to Custom, reads every section from 
 
   // Picking a preset refills the date.
   await preset.selectOption('year-to-date');
-  await expect(page).toHaveURL(/\/analytics\?span=year-to-date$/);
+  await expect(page).toHaveURL(/\/analytics\?period=year-to-date$/);
   await expect(date).toHaveValue(`${YEAR}-01-01`);
 });
 
-test('a former Period view link redirects to its nearest Span', async ({ page }) => {
-  for (const [period, span] of [
+test('a former Period view link redirects to its nearest Period', async ({ page }) => {
+  for (const [view, period] of [
     ['month', 'rolling-12-months'],
     ['quarter', 'this-year-and-last-1'],
     ['year', 'this-year-and-last-4'],
   ] as const) {
-    await page.goto(`/analytics?period=${period}`);
-    await expect(page).toHaveURL(new RegExp(`/analytics\\?span=${span}$`));
-    await expect(spanControl(page).getByLabel('Span', { exact: true })).toHaveValue(span);
+    await page.goto(`/analytics?period=${view}`);
+    await expect(page).toHaveURL(new RegExp(`/analytics\\?period=${period}$`));
+    await expect(periodControl(page).getByLabel('Period', { exact: true })).toHaveValue(period);
   }
 });
 
-test('Spending Insights judges the last complete month whatever the Span and opens its Transactions', async ({
+test('a former Span link redirects to the same Period preset', async ({ page }) => {
+  await page.goto('/analytics?span=year-to-date');
+  await expect(page).toHaveURL(/\/analytics\?period=year-to-date$/);
+  await expect(periodControl(page).getByLabel('Period', { exact: true })).toHaveValue(
+    'year-to-date',
+  );
+});
+
+test('Spending Insights judges the last complete month whatever the Period and opens its Transactions', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -324,7 +243,7 @@ test('Spending Insights judges the last complete month whatever the Span and ope
   await seedSalary(suffix);
 
   // Rolling 30 days holds no complete month, yet the insight still speaks of the last one.
-  await page.goto('/analytics?span=rolling-30-days');
+  await page.goto('/analytics?period=rolling-30-days');
   const latest = page.getByRole('link', { name: 'See the Transactions' });
   await expect(page.getByRole('heading', { name: /^Spending is / })).toBeVisible();
   await latest.click();
@@ -335,10 +254,10 @@ test('Spending Insights judges the last complete month whatever the Span and ope
     }),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?span=rolling-30-days$/);
+  await expect(page).toHaveURL(/\/analytics\?period=rolling-30-days$/);
 });
 
-test('on a phone the Span control stays at the top and the heatmap scrolls inside its card', async ({
+test('on a phone the Period control stays at the top and the heatmap scrolls inside its card', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -349,7 +268,7 @@ test('on a phone the Span control stays at the top and the heatmap scrolls insid
   await page.goto('/analytics');
   await expect(heatmap(page, 'Income vs. expense')).toBeVisible();
 
-  const control = spanControl(page);
+  const control = periodControl(page);
   const top = (await control.boundingBox())!.y;
   await page.evaluate((by) => window.scrollTo(0, by), top + 20);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(top);
@@ -360,7 +279,7 @@ test('on a phone the Span control stays at the top and the heatmap scrolls insid
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(pageOverflows).toBe(false);
-  for (const name of ['Income vs. expense', 'Categories per period']) {
+  for (const name of ['Income vs. expense', 'Categories per interval']) {
     const scroller = region(page, name).locator('figure');
     expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
       true,
@@ -368,7 +287,7 @@ test('on a phone the Span control stays at the top and the heatmap scrolls insid
   }
 });
 
-test("Net worth reads today, with a point at the Span's start, each period end and today, and its change since the start", async ({
+test("Net worth reads today, with a point at the Period's start, each interval end and today, and its change since the start", async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -378,26 +297,26 @@ test("Net worth reads today, with a point at the Span's start, each period end a
   await seedOldPurchase(suffix);
   const netWorth = region(page, 'Your net worth today');
 
-  for (const [span, periods, current] of [
+  for (const [period, intervals, current] of [
     ['rolling-12-months', ROLLING_MONTHS, CURRENT_MONTH],
     ['this-year-and-last-1', QUARTERS, formatPeriod(QUARTER)],
     ['this-year-and-last-4', 5, YEAR],
   ] as const) {
-    // Labelled with the Span's first day: it stands at its start.
-    const startLabel = spanDates({ from: STARTS[span], to: STARTS[span] });
-    await page.goto(`/analytics?span=${span}`);
+    // Labelled with the Period's first day: it stands at its start.
+    const startLabel = periodDates({ from: STARTS[period], to: STARTS[period] });
+    await page.goto(`/analytics?period=${period}`);
     const trend = netWorth.getByRole('group', {
-      name: `Net worth, ${spanDates({ from: STARTS[span], to: TODAY })}`,
+      name: `Net worth, ${periodDates({ from: STARTS[period], to: TODAY })}`,
     });
-    // The start (Net worth at the end of the day before the Span's first), then a point per period.
-    await expect(trend.getByRole('link')).toHaveCount(periods + 1);
+    // The start (Net worth at the end of the day before the Period's first), then a point per interval.
+    await expect(trend.getByRole('link')).toHaveCount(intervals + 1);
     await expect(trend.getByRole('link').first()).toHaveAccessibleName(
       new RegExp(`^${startLabel}: `),
     );
     await expect(trend.getByRole('link').last()).toHaveAccessibleName(new RegExp(`^${current}: `));
     await expect(
       netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
-    ).toHaveAccessibleName(new RegExp(`^Span: .* since the start of ${startLabel}$`));
+    ).toHaveAccessibleName(new RegExp(`^Period: .* since the start of ${startLabel}$`));
     await expect(netWorth.getByText('Came in')).toBeVisible();
     // Income minus expense is Profit (GLOSSARY), and its share of Income the Profit margin.
     await expect(netWorth.getByText('Profit', { exact: true })).toBeVisible();
@@ -466,7 +385,7 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
       page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
     ).toBeVisible();
     await page.getByRole('link', { name: 'Back to Analytics' }).click();
-    await expect(page).toHaveURL(/\/analytics\?span=rolling-12-months$/);
+    await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
   }
   await amountOf(2).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
@@ -475,8 +394,8 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   await expect(drilled.getByText(grocery)).toBeVisible();
   await expect(drilled.getByText(description)).toHaveCount(0);
 
-  // Net worth stays today's whatever the Span, and opens the Accounts as of today.
-  await page.goto('/analytics?span=this-year-and-last-4');
+  // Net worth stays today's whatever the Period, and opens the Accounts as of today.
+  await page.goto('/analytics?period=this-year-and-last-4');
   await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
   await expect(tiles[1]!.getByText('This year and last 4', { exact: true })).toBeVisible();
   await amountOf(0).click();
@@ -488,8 +407,8 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
 }) => {
   const suffix = Date.now();
   const { description } = await seedSalary(suffix);
-  // The day before Rolling 12 months starts: the last day of its Comparison span.
-  const beforeSpan = addDays(ROLLING_START, -1);
+  // The day before Rolling 12 months starts: the last day of its Comparison period.
+  const beforePeriod = addDays(ROLLING_START, -1);
   const earlier = `Analytics earlier groceries ${suffix}`;
   await withServices(async (ctx) => {
     // On the salary's own Account, lowering its balance: a new or larger Account would crowd
@@ -504,7 +423,7 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
     const groceries = await createCategory(ctx, { groupId: group.id, name: 'Groceries' });
     const transaction = await createManualTransaction(ctx, {
       accountId: account.id,
-      bookingDate: beforeSpan,
+      bookingDate: beforePeriod,
       amountMinor: -1234_00,
       description: earlier,
     });
@@ -518,10 +437,10 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
   for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
     await expect(changeOf(name)).toBeVisible();
   }
-  // The 365 days before the Span, which end last year.
+  // The 365 days before the Period, which end last year.
   await expect(changeOf('Income')).toHaveAccessibleName(
     new RegExp(
-      `^(Up|Down|Unchanged) .*vs \\d+ \\w+( \\d{4})? – \\d+ \\w+ ${beforeSpan.slice(0, 4)}`,
+      `^(Up|Down|Unchanged) .*vs \\d+ \\w+( \\d{4})? – \\d+ \\w+ ${beforePeriod.slice(0, 4)}`,
     ),
   );
 
@@ -532,7 +451,7 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
   await expect(table.getByText(description)).toBeVisible();
   await expect(table.getByText(earlier)).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?span=rolling-12-months$/);
+  await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
 
   const lastMonthEnd = new Date(Date.UTC(Number(YEAR), Number(MONTH) - 1, 0))
     .toISOString()
@@ -562,7 +481,7 @@ test('each Key figure carries a sparkline, hidden from assistive technology, tha
       const sparkline = tile.locator('[data-sparkline]');
       await expect(sparkline).toBeVisible();
       await expect(sparkline).toHaveAttribute('aria-hidden', 'true');
-      // The current period is partial: a dashed last segment to a hollow dot.
+      // The current interval is partial: a dashed last segment to a hollow dot.
       await expect(sparkline.locator('path[stroke-dasharray]')).toHaveCount(1);
       await expect(sparkline.locator('span.bg-surface')).toHaveCount(1);
       // Inside its tile, dot and line included, and the tile not overflowing either.
@@ -584,12 +503,12 @@ test('each Key figure carries a sparkline, hidden from assistive technology, tha
   expect(tree).not.toMatch(/img|graphics|svg/i);
 });
 
-test('Categories per period lists each Category beside its group subtotal, and both open their Drill-down', async ({
+test('Categories per interval lists each Category beside its group subtotal, and both open their Drill-down', async ({
   page,
 }) => {
   const suffix = Date.now();
   const { description } = await seedSalary(suffix);
-  const name = 'Categories per period';
+  const name = 'Categories per interval';
 
   await page.goto('/analytics');
   const group = heatmapRow(page, name, `Pay ${suffix}`);
@@ -606,7 +525,7 @@ test('Categories per period lists each Category beside its group subtotal, and b
     page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?span=rolling-12-months$/);
+  await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
 
   // So does the Category's Total, the row's last figure.
   await category.getByRole('link').last().click();
@@ -615,7 +534,7 @@ test('Categories per period lists each Category beside its group subtotal, and b
   ).toBeVisible();
 });
 
-test('Recent transactions and Account balances stay the same whatever the Span and open their pages', async ({
+test('Recent transactions and Account balances stay the same whatever the Period and open their pages', async ({
   page,
 }) => {
   const { description, account } = await seedSalary(Date.now());
@@ -624,8 +543,8 @@ test('Recent transactions and Account balances stay the same whatever the Span a
   // The opening 1'000.00 and today's salary of 4'321.00.
   const balance = balances.getByRole('link', { name: new RegExp(`^${account}.*5\\D?321`) });
 
-  for (const span of ['rolling-30-days', 'this-year-and-last-1', 'this-year-and-last-4']) {
-    await page.goto(`/analytics?span=${span}`);
+  for (const period of ['rolling-30-days', 'this-year-and-last-1', 'this-year-and-last-4']) {
+    await page.goto(`/analytics?period=${period}`);
     await expect(recent.getByRole('link', { name: new RegExp(description) })).toBeVisible();
     await expect(balance).toBeVisible();
   }
@@ -638,43 +557,6 @@ test('Recent transactions and Account balances stay the same whatever the Span a
   await expect(page).toHaveURL(/\/accounts\/[0-9a-f-]{36}/);
 });
 
-/**
- * Purchases booked today in three Categories, so the section is a ranking (as a stacked bar
- * Widget's card is from three series on), the first large enough to lead it in a shared DB.
- */
-async function seedPurchase(suffix: number): Promise<{ description: string; group: string }> {
-  const description = `Analytics purchase ${suffix}`;
-  const groupName = `Spend ${suffix}`;
-  await withServices(async (ctx) => {
-    const bank = await createBank(ctx, { name: `Spending bank ${suffix}` });
-    const account = await createAccount(ctx, {
-      bankId: bank.id,
-      kind: 'current',
-      importFormat: null,
-      name: `Spending account ${suffix}`,
-      currency: 'CHF',
-      openingBalanceMinor: 0,
-      openingDate: '2021-01-01',
-    });
-    const group = await createCategoryGroup(ctx, { name: groupName, type: 'expense' });
-    for (const [name, amountMinor, label] of [
-      ['Furniture', -987_654_32, description],
-      ['Lamps', -300_00, `${description} lamp`],
-      ['Rugs', -200_00, `${description} rug`],
-    ] as const) {
-      const category = await createCategory(ctx, { groupId: group.id, name });
-      const transaction = await createManualTransaction(ctx, {
-        accountId: account.id,
-        bookingDate: swissToday(),
-        amountMinor,
-        description: label,
-      });
-      await editClassification(ctx, transaction.id, { categoryId: category.id });
-    }
-  });
-  return { description, group: groupName };
-}
-
 test('Spending by Category ranks the largest Categories and a Category opens its Drill-down', async ({
   page,
 }) => {
@@ -682,7 +564,7 @@ test('Spending by Category ranks the largest Categories and a Category opens its
   const { description, group } = await seedPurchase(suffix);
   await seedOldPurchase(suffix, `Spending account ${suffix}`);
 
-  await page.goto('/analytics?span=this-year-and-last-1');
+  await page.goto('/analytics?period=this-year-and-last-1');
   const section = region(page, 'Spending by Category');
   await expect(section.getByText('Furniture leads')).toBeVisible();
   await expect(section.getByText(/^Heaviest quarter: /)).toBeVisible();
@@ -696,10 +578,10 @@ test('Spending by Category ranks the largest Categories and a Category opens its
       .getByText(description, { exact: true }),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?span=this-year-and-last-1$/);
+  await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-1$/);
 });
 
-test('Net cash flow has a bar per period, the current one partial, each opening its Drill-down', async ({
+test('Net cash flow has a bar per interval, the current one partial, each opening its Drill-down', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -709,14 +591,14 @@ test('Net cash flow has a bar per period, the current one partial, each opening 
   const partial = (label: string) =>
     flow.getByRole('link', { name: new RegExp(`^${label} \\(partial\\): `) });
 
-  await page.goto('/analytics?span=this-year-and-last-1');
+  await page.goto('/analytics?period=this-year-and-last-1');
   await expect(partial(formatPeriod(QUARTER))).toBeVisible();
   // Its best and weakest quarters, or heaviest and lightest when every quarter loses money.
   await expect(flow.getByText(/^(Weakest|Lightest) quarter: /)).toBeVisible();
 
-  await page.goto('/analytics?span=this-year-and-last-4');
+  await page.goto('/analytics?period=this-year-and-last-4');
   await expect(partial(YEAR)).toBeVisible();
-  // At most one bar per period: the Span's 5 years.
+  // At most one bar per interval: the Period's 5 years.
   expect(await flow.getByRole('link', { name: /^\d{4}( \(partial\))?: / }).count()).toBe(5);
 
   // On a wide screen it sits beside Account balances, on the left.
@@ -738,7 +620,7 @@ test('Net cash flow has a bar per period, the current one partial, each opening 
     page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(/\/analytics\?span=rolling-12-months$/);
+  await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
 });
 
 test('on a wide screen Net worth, Spending Insights and Recent transactions share the first row', async ({
@@ -798,7 +680,7 @@ async function seedUnconverted(suffix: number): Promise<void> {
 
 test('every section with figures left out for want of an FX rate says so', async ({ page }) => {
   const suffix = Date.now();
-  // Converted figures beside the left-out ones, over a Span reaching back to its start.
+  // Converted figures beside the left-out ones, over a Period reaching back to its start.
   await seedSalary(suffix);
   await seedOldPurchase(suffix);
   await seedUnconverted(suffix);
@@ -818,7 +700,7 @@ test('every section with figures left out for want of an FX rate says so', async
     'Account balances in CHF',
     'Spending by Category',
     'Income vs. expense',
-    'Categories per period',
+    'Categories per interval',
   ]) {
     await expect(region(page, name).getByText(/left out: no FX rate yet\./)).toBeVisible();
   }

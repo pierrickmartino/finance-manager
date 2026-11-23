@@ -8,7 +8,7 @@ import { analyticsCard, type AnalyticsCard } from './figures';
  * Analytics' Account balances in CHF, drawn as the Dashboard's card for the starter balances
  * Widget: each Account's balance today, converted to the Base currency at today's FX rate (an
  * archived Account only while it still holds money), each opening its Account. It doesn't
- * depend on the Span. Its `unconvertedCount` counts Accounts left out of the total for
+ * depend on the Period. Its `unconvertedCount` counts Accounts left out of the total for
  * want of an FX rate.
  */
 
