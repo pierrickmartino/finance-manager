@@ -159,21 +159,22 @@ describe('the Card Periods in the URL', () => {
   it('reserves one parameter per pinnable section, named after it', () => {
     expect(PINNABLE_SECTIONS).toEqual([
       'net-worth',
-      'net-cash-flow',
+      'income-vs-expense',
       'spending-by-category',
       'profit-and-loss',
+      'net-cash-flow',
       'profit-per-interval',
       'categories-per-interval',
     ]);
   });
 
-  it('drops a pin on income-vs-expense while no section goes by that id', () => {
+  it('pins Income vs. expense under income-vs-expense, apart from Profit per interval', () => {
     expect(
       cardPeriodsFromParams({
         'income-vs-expense': 'year-to-date',
         'profit-per-interval': 'rolling-90-days',
       }),
-    ).toEqual({ 'profit-per-interval': 'rolling-90-days' });
+    ).toEqual({ 'income-vs-expense': 'year-to-date', 'profit-per-interval': 'rolling-90-days' });
   });
 
   it('round-trips the page Period and its pins through an Analytics link', () => {

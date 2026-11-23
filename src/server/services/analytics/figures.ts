@@ -64,6 +64,11 @@ export interface AnalyticsCardSpec {
   visualisation: Visualisation;
   /** The data's row axis, as a Widget query's (a time axis makes balances Net worth). */
   rows: WidgetQuery['rows'];
+  /**
+   * The data's column axis, as a Widget query's: by Category group type, a line's placeholder
+   * hints at a flow's two areas. None by default.
+   */
+  columns?: WidgetQuery['columns'];
   data: ChartSource;
   status: SectionStatus;
 }
@@ -75,7 +80,7 @@ export function analyticsCard(spec: AnalyticsCardSpec): AnalyticsCard {
     name: spec.name,
     source: spec.source ?? 'query',
     visualisation: spec.visualisation,
-    query: { rows: spec.rows },
+    query: { rows: spec.rows, columns: spec.columns ?? null },
     data: spec.data,
     error: null,
     ...spec.status,

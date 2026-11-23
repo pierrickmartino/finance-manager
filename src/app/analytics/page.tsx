@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
+import { rowsHeight } from '@/lib/reporting/board';
+import { cardFrame } from '@/lib/reporting/card';
 import {
   analyticsHref,
   cardPeriodsFromParams,
@@ -15,6 +17,8 @@ import { swissToday } from '@/server/services/fx/dates';
 import {
   ACCOUNT_BALANCES,
   CATEGORIES_PER_INTERVAL,
+  INCOME_VS_EXPENSE,
+  INCOME_VS_EXPENSE_WIDGET,
   KEY_FIGURES,
   loadAnalytics,
   NET_CASH_FLOW,
@@ -32,17 +36,21 @@ import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transac
 import { StreamedSection } from './section';
 import { PeriodControl } from './period-control';
 import { SpendingInsightsSection } from './spending-insights';
+import { WidgetCardPlaceholder } from '../dashboards/(dashboard)/[id]/overview/card-placeholder';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
+
+/** Income vs. expense before its figures arrive: its two areas, as tall as a new chart Card. */
+const INCOME_VS_EXPENSE_FRAME = cardFrame(INCOME_VS_EXPENSE_WIDGET);
 
 /**
  * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Period in the URL: a
  * preset's `period`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
  * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
  * its nearest Period. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
- * parameter each beside the Period (`net-worth=<slug>`, `net-cash-flow=<slug>`,
- * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `profit-per-interval=<slug>`,
- * `categories-per-interval=<slug>`); a bare visit has none, and a former link carries none. The
+ * parameter each beside the Period (`net-worth=<slug>`, `income-vs-expense=<slug>`,
+ * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `net-cash-flow=<slug>`,
+ * `profit-per-interval=<slug>`, `categories-per-interval=<slug>`); a bare visit has none, and a former link carries none. The
  * shell and the Period control render at once; each section streams in behind its own placeholder and error boundary
  * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
  *
@@ -113,14 +121,25 @@ export default async function AnalyticsPage({
             <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
           </StreamedSection>
         </div>
-        {/* Net cash flow, Account balances and Spending by Category side by side on wide screens,
-            one after the other below. */}
+        {/* Income vs. expense, Account balances and Spending by Category side by side on wide
+            screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
+          <StreamedSection
+            name={INCOME_VS_EXPENSE}
+            retryHref={retryHref}
+            isCard
+            placeholder={
+              <WidgetCardPlaceholder
+                name={INCOME_VS_EXPENSE}
+                shape={INCOME_VS_EXPENSE_FRAME.placeholder}
+                height={rowsHeight(INCOME_VS_EXPENSE_FRAME.sizes.initial.h)}
+              />
+            }
+          >
             <CardSection
-              card={sections.netCashFlow}
-              section="net-cash-flow"
-              empty="no Transactions"
+              card={sections.incomeVsExpense}
+              section="income-vs-expense"
+              empty="no income or expense"
             />
           </StreamedSection>
           <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref} isCard>
@@ -134,10 +153,22 @@ export default async function AnalyticsPage({
             />
           </StreamedSection>
         </div>
-        {/* The whole Period's statement, then its intervals. */}
-        <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
-          <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
-        </StreamedSection>
+        {/* The whole Period's statement beside its Net cash flow on wide screens, then its
+            intervals. */}
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="grid min-w-0 lg:col-span-2">
+            <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
+              <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
+            </StreamedSection>
+          </div>
+          <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
+            <CardSection
+              card={sections.netCashFlow}
+              section="net-cash-flow"
+              empty="no Transactions"
+            />
+          </StreamedSection>
+        </div>
         <StreamedSection name={PROFIT_PER_INTERVAL} retryHref={retryHref} isCard>
           <CardSection
             card={sections.profitPerInterval}
