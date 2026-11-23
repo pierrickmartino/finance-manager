@@ -7,6 +7,7 @@ import { useFormatter } from '@/components/formatter-provider';
 import { WIDGET_CARD_CLASS } from '@/components/surface';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
+import { CARD_LEAD_SIZE_CLASS } from './card-layout';
 import { HeatmapGrid } from './heatmap-grid';
 import { DotMatrix, EmptyChart, MonthBars, TickList } from './marks';
 import { NetWorthLine } from './net-worth-mark';
@@ -74,8 +75,10 @@ export function WidgetCard({ card, className = '', toolbar }: WidgetCardProps) {
         {reading.lead && (
           <>
             <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>
-            {/* A size down on a narrow Card (Analytics' thirds, small board cells), full from @md. */}
-            <p className="font-display text-xl tracking-tight tabular-nums @md:text-3xl">
+            <p
+              data-testid="card-lead"
+              className={`font-display tracking-tight tabular-nums ${CARD_LEAD_SIZE_CLASS}`}
+            >
               <FigureLink href={reading.lead.href}>{reading.lead.detail}</FigureLink>
             </p>
           </>

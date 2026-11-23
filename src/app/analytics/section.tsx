@@ -1,10 +1,8 @@
 import { Suspense, type ReactNode } from 'react';
-import { PLACEHOLDER_CLASS, SECTION_TITLE_CLASS, TILE_CLASS } from '@/components/surface';
+import { PLACEHOLDER_CLASS, SECTION_TITLE_CLASS } from '@/components/surface';
 import { plural } from '@/lib/reporting/drill-summary';
 import { SectionErrorBoundary } from './section-error-boundary';
-
-/** Every section's card: a tile that never widens the page (wide content scrolls inside). */
-const SECTION_CLASS = `${TILE_CLASS} flex min-w-0 flex-col gap-4`;
+import { SECTION_CLASS, sectionFrameClass } from './section-frame';
 
 /** What a section's figures leave out for want of an FX rate: Transactions, or Accounts. */
 export interface Unconverted {
@@ -42,10 +40,20 @@ export function SectionEmpty({ children }: { children: ReactNode }) {
   return <p className="py-8 text-sm text-muted">{children}</p>;
 }
 
+interface SectionPlaceholderProps {
+  name: string;
+  className?: string;
+  isCard: boolean;
+}
+
 /** A section while its figures load: its title over a quiet block. */
-function SectionPlaceholder({ name, className = '' }: { name: string; className?: string }) {
+function SectionPlaceholder({ name, className = '', isCard }: SectionPlaceholderProps) {
   return (
-    <section aria-label={name} aria-busy="true" className={`${SECTION_CLASS} ${className}`}>
+    <section
+      aria-label={name}
+      aria-busy="true"
+      className={`${sectionFrameClass(isCard)} ${className}`}
+    >
       <h2 className={SECTION_TITLE_CLASS}>{name}</h2>
       <span className="sr-only">Loading</span>
       <div className={`${PLACEHOLDER_CLASS} h-48`} />
@@ -61,6 +69,11 @@ interface StreamedSectionProps {
   className?: string;
   /** Stands in while the figures load; by default the section's title over a quiet block. */
   placeholder?: ReactNode;
+  /**
+   * The section is drawn as a Widget's Card (a `CardSection`): its placeholder and error
+   * boundary are Card frames too (`WIDGET_CARD_CLASS`), not plain tiles.
+   */
+  isCard?: boolean;
   /** An async component awaiting the section's figures, rendering a `SectionCard`. */
   children: ReactNode;
 }
@@ -74,11 +87,16 @@ export function StreamedSection({
   retryHref,
   className,
   placeholder,
+  isCard = false,
   children,
 }: StreamedSectionProps) {
   return (
-    <SectionErrorBoundary name={name} retryHref={retryHref}>
-      <Suspense fallback={placeholder ?? <SectionPlaceholder name={name} className={className} />}>
+    <SectionErrorBoundary name={name} retryHref={retryHref} isCard={isCard}>
+      <Suspense
+        fallback={
+          placeholder ?? <SectionPlaceholder name={name} className={className} isCard={isCard} />
+        }
+      >
         {children}
       </Suspense>
     </SectionErrorBoundary>

@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { useId, useState } from 'react';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { ringArcPath, ringSlices, type RingSlice } from '@/lib/reporting/ring';
+import { RING, RING_LAYOUT_CLASS, RING_LIST_CLASS } from './card-layout';
 
 /**
  * A Donut Widget's mark on its card (docs/design-system.md, "Charts"): a ring of its parts in
- * the ramp (sky blue through violet), the total in the hole, and beside it a list of every part with its amount
- * and share. Pointing at a slice or a row, or focusing a row, shows that part in the hole.
+ * the ramp (sky blue through violet), the total in the hole, and below or beside it (by the
+ * Card's width) a list of every part with its amount and share. Pointing at a slice or a row,
+ * or focusing a row, shows that part in the hole.
  */
 
-const RING = { size: 160, outer: 78, inner: 52 };
 /** Radians left between neighbouring slices. */
 const SLICE_GAP = 0.012;
 /** At or above this share a part is the whole ring, drawn as a circle. */
@@ -76,8 +77,12 @@ export function DonutRing({ data, money }: { data: ChartSource; money: Money }) 
     setActive((current) => (isPointing ? index : current === index ? null : current));
 
   return (
-    <figure className="flex flex-col items-center gap-6 @md:flex-row">
-      <div className="relative mx-auto shrink-0" style={{ width: RING.size, height: RING.size }}>
+    <figure className={RING_LAYOUT_CLASS}>
+      <div
+        data-testid="ring"
+        className="relative mx-auto shrink-0"
+        style={{ width: RING.size, height: RING.size }}
+      >
         <svg viewBox={`0 0 ${RING.size} ${RING.size}`} className="h-full w-full" aria-hidden>
           {/* The hole: a whole-ring circle would otherwise fill it. */}
           <mask id={holeId}>
@@ -118,7 +123,7 @@ export function DonutRing({ data, money }: { data: ChartSource; money: Money }) 
           )}
         </div>
       </div>
-      <ul className="flex w-full flex-col @md:w-auto @md:flex-1">
+      <ul data-testid="ring-list" className={RING_LIST_CLASS}>
         {slices.map((slice, i) => (
           <li
             key={slice.label}

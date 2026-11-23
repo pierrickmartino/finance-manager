@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { PLACEHOLDER_CLASS, TILE_CLASS, WIDGET_CARD_CLASS } from '@/components/surface';
 import type { PlaceholderShape } from '@/lib/reporting/card';
+import { CARD_LEAD_SIZE_CLASS, RING, RING_LAYOUT_CLASS, RING_LIST_CLASS } from './card-layout';
 
 /** The quiet mark standing in for a card's chart, shaped like the one it will draw. */
 function ShapeMark({ shape }: { shape: PlaceholderShape }) {
@@ -8,19 +9,24 @@ function ShapeMark({ shape }: { shape: PlaceholderShape }) {
     case 'number':
       return <div className={`${PLACEHOLDER_CLASS} h-12 w-2/5`} />;
     case 'ring':
-      // The ring's size, and its list below it under @md and beside it from @md, as on the Card.
+      // The Card's ring and list, laid out as on the Card (card-layout.ts).
       return (
-        <div className="flex flex-col items-center gap-6 @md:flex-row">
+        <div className={RING_LAYOUT_CLASS}>
           <div
-            className={`${PLACEHOLDER_CLASS} grid size-40 shrink-0 place-items-center rounded-full`}
+            data-testid="ring"
+            className={`${PLACEHOLDER_CLASS} grid shrink-0 place-items-center rounded-full`}
+            style={{ width: RING.size, height: RING.size }}
           >
-            <div className="size-26 rounded-full bg-surface" />
+            <div
+              className="rounded-full bg-surface"
+              style={{ width: RING.inner * 2, height: RING.inner * 2 }}
+            />
           </div>
-          <TickRows count={3} className="w-full @md:w-auto" />
+          <TickRows count={3} className={`${RING_LIST_CLASS} gap-3`} testId="ring-list" />
         </div>
       );
     case 'ticks':
-      return <TickRows count={4} />;
+      return <TickRows count={4} className="flex flex-1 flex-col gap-3" />;
     case 'grid':
       return (
         <div className="grid grid-cols-6 gap-1">
@@ -44,9 +50,16 @@ function ShapeMark({ shape }: { shape: PlaceholderShape }) {
   }
 }
 
-function TickRows({ count, className = '' }: { count: number; className?: string }) {
+interface TickRowsProps {
+  count: number;
+  /** How the rows lay out where they stand (alone, or as a ring's list). */
+  className: string;
+  testId?: string;
+}
+
+function TickRows({ count, className, testId }: TickRowsProps) {
   return (
-    <div className={`flex flex-1 flex-col gap-3 ${className}`}>
+    <div className={className} data-testid={testId}>
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className={`${PLACEHOLDER_CLASS} h-4`} style={{ width: `${90 - i * 15}%` }} />
       ))}
@@ -76,10 +89,13 @@ export function WidgetCardPlaceholder({ name, shape, height }: WidgetCardPlaceho
     >
       <div>
         <h2 className="font-medium">{name}</h2>
-        {/* The headline and the lead figure, each a line of the Card's own height: the lead's
-            line a size down under @md, full from @md, as the Card's lead (widget-card.tsx). */}
+        {/* The headline and the lead figure, each a line of the Card's own height. The lead's
+            block takes the lead's size, so its line (`lh`) is the lead figure's line. */}
         <div className={`${PLACEHOLDER_CLASS} mt-1.5 mb-0.5 h-4 w-3/5`} />
-        <div className={`${PLACEHOLDER_CLASS} my-1 h-5 w-2/5 @md:h-7`} />
+        <div
+          data-testid="card-lead"
+          className={`${PLACEHOLDER_CLASS} ${CARD_LEAD_SIZE_CLASS} my-[0.15lh] h-[0.7lh] w-2/5`}
+        />
         <span className="sr-only">Loading</span>
       </div>
       <ShapeMark shape={shape} />
