@@ -720,8 +720,13 @@ test('Net cash flow has a bar per period, the current one partial, each opening 
   // On a wide screen it sits beside Account balances, on the left.
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
+  // Both stream in after the page: measure them once drawn.
+  const balances = region(page, 'Account balances in CHF');
+  await expect(partial(CURRENT_MONTH)).toBeVisible();
+  await expect(balances).toBeVisible();
+  await expect(balances).not.toHaveAttribute('aria-busy', 'true');
   const flowBox = (await flow.boundingBox())!;
-  const balancesBox = (await region(page, 'Account balances in CHF').boundingBox())!;
+  const balancesBox = (await balances.boundingBox())!;
   expect(flowBox.y).toBe(balancesBox.y);
   expect(flowBox.x + flowBox.width).toBeLessThan(balancesBox.x);
 
