@@ -1,5 +1,5 @@
 ---
-status: accepted (supersedes ADR-0015's Period view and Period window)
+status: accepted (supersedes ADR-0015's Period view and Period window; its "only control" partly superseded by ADR-0018: some Cards can be pinned to their own Span)
 ---
 
 # Analytics is read over a Span ending today
