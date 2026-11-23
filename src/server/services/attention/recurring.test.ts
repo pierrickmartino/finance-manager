@@ -87,6 +87,7 @@ describe('Recurring payment Attention items', () => {
         expectedDate: '2025-04-05',
         href: '/recurring-payments',
         tone: 'warning',
+        key: JSON.stringify(['missed', items[0]!.subject]),
         unread: true,
       },
     ]);
@@ -111,6 +112,7 @@ describe('Recurring payment Attention items', () => {
         lastCharge: expect.stringMatching(/^transaction:/),
         href: '/recurring-payments',
         tone: 'warning',
+        key: JSON.stringify(['price-increase', items[0]!.subject]),
         unread: true,
       },
     ]);

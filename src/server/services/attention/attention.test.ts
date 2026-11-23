@@ -98,6 +98,7 @@ describe('Attention items', () => {
         count: 3,
         href: '/unclassified',
         tone: 'warning',
+        key: '["unclassified",""]',
         unread: true,
       },
     ]);
@@ -210,6 +211,7 @@ describe('FX rates item', () => {
         latestRateDate: null,
         href: '/accounts',
         tone: 'warning',
+        key: '["fx-rates",""]',
         unread: true,
       },
     ]);
@@ -279,6 +281,19 @@ describe('FX rates item', () => {
 
       expect(await listAttentionItems(t.ctx, { today: TODAY })).toMatchObject([
         { kind: 'fx-rates', latestRateDate: '2025-11-10', unread: true },
+      ]);
+    });
+
+    it('marks the FX rates item unread when Stale again on an earlier newest rate', async () => {
+      await fetchRatesOn('2025-11-10');
+      setNow(`${TODAY}T12:00:00Z`);
+      await markAttentionSeen(t.ctx, { today: TODAY });
+
+      // The newest rates are gone (a database restored from an older backup, say).
+      await t.ctx.db.query(`DELETE FROM fx_rate WHERE date > '2025-11-08'`);
+
+      expect(await listAttentionItems(t.ctx, { today: TODAY })).toMatchObject([
+        { kind: 'fx-rates', latestRateDate: '2025-11-08', unread: true },
       ]);
     });
 

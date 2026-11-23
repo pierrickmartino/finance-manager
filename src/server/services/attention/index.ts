@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Db } from '@/server/db/client';
 import { withTransaction } from '@/server/db/transaction';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
@@ -38,8 +39,11 @@ export type ListedAttentionItem =
   | PriceIncreaseAttentionItem
   | UnclassifiedAttentionItem;
 
-/** An Attention item, and whether it is unread: new, or worse, since the bell was last opened. */
-export type AttentionItem = ListedAttentionItem & { unread: boolean };
+/**
+ * An Attention item, with its identity (kind plus subject) as one key, as the seen set holds it,
+ * and whether it is unread: new, or worse, since the bell was last opened.
+ */
+export type AttentionItem = ListedAttentionItem & { key: string; unread: boolean };
 
 /**
  * Every kind, in display order: FX rates, Completeness by severity, Missed, Price increase,
@@ -53,9 +57,9 @@ const KINDS: readonly AttentionKind<ListedAttentionItem>[] = [
   unclassifiedKind,
 ];
 
-const input = z.object({ today: z.iso.date() });
+const todaySchema = z.object({ today: z.iso.date() });
 
-/** The seen set's key for an item: its identity, kind plus subject. */
+/** An item's identity, kind plus subject, as one key: the seen set's and the bell's. */
 function identity(item: { kind: string; subject: string | null }): string {
   return JSON.stringify([item.kind, item.subject ?? '']);
 }
@@ -75,46 +79,70 @@ interface SeenRow {
   form: unknown;
 }
 
+/** The pool, or a transaction's client. */
+type Queryable = Pick<Db, 'query'>;
+
 /** The stored seen set, by identity. */
-async function loadSeen(ctx: ServiceContext): Promise<Map<string, SeenRow>> {
-  const result = await ctx.db.query<SeenRow>('SELECT kind, subject, form FROM attention_seen');
+async function loadSeen(db: Queryable): Promise<Map<string, SeenRow>> {
+  const result = await db.query<SeenRow>('SELECT kind, subject, form FROM attention_seen');
   return new Map(result.rows.map((row) => [identity(row), row]));
 }
 
-/**
- * Drops from the seen set the items that went away, so one that comes back is unread even if
- * the bell was not opened while it was gone. Writes only when something went away.
- */
-async function forgetGone(
-  ctx: ServiceContext,
+/** The identities in the seen set whose item is no longer current. */
+function goneKeys(
   seen: ReadonlyMap<string, SeenRow>,
   items: readonly FormedAttentionItem<ListedAttentionItem>[],
-): Promise<void> {
+): string[] {
   const current = new Set(items.map(({ item }) => identity(item)));
-  const gone = [...seen].filter(([key]) => !current.has(key)).map(([, row]) => row);
-  if (gone.length === 0) return;
-  await ctx.db.query(
-    `DELETE FROM attention_seen
-     WHERE (kind, subject) IN (SELECT * FROM unnest($1::text[], $2::text[]))`,
-    [gone.map((row) => row.kind), gone.map((row) => row.subject)],
-  );
+  return [...seen.keys()].filter((key) => !current.has(key));
+}
+
+/** Opening the bell and forgetting what went away both write the seen set: one at a time. */
+async function lockSeen(tx: Queryable): Promise<void> {
+  await tx.query('LOCK TABLE attention_seen IN SHARE ROW EXCLUSIVE MODE');
+}
+
+/**
+ * The seen set, less the items no longer current, which it forgets: one that comes back is
+ * unread even if the bell was not opened while it was gone (ADR-0019). It writes only when
+ * something went away, and then under the lock `markAttentionSeen` takes, reading the set again
+ * there, so it never undoes a bell opened meanwhile.
+ */
+async function seenForgettingGone(
+  ctx: ServiceContext,
+  items: readonly FormedAttentionItem<ListedAttentionItem>[],
+): Promise<ReadonlyMap<string, SeenRow>> {
+  const seen = await loadSeen(ctx.db);
+  if (goneKeys(seen, items).length === 0) return seen;
+  return withTransaction(ctx.db, async (tx) => {
+    await lockSeen(tx);
+    const locked = await loadSeen(tx);
+    const gone = goneKeys(locked, items).map((key) => locked.get(key)!);
+    await tx.query(
+      `DELETE FROM attention_seen
+       WHERE (kind, subject) IN (SELECT * FROM unnest($1::text[], $2::text[]))`,
+      [gone.map((row) => row.kind), gone.map((row) => row.subject)],
+    );
+    return new Map([...locked].filter(([, row]) => !gone.includes(row)));
+  });
 }
 
 /**
  * The current Attention items, in display order. An item is unread when its identity is not in
- * the seen set, or when its kind says it got worse since. `today` is passed in; the clock is
- * never read.
+ * the seen set, or when its kind says it got worse since. Items are worked out for `today`,
+ * except the FX rates' status, which reads the clock as the Accounts page's notice does.
  */
 export async function listAttentionItems(
   ctx: ServiceContext,
-  input_: { today: string },
+  input: { today: string },
 ): Promise<AttentionItem[]> {
-  const { today } = parseInput(input, input_);
-  const [items, seen] = await Promise.all([currentItems(ctx, today), loadSeen(ctx)]);
-  await forgetGone(ctx, seen, items);
+  const { today } = parseInput(todaySchema, input);
+  const items = await currentItems(ctx, today);
+  const seen = await seenForgettingGone(ctx, items);
   return items.map(({ item, isUnreadAgainst }) => {
-    const stored = seen.get(identity(item));
-    return { ...item, unread: stored === undefined || isUnreadAgainst(stored.form) };
+    const key = identity(item);
+    const stored = seen.get(key);
+    return { ...item, key, unread: stored === undefined || isUnreadAgainst(stored.form) };
   });
 }
 
@@ -124,13 +152,13 @@ export async function listAttentionItems(
  */
 export async function markAttentionSeen(
   ctx: ServiceContext,
-  input_: { today: string },
+  input: { today: string },
 ): Promise<void> {
-  const { today } = parseInput(input, input_);
+  const { today } = parseInput(todaySchema, input);
   const items = await currentItems(ctx, today);
   await withTransaction(ctx.db, async (tx) => {
-    // Two opens at once would both delete and then insert the same identities: one at a time.
-    await tx.query('LOCK TABLE attention_seen IN SHARE ROW EXCLUSIVE MODE');
+    // Two opens at once would both delete and then insert the same identities.
+    await lockSeen(tx);
     await tx.query('DELETE FROM attention_seen');
     await tx.query(
       `INSERT INTO attention_seen (kind, subject, form)

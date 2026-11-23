@@ -16,7 +16,8 @@ export interface FxRatesAttentionItem {
 }
 
 /**
- * Its form is the newest rate's date: Stale again on a later newest rate got worse. The status
+ * Its form is the newest rate's date: Stale on any other newest rate than the one seen is news,
+ * whether later (fetched, still too old) or earlier (rates lost) or none at all. The status
  * reads the clock, as the Accounts page's notice does, so the item always agrees with it.
  */
 export const fxRatesKind = attentionKind<FxRatesAttentionItem, string | null>({
@@ -36,5 +37,5 @@ export const fxRatesKind = attentionKind<FxRatesAttentionItem, string | null>({
   },
   form: (item) => item.latestRateDate,
   formSchema: z.iso.date().nullable(),
-  gotWorse: (now, seen) => now !== null && (seen === null || now > seen),
+  gotWorse: (now, seen) => now !== seen,
 });

@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { ServiceContext } from '../context';
 
 /** How strongly an item asks for attention; the bell draws it as a badge of that tone. */
-export type AttentionTone = 'warning' | 'info' | 'neutral';
+export type AttentionTone = 'warning';
 
 /** What every Attention item has, whatever its kind. */
 export interface AttentionItemBase {

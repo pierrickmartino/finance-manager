@@ -14,7 +14,8 @@ export interface CompletenessAttentionItem {
   dataEnd: string | null;
   /** As the Completeness check lists them: worst first, never empty. */
   problems: CompletenessProblem[];
-  href: `/accounts/${string}`;
+  /** Accounts for a mismatch alone, the Account for any other problem (story 15). */
+  href: '/accounts' | `/accounts/${string}`;
   tone: AttentionTone;
 }
 
@@ -93,6 +94,15 @@ function gotWorse(now: CompletenessForm, seen: CompletenessForm): boolean {
   );
 }
 
+/**
+ * Where the Account's problems are fixed: a mismatch on Accounts, beside the FX rates; Stale,
+ * never imported and Gaps on the Account itself, which wins when it has both.
+ */
+function hrefOf(accountId: string, problems: readonly CompletenessProblem[]) {
+  const isMismatchOnly = problems.every((problem) => problem.kind === 'mismatch');
+  return isMismatchOnly ? ('/accounts' as const) : (`/accounts/${accountId}` as const);
+}
+
 /** From the Completeness check itself, in its severity order; Accounts that pass give none. */
 export const completenessKind = attentionKind<CompletenessAttentionItem, CompletenessForm>({
   async list(ctx, today) {
@@ -106,7 +116,7 @@ export const completenessKind = attentionKind<CompletenessAttentionItem, Complet
         currency: entry.account.currency,
         dataEnd: entry.dataEnd,
         problems: entry.problems,
-        href: `/accounts/${entry.account.id}`,
+        href: hrefOf(entry.account.id, entry.problems),
         tone: 'warning',
       }));
   },

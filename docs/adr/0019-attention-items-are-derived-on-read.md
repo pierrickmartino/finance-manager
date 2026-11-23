@@ -16,3 +16,4 @@ The notifications bell in the top bar lists Attention items: Stale FX rates, Com
 - Every page render runs the Completeness check, Recurring payment recognition, the Unclassified count and the FX status. This runs streamed behind Suspense so pages never wait on it. Caching is left for when a measurement asks for it.
 - There is no per-item dismiss. A false-positive Recurring payment is still removed by its Dismissal.
 - Each kind of item defines what "got worse" means for it, so that it becomes unread again.
+- Listing the items also forgets, from what the bell last showed, any item that is no longer current. An item that goes away and comes back is unread, even if the bell was not opened while it was gone.

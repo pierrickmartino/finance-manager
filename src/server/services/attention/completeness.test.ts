@@ -89,6 +89,7 @@ describe('Completeness Attention items', () => {
         problems: [{ kind: 'gap', from: '2025-09-01', to: '2025-09-01' }, { kind: 'stale' }],
         href: `/accounts/${failing.id}`,
         tone: 'warning',
+        key: JSON.stringify(['completeness', failing.id]),
         unread: true,
       },
     ]);
@@ -99,6 +100,25 @@ describe('Completeness Attention items', () => {
 
     expect(await completenessItems()).toMatchObject([
       { subject: account.id, dataEnd: null, problems: [{ kind: 'never_imported' }] },
+    ]);
+  });
+
+  it('links an Account whose only problem is a mismatch to Accounts, and to the Account once it has another', async () => {
+    const account = await bcgeAccount();
+    await importFile(account, fixture(BCGE_OCTOBER));
+    await createManualTransaction(t.ctx, {
+      accountId: account.id,
+      bookingDate: '2025-10-20',
+      amountMinor: -450,
+      description: 'Coffee',
+    });
+
+    expect(await completenessItems()).toMatchObject([
+      { problems: [{ kind: 'mismatch' }], href: '/accounts' },
+    ]);
+    // Weeks later the Account is Stale as well: fixed on the Account.
+    expect(await completenessItems('2025-12-31')).toMatchObject([
+      { problems: [{ kind: 'mismatch' }, { kind: 'stale' }], href: `/accounts/${account.id}` },
     ]);
   });
 
