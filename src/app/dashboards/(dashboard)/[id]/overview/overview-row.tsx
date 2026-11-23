@@ -273,7 +273,7 @@ function SpendingChart({ months, period, money }: SpendingChartProps) {
 }
 
 /**
- * How the latest full month compares, in the ramp's navy: one sentence, then each full month's
+ * How the latest full month compares, on a deep step of the ramp: one sentence, then each full month's
  * spending against the average. As tall as Recent activity (both span the overview row's two
  * rows from `lg` up).
  */
@@ -314,7 +314,7 @@ export function InsightCard({
       {flow.latestHref && (
         <Link
           href={flow.latestHref}
-          className="mt-6 self-start rounded-lg bg-on-ramp px-5 py-2.5 text-sm font-medium text-ramp-2 shadow-lg hover:bg-on-ramp/90"
+          className="mt-6 self-start rounded-lg bg-on-ramp px-5 py-2.5 text-sm font-medium text-paper shadow-lg hover:bg-on-ramp/90"
         >
           See the Transactions
         </Link>
@@ -324,8 +324,8 @@ export function InsightCard({
 }
 
 /**
- * The latest Transactions, newest first: the largest of them in the spotlight, in the ramp's
- * navy, then the rest on a timeline with their Category and how long ago they were booked.
+ * The latest Transactions, newest first: the largest of them in the spotlight, on a deep step
+ * of the ramp, then the rest on a timeline with their Category and how long ago they were booked.
  * Each opens its page.
  */
 export function RecentActivityCard({
@@ -368,7 +368,7 @@ function RecentActivityList({ recent }: { recent: RecentActivity[] }) {
     <>
       <Link
         href={`/transactions/${lit.spotlit.id}`}
-        className="mt-3 block rounded-2xl bg-ramp-1 p-4 text-on-ramp hover:bg-ramp-2"
+        className="mt-3 block rounded-2xl bg-spotlight p-4 text-on-ramp hover:bg-spotlight-strong"
       >
         <span className="block text-xs text-on-ramp/75">Largest lately · {when(lit.spotlit)}</span>
         <span className="mt-1 block font-display text-3xl tracking-tight tabular-nums">

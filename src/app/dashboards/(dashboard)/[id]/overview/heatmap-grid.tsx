@@ -5,7 +5,9 @@ import { useFormatter } from '@/components/formatter-provider';
 import type { ChartSource, RowTree } from '@/lib/reporting/chart-data';
 import {
   compactValue,
+  HEAT_HUE,
   HEAT_LEVELS,
+  type HeatText,
   toHeatmap,
   toTreeHeatmap,
   type HeatmapCell,
@@ -16,7 +18,7 @@ import {
 
 /**
  * A table Widget's card (docs/design-system.md, "Charts"): rows × columns as cells shaded in six
- * steps of `ramp-3`, each a link to its Transactions. Rows that form a tree (Analytics'
+ * steps of `HEAT_HUE`, each a link to its Transactions. Rows that form a tree (Analytics'
  * Categories per period) are drawn as one: a heading per type, each group a band of plain
  * subtotals, its Categories indented beneath it and shaded within their type.
  */
@@ -37,10 +39,17 @@ function useText(data: ChartSource, isSigned: boolean): Text {
   };
 }
 
-const shade = (mix: number) =>
-  `color-mix(in srgb, var(--color-ramp-3) ${mix}%, var(--color-surface))`;
+/** `HEAT_HUE` as a CSS variable, spelt out so the stylesheet keeps the token. */
+const HUE_VAR: Record<typeof HEAT_HUE, string> = { 'ramp-3': 'var(--color-ramp-3)' };
 
-const PARTIAL_OUTLINE = 'outline-2 -outline-offset-2 outline-ramp-1 outline-dashed';
+const shade = (mix: number) =>
+  `color-mix(in srgb, ${HUE_VAR[HEAT_HUE]} ${mix}%, var(--color-surface))`;
+
+/** A level's number: light on the quiet shades, navy on the brightest (HEAT_LEVELS). */
+const TEXT_CLASS: Record<HeatText, string> = { ink: 'text-ink', paper: 'text-paper' };
+
+/** The running period, outlined just outside its cells, on the card (HEAT_PARTIAL_OUTLINE). */
+const PARTIAL_OUTLINE = 'outline-2 outline-offset-0 outline-ramp-1 outline-dashed';
 
 function ColumnHeads({ columns, hasTotal }: { columns: HeatmapColumn[]; hasTotal: boolean }) {
   return (
@@ -85,7 +94,7 @@ function HeatCell({ cell, column, label, text }: CellProps) {
         href={cell.href}
         aria-label={`${label}, ${column.fullLabel}: ${text.full(cell.value)}`}
         title={text.full(cell.value)}
-        className={`block min-w-12 rounded-md px-1 py-2 text-center tabular-nums hover:ring-2 hover:ring-accent ${level.isDark ? 'text-on-ramp' : 'text-ink'} ${column.isPartial ? PARTIAL_OUTLINE : ''}`}
+        className={`block min-w-12 rounded-md px-1 py-2 text-center tabular-nums hover:ring-2 hover:ring-accent ${TEXT_CLASS[level.text]} ${column.isPartial ? PARTIAL_OUTLINE : ''}`}
         style={{ backgroundColor: shade(level.mix) }}
       >
         {text.compact(cell.value)}
@@ -99,7 +108,7 @@ function RowTotal({ row, text, className }: { row: HeatmapRow; text: Text; class
   return (
     <td className={`pl-2 text-right whitespace-nowrap tabular-nums ${className}`}>
       {row.total === null ? (
-        <span className="text-faint">—</span>
+        <span className="text-muted">—</span>
       ) : (
         <Link href={row.totalHref} className="hover:underline">
           {text.full(row.total)}
@@ -168,7 +177,7 @@ function RankedHeatmapGrid({ data }: { data: ChartSource }) {
       </table>
       <figcaption className="mt-2 flex items-center gap-2 text-xs text-muted">
         <HeatScale />
-        Darker is larger{partialNote(map.columns)}
+        Brighter is larger{partialNote(map.columns)}
       </figcaption>
     </figure>
   );
@@ -218,7 +227,7 @@ function TreeHeatmapGrid({ data, tree }: { data: ChartSource; tree: RowTree }) {
         <span className="ml-2">
           <HeatScale />
         </span>
-        Category: darker is larger within its type{partialNote(map.columns)}
+        Category: brighter is larger within its type{partialNote(map.columns)}
       </figcaption>
     </figure>
   );
@@ -255,7 +264,7 @@ function GroupRows({ group, columns, hasTotal, text }: GroupRowsProps) {
               className={`rounded-md px-1 py-1.5 text-center font-semibold tabular-nums ${column.isPartial ? PARTIAL_OUTLINE : ''}`}
             >
               {cell === null ? (
-                <span className="text-faint">—</span>
+                <span className="text-muted">—</span>
               ) : (
                 <Link
                   href={cell.href}

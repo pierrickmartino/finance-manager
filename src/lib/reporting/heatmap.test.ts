@@ -100,14 +100,14 @@ describe('heatLevel', () => {
     expect(heatLevel(1)).toBe(HEAT_LEVELS.length - 1);
   });
 
-  it('puts light text only on the darkest levels', () => {
-    expect(HEAT_LEVELS.map((level) => level.isDark)).toEqual([
-      false,
-      false,
-      false,
-      false,
-      true,
-      true,
+  it('puts navy text only on the brightest level, light text on the rest', () => {
+    expect(HEAT_LEVELS.map((level) => level.text)).toEqual([
+      'ink',
+      'ink',
+      'ink',
+      'ink',
+      'ink',
+      'paper',
     ]);
   });
 });

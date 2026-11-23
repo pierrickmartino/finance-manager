@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { AA_NON_TEXT, AA_TEXT, contrastRatio, relativeLuminance } from './contrast';
+import { HEAT_HUE, HEAT_LEVELS, HEAT_PARTIAL_OUTLINE } from '@/lib/reporting/heatmap';
+import {
+  AA_NON_TEXT,
+  AA_TEXT,
+  composite,
+  contrastRatio,
+  mixSrgb,
+  relativeLuminance,
+} from './contrast';
 
 /*
  * The colour data itself (spec #239, ADR-0017): every token text pair passes AA. The values are
@@ -71,6 +79,59 @@ describe('buttons', () => {
   it('text on an ink fill (selected list items, the current Dashboard tab)', () => {
     expectPair('on-ink', 'ink');
   });
+});
+
+describe('the heatmap', () => {
+  HEAT_LEVELS.forEach((level, i) => {
+    it(`level ${i + 1}'s number passes AA on its shade (${level.mix}% of ${HEAT_HUE})`, () => {
+      const shade = mixSrgb(token(HEAT_HUE), token('surface'), level.mix / 100);
+      const ratio = contrastRatio(token(level.text), shade);
+      expect(ratio, `${level.text} on ${shade}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+        AA_TEXT,
+      );
+    });
+  });
+
+  // Drawn just outside the cell, so on the card or a group's subtotal band.
+  for (const background of ['surface', 'sunken']) {
+    it(`the running period's outline is visible on ${background}`, () =>
+      expectPair(HEAT_PARTIAL_OUTLINE, background, AA_NON_TEXT));
+  }
+
+  it('the shades step up from the card: the largest is the brightest', () => {
+    const luminances = HEAT_LEVELS.map((level) =>
+      relativeLuminance(mixSrgb(token(HEAT_HUE), token('surface'), level.mix / 100)),
+    );
+    expect(luminances).toEqual([...luminances].sort((a, b) => a - b));
+    expect(luminances[0]).toBeGreaterThan(relativeLuminance(token('surface')));
+  });
+});
+
+/** A `@utility` whose background is `color-mix(in srgb, var(--color-a) N%, var(--color-b))`. */
+function mixedUtility(name: string): string {
+  const match = new RegExp(
+    `@utility ${name} \\{\\s*background-color: color-mix\\(in srgb, var\\(--color-([\\w-]+)\\) (\\d+)%, var\\(--color-([\\w-]+)\\)\\);`,
+  ).exec(css);
+  if (!match) throw new Error(`No flat color-mix @utility ${name} in globals.css`);
+  const [, a, share, b] = match;
+  return mixSrgb(token(a!), token(b!), Number(share) / 100);
+}
+
+describe('white text on the deep steps of the ramp', () => {
+  const cases = [
+    ['bg-insight', 0.6], // the insight card's faintest words: its bars' labels
+    ['bg-spotlight', 0.75], // Recent activity's spotlight caption
+    ['bg-spotlight-strong', 0.75], // …on hover
+  ] as const;
+  for (const [utility, alpha] of cases) {
+    it(`on-ramp/${alpha * 100} on ${utility}`, () => {
+      const background = mixedUtility(utility);
+      const text = composite(`rgba(255, 255, 255, ${alpha})`, background);
+      expect(relativeLuminance(token('on-ramp'))).toBe(1);
+      const ratio = contrastRatio(text, background);
+      expect(ratio, `${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+  }
 });
 
 describe('the focus outline', () => {

@@ -61,9 +61,9 @@ export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-
 
 /**
  * A quiet block standing in for content still loading (a card's chart, a line of text): a
- * sunken fill that pulses gently, still under reduced motion. Decorative: mark its container busy.
+ * `rule` fill that pulses gently, still under reduced motion. Decorative: mark its container busy.
  */
-export const PLACEHOLDER_CLASS = 'rounded-md bg-sunken motion-safe:animate-pulse';
+export const PLACEHOLDER_CLASS = 'rounded-md bg-rule motion-safe:animate-pulse';
 
 const BADGE_BASE = 'rounded-md px-2 py-0.5 text-xs font-medium';
 /**

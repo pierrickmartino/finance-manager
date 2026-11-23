@@ -1,6 +1,9 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createAccount } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
+import { createCategory, createCategoryGroup } from '../src/server/services/categories';
+import { swissToday } from '../src/server/services/fx/dates';
+import { editClassification } from '../src/server/services/transactions';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
 import { SIGNED_OUT } from './support/auth';
 import { focusOutline, pageColours, textContrastFailures } from './support/contrast';
@@ -43,6 +46,61 @@ async function seedTransactions(): Promise<string> {
   });
 }
 
+/** The 10th of the month `back` months before this one, from the Swiss date. */
+function inMonthBefore(back: number): string {
+  const [year, month] = swissToday().split('-').map(Number) as [number, number];
+  const index = year * 12 + (month - 1) - back;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-10`;
+}
+
+/**
+ * Four months of classified income and spending, so Analytics draws every Card with words on
+ * its marks: the heatmap's shades, the insight card and Recent transactions' spotlight.
+ */
+async function seedFlow(): Promise<void> {
+  const suffix = Date.now();
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Flow bank ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: `Flow account ${suffix}`,
+      currency: 'CHF',
+      openingBalanceMinor: 0,
+      openingDate: '2021-01-01',
+    });
+    const income = await createCategoryGroup(ctx, { name: `In ${suffix}`, type: 'income' });
+    const living = await createCategoryGroup(ctx, { name: `Out ${suffix}`, type: 'expense' });
+    const salary = await createCategory(ctx, { groupId: income.id, name: 'Salary' });
+    const rent = await createCategory(ctx, { groupId: living.id, name: 'Rent' });
+    const food = await createCategory(ctx, { groupId: living.id, name: 'Food' });
+    for (const back of [0, 1, 2, 3]) {
+      for (const [amountMinor, category] of [
+        [5000_00, salary],
+        [-(1000_00 + back * 150_00), rent],
+        [-(120_00 + back * 90_00), food],
+      ] as const) {
+        const transaction = await createManualTransaction(ctx, {
+          accountId: account.id,
+          bookingDate: inMonthBefore(back),
+          amountMinor,
+          description: `Flow ${back} ${category.name}`,
+        });
+        await editClassification(ctx, transaction.id, { categoryId: category.id });
+      }
+    }
+  });
+}
+
+/** Analytics with every Card drawn, the ones with words on their marks among them. */
+async function openAnalytics(page: Page): Promise<void> {
+  await page.goto('/analytics');
+  await expect(page.getByRole('table', { name: 'Heatmap' }).first()).toBeVisible();
+  await expect(page.locator('section[aria-labelledby="overview-insight"]')).toBeVisible();
+  await expect(page.locator('section[aria-labelledby="overview-recent"] > a')).toBeVisible();
+}
+
 /** The Transactions list of a seeded Account, with a row ticked so the Bulk edit dock is open. */
 async function openListWithDock(page: Page): Promise<Locator> {
   const accountId = await seedTransactions();
@@ -57,21 +115,11 @@ async function openListWithDock(page: Page): Promise<Locator> {
 }
 
 const PAGES: { name: string; open: (page: Page) => Promise<unknown> }[] = [
-  { name: 'Analytics', open: (page) => page.goto('/analytics') },
+  { name: 'Analytics', open: openAnalytics },
   { name: 'a Dashboard', open: openHomeDashboard },
   { name: 'the Transactions list with the Bulk edit dock open', open: openListWithDock },
   { name: 'Settings', open: (page) => page.goto('/settings') },
 ];
-
-/**
- * The Dashboard Cards' marks that ticket #242 ("Cards read on dark") retunes for the dark page:
- * their text is not measured until then. Remove an entry once its Card passes.
- */
-const CARDS_RETUNED_BY_242: Record<string, string> = {
-  '[aria-label="Heatmap"]': 'heatmap levels are retuned for dark in #242',
-  'section[aria-labelledby="overview-insight"]': 'the insight card is retuned for dark in #242',
-  'section[aria-labelledby="overview-recent"] > a': 'the spotlight is retuned for dark in #242',
-};
 
 /** Waits until nothing is still loading or animating in, so colours are the settled ones. */
 async function settle(page: Page): Promise<void> {
@@ -79,6 +127,8 @@ async function settle(page: Page): Promise<void> {
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   await page.waitForFunction(() => document.getAnimations().length === 0);
 }
+
+test.beforeAll(seedFlow);
 
 for (const { name, open } of PAGES) {
   test(`${name} stays dark with a light system theme`, async ({ page }) => {
@@ -95,7 +145,7 @@ for (const { name, open } of PAGES) {
     await open(page);
     await settle(page);
 
-    const { failures, measured } = await textContrastFailures(page, CARDS_RETUNED_BY_242);
+    const { failures, measured } = await textContrastFailures(page);
 
     expect(measured).toBeGreaterThan(10);
     expect(failures).toEqual([]);

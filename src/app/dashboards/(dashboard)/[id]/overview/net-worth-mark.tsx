@@ -17,8 +17,9 @@ import type { AccountKind } from '@/server/services/accounts/input';
 
 /**
  * The Net worth card's mark (docs/design-system.md, "Charts"): a band per account kind,
- * current, savings and 3a stacked above zero and loans below, under the navy Net worth line.
- * capital movements sit on the line as amber diamonds. Amounts in minor units, shown in CHF.
+ * current, savings and 3a stacked above zero and loans below, under the near-white Net worth
+ * line. Capital movements sit on the line as diamonds in the cyan accent, the point of the
+ * chart. Amounts in minor units, shown in CHF.
  */
 
 type Money = (minor: number) => string;
@@ -32,10 +33,10 @@ interface BandTone {
 
 /** Each kind's tone; a loan, below zero, is debt. */
 const BAND_TONES: Record<AccountKind, BandTone> = {
-  current: { fill: 'fill-ramp-3', dot: 'bg-ramp-3', swatch: 'bg-ramp-3' },
+  current: { fill: 'fill-ramp-2', dot: 'bg-ramp-2', swatch: 'bg-ramp-2' },
   savings: { fill: 'fill-ramp-4', dot: 'bg-ramp-4', swatch: 'bg-ramp-4' },
   '3a': { fill: 'fill-ramp-5', dot: 'bg-ramp-5', swatch: 'bg-ramp-5' },
-  loan: { fill: 'fill-negative-tint', dot: 'bg-negative', swatch: 'bg-negative-tint' },
+  loan: { fill: 'fill-negative/45', dot: 'bg-negative', swatch: 'bg-negative/45' },
 };
 
 /** The bands' fill opacity: a touch translucent, so they sit back behind the Net worth line. */
@@ -80,7 +81,7 @@ function NetWorthPlot({ points, bands, stacks, scale }: PlotProps) {
       <polyline
         points={points.map((point, i) => `${scale.x(i)},${scale.y(point.value)}`).join(' ')}
         fill="none"
-        className="stroke-ramp-1"
+        className="stroke-ink"
         strokeWidth={2}
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
@@ -154,8 +155,8 @@ function PointDots({ points, scale, money }: PointDotsProps) {
         </span>
       )}
       <span
-        className={`h-2.5 w-2.5 rounded-full border-2 border-ramp-1 group-hover:scale-125 ${
-          point.isPartial ? 'bg-surface' : 'bg-ramp-1'
+        className={`h-2.5 w-2.5 rounded-full border-2 border-ink group-hover:scale-125 ${
+          point.isPartial ? 'bg-surface' : 'bg-ink'
         }`}
       />
     </Link>
@@ -169,7 +170,7 @@ interface CapitalMarkerLinkProps {
   y: number;
 }
 
-/** A capital movement on the line: an amber diamond that opens its Transaction. */
+/** A capital movement on the line: a diamond in the accent that opens its Transaction. */
 function CapitalMarkerLink({ marker, x, y }: CapitalMarkerLinkProps) {
   return (
     <Link
@@ -179,7 +180,7 @@ function CapitalMarkerLink({ marker, x, y }: CapitalMarkerLinkProps) {
       className="group absolute z-10 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
       style={{ left: `${x}%`, top: `${y}%` }}
     >
-      <span className="h-2.5 w-2.5 rotate-45 border border-accent-ink bg-accent group-hover:scale-125" />
+      <span className="h-2.5 w-2.5 rotate-45 border border-paper bg-accent group-hover:scale-125" />
     </Link>
   );
 }
