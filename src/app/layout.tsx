@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Inter_Tight } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell/app-shell';
+import { StreamedBell } from '@/components/app-shell/streamed-bell';
 import { FormatterProvider } from '@/components/formatter-provider';
 import { getCurrentSession } from '@/server/app-context';
 import { getRequestDisplaySettings } from '@/server/formatter';
@@ -28,7 +29,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en" className={`${inter.variable} ${interTight.variable}`}>
       <body>
         <FormatterProvider settings={settings}>
-          <AppShell showNavigation={isSignedIn}>{children}</AppShell>
+          <AppShell showNavigation={isSignedIn} bell={isSignedIn ? <StreamedBell /> : null}>
+            {children}
+          </AppShell>
         </FormatterProvider>
       </body>
     </html>

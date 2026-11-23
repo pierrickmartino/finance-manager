@@ -110,7 +110,7 @@ Settled while building it (#128–#132):
 - A Recurring payments Widget on Dashboards.
 - Creating a Rule from a Recurring payment.
 - Settings for the recognition thresholds.
-- Notifications about flags.
+- Notifications about the New and Ended flags. A Missed Recurring payment and a Price increase each appear as an Attention item in the top bar's notifications bell (issue #197); there are no notifications outside the app.
 
 ## Further Notes
 

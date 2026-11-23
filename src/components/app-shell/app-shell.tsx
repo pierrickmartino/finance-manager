@@ -19,9 +19,18 @@ import { PRIMARY_LINKS, isActive } from './navigation';
 
 /**
  * The 48px bar on every signed-in page, sitting on the navy page, one row: brand, the pills and
- * More from `lg` (the menu button below it), then the quick actions, settings and sign out.
+ * More from `lg` (the menu button below it), then the bell, the quick actions, settings and
+ * sign out.
  */
-function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => void }) {
+function TopBar({
+  pathname,
+  onOpenMenu,
+  bell,
+}: {
+  pathname: string;
+  onOpenMenu: () => void;
+  bell: ReactNode;
+}) {
   return (
     <header className="flex h-12 items-center gap-2 px-3 text-on-ramp md:px-5">
       <button
@@ -54,6 +63,7 @@ function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => 
         <MoreMenu pathname={pathname} />
       </nav>
       <div className="ml-auto flex items-center gap-1.5">
+        {bell}
         {/* Statements are imported from an Account's page: pick the Account there. */}
         <Link href="/accounts" className={`${BAR_SECONDARY_BUTTON_CLASS} hidden md:block`}>
           Import statement
@@ -77,6 +87,8 @@ function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => 
 interface AppShellProps {
   /** Signed out (login, setup), only the page renders: no top bar or drawer. */
   showNavigation: boolean;
+  /** The notifications bell, streamed in by the layout; shown with the navigation. */
+  bell?: ReactNode;
   children: ReactNode;
 }
 
@@ -89,7 +101,7 @@ interface AppShellProps {
  * whose action signs the user in (first-run setup shows its recovery codes afterwards) is not
  * remounted, and loses no state, when the navigation appears.
  */
-export function AppShell({ showNavigation, children }: AppShellProps) {
+export function AppShell({ showNavigation, bell, children }: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -102,7 +114,9 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
   return (
     <div className="relative min-h-screen">
       <div className="relative">
-        {showNavigation && <TopBar pathname={pathname} onOpenMenu={() => setIsMenuOpen(true)} />}
+        {showNavigation && (
+          <TopBar pathname={pathname} onOpenMenu={() => setIsMenuOpen(true)} bell={bell} />
+        )}
         <main className={main}>{children}</main>
       </div>
 
