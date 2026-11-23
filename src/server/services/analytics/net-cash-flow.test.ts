@@ -167,6 +167,67 @@ describe('Net cash flow', () => {
     }
   });
 
+  it('pinned, reads its own Period by its own Intervals while the page reads years', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+    const pins = { 'net-cash-flow': 'year-to-date' } as const;
+
+    const card = await loadSection(t.ctx, YEARLY, 'netCashFlow', pins);
+
+    expect(card.isPinned).toBe(true);
+    expect(card.reading).toMatchObject({
+      period: presetPeriod('year-to-date'),
+      from: '2025-01-01',
+      grain: 'month',
+    });
+    expect(card.data!.rows.map((row) => [row.key, row.isPartial])).toEqual([
+      ['2025-01', false],
+      ['2025-02', false],
+      ['2025-03', true],
+    ]);
+    expect(card.data!.rowTotals).toEqual([600_000, -540_000, 293_000]);
+    // March to date is left out: (6'000.00 - 5'400.00) over January and February.
+    const average = readCard(card, money).facts.at(-1)!;
+    expect(average).toMatchObject({ label: 'Monthly average', value: '30000' });
+    expect((await openDrill(t.ctx, average.href)).value).toBe(30_000);
+    for (const { value, href } of linkedValues(card.data!)) {
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: YEARLY, cardPeriods: pins });
+      expect((await openDrill(t.ctx, href)).value).toBe(value);
+    }
+  });
+
+  it('pinned to a Period with no complete Interval, sets both apart and shows no average', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, YEARLY, 'netCashFlow', {
+      'net-cash-flow': 'rolling-30-days',
+    });
+
+    expect(card.data!.rows.map((row) => [row.key, row.isPartial])).toEqual([
+      ['2025-02', true],
+      ['2025-03', true],
+    ]);
+    expect(readCard(card, money).facts.at(-1)).toEqual({
+      label: 'Monthly average',
+      value: '—',
+      href: null,
+    });
+  });
+
+  it('unpinned, follows the page Period and says so', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, YEARLY, 'netCashFlow', {
+      'spending-by-category': 'rolling-30-days',
+    });
+
+    expect(card.isPinned).toBe(false);
+    expect(card.reading).toMatchObject({ period: YEARLY, grain: 'year' });
+    expect(labels(card.data!.rows)).toEqual(['2021', '2022', '2023', '2024', '2025']);
+  });
+
   it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');
 

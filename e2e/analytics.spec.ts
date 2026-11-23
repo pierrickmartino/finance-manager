@@ -823,6 +823,78 @@ test('a hand-edited pin on a Card without a dropdown, or an invalid one, is igno
   await expect(region(page, 'Key figures').getByLabel(/^Period for /)).toHaveCount(0);
 });
 
+test('pinning Categories per interval reads it by year while the page reads months, and Net cash flow and Income vs. expense pin beside it', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  await seedOldPurchase(suffix);
+  const name = 'Categories per interval';
+  const picker = cardPeriod(page, name);
+  const group = heatmapRow(page, name, `Pay ${suffix}`);
+  const partialYear = new RegExp(`^Pay ${suffix}, ${YEAR} \\(partial\\): `);
+  const allPinned = {
+    period: 'rolling-90-days',
+    'net-cash-flow': 'this-year-and-last-1',
+    'income-vs-expense': 'this-year-and-last-1',
+    'categories-per-interval': 'this-year-and-last-4',
+  };
+
+  // Unpinned: by month, as the page's Rolling 90 days, and no mark.
+  await page.goto('/analytics?period=rolling-90-days');
+  await expect(group).toBeVisible();
+  await expect(picker).toHaveValue('');
+  await expect(cardPeriodMark(page, name)).toHaveCount(0);
+  expect((await columns(page, name)).length).toBeLessThanOrEqual(5);
+
+  // Pinned to This year and last 4: five years, this one to date; the page still reads months.
+  await picker.selectOption('this-year-and-last-4');
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({ period: 'rolling-90-days', 'categories-per-interval': 'this-year-and-last-4' });
+  await expect(cardPeriodMark(page, name)).toHaveText('Pinned to This year and last 4');
+  await expect(group.getByRole('link', { name: partialYear })).toBeVisible();
+  expect(await columns(page, name)).toHaveLength(6);
+  expect((await columns(page, 'Income vs. expense')).length).toBeLessThanOrEqual(5);
+
+  // Net cash flow and Income vs. expense pin too, by quarter, each keeping the other pins.
+  await cardPeriod(page, 'Net cash flow').selectOption('this-year-and-last-1');
+  await expect
+    .poll(() => searchOf(page))
+    .toEqual({
+      period: 'rolling-90-days',
+      'net-cash-flow': 'this-year-and-last-1',
+      'categories-per-interval': 'this-year-and-last-4',
+    });
+  await expect(cardPeriodMark(page, 'Net cash flow')).toHaveText('Pinned to This year and last 1');
+  await expect(region(page, 'Net cash flow').getByText(/^Quarterly average$/)).toBeVisible();
+  await cardPeriod(page, 'Income vs. expense').selectOption('this-year-and-last-1');
+  await expect.poll(() => searchOf(page)).toEqual(allPinned);
+  await expect(cardPeriodMark(page, 'Income vs. expense')).toBeVisible();
+  await expect
+    .poll(async () => (await columns(page, 'Income vs. expense')).length)
+    .toBe(QUARTERS + 1);
+
+  // The current year's subtotal opens its Transactions, and the way back keeps every pin.
+  await group.getByRole('link', { name: partialYear }).click();
+  await expect(page).toHaveURL(
+    /\/widgets\/drill\?.*originCategoriesPerInterval=this-year-and-last-4/,
+  );
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect.poll(() => searchOf(page)).toEqual(allPinned);
+  await expect(cardPeriodMark(page, name)).toBeVisible();
+
+  // Same as page: back to months, its mark gone, the other pins kept.
+  await picker.selectOption({ label: 'Same as page' });
+  const { 'categories-per-interval': _unpinned, ...others } = allPinned;
+  await expect.poll(() => searchOf(page)).toEqual(others);
+  await expect(cardPeriodMark(page, name)).toHaveCount(0);
+  await expect.poll(async () => (await columns(page, name)).length).toBeLessThanOrEqual(5);
+});
+
 test('Net cash flow has a bar per interval, the current one partial, each opening its Drill-down', async ({
   page,
 }) => {

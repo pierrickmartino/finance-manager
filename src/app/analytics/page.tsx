@@ -39,7 +39,8 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
  * preset's `period`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
  * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
  * its nearest Period. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
- * parameter each beside the Period (`spending-by-category=<slug>`); a bare visit has none, and a
+ * parameter each beside the Period (`net-cash-flow=<slug>`, `spending-by-category=<slug>`,
+ * `income-vs-expense=<slug>`, `categories-per-interval=<slug>`); a bare visit has none, and a
  * former link carries none. The shell and the Period
  * control render at once; each section streams in behind its own placeholder and error boundary
  * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
@@ -115,8 +116,9 @@ export default async function AnalyticsPage({
             one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
-            <CardSection
+            <PinnableCardSection
               card={sections.netCashFlow}
+              section="net-cash-flow"
               empty="Nothing to show yet: no Transactions in these intervals."
             />
           </StreamedSection>
@@ -139,14 +141,16 @@ export default async function AnalyticsPage({
           <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
         </StreamedSection>
         <StreamedSection name={INCOME_VS_EXPENSE} retryHref={retryHref} isCard>
-          <CardSection
+          <PinnableCardSection
             card={sections.incomeVsExpense}
+            section="income-vs-expense"
             empty="Nothing to show yet: no income, expense or Capital in these intervals."
           />
         </StreamedSection>
         <StreamedSection name={CATEGORIES_PER_INTERVAL} retryHref={retryHref} isCard>
-          <CardSection
+          <PinnableCardSection
             card={sections.categoriesPerInterval}
+            section="categories-per-interval"
             empty="Nothing to show yet: no classified Transactions in these intervals."
           />
         </StreamedSection>
