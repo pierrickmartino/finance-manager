@@ -2,6 +2,13 @@ import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
 import type { AxisSelector } from '../reporting/cell-ref';
 import {
+  byGroupType,
+  cellCount,
+  hasTransactions,
+  UNCLASSIFIED_CELL,
+  type GroupTypeKey,
+} from './by-group-type';
+import {
   analyticsCard,
   cellOf,
   periodRow,
@@ -9,7 +16,6 @@ import {
   statusOf,
   sumOf,
   type AnalyticsCard,
-  type PeriodRow,
 } from './figures';
 import type { AnalyticsReading } from './reading';
 
@@ -27,9 +33,6 @@ export const INCOME_VS_EXPENSE = 'Income vs. expense';
 
 export type IncomeVsExpenseRow =
   'income' | 'expense' | 'capital' | 'profit' | 'unclassified' | 'netCashFlow';
-
-/** A Category group type, as a key of the report's rows: `null` is Unclassified. */
-type GroupTypeKey = 'income' | 'expense' | 'capital' | null;
 
 interface RowDefinition {
   key: IncomeVsExpenseRow;
@@ -54,24 +57,16 @@ const ROWS: readonly RowDefinition[] = [
   { key: 'netCashFlow', label: 'Net cash flow', types: ['income', 'expense', 'capital', null] },
 ];
 
-/** Unclassified shows only when some period of the Span has an Unclassified flow. */
-function isShown(row: PeriodRow): boolean {
-  return row.key !== 'unclassified' || row.cells.some((cell) => (cell.value ?? 0) !== 0);
-}
-
 export async function incomeVsExpense(
   ctx: ServiceContext,
   reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
-  // The Net cash flow section's query, by Category group type: every non-Transfer flow.
-  const report = await runWidgetQuery(ctx, {
-    dateRange: reading.range,
-    rows: 'categoryGroupType',
-    columns: reading.grain,
-    includeCapital: true,
-  });
+  const report = await runWidgetQuery(ctx, byGroupType(reading.range, reading.grain));
+  // Unclassified shows when the Span has any Unclassified Transactions, even netting to zero.
+  const hasUnclassified = hasTransactions(await cellCount(ctx, report, UNCLASSIFIED_CELL));
   const cell = cellOf(report);
-  const rows = ROWS.map(({ key, label, types, selector }) =>
+  const shown = ROWS.filter(({ key }) => key !== 'unclassified' || hasUnclassified);
+  const rows = shown.map(({ key, label, types, selector }) =>
     periodRow(reading, {
       key,
       label,
@@ -79,7 +74,7 @@ export async function incomeVsExpense(
       selector,
       valueAt: (period) => sumOf(types.map((type) => cell(type, period))),
     }),
-  ).filter(isShown);
+  );
   return analyticsCard({
     id: 'income-vs-expense',
     name: INCOME_VS_EXPENSE,

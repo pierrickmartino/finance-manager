@@ -5,13 +5,13 @@ import type { ServiceContext } from '../context';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
 import type { DateSpan } from '../reporting/periods';
-import type { DataStart } from './data-start';
+import { typeTotal } from './by-group-type';
 import type { SharedSections } from './figures';
 import { flowFigures } from './flow-figures';
 import {
   flowChange,
-  loadComparison,
   netWorthChange,
+  type Comparison,
   type FlowFigureId,
   type KeyFigureChange,
 } from './key-figure-change';
@@ -89,17 +89,11 @@ function runFlow(
   });
 }
 
-/** A flow report's Category group type total; 0 when nothing of it falls in the span. */
-function typeTotal(report: ReportTable, type: FlowType): number {
-  const index = report.rows.findIndex((row) => row.key === type);
-  return index < 0 ? 0 : (report.rowTotals[index] ?? 0);
-}
-
 export async function keyFigures(
   ctx: ServiceContext,
   reading: AnalyticsReading,
   sections: SharedSections,
-  dataStart: DataStart,
+  comparisonLoad: Promise<Comparison>,
 ): Promise<AnalyticsKeyFigures> {
   const { from, to: today } = reading;
   const span = { from, to: today };
@@ -109,7 +103,7 @@ export async function keyFigures(
       runFlow(ctx, span),
       runFlow(ctx, span, ['income']),
       runFlow(ctx, span, ['expense']),
-      loadComparison(ctx, reading, dataStart.accountData),
+      comparisonLoad,
       sections.balances,
       sections.trend,
       sections.flow,

@@ -5,7 +5,8 @@ import { addDays } from '../fx/dates';
 import { runWidgetQuery, type ReportTable } from '../reporting';
 import type { CellRef } from '../reporting/cell-ref';
 import { periodKey, periodOf, type DateSpan } from '../reporting/periods';
-import type { TimeAxis, WidgetQueryInput } from '../reporting/query';
+import type { WidgetQueryInput } from '../reporting/query';
+import { byGroupType, typeTotal } from './by-group-type';
 import { comparisonLabel, comparisonSpan } from './comparison-span';
 import { flowFigures, type FlowFigureId } from './flow-figures';
 import type { AnalyticsReading } from './reading';
@@ -20,11 +21,11 @@ import type { AnalyticsReading } from './reading';
 export type ChangeDirection = 'up' | 'down' | 'flat';
 
 /**
- * Which way up counts as good: up for Income, Profit and Net worth, down for Expense; neither
- * for a figure no direction of which is good or bad (the Profit and loss's Capital and
+ * Which direction of change is good: up for Income, Profit and Net worth, down for Expense;
+ * neither for a figure whose moves are neither good nor bad (the Profit and loss's Capital and
  * Unclassified).
  */
-export type GoodWay = 'up' | 'down' | 'neutral';
+export type GoodDirection = 'up' | 'down' | 'neither';
 
 export interface KeyFigureChange {
   /** The figure less its earlier value, in CHF minor units. */
@@ -32,7 +33,10 @@ export interface KeyFigureChange {
   /** The change as a share of the earlier value (0.25 for +25%); null unless it is above zero. */
   percent: number | null;
   direction: ChangeDirection;
-  /** Whether the change is good for this figure; null when it has not moved, or is neutral. */
+  /**
+   * Whether the change is good for this figure; null when it is neither good nor bad: the figure
+   * has not moved, or no direction is good for it.
+   */
   isGood: boolean | null;
   /** Those dates as the line says them: "vs 1–22 Oct". */
   label: string;
@@ -53,8 +57,13 @@ const FLOW_CELLS: Record<FlowFigureId, CellRef> = {
   profit: { withPeriodSubtotals: true },
 };
 
+/** The Key figures' flows: only the Income and Expense Category groups. */
+const INCOME_AND_EXPENSE: BothStretchesFlows = {
+  filters: { categoryGroupTypes: ['income', 'expense'] },
+};
+
 /** Which way each flow figure is good: more spending is never good. */
-const FLOW_GOOD_WAYS: Record<FlowFigureId, GoodWay> = {
+const FLOW_GOOD_DIRECTIONS: Record<FlowFigureId, GoodDirection> = {
   income: 'up',
   expense: 'down',
   profit: 'up',
@@ -69,7 +78,10 @@ export interface Comparison {
   dataStart: string | null;
   /** Income and expense of both stretches, a row per period: what a change line opens. */
   report: ReportTable;
-  /** Income and expense of the Comparison span, a row per Category group type. */
+  /**
+   * Every flow of the Comparison span, a row per Category group type (`byGroupType`): Income and
+   * Expense for the Key figures, and Capital and Unclassified too for the Profit and loss.
+   */
   earlier: ReportTable;
 }
 
@@ -78,7 +90,12 @@ const directionOf = (amount: number): ChangeDirection =>
 
 function changeOf(
   [value, earlier]: readonly [value: number, earlier: number],
-  { span, today, goodWay, href }: { span: DateSpan; today: string; goodWay: GoodWay; href: string },
+  {
+    span,
+    today,
+    goodDirection,
+    href,
+  }: { span: DateSpan; today: string; goodDirection: GoodDirection; href: string },
 ): KeyFigureChange {
   const amount = value - earlier;
   const direction = directionOf(amount);
@@ -86,65 +103,59 @@ function changeOf(
     amount,
     percent: earlier > 0 ? amount / earlier : null,
     direction,
-    isGood: direction === 'flat' || goodWay === 'neutral' ? null : direction === goodWay,
+    isGood:
+      direction === 'flat' || goodDirection === 'neither' ? null : direction === goodDirection,
     label: comparisonLabel(span, today),
     href,
   };
 }
 
-/**
- * Both stretches of days: from the Comparison span's start to today, leaving out the days
- * between the two stretches.
- */
-export function bothStretchesRange(
-  span: DateSpan,
-  current: DateSpan,
-): WidgetQueryInput['dateRange'] {
-  const gap = { from: addDays(span.to, 1), to: addDays(current.from, -1) };
-  return {
-    kind: 'fixed',
-    from: span.from,
-    to: current.to,
-    ...(gap.from <= gap.to ? { except: gap } : {}),
-  };
-}
+/** What any change against the Comparison span is read over. */
+export type ComparisonWindow = Pick<Comparison, 'reading' | 'span' | 'dataStart'>;
 
-/** Income and expense over both stretches, by period of the grain. */
-function bothStretchesQuery(grain: TimeAxis, span: DateSpan, current: DateSpan): WidgetQueryInput {
+/** Which flows a both-stretches query reads: a Category group type filter, Capital or not. */
+export type BothStretchesFlows = Pick<WidgetQueryInput, 'filters' | 'includeCapital'>;
+
+/**
+ * Some flows over both stretches of days, by period of the grain, a column per Category group
+ * type: what a change line opens. From the Comparison span's start to today, leaving out the
+ * days between the two stretches.
+ */
+export function bothStretchesQuery(
+  { reading, span }: ComparisonWindow,
+  flows: BothStretchesFlows,
+): WidgetQueryInput {
+  const gap = { from: addDays(span.to, 1), to: addDays(reading.from, -1) };
   return {
-    filters: { categoryGroupTypes: ['income', 'expense'] },
-    dateRange: bothStretchesRange(span, current),
-    rows: grain,
+    ...flows,
+    dateRange: {
+      kind: 'fixed',
+      from: span.from,
+      to: reading.to,
+      ...(gap.from <= gap.to ? { except: gap } : {}),
+    },
+    rows: reading.grain,
     columns: 'categoryGroupType',
   };
 }
 
 /**
- * Starts reading what the Key figures' changes compare with, over a reading, given the first
- * day any Account holds data (`DataStart.accountData`).
+ * Starts reading what the Key figures' and the Profit and loss's changes compare with, over a
+ * reading, given the first day any Account holds data (`DataStart.accountData`).
  */
 export async function loadComparison(
   ctx: ServiceContext,
   reading: AnalyticsReading,
   dataStart: string | null,
 ): Promise<Comparison> {
-  const { grain, from, to: today } = reading;
-  const current = { from, to: today };
-  const span = comparisonSpan(reading.span, current);
+  const span = comparisonSpan(reading.span, { from: reading.from, to: reading.to });
+  const window = { reading, span, dataStart };
   const [report, earlier] = await Promise.all([
-    runWidgetQuery(ctx, bothStretchesQuery(grain, span, current)),
-    runWidgetQuery(ctx, {
-      filters: { categoryGroupTypes: ['income', 'expense'] },
-      dateRange: { kind: 'fixed', from: span.from, to: span.to },
-      rows: 'categoryGroupType',
-      columns: null,
-    }),
+    runWidgetQuery(ctx, bothStretchesQuery(window, INCOME_AND_EXPENSE)),
+    runWidgetQuery(ctx, byGroupType({ kind: 'fixed', from: span.from, to: span.to })),
   ]);
-  return { reading, span, dataStart, report, earlier };
+  return { ...window, report, earlier };
 }
-
-/** What any change against the Comparison span is read over. */
-export type ComparisonWindow = Pick<Comparison, 'reading' | 'span' | 'dataStart'>;
 
 const reachesBack = ({ dataStart }: Pick<Comparison, 'dataStart'>, date: string) =>
   dataStart !== null && dataStart <= date;
@@ -156,16 +167,10 @@ const reachesBack = ({ dataStart }: Pick<Comparison, 'dataStart'>, date: string)
 export function spanChange(
   { reading, span, dataStart }: ComparisonWindow,
   values: readonly [value: number, earlier: number],
-  { goodWay, href }: { goodWay: GoodWay; href: string },
+  { goodDirection, href }: { goodDirection: GoodDirection; href: string },
 ): KeyFigureChange | null {
   if (!reachesBack({ dataStart }, span.from)) return null;
-  return changeOf(values, { span, today: reading.to, goodWay, href });
-}
-
-/** The Comparison span's total of one Category group type; 0 when nothing of it falls there. */
-function earlierOf({ earlier }: Comparison, type: 'income' | 'expense'): number {
-  const row = earlier.rows.findIndex((header) => header.key === type);
-  return row < 0 ? 0 : (earlier.rowTotals[row] ?? 0);
+  return changeOf(values, { span, today: reading.to, goodDirection, href });
 }
 
 /** A flow figure's change against the Comparison span; null when the data doesn't reach back. */
@@ -174,12 +179,11 @@ export function flowChange(
   id: FlowFigureId,
   value: number,
 ): KeyFigureChange | null {
-  const earlier = flowFigures(earlierOf(comparison, 'income'), earlierOf(comparison, 'expense'))[
-    id
-  ];
+  const { earlier: before } = comparison;
+  const earlier = flowFigures(typeTotal(before, 'income'), typeTotal(before, 'expense'))[id];
   const { reading, report } = comparison;
   return spanChange(comparison, [value, earlier], {
-    goodWay: FLOW_GOOD_WAYS[id],
+    goodDirection: FLOW_GOOD_DIRECTIONS[id],
     href: analyticsDrillUrl(reading, report.query, FLOW_CELLS[id]),
   });
 }
@@ -201,7 +205,7 @@ export function netWorthChange(
   return changeOf([value, trend.rowTotals[row] ?? 0], {
     span: { from: end, to: end },
     today,
-    goodWay: 'up',
+    goodDirection: 'up',
     href: accountsHref({ date: end }),
   });
 }

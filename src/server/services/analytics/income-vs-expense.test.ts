@@ -161,6 +161,44 @@ describe('Income vs. expense', () => {
     }
   });
 
+  it('shows the Unclassified row when its Transactions net to zero', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+    const postFinance = await seedAccount(t.ctx, 'PostFinance');
+    // An Unclassified purchase in January and its refund the same month.
+    await seedClassified(t.ctx, postFinance, [
+      { bookingDate: '2025-01-12', amountMinor: -7_000 },
+      { bookingDate: '2025-01-14', amountMinor: 7_000 },
+    ]);
+
+    const data = (await loadSection(t.ctx, MONTHLY, 'incomeVsExpense')).data!;
+
+    const empty = Array<null>(10).fill(null);
+    const unclassified = data.rows.findIndex((row) => row.key === 'unclassified');
+    expect(data.rows.map((row) => row.key)).toEqual([
+      'income',
+      'expense',
+      'capital',
+      'profit',
+      'unclassified',
+      'netCashFlow',
+    ]);
+    expect(data.cells[unclassified]).toEqual([...empty, 0, null, null]);
+    expect(data.rowTotals[unclassified]).toBe(0);
+  });
+
+  it('shows the Unclassified row when its only Transactions could not be converted', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+    // No GBP rate at all: the Unclassified payment is left out.
+    const barclays = await seedAccount(t.ctx, 'Barclays', 'GBP');
+    await seedClassified(t.ctx, barclays, [{ bookingDate: '2025-02-12', amountMinor: -3_000 }]);
+
+    const data = (await loadSection(t.ctx, MONTHLY, 'incomeVsExpense')).data!;
+
+    expect(data.rows.map((row) => row.key)).toContain('unclassified');
+  });
+
   it('leads with its largest row, as a Dashboard heatmap does', async () => {
     fixToday('2025-03-20');
     await dataset();

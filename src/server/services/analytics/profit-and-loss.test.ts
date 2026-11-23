@@ -208,6 +208,57 @@ describe('Profit and loss', () => {
     ]);
   });
 
+  it('shows the Unclassified row when its Transactions net to zero', async () => {
+    fixToday('2025-05-20');
+    const { salary } = await categories();
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    // An Unclassified purchase and its refund.
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2025-05-10', amountMinor: 120_000, classify: salary },
+      { bookingDate: '2025-05-11', amountMinor: -4_000 },
+      { bookingDate: '2025-05-12', amountMinor: 4_000 },
+    ]);
+
+    const { rows } = await loadSection(t.ctx, SINCE_MID_FEBRUARY, 'profitAndLoss');
+
+    expect(amounts(rows)).toEqual([
+      ['Income', 120_000],
+      ['Expense', 0],
+      ['Profit', 120_000],
+      ['Capital', 0],
+      ['Unclassified', 0],
+      ['Net cash flow', 120_000],
+    ]);
+  });
+
+  it('counts a first period cut short only from the Span start', async () => {
+    fixToday('2025-05-20');
+    const { salary, groceries, property } = await categories();
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    // The Span starts on 15 February, mid-month: the 14th falls before it, the 15th in it.
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2025-02-14', amountMinor: 70_000, classify: salary },
+      { bookingDate: '2025-02-15', amountMinor: 40_000, classify: salary },
+      { bookingDate: '2025-02-14', amountMinor: -9_000, classify: groceries },
+      { bookingDate: '2025-02-16', amountMinor: -6_000, classify: groceries },
+      { bookingDate: '2025-02-14', amountMinor: -50_000, classify: property },
+      { bookingDate: '2025-02-28', amountMinor: -10_000, classify: property },
+      { bookingDate: '2025-02-01', amountMinor: -3_000 },
+      { bookingDate: '2025-02-20', amountMinor: -1_000 },
+    ]);
+
+    const { rows } = await loadSection(t.ctx, SINCE_MID_FEBRUARY, 'profitAndLoss');
+
+    expect(amounts(rows)).toEqual([
+      ['Income', 40_000],
+      ['Expense', 6_000],
+      ['Profit', 34_000],
+      ['Capital', -10_000],
+      ['Unclassified', -1_000],
+      ['Net cash flow', 23_000],
+    ]);
+  });
+
   it('shows CHF 0 rows for a Span with no Transactions', async () => {
     fixToday('2025-05-20');
 

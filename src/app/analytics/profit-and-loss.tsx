@@ -10,16 +10,26 @@ import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { ChangeLine } from './key-figure-change';
 import { SectionCard, UnconvertedNote } from './section';
 
-/** The rows that close a part of the statement: set off by a stronger rule and in bold. */
-const SUBTOTALS: ReadonlySet<ProfitAndLossRowId> = new Set(['profit', 'netCashFlow']);
-
-/** A row's look: the quiet rows, the subtotals, and Net cash flow highlighted at the foot. */
-function rowClass(id: ProfitAndLossRowId): string {
-  if (id === 'netCashFlow') return 'bg-accent-tint';
-  return SUBTOTALS.has(id) ? 'border-t border-rule-strong' : 'border-t border-rule';
+/** How a row reads: its rule (or fill) and its weight. */
+interface RowLook {
+  row: string;
+  weight: string;
 }
 
-const weightOf = (id: ProfitAndLossRowId) => (SUBTOTALS.has(id) ? 'font-semibold' : 'font-normal');
+const LINE: RowLook = { row: 'border-t border-rule', weight: 'font-normal' };
+/** A row closing a part of the statement: set off by a stronger rule and in bold. */
+const SUBTOTAL: RowLook = { row: 'border-t border-rule-strong', weight: 'font-semibold' };
+/** Net cash flow, the statement's foot: highlighted, and in bold. */
+const FOOT: RowLook = { row: 'bg-accent-tint', weight: 'font-semibold' };
+
+const LOOKS: Record<ProfitAndLossRowId, RowLook> = {
+  income: LINE,
+  expense: LINE,
+  profit: SUBTOTAL,
+  capital: LINE,
+  unclassified: LINE,
+  netCashFlow: FOOT,
+};
 
 interface StatementRowProps {
   row: ProfitAndLossRow;
@@ -28,9 +38,14 @@ interface StatementRowProps {
   hasComparison: boolean;
 }
 
-/** A row's amount over the Comparison span, then its change line, which wraps on a phone. */
+/**
+ * A row's amount over the Comparison span, then its change line, which wraps on a phone; a
+ * muted "—" for a row without one.
+ */
 function ComparisonCell({ row, fmt }: Omit<StatementRowProps, 'hasComparison'>) {
-  if (row.earlier === null || row.change === null) return <td className="rounded-r-md" />;
+  if (row.earlier === null || row.change === null) {
+    return <td className="rounded-r-md py-2 pr-2 pl-3 text-right align-top text-muted">—</td>;
+  }
   const earlier = fmt.amount(row.earlier, { currency: BASE_CURRENCY, isWhole: true });
   return (
     <td className="rounded-r-md py-2 pr-2 pl-3 text-right align-top tabular-nums">
@@ -46,10 +61,10 @@ function ComparisonCell({ row, fmt }: Omit<StatementRowProps, 'hasComparison'>) 
  */
 function StatementRow({ row, fmt, hasComparison }: StatementRowProps) {
   const amount = fmt.amount(row.value, { currency: BASE_CURRENCY, isWhole: true });
-  const weight = weightOf(row.id);
+  const { row: look, weight } = LOOKS[row.id];
   const amountCorner = hasComparison ? '' : 'rounded-r-md';
   return (
-    <tr className={rowClass(row.id)}>
+    <tr className={look}>
       <th scope="row" className={`rounded-l-md py-2 pr-3 pl-2 text-left align-top ${weight}`}>
         {row.label}
         {row.unconverted > 0 && (

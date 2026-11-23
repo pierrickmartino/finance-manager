@@ -6,6 +6,7 @@ import { categoriesPerPeriod } from './categories-per-period';
 import { loadDataStart } from './data-start';
 import type { AnalyticsCard } from './figures';
 import { incomeVsExpense } from './income-vs-expense';
+import { loadComparison } from './key-figure-change';
 import { netCashFlow } from './net-cash-flow';
 import { keyFigures, type AnalyticsKeyFigures } from './key-figures';
 import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
@@ -59,7 +60,8 @@ export interface AnalyticsView {
  * keeps its name, and the reading carries the effective Span). The sections' promises are not
  * awaited here: the page awaits each where it shows it. Net worth reads the Account balances and
  * the Span's income and expense, and Key figures the Account balances, Net worth's trend and the
- * Span's income and expense, so they share those promises rather than run them again. Spending
+ * Span's income and expense, so they share those promises rather than run them again; Key
+ * figures and Profit and loss share what their changes compare with (`loadComparison`). Spending
  * Insights reads its own months: the last complete one and those before it, whatever the Span.
  */
 export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<AnalyticsView> {
@@ -69,19 +71,20 @@ export async function loadAnalytics(ctx: ServiceContext, span: Span): Promise<An
   const balances = accountBalances(ctx, today);
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
+  const comparison = loadComparison(ctx, reading, dataStart.accountData);
   return {
     today,
     reading,
     starts: presetStarts(today, dataStart.firstTransaction),
     sections: {
-      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, dataStart),
+      keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, comparison),
       netWorth: netWorth(reading, { trend, balances, flow }),
       spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
       netCashFlow: netCashFlow(ctx, reading),
       accountBalances: balances,
       spendingByCategory: spendingByCategory(ctx, reading),
-      profitAndLoss: profitAndLoss(ctx, reading, dataStart),
+      profitAndLoss: profitAndLoss(ctx, reading, comparison),
       incomeVsExpense: incomeVsExpense(ctx, reading),
       categoriesPerPeriod: categoriesPerPeriod(ctx, reading),
     },
