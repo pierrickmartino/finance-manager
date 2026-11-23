@@ -15,7 +15,7 @@ import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { splitTransaction } from '../transactions';
-import { linkTransfer, transactionSide } from '../transfers';
+import { linkTransfer, splitLineSide, transactionSide } from '../transfers';
 import { readCard } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 
@@ -76,7 +76,7 @@ async function dataset(): Promise<void> {
 const money = String;
 
 describe('Income vs. expense', () => {
-  it('is a heatmap card: a row per type, then Net and Net incl. Capital, per period and in Total', async () => {
+  it('is a heatmap card: a row per type, then Profit and Net cash flow, per period and in Total', async () => {
     fixToday('2025-03-20');
     await dataset();
 
@@ -105,10 +105,60 @@ describe('Income vs. expense', () => {
       ['Income', [...empty, 600_000, 600_000, 300_000], 1_500_000],
       ['Expense', [...empty, -19_400, -20_000, -5_000], -44_400],
       ['Capital', [...empty, null, -510_000, null], -510_000],
-      ['Net (income − expense)', [...empty, 580_600, 580_000, 295_000], 1_455_600],
-      ['Net incl. Capital', [...empty, 580_600, 70_000, 295_000], 945_600],
+      ['Profit', [...empty, 580_600, 580_000, 295_000], 1_455_600],
+      ['Net cash flow', [...empty, 580_600, 70_000, 295_000], 945_600],
     ]);
+    // Nothing is Unclassified in the Span: no Unclassified row.
+    expect(data.rows.map((row) => row.key)).not.toContain('unclassified');
     expect(data.total).toBe(945_600);
+  });
+
+  it('adds an Unclassified row after Profit, and Net cash flow takes it in', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+    const home = await createCategoryGroup(t.ctx, { name: 'Home', type: 'expense' });
+    const household = await createCategory(t.ctx, { groupId: home.id, name: 'Household' });
+    const postFinance = await seedAccount(t.ctx, 'PostFinance');
+    const savings = await seedAccount(t.ctx, 'Savings');
+    // Unclassified: a purchase in January and a refund in March; a deposit in March.
+    const [, , , split] = await seedClassified(t.ctx, postFinance, [
+      { bookingDate: '2025-01-12', amountMinor: -7_000 },
+      { bookingDate: '2025-03-02', amountMinor: 1_500 },
+      { bookingDate: '2025-03-04', amountMinor: 20_000 },
+      { bookingDate: '2025-02-08', amountMinor: -50_000 },
+    ]);
+    // A split purchase whose first line is a Transfer to Savings: only its second line counts.
+    const lines = await splitTransaction(t.ctx, split!, [
+      { amountMinor: -40_000, categoryId: household.id },
+      { amountMinor: -10_000, categoryId: household.id },
+    ]);
+    const [credit] = await seedClassified(t.ctx, savings, [
+      { bookingDate: '2025-02-08', amountMinor: 40_000 },
+    ]);
+    await linkTransfer(t.ctx, {
+      sides: [splitLineSide(lines.splitLines[0]!.id), transactionSide(credit!)],
+    });
+
+    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense');
+    const data = card.data!;
+
+    const empty = Array<null>(10).fill(null);
+    expect(data.rows.map((row, r) => [row.label, data.cells[r], data.rowTotals[r]])).toEqual([
+      ['Income', [...empty, 600_000, 600_000, 300_000], 1_500_000],
+      ['Expense', [...empty, -19_400, -30_000, -5_000], -54_400],
+      ['Capital', [...empty, null, -510_000, null], -510_000],
+      ['Profit', [...empty, 580_600, 570_000, 295_000], 1_445_600],
+      ['Unclassified', [...empty, -7_000, null, 21_500], 14_500],
+      ['Net cash flow', [...empty, 573_600, 60_000, 316_500], 950_100],
+    ]);
+    expect(data.total).toBe(950_100);
+    // Net cash flow per period is the Net cash flow section's.
+    const flow = (await loadSection(t.ctx, MONTHLY, 'netCashFlow')).data!;
+    expect(data.cells.at(-1)).toEqual(flow.rowTotals);
+    // Its Unclassified and Net cash flow values open the Transactions behind them.
+    for (const { value, href } of linkedValues(data)) {
+      expect((await openDrill(t.ctx, href)).value).toBe(value);
+    }
   });
 
   it('leads with its largest row, as a Dashboard heatmap does', async () => {

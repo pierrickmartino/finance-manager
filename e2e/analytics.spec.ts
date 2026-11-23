@@ -159,13 +159,7 @@ test('picking a Span preset fills in its date, reads every section over it, and 
   expect(headers).toHaveLength(ROLLING_MONTHS + 1);
   expect(headers.slice(-2)).toEqual([`${CURRENT_MONTH.split(' ')[0]}*`, 'Total']);
   expect(headers[0]!.endsWith('*')).toBe(ROLLING_MONTHS === 13);
-  for (const row of [
-    'Income',
-    'Expense',
-    'Capital',
-    'Net (income − expense)',
-    'Net incl. Capital',
-  ]) {
+  for (const row of ['Income', 'Expense', 'Capital', 'Profit', 'Net cash flow']) {
     await expect(
       heatmap(page, name).getByRole('rowheader', { name: row, exact: true }),
     ).toBeVisible();
