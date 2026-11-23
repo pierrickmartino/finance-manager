@@ -11,6 +11,7 @@ import {
   seedEarlyStart,
 } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
+import { presetPeriod } from '@/lib/analytics/period';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
@@ -243,6 +244,68 @@ describe('Income vs. expense', () => {
       expect(originOf(href)).toEqual({ kind: 'analytics', period: QUARTERLY });
       expect((await openDrill(t.ctx, href)).value).toBe(value);
     }
+  });
+
+  it('pinned, reads its own Period by quarter while the page reads months, each Drill-down over it', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+    const pins = { 'income-vs-expense': 'this-year-and-last-1' } as const;
+
+    const card = await loadSection(t.ctx, MONTHLY, 'incomeVsExpense', pins);
+    const data = card.data!;
+
+    expect(card.isPinned).toBe(true);
+    expect(card.reading).toMatchObject({
+      period: presetPeriod('this-year-and-last-1'),
+      from: '2024-01-01',
+      grain: 'quarter',
+    });
+    expect(data.columns.map((column) => [column.label, column.isPartial])).toEqual([
+      ['Q1 2024', false],
+      ['Q2 2024', false],
+      ['Q3 2024', false],
+      ['Q4 2024', false],
+      ['Q1 2025', true],
+    ]);
+    const expense = data.rows.findIndex((row) => row.key === 'expense');
+    // February 2024's groceries are outside the page's Rolling 12 months, inside the pin.
+    expect(data.cells[expense]).toEqual([-999, null, null, null, -44_400]);
+    for (const { value, href } of linkedValues(data)) {
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: MONTHLY, cardPeriods: pins });
+      expect((await openDrill(t.ctx, href)).value).toBe(value);
+    }
+  });
+
+  it('pinned, sets apart its own partial first and to-date last Intervals', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, YEARLY, 'incomeVsExpense', {
+      'income-vs-expense': 'rolling-90-days',
+    });
+    const data = card.data!;
+
+    expect(data.columns.map((column) => [column.label, column.isPartial])).toEqual([
+      ['Dec 2024', true],
+      ['Jan 2025', false],
+      ['Feb 2025', false],
+      ['Mar 2025', true],
+    ]);
+    const expense = data.rows.findIndex((row) => row.key === 'expense');
+    expect(data.cells[expense]).toEqual([null, -19_400, -20_000, -5_000]);
+  });
+
+  it('unpinned, follows the page Period and says so', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, YEARLY, 'incomeVsExpense', {
+      'net-cash-flow': 'rolling-90-days',
+    });
+
+    expect(card.isPinned).toBe(false);
+    expect(card.reading).toMatchObject({ period: YEARLY, grain: 'year' });
+    expect(labels(card.data!.columns)).toEqual(['2021', '2022', '2023', '2024', '2025']);
   });
 
   it('is empty when no Transaction falls in the Period', async () => {

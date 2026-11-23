@@ -11,6 +11,7 @@ import {
   seedEarlyStart,
 } from '@test/support/analytics';
 import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
+import { presetPeriod } from '@/lib/analytics/period';
 import { setupTestDatabase } from '@test/support/db';
 import { seedEurRates } from '@test/support/fx';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
@@ -193,6 +194,66 @@ describe('Categories per interval', () => {
       }
     },
   );
+
+  it('pinned, reads its own Period by year while the page reads Rolling 90 days by month', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+    const page = presetPeriod('rolling-90-days');
+    const pins = { 'categories-per-interval': 'this-year-and-last-4' } as const;
+
+    const card = await loadSection(t.ctx, page, 'categoriesPerInterval', pins);
+    const data = card.data!;
+
+    expect(card.isPinned).toBe(true);
+    expect(card.reading).toMatchObject({
+      period: presetPeriod('this-year-and-last-4'),
+      from: '2021-01-01',
+      grain: 'year',
+    });
+    expect(data.columns.map((column) => [column.label, column.isPartial])).toEqual([
+      ['2021', false],
+      ['2022', false],
+      ['2023', false],
+      ['2024', false],
+      ['2025', true],
+    ]);
+    const groceries = labels(data.rows).indexOf('Food › Groceries');
+    // February 2024's groceries are outside the page's 90 days, inside the pin.
+    expect(data.cells[groceries]).toEqual([null, null, null, -999, -39_400]);
+    expect(data.rowTotals[groceries]).toBe(-40_399);
+    for (const { value, href } of linkedValues(data)) {
+      expect(originOf(href)).toEqual({ kind: 'analytics', period: page, cardPeriods: pins });
+      expect((await openDrill(t.ctx, href)).value).toBe(value);
+    }
+  });
+
+  it('pinned, sets apart its own partial first and to-date last Intervals', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, YEARLY, 'categoriesPerInterval', {
+      'categories-per-interval': 'rolling-60-days',
+    });
+
+    expect(card.data!.columns.map((column) => [column.label, column.isPartial])).toEqual([
+      ['Jan 2025', true],
+      ['Feb 2025', false],
+      ['Mar 2025', true],
+    ]);
+  });
+
+  it('unpinned, follows the page Period and says so', async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const card = await loadSection(t.ctx, QUARTERLY, 'categoriesPerInterval', {
+      'income-vs-expense': 'rolling-60-days',
+    });
+
+    expect(card.isPinned).toBe(false);
+    expect(card.reading).toMatchObject({ period: QUARTERLY, grain: 'quarter' });
+    expect(card.data!.columns).toHaveLength(5);
+  });
 
   it('is empty when no Transaction falls in the Period', async () => {
     fixToday('2025-03-20');

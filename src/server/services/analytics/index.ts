@@ -55,12 +55,12 @@ export interface AnalyticsSections {
   netWorth: Promise<AnalyticsNetWorth>;
   spendingInsights: Promise<AnalyticsCard>;
   recentTransactions: Promise<RecentTransactions>;
-  netCashFlow: Promise<AnalyticsCard>;
+  netCashFlow: Promise<Pinnable<AnalyticsCard>>;
   accountBalances: Promise<AnalyticsCard>;
   spendingByCategory: Promise<Pinnable<AnalyticsCard>>;
   profitAndLoss: Promise<AnalyticsProfitAndLoss>;
-  incomeVsExpense: Promise<AnalyticsCard>;
-  categoriesPerInterval: Promise<AnalyticsCard>;
+  incomeVsExpense: Promise<Pinnable<AnalyticsCard>>;
+  categoriesPerInterval: Promise<Pinnable<AnalyticsCard>>;
 }
 
 export interface AnalyticsView {
@@ -142,14 +142,18 @@ export async function loadAnalytics(
       netWorth: netWorth(reading, { trend, balances, flow }),
       spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
-      netCashFlow: netCashFlow(ctx, reading),
+      netCashFlow: pinnable(readingFor('net-cash-flow'), (read) => netCashFlow(ctx, read)),
       accountBalances: balances,
       spendingByCategory: pinnable(readingFor('spending-by-category'), (read) =>
         spendingByCategory(ctx, read),
       ),
       profitAndLoss: profitAndLoss(ctx, reading, comparison),
-      incomeVsExpense: incomeVsExpense(ctx, reading),
-      categoriesPerInterval: categoriesPerInterval(ctx, reading),
+      incomeVsExpense: pinnable(readingFor('income-vs-expense'), (read) =>
+        incomeVsExpense(ctx, read),
+      ),
+      categoriesPerInterval: pinnable(readingFor('categories-per-interval'), (read) =>
+        categoriesPerInterval(ctx, read),
+      ),
     },
   };
 }
