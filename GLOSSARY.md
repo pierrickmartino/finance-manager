@@ -194,7 +194,7 @@ How one Widget is drawn on the Dashboard Story, or one section of Analytics: a s
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The landing page: a single fixed page of reports, read over one Span at a time: the Key figures (Net worth today; Income, Expense and Profit over the Span), Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Span, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read over one Span at a time: the Key figures (Net worth today; Income, Expense and Profit over the Span) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Span, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
 **Span**:
@@ -212,6 +212,10 @@ _Avoid_: Kept, net profit, savings, net, surplus
 **Net cash flow**:
 All the money that moved in and out over a span of time, Transfers left out: Profit plus Capital plus what is still Unclassified. It is negative when more went out than came in.
 _Avoid_: Net incl. Capital, net profit, net result, bottom line
+
+**Profit and loss**:
+The statement of a Span on Analytics: its Income, Expense, Profit, Capital, Unclassified (when there is any) and Net cash flow, each beside its value over the Comparison span and the change. Capital and Unclassified are neither good nor bad.
+_Avoid_: P&L, income statement, statement, summary
 
 **Comparison span**:
 The stretch a Span's figures are compared with. For a Span to date of a calendar period (quarter, year, or years), it is the same stretch of the previous one, a short month compared up to its last day; for any other Span, the stretch of the same number of days just before it.
