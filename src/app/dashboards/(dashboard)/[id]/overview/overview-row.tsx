@@ -181,7 +181,7 @@ export function NetWorthCard({
   return (
     <section
       aria-labelledby="overview-headline"
-      className={`${TILE_CLASS} flex flex-col bg-gradient-to-br from-ramp-5/30 to-surface ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
+      className={`${TILE_CLASS} flex flex-col bg-gradient-to-br from-ramp-5/30 to-transparent ${flow ? 'lg:row-span-2 lg:self-stretch' : ''}`}
     >
       <h2 id="overview-headline" className="font-medium">
         {headline.label}

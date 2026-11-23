@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { GLASS_CLASS } from './surface';
 
 interface MenuProps {
   /** What the toggle shows. */
@@ -39,7 +40,9 @@ export function Menu({ trigger, label, triggerClassName, children }: MenuProps) 
       <summary aria-label={label} className={`cursor-pointer list-none ${triggerClassName}`}>
         {trigger}
       </summary>
-      <div className="absolute right-0 z-10 mt-1 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-xl border border-rule bg-surface p-3 shadow-lg">
+      <div
+        className={`absolute right-0 z-10 mt-1 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-xl ${GLASS_CLASS} p-3 shadow-lg`}
+      >
         {children}
       </div>
     </details>
