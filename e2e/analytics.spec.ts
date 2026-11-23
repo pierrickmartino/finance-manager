@@ -7,6 +7,7 @@ import { createCategory, createCategoryGroup } from '../src/server/services/cate
 import { addDays, swissToday } from '../src/server/services/fx/dates';
 import { editClassification } from '../src/server/services/transactions';
 import { createManualTransaction } from '../src/server/services/transactions/manual';
+import { leadFontSize } from './support/card-layout';
 import { withServices } from './support/services';
 
 /**
@@ -846,8 +847,7 @@ test('on a wide screen the third-width sections draw their lead a size down, fro
   await page.goto('/analytics');
   // About 355px inside at 1280, under the Card's lead threshold (28rem): the smaller size.
   for (const name of ['Net cash flow', 'Account balances in CHF', 'Spending by Category']) {
-    const lead = region(page, name).locator('h2 ~ p.font-display');
-    await expect(lead).toBeVisible();
-    expect(await lead.evaluate((el) => getComputedStyle(el).fontSize)).toBe('20px');
+    await expect(region(page, name).getByTestId('card-lead')).toBeVisible();
+    expect(await leadFontSize(region(page, name))).toBe('20px');
   }
 });
