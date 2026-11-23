@@ -229,6 +229,42 @@ describe('axes', () => {
     expect(years.cells).toEqual([[null], [564949]]);
   });
 
+  it('groups by day, listing every day of the range with its ISO date', async () => {
+    await dataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'fixed', from: '2025-01-09', to: '2025-01-12' },
+      rows: 'day',
+      columns: 'categoryGroupType',
+    });
+
+    expect(keys(report.rows)).toEqual(['2025-01-09', '2025-01-10', '2025-01-11', '2025-01-12']);
+    expect(labels(report.rows)).toEqual([
+      '9 Jan 2025',
+      '10 Jan 2025',
+      '11 Jan 2025',
+      '12 Jan 2025',
+    ]);
+    expect(report.rows.map((row) => row.isPartial)).toEqual([false, false, false, false]);
+    // Groceries at Migros on the 10th, and EUR -100.00 at CA on Saturday the 11th at 0.94.
+    expect(report.cells).toEqual([[null], [-12000], [-9400], [null]]);
+  });
+
+  it('groups a range of several years by day, uncapped', async () => {
+    await dataset();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'fixed', from: '2021-01-01', to: '2025-12-31' },
+      rows: 'day',
+    });
+
+    // 2021 to 2025: 5 × 365 days and 29 February 2024.
+    expect(report.rows).toHaveLength(1826);
+    expect(report.rows[0]!.key).toBe('2021-01-01');
+    expect(report.rows.at(-1)!.key).toBe('2025-12-31');
+    expect(report.total).toBe(564949);
+  });
+
   it('groups by Category group, Account and Currency', async () => {
     const { ubs, ca, income, food } = await dataset();
 
@@ -377,6 +413,49 @@ describe('date ranges', () => {
     expect(report.cells.at(-1)).toEqual([-999]);
   });
 
+  it('flags today, and no other day, as partial by day', async () => {
+    const { ubs } = await dataset();
+    await seed(ubs, [{ bookingDate: '2025-04-10', amountMinor: -999 }]);
+    onApril10();
+
+    const fixed = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'fixed', from: '2025-04-08', to: '2025-04-10' },
+      rows: 'day',
+    });
+    const live = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'last', count: 1, unit: 'month', includeCurrent: true },
+      rows: 'day',
+    });
+
+    expect(fixed.rows.map((row) => [row.key, row.isPartial])).toEqual([
+      ['2025-04-08', false],
+      ['2025-04-09', false],
+      ['2025-04-10', true],
+    ]);
+    expect(fixed.cells.at(-1)).toEqual([-999]);
+    expect(live.rows).toHaveLength(31 + 10);
+    expect(live.rows.filter((row) => row.isPartial).map((row) => row.key)).toEqual(['2025-04-10']);
+  });
+
+  it('covers the last N complete days, or up to today when asked', async () => {
+    onApril10();
+
+    const complete = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'last', count: 7, unit: 'day' },
+      rows: 'day',
+    });
+    const toDate = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'last', count: 7, unit: 'day', includeCurrent: true },
+      rows: 'day',
+    });
+
+    expect(complete.range).toEqual({ from: '2025-04-03', to: '2025-04-09' });
+    expect(complete.rows.some((row) => row.isPartial)).toBe(false);
+    expect(toDate.range).toEqual({ from: '2025-04-03', to: '2025-04-10' });
+    expect(toDate.partialPeriod).toEqual({ from: '2025-04-10', to: '2025-04-10' });
+    expect(toDate.rows.at(-1)).toMatchObject({ key: '2025-04-10', isPartial: true });
+  });
+
   it('covers complete years and year to date', async () => {
     onApril10();
 
@@ -500,6 +579,37 @@ describe('drill down into a cell', () => {
     );
 
     expect(page).toMatchObject({ measure: 'count', total: 4, value: 4 });
+  });
+
+  it("lists a day cell's Transactions: in CHF at their date, Transfers left out", async () => {
+    await dataset();
+
+    const saturday = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: 'day', columns: 'categoryGroupType' },
+      { row: '2025-01-11', column: 'expense' },
+    );
+    // The Transfer's EUR side lands on 22 February: that day has nothing to list.
+    const transferDay = await listCellTransactions(
+      t.ctx,
+      { dateRange: Q1_2025, rows: 'day' },
+      { row: '2025-02-22' },
+    );
+
+    expect(saturday.transactions.map((item) => [item.bookingDate, item.chfMinor])).toEqual([
+      ['2025-01-11', -9400],
+    ]);
+    expect(saturday.sumChfMinor).toBe(-9400);
+    expect(transferDay.total).toBe(0);
+  });
+
+  it('adds up, cell by cell, for day × Category group type', async () => {
+    await dataset();
+    await expectDrillDownConsistent({
+      dateRange: { kind: 'fixed', from: '2025-01-09', to: '2025-01-26' },
+      rows: 'day',
+      columns: 'categoryGroupType',
+    });
   });
 
   it('adds up, cell by cell, for month × Category', async () => {
@@ -794,6 +904,25 @@ describe('split Transactions', () => {
       columns: 'currency',
       includeCapital: true,
     });
+  });
+
+  it('drills down from a day cell to its split lines by their own Category', async () => {
+    const { shopping, groceries } = await splitDataset();
+    const query: WidgetQueryInput = {
+      dateRange: { kind: 'fixed', from: '2025-03-04', to: '2025-03-06' },
+      rows: 'day',
+      columns: 'category',
+    };
+
+    const report = await runWidgetQuery(t.ctx, query);
+    const page = await listCellTransactions(t.ctx, query, {
+      row: '2025-03-05',
+      column: groceries.id,
+    });
+
+    const groceriesColumn = report.columns.findIndex((column) => column.key === groceries.id);
+    expect(report.cells[1]![groceriesColumn]).toBe(-15000);
+    expect(page.transactions.map((item) => [item.id, item.chfMinor])).toEqual([[shopping, -15000]]);
   });
 
   it('counts a split Transaction once in each cell and total its lines fall in', async () => {

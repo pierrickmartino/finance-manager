@@ -96,6 +96,8 @@ describe('period', () => {
     ['2024-12', 'Dec 2024'],
     ['2025-Q1', 'Q1 2025'],
     ['2025', '2025'],
+    ['2025-03-09', '9 Mar 2025'],
+    ['2024-02-29', '29 Feb 2024'],
   ])('formats the period key %s as %s', (key, expected) => {
     expect(createFormatter(DEFAULT_DISPLAY_SETTINGS).period(key)).toBe(expected);
     expect(formatPeriod(key)).toBe(expected);

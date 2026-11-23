@@ -128,6 +128,8 @@ export function baseCte(
 /** The key expression of an axis over `report_base b` (and `bt`, its Tags, for the Tag axis). */
 export function axisKey(axis: ReportAxis): string {
   switch (axis) {
+    case 'day':
+      return `to_char(b.booking_date, 'YYYY-MM-DD')`;
     case 'month':
       return `to_char(b.booking_date, 'YYYY-MM')`;
     case 'quarter':

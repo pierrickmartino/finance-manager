@@ -13,7 +13,10 @@ export interface ReportHeader {
    */
   key: string | null;
   label: string;
-  /** A time period that is the current, incomplete one (spec 101). */
+  /**
+   * A time period that is the current, incomplete one (spec 101). By day, today alone: every
+   * other day is full, the range's first included.
+   */
   isPartial: boolean;
 }
 
@@ -68,6 +71,7 @@ async function labelKeys(db: Queryable, axis: ReportAxis, keys: string[]): Promi
 /**
  * The headers of one axis: every period of the range for a time axis (so gaps show as empty
  * periods), otherwise the keys that have data, labelled and ordered, with the "none" bucket last.
+ * A day is partial when it is `today`; a longer period when it overlaps the partial period.
  */
 export async function axisHeaders(
   db: Queryable,
@@ -75,13 +79,18 @@ export async function axisHeaders(
   keys: ReadonlySet<string | null>,
   range: DateSpan,
   partialPeriod: DateSpan | null,
+  today: string,
 ): Promise<ReportHeader[]> {
   if (axis === null) return [ALL_HEADER];
   if (isTimeAxis(axis)) {
+    const isPartial = (key: string) =>
+      axis === 'day'
+        ? key === today
+        : partialPeriod !== null && intersect(periodSpan(key, axis), partialPeriod) !== null;
     return periodsIn(range, axis).map((key) => ({
       key,
       label: formatPeriod(key),
-      isPartial: partialPeriod !== null && intersect(periodSpan(key, axis), partialPeriod) !== null,
+      isPartial: isPartial(key),
     }));
   }
   const present = [...keys].filter((key): key is string => key !== null);
