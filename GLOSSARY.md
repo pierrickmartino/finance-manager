@@ -194,16 +194,20 @@ How one Widget is drawn on the Dashboard Story, or one section of Analytics: a s
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The landing page: a single fixed page of reports, read over one Span at a time: the Key figures (Net worth today; Income, Expense and Profit over the Span) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Span, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read over one Span at a time, which some Cards may replace with their own Card Span: the Key figures (Net worth today; Income, Expense and Profit over the Span) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per period of the Span, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
 **Span**:
-The stretch of days Analytics is read over: from a start date, never before the first Transaction, to today. It is split into months, quarters or years by its length; its first period starts at the start date and its last is shown "to date", both set apart from complete ones. The spending insight always speaks of the last complete month, whatever the Span.
+The stretch of days Analytics, or one of its Cards, is read over: from a start date, never before the first Transaction, to today. It is split into months, quarters or years by its length; its first period starts at the start date and its last is shown "to date", both set apart from complete ones. The spending insight always speaks of the last complete month, whatever the Span.
 _Avoid_: Date range, period window, period view, lookback
 
 **Span preset**:
 A named way of choosing a Span's start date, such as "Rolling 90 days", "Year to date" or "This year and last 2". A Span chosen by preset moves with it as days pass; one chosen by date keeps its start date.
 _Avoid_: Quick range, shortcut
+
+**Card Span**:
+The Span preset one Card of Analytics is pinned to, in place of the page's Span, until set back to the page's. The Card is then read wholly over it: its periods, its Drill-downs and its Comparison span. The Key figures, the spending insight, the most recent Transactions and the Account balances have none.
+_Avoid_: Override, local span, card period
 
 **Profit**:
 Income minus expense over a span of time, with Capital left out. It is negative when more went out than came in.
