@@ -28,6 +28,8 @@ export const TILE_AMOUNT_CLASS =
  * transparency, or without backdrop-filter, the fill is opaque (one rule in globals.css).
  */
 export const GLASS_CLASS = 'border border-ink/12 glass-surface';
+/** GLASS_CLASS's thin luminous border alone, for glass of another fill (the insight tile). */
+const GLASS_BORDER_CLASS = 'border border-ink/12';
 /**
  * The soft cyan inner glow of the Dashboard's and Analytics' tiles (with their small shadow),
  * so the cards read for insight stand out from working lists. Tiles only: TILE_CLASS has it.
@@ -72,6 +74,11 @@ export const CHOICE_TILE_CLASS =
   'rounded-md border border-rule-strong bg-surface hover:border-faint aria-[current=page]:border-ink aria-[current=page]:ring-2 aria-[current=page]:ring-ink has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent-ink';
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = `rounded-3xl ${GLASS_CLASS} ${TILE_GLOW_CLASS} p-5`;
+/**
+ * The insight tile (the Dashboard's and Analytics' spending insight): TILE_CLASS in the ramp's
+ * deep violet (`insight`) instead of `surface`, glass with the glow, under white `on-ramp` text.
+ */
+export const INSIGHT_TILE_CLASS = `rounded-3xl ${GLASS_BORDER_CLASS} glass-insight ${TILE_GLOW_CLASS} p-6 text-on-ramp`;
 
 /**
  * A quiet block standing in for content still loading (a card's chart, a line of text): a

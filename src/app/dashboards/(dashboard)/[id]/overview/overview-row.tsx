@@ -4,7 +4,12 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useFormatter } from '@/components/formatter-provider';
 import { cssGradient, RAMP_FILLS } from '@/lib/color/ramp-fills';
-import { BADGE_CLASS, HEADLINE_AMOUNT_CLASS, TILE_CLASS } from '@/components/surface';
+import {
+  BADGE_CLASS,
+  HEADLINE_AMOUNT_CLASS,
+  INSIGHT_TILE_CLASS,
+  TILE_CLASS,
+} from '@/components/surface';
 import { readCard, type CardFlow, type MonthFlow, type WidgetCardData } from '@/lib/reporting/card';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { plural } from '@/lib/reporting/drill-summary';
@@ -296,7 +301,7 @@ export function InsightCard({
   return (
     <section
       aria-labelledby="overview-insight"
-      className="flex flex-col rounded-3xl bg-insight p-6 text-on-ramp shadow-lg lg:row-span-2 lg:self-stretch"
+      className={`${INSIGHT_TILE_CLASS} flex flex-col lg:row-span-2 lg:self-stretch`}
     >
       <h2 id="overview-insight" className="font-display text-lg leading-snug tracking-tight">
         {insight.headline}

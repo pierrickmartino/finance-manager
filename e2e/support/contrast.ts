@@ -12,6 +12,7 @@ import {
   contrastRatio,
   relativeLuminance,
 } from '../../src/lib/color/contrast';
+import { colourReader, type ColourReader } from './colour-reader';
 
 /** What the browser reports about one element: its colour and the fills behind it, nearest first. */
 interface Sample {
@@ -19,8 +20,13 @@ interface Sample {
   color: string;
   /** Background colours from the element out, up to and including the first opaque one. */
   layers: string[];
-  /** Set when a gradient or image is behind the element: no single colour to measure against. */
-  skip?: string;
+  /**
+   * Whether a gradient or image is drawn behind it (the Net worth tile's ramp fill). The text is
+   * then measured on the fills beneath the image: under reduced transparency, the opaque
+   * fallback surface. The gradient itself is checked at every step by `design-tokens.test.ts`
+   * (`TEXT_ON_RAMP_FILLS`).
+   */
+  isOverImage: boolean;
   isLarge: boolean;
 }
 
@@ -50,52 +56,45 @@ function measure(sample: Sample, minimum: number): ContrastFailure | null {
 }
 
 /** Functions living in the page, passed into later `evaluate` calls. */
-interface PageTools {
-  /** Any CSS colour the browser computes (rgb, oklab from Tailwind's `/alpha`…) as `rgba()`. */
-  rgba: (color: string) => string;
+interface PageTools extends ColourReader {
   /** The background colours behind an element, from it outwards, as `rgba()`. */
-  layersOf: (element: Element) => Pick<Sample, 'layers' | 'skip'>;
+  layersOf: (element: Element) => Pick<Sample, 'layers' | 'isOverImage'>;
 }
 
-function toolsInPage(page: Page): Promise<JSHandle<PageTools>> {
-  return page.evaluateHandle(() => {
-    const canvas = document.createElement('canvas').getContext('2d', {
-      willReadFrequently: true,
-    });
-    if (!canvas) throw new Error('No 2D canvas to read colours with');
-    // A canvas reads any colour syntax the browser computes and hands back plain sRGB.
-    const rgba = (color: string) => {
-      canvas.clearRect(0, 0, 1, 1);
-      canvas.fillStyle = color;
-      canvas.fillRect(0, 0, 1, 1);
-      const [r = 0, g = 0, b = 0, a = 255] = canvas.getImageData(0, 0, 1, 1).data;
-      return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
-    };
+async function toolsInPage(page: Page): Promise<JSHandle<PageTools>> {
+  const reader = await colourReader(page);
+  return page.evaluateHandle((reader) => {
     const layersOf = (element: Element) => {
       const layers: string[] = [];
+      let isOverImage = false;
       for (let node: Element | null = element; node; node = node.parentElement) {
         const style = getComputedStyle(node);
-        if (style.backgroundImage !== 'none')
-          return { layers, skip: 'a gradient or image behind it' };
-        const color = rgba(style.backgroundColor);
-        if (color.endsWith(', 0)')) continue;
-        layers.push(color);
-        if (color.endsWith(', 1)')) return { layers };
+        if (style.backgroundImage !== 'none') isOverImage = true;
+        const alpha = reader.alpha(style.backgroundColor);
+        if (alpha === 0) continue;
+        layers.push(reader.rgba(style.backgroundColor));
+        if (alpha === 1) return { layers, isOverImage };
       }
-      return { layers: [...layers, 'rgba(255, 255, 255, 1)'] };
+      // The page always has an opaque fill (`body`): reaching here is a page drawn without one.
+      throw new Error(`No opaque background behind <${element.tagName.toLowerCase()}>`);
     };
-    return { rgba, layersOf };
-  });
+    return { rgba: reader.rgba, alpha: reader.alpha, layersOf };
+  }, reader);
 }
+
+/** The font size (px) from which text counts as large for AA, and the size that does when bold. */
+const LARGE_TEXT_PX = 24;
+const LARGE_BOLD_TEXT_PX = 18.66;
+const BOLD_WEIGHT = 700;
 
 /**
  * Every visible piece of text on the page that should be read: not decorative (`aria-hidden`),
  * not disabled or faded out (WCAG exempts inactive controls), not visually hidden.
  */
-async function textSamples(page: Page, excluded: Record<string, string>): Promise<Sample[]> {
+async function textSamples(page: Page): Promise<Sample[]> {
   const tools = await toolsInPage(page);
   return page.evaluate(
-    ({ tools: { rgba, layersOf }, excluded }) => {
+    ({ tools: { rgba, layersOf }, large }) => {
       const samples: Sample[] = [];
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       const seen = new Set<Element>();
@@ -117,36 +116,35 @@ async function textSamples(page: Page, excluded: Record<string, string>): Promis
         const size = Number.parseFloat(style.fontSize);
         const weight = Number(style.fontWeight);
         const label = `"${text.textContent.trim().slice(0, 40)}" <${element.tagName.toLowerCase()} class="${element.getAttribute('class') ?? ''}">`;
-        const exclusion = Object.entries(excluded).find(([selector]) => element.closest(selector));
         samples.push({
           label,
           color: rgba(style.color),
-          isLarge: size >= 24 || (size >= 18.66 && weight >= 700),
+          isLarge: size >= large.size || (size >= large.boldSize && weight >= large.bold),
           ...layersOf(element),
-          ...(exclusion && { skip: exclusion[1] }),
         });
       }
       return samples;
     },
-    { tools, excluded },
+    {
+      tools,
+      large: { size: LARGE_TEXT_PX, boldSize: LARGE_BOLD_TEXT_PX, bold: BOLD_WEIGHT },
+    },
   );
 }
 
 /**
- * The text on the page that fails AA (4.5:1, or 3:1 for large text), and what was skipped.
- * `excluded` maps a selector to the reason the text inside it is not measured.
+ * The text on the page that fails AA (4.5:1, or 3:1 for large text), how many pieces were
+ * measured, and the labels of those measured over a gradient (see `Sample.isOverImage`).
  */
 export async function textContrastFailures(
   page: Page,
-  excluded: Record<string, string> = {},
-): Promise<{ failures: ContrastFailure[]; measured: number; skipped: string[] }> {
-  const samples = await textSamples(page, excluded);
-  const skipped = samples.filter((s) => s.skip).map((s) => `${s.label}: ${s.skip}`);
+): Promise<{ failures: ContrastFailure[]; measured: number; overImage: string[] }> {
+  const samples = await textSamples(page);
   const failures = samples
-    .filter((s) => !s.skip)
     .map((s) => measure(s, s.isLarge ? AA_NON_TEXT : AA_TEXT))
     .filter((failure): failure is ContrastFailure => failure !== null);
-  return { failures, measured: samples.length - skipped.length, skipped };
+  const overImage = samples.filter((s) => s.isOverImage).map((s) => s.label);
+  return { failures, measured: samples.length, overImage };
 }
 
 /**
@@ -170,7 +168,6 @@ export async function focusOutline(
       },
     };
   }, tools);
-  if (sample.sample.skip) throw new Error(`${sample.sample.label}: ${sample.sample.skip}`);
   return {
     isFocusVisible: sample.isFocusVisible && sample.outlineStyle !== 'none',
     outline: sample.sample.color,
@@ -192,4 +189,20 @@ export async function pageColours(
     text: relativeLuminance(computed.text),
     colorScheme: computed.colorScheme,
   };
+}
+
+/** An element's computed text colour, as `rgba()`. */
+export async function textColour(target: Locator): Promise<string> {
+  const reader = await colourReader(target.page());
+  return target.evaluate((element, reader) => reader.rgba(getComputedStyle(element).color), reader);
+}
+
+/** A colour token's value as the page computes it (`--color-<name>`), as `rgba()`. */
+export async function tokenColour(page: Page, name: string): Promise<string> {
+  const reader = await colourReader(page);
+  return page.evaluate(
+    ({ reader, name }) =>
+      reader.rgba(getComputedStyle(document.documentElement).getPropertyValue(`--color-${name}`)),
+    { reader, name },
+  );
 }

@@ -1,9 +1,9 @@
 /** Controls that sit on the app shell's 48px bar, on the navy page (docs/design-system.md, "The app shell"). */
 
-/** A pill of the top bar. */
+/** A pill of the top bar; the current page's is marked in the accent, as in the drawer. */
 export const BAR_PILL_CLASS =
   'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] whitespace-nowrap transition-colors';
-export const BAR_PILL_ACTIVE = 'bg-on-ramp/20 text-on-ramp shadow-inner ring-1 ring-on-ramp/25';
+export const BAR_PILL_ACTIVE = 'bg-accent-tint font-medium text-accent-ink ring-1 ring-accent/40';
 export const BAR_PILL_IDLE = 'text-on-ramp/75 hover:bg-on-ramp/10 hover:text-on-ramp';
 
 /** A square icon button (settings, sign out, the menu on small screens). */

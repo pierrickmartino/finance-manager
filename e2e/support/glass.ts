@@ -5,6 +5,7 @@
  * option, so it is emulated through Chromium's DevTools protocol.
  */
 import type { Locator, Page } from '@playwright/test';
+import { colourReader } from './colour-reader';
 
 /** What an element's own fill looks like, as the browser computes it. */
 export interface Fill {
@@ -20,29 +21,54 @@ export interface Fill {
  * The fill an element sits on: its own when it has one, else its nearest filled ancestor's
  * (`isOwn` keeps to the element itself, so a row with no fill of its own reads as none).
  */
-export function fillOf(target: Locator, { isOwn = false } = {}): Promise<Fill> {
-  return target.evaluate((start, isOwn) => {
-    const canvas = document.createElement('canvas').getContext('2d', {
-      willReadFrequently: true,
-    });
-    if (!canvas) throw new Error('No 2D canvas to read colours with');
-    // A canvas reads any colour syntax the browser computes (color-mix, oklab…) as plain sRGB.
-    const alphaOf = (color: string) => {
-      canvas.clearRect(0, 0, 1, 1);
-      canvas.fillStyle = color;
-      canvas.fillRect(0, 0, 1, 1);
-      return (canvas.getImageData(0, 0, 1, 1).data[3] ?? 0) / 255;
+export async function fillOf(target: Locator, { isOwn = false } = {}): Promise<Fill> {
+  const reader = await colourReader(target.page());
+  return target.evaluate(
+    (start, { reader, isOwn }) => {
+      let element: Element | null = start;
+      while (!isOwn && element && reader.alpha(getComputedStyle(element).backgroundColor) === 0)
+        element = element.parentElement;
+      const style = getComputedStyle(element ?? start);
+      return {
+        alpha: reader.alpha(style.backgroundColor),
+        isBlurred: /blur\(/.test(style.backdropFilter),
+        hasInnerGlow: /inset/.test(style.boxShadow),
+      };
+    },
+    { reader, isOwn },
+  );
+}
+
+/** A named region of the page's content that is a glass container of its own. */
+export interface GlassRegion {
+  name: string;
+  hasInnerGlow: boolean;
+}
+
+/**
+ * Every named region (`<section>`) of the page's content that is glass and not inside another
+ * glass container: on the Dashboard and Analytics, each tile and any card beside them.
+ */
+export function glassRegions(page: Page): Promise<GlassRegion[]> {
+  return page.locator('main').evaluate((main) => {
+    const isGlass = (element: Element) => /blur\(/.test(getComputedStyle(element).backdropFilter);
+    const isInGlass = (element: Element) => {
+      for (let node = element.parentElement; node && node !== main; node = node.parentElement)
+        if (isGlass(node)) return true;
+      return false;
     };
-    let element: Element | null = start;
-    while (!isOwn && element && alphaOf(getComputedStyle(element).backgroundColor) === 0)
-      element = element.parentElement;
-    const style = getComputedStyle(element ?? start);
-    return {
-      alpha: alphaOf(style.backgroundColor),
-      isBlurred: /blur\(/.test(style.backdropFilter),
-      hasInnerGlow: /inset/.test(style.boxShadow),
+    const nameOf = (element: Element) => {
+      const labelledBy = element.getAttribute('aria-labelledby');
+      const label = labelledBy ? document.getElementById(labelledBy)?.textContent : null;
+      return (label ?? element.getAttribute('aria-label') ?? '').trim();
     };
-  }, isOwn);
+    return [...main.querySelectorAll('section[aria-label], section[aria-labelledby]')]
+      .filter((section) => isGlass(section) && !isInGlass(section))
+      .map((section) => ({
+        name: nameOf(section),
+        hasInnerGlow: /inset/.test(getComputedStyle(section).boxShadow),
+      }));
+  });
 }
 
 /** Every element on the page that is see-through and blurs what is behind it: the glass. */
