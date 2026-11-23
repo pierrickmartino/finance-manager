@@ -52,7 +52,7 @@ export type Pinnable<Result> = Result & SectionReading;
 /** Each section's promise, by name. */
 export interface AnalyticsSections {
   keyFigures: Promise<AnalyticsKeyFigures>;
-  netWorth: Promise<AnalyticsNetWorth>;
+  netWorth: Promise<Pinnable<AnalyticsNetWorth>>;
   spendingInsights: Promise<AnalyticsCard>;
   recentTransactions: Promise<RecentTransactions>;
   netCashFlow: Promise<Pinnable<AnalyticsCard>>;
@@ -114,7 +114,8 @@ async function pinnable<Result>(
  * A pinned section (GLOSSARY: Card Period, ADR-0018; `cardPeriods`, none by default) is read over
  * its own preset instead, resolved from the same today and first Transaction, so it is cut to the
  * data like any Period; its result names the reading it was read over. Every Drill-down, pinned or
- * not, leads back to the page with its Period and every pin (the readings' `page`).
+ * not, leads back to the page with its Period and every pin (the readings' `page`). A pinned Net
+ * worth runs its own trend and income and expense; the Key figures keep the page's.
  */
 export async function loadAnalytics(
   ctx: ServiceContext,
@@ -133,13 +134,22 @@ export async function loadAnalytics(
   const flow = spendingInsights(ctx, reading);
   const trend = netWorthTrend(ctx, reading);
   const comparison = loadComparison(ctx, reading, dataStart.accountData);
+  const netWorthReading = readingFor('net-worth');
   return {
     today,
     reading,
     starts: presetStarts(today, dataStart.firstTransaction),
     sections: {
       keyFigures: keyFigures(ctx, reading, { balances, trend, flow }, comparison),
-      netWorth: netWorth(reading, { trend, balances, flow }),
+      netWorth: pinnable(netWorthReading, (read) =>
+        netWorth(
+          read,
+          // Pinned, it runs its own trend and flow; unpinned, it shares the Key figures'.
+          netWorthReading.isPinned
+            ? { trend: netWorthTrend(ctx, read), balances, flow: spendingInsights(ctx, read) }
+            : { trend, balances, flow },
+        ),
+      ),
       spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
       netCashFlow: pinnable(readingFor('net-cash-flow'), (read) => netCashFlow(ctx, read)),

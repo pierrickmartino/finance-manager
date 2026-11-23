@@ -7,11 +7,12 @@ import { seedTransactions } from '@test/support/transactions';
 import { archiveAccount, createAccount } from '../accounts';
 import { recordBalanceSnapshot } from '../balance-snapshots';
 import { createBank } from '../banks';
-import { presetPeriod, type Period } from '@/lib/analytics/period';
+import { NO_PINS, presetPeriod, type CardPeriods, type Period } from '@/lib/analytics/period';
 import type { ChartSource } from '@/lib/reporting/chart-data';
 import { readHeadlineTrend } from '@/lib/reporting/net-worth-headline';
 import { headlineAmount } from '@/lib/reporting/overview';
 import type { TimeAxis } from '../reporting/query';
+import { loadAnalytics } from '.';
 
 /** Analytics' Net worth (spec #170, user stories 14-17): today, its trend and its change. */
 
@@ -83,6 +84,17 @@ async function headlineAt(period: Period, grain: TimeAxis) {
   return {
     netWorth,
     hero: headlineAmount(netWorth.cards, readHeadlineTrend(netWorth.trend, grain)),
+  };
+}
+
+/** Net worth and the Key figures' Net worth tile, read in the same call, once every section is in. */
+async function beside(period: Period, pins: CardPeriods = NO_PINS) {
+  const { sections } = await loadAnalytics(t.ctx, period, pins);
+  await Promise.allSettled(Object.values(sections));
+  const keyFigures = await sections.keyFigures;
+  return {
+    netWorth: await sections.netWorth,
+    tile: keyFigures.figures.find((figure) => figure.id === 'netWorth'),
   };
 }
 
@@ -245,6 +257,57 @@ describe('Net worth', () => {
       'Account balances in CHF',
       'Spending Insights',
     ]);
+  });
+
+  it("pinned, runs its line from its own Period's start, its change since then, while the Key figures' tile reads the page", async () => {
+    fixToday('2025-03-20');
+    await dataset();
+    const pins = { 'net-worth': 'year-to-date' } as const;
+
+    const pinned = await beside(MONTHLY, pins);
+    const unpinned = await beside(MONTHLY);
+
+    const { netWorth } = pinned;
+    expect(netWorth.isPinned).toBe(true);
+    expect(netWorth.reading).toMatchObject({
+      period: presetPeriod('year-to-date'),
+      from: '2025-01-01',
+      to: '2025-03-20',
+      grain: 'month',
+      page: { period: MONTHLY, cardPeriods: pins },
+    });
+    expect(dated(netWorth.trend)).toEqual([
+      ['1 Jan 2025', END_OF_2024, '/accounts?date=2024-12-31'],
+      ['Jan 2025', 100_000 + 94_000 - 300_000, '/accounts?date=2025-01-31'],
+      ['Feb 2025', 120_000 + 95_000 - 250_000, '/accounts?date=2025-02-28'],
+      ['Mar 2025', TODAY, '/accounts?date=2025-03-20'],
+    ]);
+    expect(netWorth.change).toEqual({
+      since: '1 Jan 2025',
+      change: TODAY - END_OF_2024,
+      href: '/accounts?date=2024-12-31',
+    });
+    // What came in and went out is read over its own Period's months too.
+    expect(netWorth.cards[1]?.data?.rows.map((row) => row.key)).toEqual([
+      '2025-01',
+      '2025-02',
+      '2025-03',
+    ]);
+    // The Key figures' Net worth tile, sparkline and change still read Rolling 12 months.
+    expect(pinned.tile).toEqual(unpinned.tile);
+    expect(pinned.tile?.sparkline).toHaveLength(14);
+  });
+
+  it("unpinned, reads the page's Period and says so", async () => {
+    fixToday('2025-03-20');
+    await dataset();
+
+    const { netWorth } = await beside(MONTHLY);
+
+    expect(netWorth.isPinned).toBe(false);
+    expect(netWorth.reading).toMatchObject({ period: MONTHLY, from: '2024-03-21' });
+    expect(netWorth.trend.rows).toHaveLength(14);
+    expect(netWorth.change?.since).toBe('21 Mar 2024');
   });
 
   it('has nothing to show without an Account', async () => {
