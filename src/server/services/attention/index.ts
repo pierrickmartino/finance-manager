@@ -3,6 +3,12 @@ import { withTransaction } from '@/server/db/transaction';
 import type { ServiceContext } from '../context';
 import { parseInput } from '../errors';
 import type { AttentionKind, FormedAttentionItem } from './kind';
+import {
+  missedKind,
+  priceIncreaseKind,
+  type MissedAttentionItem,
+  type PriceIncreaseAttentionItem,
+} from './recurring';
 import { unclassifiedKind, type UnclassifiedAttentionItem } from './unclassified';
 
 /**
@@ -17,10 +23,12 @@ import { unclassifiedKind, type UnclassifiedAttentionItem } from './unclassified
  */
 
 export type { AttentionTone } from './kind';
+export type { MissedAttentionItem, PriceIncreaseAttentionItem } from './recurring';
 export type { UnclassifiedAttentionItem } from './unclassified';
 
 /** An Attention item of any kind, as its kind lists it. */
-export type ListedAttentionItem = UnclassifiedAttentionItem;
+export type ListedAttentionItem =
+  MissedAttentionItem | PriceIncreaseAttentionItem | UnclassifiedAttentionItem;
 
 /** An Attention item, and whether it is unread: new, or worse, since the bell was last opened. */
 export type AttentionItem = ListedAttentionItem & { unread: boolean };
@@ -29,7 +37,11 @@ export type AttentionItem = ListedAttentionItem & { unread: boolean };
  * Every kind, in display order: FX rates, Completeness by severity, Missed, Price increase,
  * Unclassified.
  */
-const KINDS: readonly AttentionKind<ListedAttentionItem>[] = [unclassifiedKind];
+const KINDS: readonly AttentionKind<ListedAttentionItem>[] = [
+  missedKind,
+  priceIncreaseKind,
+  unclassifiedKind,
+];
 
 const input = z.object({ today: z.iso.date() });
 

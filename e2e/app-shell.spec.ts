@@ -2,7 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import { createAccount } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
 import { createCategory, createCategoryGroup } from '../src/server/services/categories';
-import { createManualTransaction } from '../src/server/services/transactions/manual';
+import { formatDate } from '../src/lib/format';
+import { addDays, swissToday } from '../src/server/services/fx/dates';
+import { addMonths } from '../src/server/services/recurring-payments/dates';
+import { getDisplaySettings } from '../src/server/services/settings';
+import { editClassification } from '../src/server/services/transactions';
+import {
+  createManualTransaction,
+  deleteManualTransaction,
+} from '../src/server/services/transactions/manual';
 import { SIGNED_OUT } from './support/auth';
 import { classifyEverything } from './support/attention';
 import { withServices } from './support/services';
@@ -114,6 +122,76 @@ test('the bell lists the Unclassified Transactions and leads to Unclassified', a
   await item.click();
   await expect(page).toHaveURL(/\/unclassified$/);
   await expect(bellPopover(page)).toBeHidden();
+});
+
+/**
+ * Adds a monthly Recurring payment charged 100, 70 and 40 days ago, on an Account entered by
+ * hand: its next charge, due a month after the last, is past its grace, so it is Missed. Returns
+ * its Payee, its expected date as the bell words it, and a cleanup that deletes its charges.
+ */
+async function addMissed(): Promise<{
+  payeeName: string;
+  expected: string;
+  remove: () => Promise<void>;
+}> {
+  const suffix = Date.now();
+  const payeeName = `Bell gym ${suffix}`;
+  const today = swissToday();
+  return withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Bell bank missed ${suffix}` });
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      name: `Bell account missed ${suffix}`,
+      currency: 'CHF',
+      kind: 'current',
+      importFormat: null,
+      openingBalanceMinor: 0,
+      openingDate: addDays(today, -365),
+    });
+    const group = await createCategoryGroup(ctx, { name: `Bell ${suffix}`, type: 'expense' });
+    const category = await createCategory(ctx, { groupId: group.id, name: 'Gym' });
+    const dates = [100, 70, 40].map((days) => addDays(today, -days));
+    const ids: string[] = [];
+    for (const bookingDate of dates) {
+      const { id } = await createManualTransaction(ctx, {
+        accountId: account.id,
+        bookingDate,
+        amountMinor: -50_00,
+        description: payeeName,
+      });
+      await editClassification(ctx, id, { categoryId: category.id, payeeName });
+      ids.push(id);
+    }
+    const { dateFormat } = await getDisplaySettings(ctx);
+    return {
+      payeeName,
+      expected: formatDate(addMonths(dates.at(-1)!, 1), dateFormat),
+      remove: () =>
+        withServices(async (cleanup) => {
+          for (const id of ids) await deleteManualTransaction(cleanup, id);
+        }),
+    };
+  });
+}
+
+test('the bell lists a Missed Recurring payment and leads to Recurring payments', async ({
+  page,
+}) => {
+  const { payeeName, expected, remove } = await addMissed();
+  try {
+    await page.goto('/categories');
+    await bell(page).click();
+    const item = bellPopover(page).getByRole('link', {
+      name: `${payeeName} was Missed: expected ${expected}, unread`,
+    });
+    await expect(item).toBeVisible();
+
+    await item.click();
+    await expect(page).toHaveURL(/\/recurring-payments$/);
+  } finally {
+    // Gone again, so the other bell tests see only what they add.
+    await remove();
+  }
 });
 
 test('a dot shows what is unread until the bell is opened, and stays gone after a reload', async ({
