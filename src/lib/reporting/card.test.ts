@@ -215,6 +215,18 @@ describe('cardFrame', () => {
     expect(before('query', 'line')).toBe('bars');
     expect(before('query', 'stacked_bar')).toBe('bars');
   });
+
+  it('hints at two areas for a line whose columns are income and expense', () => {
+    const before = (visualisation: Visualisation, columns: ReportAxis | null) =>
+      cardFrame({ source: 'query', visualisation, query: { rows: 'month', columns }, data: null })
+        .placeholder;
+
+    expect(before('line', 'categoryGroupType')).toBe('areas');
+    // A bars flow keeps its dots, drawn where the bars stand; any other line keeps its bars.
+    expect(before('stacked_bar', 'categoryGroupType')).toBe('bars');
+    expect(before('line', 'category')).toBe('bars');
+    expect(before('line', null)).toBe('bars');
+  });
 });
 
 describe('readCard: income vs. expense', () => {
@@ -287,12 +299,65 @@ describe('readCard: income vs. expense', () => {
     });
   });
 
-  it('tells and draws a line of income vs. expense as a flow, as it does bars', () => {
+  it('tells a line of income vs. expense as a flow, as it does bars', () => {
     const line = read(widget({ visualisation: 'line', data: incomeVsExpense.data }));
     const bars = read(incomeVsExpense);
 
     expect(line.kind).toBe('trend');
-    expect({ ...line, kind: 'bars' }).toEqual(bars);
+    expect(line.lead).toEqual(bars.lead);
+    expect(line.facts).toEqual(bars.facts);
+    expect(line.flow).toEqual(bars.flow);
+  });
+
+  it("draws a line flow as two areas, each point that row's own income and expense", () => {
+    const flow = source(
+      ['2025-01', '2025-02', '2025-03'],
+      ['expense', 'income'],
+      [
+        [-600_00, 1000_00],
+        [50_00, 1000_00],
+        [-300_00, 0],
+      ],
+      { lastIsPartial: true },
+    );
+
+    expect(read(widget({ visualisation: 'line', data: flow })).mark).toEqual({
+      type: 'areas',
+      isRunning: false,
+      points: [
+        {
+          label: '2025-01',
+          key: '2025-01',
+          isPartial: false,
+          income: 1000_00,
+          expense: 600_00,
+          href: 'row:2025-01',
+          incomeHref: 'cell:2025-01/income',
+          expenseHref: 'cell:2025-01/expense',
+        },
+        {
+          label: '2025-02',
+          key: '2025-02',
+          isPartial: false,
+          // A refund month: what went out nets below zero.
+          income: 1000_00,
+          expense: -50_00,
+          href: 'row:2025-02',
+          incomeHref: 'cell:2025-02/income',
+          expenseHref: 'cell:2025-02/expense',
+        },
+        {
+          label: '2025-03',
+          key: '2025-03',
+          isPartial: true,
+          income: 0,
+          expense: 300_00,
+          href: 'row:2025-03',
+          incomeHref: 'cell:2025-03/income',
+          expenseHref: 'cell:2025-03/expense',
+        },
+      ],
+    });
   });
 
   it('counts an empty cell as nothing', () => {
@@ -977,6 +1042,10 @@ describe('STORY_SHOWN_AS', () => {
   it('mentions the ranking a stacked bar becomes with many series', () => {
     expect(cardFrame(framed('query', 'stacked_bar', 3)).kind).toBe('ranking');
     expect(STORY_SHOWN_AS.stacked_bar.full).toContain('ranking');
+  });
+
+  it('mentions the two areas a line of income and expense becomes', () => {
+    expect(STORY_SHOWN_AS.line.full).toContain('two areas');
   });
 });
 

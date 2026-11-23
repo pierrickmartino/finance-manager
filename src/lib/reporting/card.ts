@@ -27,11 +27,13 @@ export interface CardWidget {
 }
 
 /**
- * Of a Widget's query, what its card reads: the row axis. A time axis makes the Account
- * balances Net worth over time.
+ * Of a Widget's query, what its card reads: the row axis, and the column axis. A time axis
+ * of rows makes the Account balances Net worth over time; columns by Category group type are
+ * how a flow's income and expense columns come, which its placeholder hints at.
  */
 export interface CardQuery {
   rows?: ReportAxis | null;
+  columns?: ReportAxis | null;
 }
 
 /** A Widget as its card draws it: its data, and how its query went. */
@@ -53,8 +55,11 @@ export type CardSource = Pick<CardWidget, 'source' | 'visualisation' | 'query'> 
 export type CardKind =
   'trend' | 'bars' | 'ranking' | 'share' | 'grid' | 'ring' | 'number' | 'netWorthTrend';
 
-/** The quiet mark a placeholder draws: a figure, tick rows, a ring, a grid of cells or bars. */
-export type PlaceholderShape = 'number' | 'ticks' | 'ring' | 'grid' | 'bars';
+/**
+ * The quiet mark a placeholder draws: a figure, tick rows, a ring, a grid of cells, bars or
+ * two overlapping areas.
+ */
+export type PlaceholderShape = 'number' | 'ticks' | 'ring' | 'grid' | 'bars' | 'areas';
 
 /** The size a new Widget's card starts at, and the smallest it can be read at. */
 export interface CardSizes {
@@ -115,6 +120,14 @@ function kindOf(widget: CardSource): CardKind {
   return (widget.data?.columns.length ?? 0) >= RANKING_FROM_SERIES ? 'ranking' : 'bars';
 }
 
+/**
+ * Whether a trend's placeholder hints at a flow's two areas. Whether it is a flow is only known
+ * once its totals are (one column positive, one negative), so the hint goes by how a flow's
+ * columns come: one per Category group type.
+ */
+const hintsAtFlow = (kind: CardKind, query: CardQuery): boolean =>
+  kind === 'trend' && query.columns === 'categoryGroupType';
+
 /** A card's kind, sizes and placeholder, from its Widget alone (and the series, once known). */
 export function cardFrame(widget: CardSource): CardFrame {
   const kind = kindOf(widget);
@@ -122,7 +135,7 @@ export function cardFrame(widget: CardSource): CardFrame {
   return {
     kind,
     sizes: { initial: { ...sizes.initial }, min: { ...sizes.min } },
-    placeholder,
+    placeholder: hintsAtFlow(kind, widget.query) ? 'areas' : placeholder,
   };
 }
 
@@ -132,7 +145,10 @@ export function cardFrame(widget: CardSource): CardFrame {
  */
 export const STORY_SHOWN_AS: Record<Visualisation, { short: string; full: string }> = {
   table: { short: 'as a heatmap', full: 'In the Story: a heatmap of its rows and columns' },
-  line: { short: 'as a trend', full: 'In the Story: a trend line' },
+  line: {
+    short: 'as a trend',
+    full: 'In the Story: a trend line, or two areas when its columns are income and expense',
+  },
   stacked_bar: {
     short: 'as bars',
     full: `In the Story: bars per period, or a ranking from ${RANKING_FROM_SERIES} series`,
@@ -161,6 +177,25 @@ export interface TickItem {
   href: string | null;
 }
 
+/**
+ * One point of a line flow's two areas: its row's income and expense (both positive while
+ * money came in and went out), or, drawn as running totals, what came in and went out from
+ * the first row through this one. Each link opens the Drill-down whose working gives it:
+ * `href` both columns together (the gap between the areas), the others one column each.
+ */
+export interface FlowPoint {
+  label: string;
+  /** The row's key: its date or Interval (`2025-03-14`, `2025-03`, `2025-Q1`, `2025`). */
+  key: string | null;
+  /** The row is still running (its numbers will still change). */
+  isPartial: boolean;
+  income: number;
+  expense: number;
+  href: string;
+  incomeHref: string;
+  expenseHref: string;
+}
+
 /** The income and expense of a Widget that holds both, and where its figures drill down. */
 export interface CardFlow {
   months: MonthFlow[];
@@ -186,6 +221,12 @@ export type CardMark =
   | { type: 'ring'; data: ChartSource }
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
+  /**
+   * A line flow: two overlapping areas, income and expense, whose gap is its Profit. Running:
+   * each point is the total from the first row through its own, so the last gap is the Profit
+   * of the whole stretch.
+   */
+  | { type: 'areas'; isRunning: boolean; points: FlowPoint[] }
   | { type: 'bars'; periods: PeriodValue[] }
   | NetWorthLineMark;
 
@@ -256,6 +297,27 @@ function monthsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): Mo
     const expense = 0 - (data.cells[r]?.[expenseSlot] ?? 0);
     return { label: row.label, isPartial: row.isPartial, income, expense, net: income - expense };
   });
+}
+
+/** A line flow's points: each row's own income and expense, and its Drill-downs. */
+function flowPointsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): FlowPoint[] {
+  return data.rows.map((row, r) => ({
+    label: row.label,
+    key: row.key,
+    isPartial: row.isPartial,
+    income: data.cells[r]?.[incomeSlot] ?? 0,
+    expense: 0 - (data.cells[r]?.[expenseSlot] ?? 0),
+    href: data.hrefs.rowTotals[r] ?? data.hrefs.total,
+    incomeHref: data.hrefs.cells[r]?.[incomeSlot] ?? data.hrefs.total,
+    expenseHref: data.hrefs.cells[r]?.[expenseSlot] ?? data.hrefs.total,
+  }));
+}
+
+/** How a flow is drawn: a line as two areas, bars as dots. */
+function flowMark(kind: CardKind, data: ChartSource, slots: FlowSlots): CardMark {
+  return kind === 'trend'
+    ? { type: 'areas', isRunning: false, points: flowPointsOf(data, slots) }
+    : { type: 'dots', months: monthsOf(data, slots) };
 }
 
 /**
@@ -526,7 +588,7 @@ function readRows(
       return slots
         ? {
             ...flowSentences(data, slots, money),
-            mark: { type: 'dots', months: monthsOf(data, slots) },
+            mark: flowMark(kind, data, slots),
           }
         : {
             ...periodSentences(kind, data, money),
