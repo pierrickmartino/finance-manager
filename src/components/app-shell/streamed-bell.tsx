@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { getServiceContext } from '@/server/app-context';
 import { listAttentionItems } from '@/server/services/attention';
 import { swissToday } from '@/server/services/fx/dates';
+import { BellOpenProvider } from './bell-open';
 import { NotificationsBell } from './notifications-bell';
 
 async function BellWithItems() {
@@ -16,8 +17,10 @@ async function BellWithItems() {
  */
 export function StreamedBell() {
   return (
-    <Suspense fallback={<NotificationsBell items={null} />}>
-      <BellWithItems />
-    </Suspense>
+    <BellOpenProvider>
+      <Suspense fallback={<NotificationsBell items={null} />}>
+        <BellWithItems />
+      </Suspense>
+    </BellOpenProvider>
   );
 }

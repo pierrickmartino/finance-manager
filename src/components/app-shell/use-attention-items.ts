@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AttentionItem } from '@/server/services/attention';
 import { loadAttentionItemsAction, markAttentionSeenAction } from './attention-actions';
 
@@ -44,14 +44,14 @@ export function useAttentionItems(served: readonly AttentionItem[] | null): {
     });
   }, [pathname]);
 
-  function markSeen() {
+  const markSeen = useCallback(() => {
     generation.current++;
     setState((previous) => ({
       ...previous,
       items: previous.items?.map((item) => ({ ...item, unread: false })) ?? null,
     }));
     void markAttentionSeenAction();
-  }
+  }, []);
 
   return { items: current.items, markSeen };
 }

@@ -6,6 +6,7 @@ import { transactionCountLabel } from '@/lib/text';
 import type { AttentionItem } from '@/server/services/attention';
 import { BADGE_CLASS, POPOVER_CLASS } from '../surface';
 import { BAR_ICON_BUTTON_CLASS } from './bar-styles';
+import { useBellOpen } from './bell-open';
 import { Icon } from './icon';
 import { useAttentionItems } from './use-attention-items';
 
@@ -41,7 +42,7 @@ interface NotificationsBellProps {
  */
 export function NotificationsBell({ items: served }: NotificationsBellProps) {
   const { items, markSeen } = useAttentionItems(served);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useBellOpen();
   // The items that were unread when the bell was opened: marked in the list while it is open.
   const [unreadWhenOpened, setUnreadWhenOpened] = useState<ReadonlySet<string>>(new Set());
   const rootRef = useRef<HTMLDivElement>(null);
@@ -65,21 +66,23 @@ export function NotificationsBell({ items: served }: NotificationsBellProps) {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, setIsOpen]);
 
-  const unreadCount = items?.filter((item) => item.unread).length ?? 0;
-
-  function toggle() {
-    if (isOpen) {
-      setIsOpen(false);
+  // Opening marks everything listed read, once per opening. Opened while still loading, the
+  // bell marks the items when they arrive: this bell takes the loading one's place, still open.
+  const isMarkedRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen) {
+      isMarkedRef.current = false;
       return;
     }
-    setIsOpen(true);
-    // Still loading: nothing is listed yet, so nothing is marked read.
-    if (items === null) return;
+    if (items === null || isMarkedRef.current) return;
+    isMarkedRef.current = true;
     setUnreadWhenOpened(new Set(items.filter((item) => item.unread).map(itemKey)));
     markSeen();
-  }
+  }, [isOpen, items, markSeen]);
+
+  const unreadCount = items?.filter((item) => item.unread).length ?? 0;
 
   return (
     <div ref={rootRef} className="sm:relative">
@@ -89,7 +92,7 @@ export function NotificationsBell({ items: served }: NotificationsBellProps) {
         aria-label={bellLabel(unreadCount)}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        onClick={toggle}
+        onClick={() => setIsOpen(!isOpen)}
         className={`relative ${BAR_ICON_BUTTON_CLASS}`}
       >
         <Icon name="bell" />
