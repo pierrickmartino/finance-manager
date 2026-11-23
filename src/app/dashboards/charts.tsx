@@ -288,7 +288,7 @@ export function SingleNumberWidget({ data, title }: ChartProps) {
   return (
     <div className="flex h-full flex-col justify-center">
       {value === null ? (
-        <span className="text-3xl text-faint">—</span>
+        <span className="text-3xl text-muted">—</span>
       ) : (
         <Link
           href={href}

@@ -49,7 +49,7 @@ export function PivotTable({
   const valueCell = (value: number | null, href: string, where: string, isTotal = false) => (
     <td className={`${CELL} ${isTotal ? 'font-semibold' : ''}`}>
       {value === null ? (
-        <span className="text-faint">—</span>
+        <span className="text-muted">—</span>
       ) : (
         <Link
           href={href}

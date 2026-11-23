@@ -6,7 +6,7 @@ import type { MonthFlow, PeriodValue, TickItem } from '@/lib/reporting/card';
 import { litTicks } from '@/lib/reporting/overview';
 
 /**
- * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the ramp's navy,
+ * The marks the Dashboard's cards draw (docs/design-system.md, "Dashboard"): in the ramp,
  * with the latest full period hatched. Amounts in minor units, shown in CHF.
  */
 
@@ -78,8 +78,8 @@ const BAR_PERIODS = 6;
 
 function barTone(period: PeriodValue, index: number, isMarked: boolean): string {
   if (isMarked) return 'bg-hatch';
-  if (period.value < 0) return 'bg-negative-tint';
-  return index % 2 ? 'bg-ramp-5/50' : 'bg-sunken';
+  if (period.value < 0) return 'bg-negative/50';
+  return index % 2 ? 'bg-ramp-5/60' : 'bg-ramp-3/60';
 }
 
 /**
