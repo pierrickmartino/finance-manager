@@ -2,55 +2,56 @@
 
 /*
  * Finance Manager design system: the Dashboard Story's style, app-wide (docs/design-system.md).
- * "Midnight": ink and one amber accent on cool paper under a navy band; Inter for everything,
- * Inter Tight for display; small radii. Light only, by choice: no dark theme, whatever the
- * system setting.
+ * Dark only, by choice (ADR-0017): a deep navy page, light ink and one cyan accent; Inter for
+ * everything, Inter Tight for display; small radii. No light theme, whatever the system setting.
  *
  * Tokens become Tailwind utilities: bg-paper, text-ink, border-rule, text-accent-ink, font-display…
  * Use these, never raw palette classes (zinc-*, emerald-*…), so the look stays in one place.
+ * Every text pair is checked for AA by src/lib/color/design-tokens.test.ts.
  */
 @theme {
   /* Neutrals: the page, what sits on it, and the ink written on both. */
-  --color-paper: #f7f8fa; /* page background */
-  --color-surface: #ffffff; /* cards, inputs, menus */
-  --color-sunken: #eef1f5; /* hover, selected rows, tracks; also behind the page panel */
-  --color-rule: #e1e5ec; /* borders and dividers */
-  --color-rule-strong: #cdd3dd; /* control borders */
-  --color-faint: #a1a9b8; /* placeholders, disabled, decorative marks (not body text) */
-  --color-muted: #66708a; /* secondary text: labels, hints, metadata (AA on paper and sunken) */
-  --color-ink-soft: #46506a; /* tertiary headings, quiet controls */
-  --color-ink: #141a2b; /* text and primary buttons */
-  --color-ink-hover: #2c3550; /* primary button hover */
+  --color-paper: #0a1020; /* page background: deep navy */
+  --color-surface: #111a2e; /* cards, inputs, menus: a step up from the page */
+  --color-sunken: #18233b; /* hover, selected rows, tracks, quiet fills */
+  --color-rule: #243150; /* borders and dividers */
+  --color-rule-strong: #3a4a72; /* control borders */
+  --color-faint: #56647f; /* placeholders, disabled, decorative marks (not body text) */
+  --color-muted: #94a1bd; /* secondary text: labels, hints, metadata (AA on paper, surface, sunken) */
+  --color-ink-soft: #c3cbdc; /* tertiary headings, quiet controls */
+  --color-ink: #eef2f8; /* text, and the primary button's near-white fill */
+  --color-ink-hover: #cfd8e8; /* primary button hover */
 
-  /* The accent: amber. The fill is too light for text or controls on white (2:1): use it on the
-     band and for marks only. accent-ink is for text, links, the focus ring and controls. */
-  --color-accent: #f5a623;
-  --color-accent-ink: #9a5b00; /* AA on paper, surface and accent-tint */
-  --color-accent-tint: #fff5e3; /* selected navigation, highlighted rows */
+  /* The accent: cyan, the one colour that marks what is selected, focused or the point of a
+     chart. accent is the fill (the brand dot, marks); accent-ink is for text, links, the focus
+     ring and controls such as an on toggle: AA on paper, surface, sunken and accent-tint. */
+  --color-accent: #22d3ee;
+  --color-accent-ink: #4cdcf0;
+  --color-accent-tint: #0e3343; /* selected navigation, highlighted rows */
 
-  /* The ramp: five steps of navy, darkest first. Atmosphere only, never meaning (the accent
-     stays amber): the app shell's band (bg-band) and the marks of the Dashboard's and
+  /* The ramp: five flat steps from cyan through blue to violet, ramp-1 first. Atmosphere only,
+     never meaning (cyan as the accent alone marks a state): the marks of the Dashboard's and
      Analytics' cards, the heatmap, the Net worth bands and the sparklines. */
-  --color-ramp-1: #0a1630;
-  --color-ramp-2: #13254d; /* also text on the bar's white buttons (AA) */
-  --color-ramp-3: #284a8a;
-  --color-ramp-4: #4f78c4;
-  --color-ramp-5: #b7c7e6;
-  --color-on-ramp: #ffffff; /* text, outlines and translucent fills on the ramp */
-  --color-on-ink: #ffffff; /* text on an ink fill: selected list items, the Dashboard tabs */
+  --color-ramp-1: #2bc4f0;
+  --color-ramp-2: #3b9cff;
+  --color-ramp-3: #4f7cff;
+  --color-ramp-4: #7a68ff;
+  --color-ramp-5: #a06bff;
+  --color-on-ramp: #ffffff; /* the bar's text and translucent fills; text on the dark ramp shades */
+  --color-on-ink: #0a1020; /* text on an ink fill: selected list items, the Dashboard tabs */
 
-  /* Meaning, kept apart from the accent: never use these for decoration. */
-  --color-positive: #047857;
-  --color-positive-tint: #ecfdf5;
-  --color-negative: #be123c;
-  --color-negative-tint: #fff1f2;
-  /* Warning is terracotta, a red-orange well apart from the amber accent, so attention never
-     reads as a link or a selection. AA on surface (5.2:1) and on its tint (4.8:1). */
-  --color-warning: #c2410c;
-  --color-warning-tint: #fff4ed;
-  --color-warning-rule: #fdba74;
-  --color-info: #0369a1;
-  --color-info-tint: #f0f9ff;
+  /* Meaning, kept apart from the accent: never use these for decoration. positive is a
+     yellowish green, clear of teal and cyan; warning an orange, well apart from the cyan accent
+     so attention never reads as a link or a selection. */
+  --color-positive: #a3d94e;
+  --color-positive-tint: #1b2e17;
+  --color-negative: #ff7a8a;
+  --color-negative-tint: #3a1825;
+  --color-warning: #ff9d5c;
+  --color-warning-tint: #36210f;
+  --color-warning-rule: #8a4b1f;
+  --color-info: #9aa9ff;
+  --color-info-tint: #1c2350;
 
   /* Type: Inter for everything, Inter Tight for display (page titles, headline amounts). The
      font files come from next/font in the root layout, which sets --font-inter and
@@ -69,7 +70,7 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
   /*
    * Navigation motion (ADR-0012): how long a route navigation's view transition takes, and
@@ -96,22 +97,7 @@
   }
 }
 
-/* The app shell's band behind the bar: deep navy at the top, lit from the top right, fading into the page. */
-@utility bg-band {
-  background:
-    radial-gradient(120% 90% at 85% 10%, var(--color-ramp-4) 0%, transparent 55%),
-    radial-gradient(90% 120% at 0% 0%, var(--color-ramp-1) 0%, transparent 100%),
-    linear-gradient(
-      180deg,
-      var(--color-ramp-2) 0%,
-      var(--color-ramp-3) 38%,
-      var(--color-ramp-5) 72%,
-      transparent 100%
-    );
-  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
-}
-
-/* The Dashboard's insight card: the ramp's navy, lit from the lower right. */
+/* The Dashboard's insight card: the ramp, lit from the lower right. */
 @utility bg-insight {
   background:
     radial-gradient(120% 120% at 100% 100%, var(--color-ramp-5) 0%, transparent 45%),
@@ -119,7 +105,7 @@
     linear-gradient(135deg, var(--color-ramp-3), var(--color-ramp-1));
 }
 
-/* The period a Dashboard card points out (the latest full month): hatched navy. */
+/* The period a Dashboard card points out (the latest full month): hatched in the ramp. */
 @utility bg-hatch {
   background: repeating-linear-gradient(
     135deg,
@@ -132,7 +118,7 @@ body {
   @apply bg-paper text-ink antialiased;
 }
 
-/* One visible focus style everywhere, in the accent's ink (the fill is too light on white). */
+/* One visible focus style everywhere, in the accent's ink (AA on every dark surface). */
 :focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;

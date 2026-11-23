@@ -19,7 +19,7 @@ export function MobileDrawer({ onClose }: { onClose: () => void }) {
         type="button"
         aria-label="Close menu"
         onClick={onClose}
-        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-paper/70 backdrop-blur-sm"
       />
       <div
         role="dialog"

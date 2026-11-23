@@ -18,8 +18,8 @@ import { MoreMenu } from './more-menu';
 import { PRIMARY_LINKS, isActive } from './navigation';
 
 /**
- * The navy bar on every signed-in page, one row: brand, the pills and More from `lg` (the menu
- * button below it), then the quick actions, settings and sign out.
+ * The 48px bar on every signed-in page, sitting on the navy page, one row: brand, the pills and
+ * More from `lg` (the menu button below it), then the quick actions, settings and sign out.
  */
 function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => void }) {
   return (
@@ -75,15 +75,15 @@ function TopBar({ pathname, onOpenMenu }: { pathname: string; onOpenMenu: () => 
 }
 
 interface AppShellProps {
-  /** Signed out (login, setup), only the page renders: no band, top bar or drawer. */
+  /** Signed out (login, setup), only the page renders: no top bar or drawer. */
   showNavigation: boolean;
   children: ReactNode;
 }
 
 /**
- * The page layout, full width and dense: one slim navy bar carries the brand, the main pages as
- * pills (the rest under More) and the quick actions; the page sits on a paper panel that rises
- * out of the navy just below it. Below `lg` the pills give way to a drawer opened from the bar.
+ * The page layout, full width and dense: the page is the navy, and one slim bar on it carries
+ * the brand, the main pages as pills (the rest under More) and the quick actions, with the page's
+ * content right below. Below `lg` the pills give way to a drawer opened from the bar.
  *
  * `children` keeps the same position in the tree whether or not the navigation shows, so a page
  * whose action signs the user in (first-run setup shows its recovery codes afterwards) is not
@@ -96,14 +96,11 @@ export function AppShell({ showNavigation, children }: AppShellProps) {
   // Nothing clips the page: a menu that drops past the end of a page must still be reachable,
   // and sticky columns must stick.
   const main = showNavigation
-    ? 'mx-2 mt-1 mb-4 rounded-xl bg-paper px-4 py-5 shadow-lg shadow-ramp-2/10 md:mx-4 md:px-6'
+    ? 'px-4 pt-3 pb-6 md:px-6'
     : 'mx-auto w-full max-w-5xl px-4 py-8 md:px-6';
 
   return (
-    <div className={`relative min-h-screen ${showNavigation ? 'bg-sunken' : 'bg-paper'}`}>
-      {showNavigation && (
-        <div aria-hidden="true" className="bg-band absolute inset-x-0 top-0 h-28" />
-      )}
+    <div className="relative min-h-screen bg-paper">
       <div className="relative">
         {showNavigation && <TopBar pathname={pathname} onOpenMenu={() => setIsMenuOpen(true)} />}
         <main className={main}>{children}</main>

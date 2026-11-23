@@ -35,16 +35,18 @@ export const WARNING_NOTICE_CLASS =
  */
 export const INFO_NOTICE_CLASS = 'rounded-lg bg-sunken px-3 py-2 text-sm text-ink-soft';
 /**
- * A dark toolbar floating over the page's bottom edge while something is selected (the
- * Transactions list's Bulk edit dock). Ink, so it reads as a tool above the page, not part of it.
+ * A solid toolbar floating over the page's bottom edge while something is selected (the
+ * Transactions list's Bulk edit dock): raised a step above the page, inside a strong rule and a
+ * deep shadow, so it reads as a tool above the page, not part of it.
  */
-export const DOCK_CLASS = 'rounded-xl bg-ink p-1.5 text-sm text-paper shadow-2xl';
+export const DOCK_CLASS =
+  'rounded-xl border border-rule-strong bg-sunken p-1.5 text-sm text-ink shadow-2xl';
 /**
- * An action on DOCK_CLASS: paper text, a translucent paper fill on hover or while its popover
- * is open (`aria-expanded`), and the accent fill as its focus ring (accent-ink fails on ink).
+ * An action on DOCK_CLASS: ink text, a translucent ink fill on hover or while its popover is
+ * open (`aria-expanded`), and the global accent-ink focus ring, which passes on the dock.
  */
 export const DOCK_BUTTON_CLASS =
-  'flex items-center gap-2 rounded-md px-3 py-1.5 font-medium hover:bg-paper/10 aria-expanded:bg-paper/15 focus-visible:outline-accent disabled:opacity-50';
+  'flex items-center gap-2 rounded-md px-3 py-1.5 font-medium hover:bg-ink/10 aria-expanded:bg-ink/15 disabled:opacity-50';
 /** A popover over the page: a menu or picker opened from a toolbar or the dock. */
 export const POPOVER_CLASS = 'rounded-xl border border-rule bg-surface p-2 text-ink shadow-xl';
 /**
@@ -53,7 +55,7 @@ export const POPOVER_CLASS = 'rounded-xl border border-rule bg-surface p-2 text-
  * `aria-current="page"`, a `<label>` tile by its checked radio, which shows its focus ring.
  */
 export const CHOICE_TILE_CLASS =
-  'rounded-md border border-rule-strong bg-surface hover:border-faint aria-[current=page]:border-ink aria-[current=page]:ring-2 aria-[current=page]:ring-ink has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-info';
+  'rounded-md border border-rule-strong bg-surface hover:border-faint aria-[current=page]:border-ink aria-[current=page]:ring-2 aria-[current=page]:ring-ink has-checked:border-ink has-checked:ring-2 has-checked:ring-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent-ink';
 /** A card of the Dashboard's grid: a little rounder and roomier than CARD_CLASS. */
 export const TILE_CLASS = 'rounded-3xl border border-rule bg-surface p-5 shadow-sm';
 
@@ -77,15 +79,15 @@ export type BadgeTone = keyof typeof BADGE_CLASS;
 
 // Buttons --------------------------------------------------------------------------------------
 
-/** The page's main action. One per view where possible. */
+/** The page's main action, one per view where possible: a near-white ink fill under navy text. */
 export const PRIMARY_BUTTON_CLASS =
   'rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink-hover disabled:opacity-50';
 /**
  * The main action of the Dashboard Story's own views (Done in Edit mode, Save in the Widget
- * editor): the accent, darkened for AA, under paper text.
+ * editor): a cyan fill under navy text.
  */
 export const ACCENT_BUTTON_CLASS =
-  'rounded-md bg-accent-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink disabled:opacity-50';
+  'rounded-md bg-accent-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-accent disabled:opacity-50';
 /** Any other action; also links styled as buttons. */
 export const SECONDARY_BUTTON_CLASS =
   'rounded-md border border-rule-strong bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-sunken disabled:opacity-40';

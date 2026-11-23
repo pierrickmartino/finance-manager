@@ -181,7 +181,7 @@ export function BulkActionDock({
               type="button"
               onClick={clear}
               aria-label="Clear selection"
-              className={`${DOCK_BUTTON_CLASS} px-2 text-paper/70 hover:text-paper`}
+              className={`${DOCK_BUTTON_CLASS} px-2 text-ink-soft hover:text-ink`}
             >
               ✕
             </button>
@@ -192,14 +192,14 @@ export function BulkActionDock({
               <button
                 type="button"
                 onClick={() => widen.onChange(!widen.isAll)}
-                className={`${DOCK_BUTTON_CLASS} px-2 text-xs text-accent underline hover:no-underline`}
+                className={`${DOCK_BUTTON_CLASS} px-2 text-xs text-accent-ink underline hover:no-underline`}
               >
                 {widen.isAll
                   ? 'Select only this page'
                   : `Select all ${widen.total} matching this filter`}
               </button>
             )}
-            <span aria-hidden className="mx-1 hidden h-5 w-px bg-paper/20 sm:block" />
+            <span aria-hidden className="mx-1 hidden h-5 w-px bg-rule-strong sm:block" />
             {ACTIONS.map(({ kind, label, key }) => (
               <button
                 key={kind}
@@ -218,7 +218,7 @@ export function BulkActionDock({
                 {label}
                 <span
                   aria-hidden
-                  className="hidden rounded border border-paper/25 px-1 font-mono text-xs leading-4 text-paper/70 sm:inline"
+                  className="hidden rounded border border-rule-strong px-1 font-mono text-xs leading-4 text-muted sm:inline"
                 >
                   {key}
                 </span>
