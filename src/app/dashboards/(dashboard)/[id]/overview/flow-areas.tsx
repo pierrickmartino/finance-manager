@@ -149,12 +149,19 @@ const TOOLTIP_SIDE_CLASS: Record<LabelSide, string> = {
 const pointName = (point: FlowPoint): string =>
   point.isPartial ? `${point.label} (to date)` : point.label;
 
-/** What a point says: its name, what came in, what went out and what was kept. */
-function pointFigures(point: FlowPoint, money: Money): { label: string; value: string }[] {
+/**
+ * What a point says: what came in, what went out and what was kept, through it when the
+ * points are running totals.
+ */
+function pointFigures(
+  point: FlowPoint,
+  money: Money,
+  isRunning: boolean,
+): { label: string; value: string }[] {
   return [
     { label: SERIES.income.label, value: money(point.income) },
     { label: SERIES.expense.label, value: money(point.expense) },
-    { label: 'Kept', value: money(point.income - point.expense) },
+    { label: isRunning ? 'Kept so far' : 'Kept', value: money(point.income - point.expense) },
   ];
 }
 
@@ -163,10 +170,11 @@ interface ActivePointProps {
   index: number;
   scale: Scale;
   money: Money;
+  isRunning: boolean;
 }
 
 /** The active point: a crosshair, a dot on each line (hollow while partial) and its figures. */
-function ActivePoint({ point, index, scale, money }: ActivePointProps) {
+function ActivePoint({ point, index, scale, money, isRunning }: ActivePointProps) {
   const x = scale.x(index);
   const side = labelSide(x);
   return (
@@ -188,7 +196,7 @@ function ActivePoint({ point, index, scale, money }: ActivePointProps) {
       >
         <p className="font-medium whitespace-nowrap text-ink">{pointName(point)}</p>
         <dl className="mt-1 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
-          {pointFigures(point, money).map((figure) => (
+          {pointFigures(point, money, isRunning).map((figure) => (
             <div key={figure.label} className="contents">
               <dt className="text-muted">{figure.label}</dt>
               <dd className="text-right text-ink tabular-nums">{figure.value}</dd>
@@ -245,6 +253,8 @@ function FlowLegend({ points }: { points: FlowPoint[] }) {
 
 interface FlowAreasProps {
   points: FlowPoint[];
+  /** Each point is a running total from the first: its Drill-down covers the rows through it. */
+  isRunning: boolean;
 }
 
 /**
@@ -253,7 +263,7 @@ interface FlowAreasProps {
  * Drill-down (both columns, so it sums to what was kept). A touch has no hover, so its first
  * tap on a point shows the figures and a second one opens them.
  */
-export function FlowAreas({ points }: FlowAreasProps) {
+export function FlowAreas({ points, isRunning }: FlowAreasProps) {
   const router = useRouter();
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
@@ -291,7 +301,15 @@ export function FlowAreas({ points }: FlowAreasProps) {
     <figure className="flex flex-col lg:flex-1">
       <div className="relative mx-2 mt-2 h-40 lg:h-auto lg:min-h-24 lg:flex-1">
         <FlowPlot points={points} scale={scale} />
-        {point && <ActivePoint point={point} index={active!} scale={scale} money={money} />}
+        {point && (
+          <ActivePoint
+            point={point}
+            index={active!}
+            scale={scale}
+            money={money}
+            isRunning={isRunning}
+          />
+        )}
         <div
           role="group"
           tabIndex={0}
@@ -319,7 +337,7 @@ export function FlowAreas({ points }: FlowAreasProps) {
         />
         <p className="sr-only" aria-live="polite">
           {point &&
-            `${pointName(point)}: ${pointFigures(point, money)
+            `${pointName(point)}: ${pointFigures(point, money, isRunning)
               .map((figure) => `${figure.label} ${figure.value}`)
               .join(', ')}`}
         </p>

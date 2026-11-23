@@ -360,7 +360,77 @@ describe('readCard: income vs. expense', () => {
     });
   });
 
-  it('draws a line flow by day as each day its own amounts, telling the flow in days', () => {
+  it('draws a line flow by day as running totals from its first day, each point opening the days through it', () => {
+    const days = drillable(
+      source(
+        ['2025-03-01', '2025-03-02', '2025-03-03', '2025-03-04'],
+        ['Income', 'Expense'],
+        [
+          [5000_00, -40_00],
+          [null, null],
+          // A refund: what went out so far falls.
+          [null, 10_00],
+          [null, -60_00],
+        ],
+        { lastIsPartial: true },
+      ),
+      'day',
+      'categoryGroupType',
+    );
+
+    const { mark } = read(widget({ visualisation: 'line', data: days }));
+
+    if (mark.type !== 'areas') throw new Error(`expected areas, got ${mark.type}`);
+    expect(mark.isRunning).toBe(true);
+    expect(
+      mark.points.map(({ key, income, expense, isPartial }) => ({
+        key,
+        income,
+        expense,
+        isPartial,
+      })),
+    ).toEqual([
+      { key: '2025-03-01', income: 5000_00, expense: 40_00, isPartial: false },
+      // A quiet day keeps the totals flat.
+      { key: '2025-03-02', income: 5000_00, expense: 40_00, isPartial: false },
+      { key: '2025-03-03', income: 5000_00, expense: 30_00, isPartial: false },
+      { key: '2025-03-04', income: 5000_00, expense: 90_00, isPartial: true },
+    ]);
+    const second = mark.points[1]!;
+    expect(drillOf(second.incomeHref).cell).toMatchObject({
+      row: { through: '2025-03-02' },
+      column: 'Income',
+    });
+    expect(drillOf(second.expenseHref).cell).toMatchObject({
+      row: { through: '2025-03-02' },
+      column: 'Expense',
+    });
+    expect(drillOf(second.href).cell).toMatchObject({ row: { through: '2025-03-02' } });
+    expect(drillOf(second.href).cell.column).toBeUndefined();
+  });
+
+  it('tells a line flow by day as what was kept so far, what came in and what went out', () => {
+    const days = source(
+      ['2025-03-01', '2025-03-02', '2025-03-03'],
+      ['Expense', 'Income'],
+      [
+        [-40_00, 5000_00],
+        [null, null],
+        [-60_00, null],
+      ],
+      { lastIsPartial: true },
+    );
+
+    const reading = read(widget({ visualisation: 'line', data: days }));
+
+    expect(reading.lead).toEqual({ headline: 'Kept so far', detail: 'CHF 4900', href: 'total' });
+    expect(reading.facts).toEqual([
+      { label: 'Came in', value: 'CHF 5000', href: 'column:Income' },
+      { label: 'Went out', value: 'CHF 100', href: 'column:Expense' },
+    ]);
+  });
+
+  it('tells a bars flow by day by its days, today to date, drawn as dots', () => {
     const days = source(
       ['2025-03-01', '2025-03-02', '2025-03-03'],
       ['Income', 'Expense'],
@@ -372,23 +442,14 @@ describe('readCard: income vs. expense', () => {
       { lastIsPartial: true },
     );
 
-    const reading = read(widget({ visualisation: 'line', data: days }));
+    const reading = read(widget({ visualisation: 'stacked_bar', data: days }));
 
     expect(reading.lead).toMatchObject({ headline: 'Most came in: 2025-03-01' });
     expect(reading.facts.map((fact) => fact.label)).toEqual([
-      'Most went out: 2025-03-03 (partial)',
+      'Most went out: 2025-03-03 (to date)',
       'Kept per day, on average',
     ]);
-    expect(reading.mark).toMatchObject({
-      type: 'areas',
-      isRunning: false,
-      points: [
-        { key: '2025-03-01', income: 5000_00, expense: 40_00, isPartial: false },
-        // A quiet day is nothing either way, its links its own.
-        { key: '2025-03-02', income: 0, expense: 0, incomeHref: 'cell:2025-03-02/Income' },
-        { key: '2025-03-03', income: 0, expense: 60_00, isPartial: true },
-      ],
-    });
+    expect(reading.mark.type).toBe('dots');
   });
 
   it('counts an empty cell as nothing', () => {

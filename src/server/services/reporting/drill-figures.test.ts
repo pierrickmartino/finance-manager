@@ -7,7 +7,7 @@ import { changeWorking } from '@/lib/reporting/drill-summary';
 import { readCard, type CardWidget } from '@/lib/reporting/card';
 import { spendingInsight } from '@/lib/reporting/overview';
 import { cellFromParams, queryFromParams } from '@/lib/reporting/widget-params';
-import { createAccount } from '../accounts';
+import { createAccount, type Account } from '../accounts';
 import { createBank } from '../banks';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { editClassification } from '../transactions';
@@ -34,7 +34,7 @@ const MONTHS = ['2025-01', '2025-02', '2025-03'];
  * Q1 2025 on one CHF Account: a salary each month, and nine expense Categories (one more than
  * a chart's colours, so they fold into "Other") with odd amounts, so averages round.
  */
-async function dataset(): Promise<void> {
+async function dataset(): Promise<{ account: Account; expense: Category }> {
   const bank = await createBank(t.ctx, { name: 'UBS' });
   const account = await createAccount(t.ctx, {
     bankId: bank.id,
@@ -69,6 +69,7 @@ async function dataset(): Promise<void> {
   for (const [index, row] of rows.entries()) {
     await editClassification(t.ctx, ids[index]!, { categoryId: row.categoryId });
   }
+  return { account, expense: expenses[0]! };
 }
 
 /** A Widget's data, linked as on a Dashboard. */
@@ -266,19 +267,52 @@ describe('a Widget by day', () => {
     }
   });
 
-  it("draws a line flow's areas a point per day, each figure what its Drill-down works out", async () => {
-    await dataset();
+  /** January with a refund of 50.00 on the 20th, booked to an expense Category. */
+  async function withRefund(): Promise<void> {
+    const { account, expense } = await dataset();
+    const [id] = await seedTransactions(t.ctx.db, account, [
+      { bookingDate: '2025-01-20', amountMinor: 5_000 },
+    ]);
+    await editClassification(t.ctx, id!, { categoryId: expense.id });
+  }
+
+  // A quiet day opens no Transactions: its figures are nothing.
+  const sumOf = async (href: string | null) => (await open(href)).sumChfMinor ?? 0;
+
+  it("draws a line flow's areas as running totals, each point what its days through it add up to", async () => {
+    await withRefund();
     const { mark } = readCard(await widget(januaryByDay, 'line'), money);
     if (mark.type !== 'areas') throw new Error(`expected areas, got ${mark.type}`);
 
+    expect(mark.isRunning).toBe(true);
     expect(mark.points).toHaveLength(31);
-    expect(mark.points[0]).toMatchObject({ key: '2025-01-01', label: '1 Jan 2025' });
+    const on = (day: number) => mark.points[day - 1]!;
+    expect(on(1)).toMatchObject({ key: '2025-01-01', label: '1 Jan 2025', income: 0, expense: 0 });
+    // The nine costs of the 10th to the 18th: 100.01 + 200.01 + … + 900.01.
+    expect(on(18)).toMatchObject({ income: 0, expense: 450_009 });
+    // Quiet days keep it flat; the refund lowers what went out so far.
+    expect(on(19)).toMatchObject({ income: 0, expense: 450_009 });
+    expect(on(20)).toMatchObject({ income: 0, expense: 445_009 });
+    expect(on(31)).toMatchObject({ income: 500_000, expense: 445_009 });
     for (const point of mark.points) {
-      // A quiet day opens no Transactions: its figures are nothing, not the whole range.
-      const sumOf = async (href: string) => (await open(href)).sumChfMinor ?? 0;
       expect(await sumOf(point.incomeHref)).toBe(point.income);
       expect(0 - (await sumOf(point.expenseHref))).toBe(point.expense);
       expect(await sumOf(point.href)).toBe(point.income - point.expense);
     }
+    expect((await open(on(20).expenseHref)).span).toEqual({ from: '2025-01-01', to: '2025-01-20' });
+  });
+
+  it('tells a line flow by day as kept so far, came in and went out, each what its Drill-down sums to', async () => {
+    await withRefund();
+    const { lead, facts } = readCard(await widget(januaryByDay, 'line'), money);
+
+    expect(lead).toMatchObject({ headline: 'Kept so far', detail: String(500_000 - 445_009) });
+    expect(facts.map((fact) => [fact.label, fact.value])).toEqual([
+      ['Came in', '500000'],
+      ['Went out', '445009'],
+    ]);
+    expect(await sumOf(lead!.href)).toBe(500_000 - 445_009);
+    expect(await sumOf(facts[0]!.href)).toBe(500_000);
+    expect(await sumOf(facts[1]!.href)).toBe(-445_009);
   });
 });

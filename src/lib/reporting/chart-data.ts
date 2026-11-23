@@ -3,6 +3,7 @@ import type { CellRef } from '@/server/services/reporting/cell-ref';
 import type { ReportHeader } from '@/server/services/reporting/headers';
 import { isTimeAxis, type Measure, type TimeAxis } from '@/server/services/reporting/query';
 import { drillUrl, type DrillTarget } from './drill-link';
+import { intervalLabel } from './interval-label';
 
 /**
  * The data mapping behind the chart visualisations (spec 104). Every chart is a pure renderer
@@ -136,9 +137,7 @@ export interface SeriesChart {
   totalHrefs: Record<string, string | null>;
 }
 
-function headerLabel(header: ReportHeader): string {
-  return header.isPartial ? `${header.label} (partial)` : header.label;
-}
+const headerLabel = intervalLabel;
 
 function sumOrNull(values: (number | null)[]): number | null {
   const present = values.filter((value): value is number => value !== null);
