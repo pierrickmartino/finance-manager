@@ -25,7 +25,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** Expense Categories with their bookings in Rolling 12 months, and a salary that never counts. */
+/** Expense Categories with their bookings in Last 12 months, and a salary that never counts. */
 const SPENDING: Record<string, [string, number][]> = {
   Rent: [
     ['2025-01-05', -50_000],
@@ -234,7 +234,7 @@ describe('Spending by Category', () => {
     });
     const unpinned = await loadSection(t.ctx, MONTHLY, 'spendingByCategory');
 
-    expect(pinned.periodName).toBe('This year and last 1');
+    expect(pinned.periodName).toBe('Since 2024');
     expect(unpinned.periodName).toBeNull();
   });
 });

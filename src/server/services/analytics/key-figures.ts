@@ -45,7 +45,7 @@ export interface KeyFigureUnconverted {
 export interface KeyFigure {
   id: KeyFigureId;
   label: string;
-  /** When the figure stands: "Today", or the Period ("Rolling 90 days", "1 Jan 2024 – today"). */
+  /** When the figure stands: "Today", or the Period ("Last 90 days", "1 Jan 2024 – today"). */
   caption: string;
   /** CHF minor units. Expense is what went out, net of refunds, as a positive amount. */
   value: number;

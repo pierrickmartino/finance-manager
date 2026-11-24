@@ -40,7 +40,7 @@ import {
  * Each Card's own Period is card-period.spec.ts.
  */
 
-test('/ lands on Analytics over Rolling 12 months, its dates in words', async ({ page }) => {
+test('/ lands on Analytics over Last 12 months, its dates in words', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/analytics$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
@@ -64,7 +64,7 @@ test('picking a Period preset fills in its date, reads every section over it, an
   const income = region(page, 'Key figures').getByRole('region', { name: 'Income', exact: true });
   const incomeCaption = (period: string) => income.getByText(period, { exact: true });
 
-  // Rolling 12 months: a month each, the first cut short (unless it starts on the 1st) and the
+  // Last 12 months: a month each, the first cut short (unless it starts on the 1st) and the
   // current one starred as running, then Total.
   await page.goto('/analytics');
   await expect(heatmap(page, name)).toBeVisible();
@@ -85,7 +85,7 @@ test('picking a Period preset fills in its date, reads every section over it, an
     ).toBeVisible();
   }
 
-  // This year and last 1: by quarter, from 1 January last year.
+  // Since last year: by quarter, from 1 January last year.
   await preset.selectOption('this-year-and-last-1');
   await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-1$/);
   await expect(control.getByLabel('From', { exact: true })).toHaveValue(`${LAST_YEAR}-01-01`);
@@ -96,16 +96,16 @@ test('picking a Period preset fills in its date, reads every section over it, an
   ).toHaveText(`${formatPeriod(QUARTER)}*`);
   headers = await columns(page, name);
   expect(headers).toHaveLength(QUARTERS + 1);
-  await expect(incomeCaption('This year and last 1')).toBeVisible();
+  await expect(incomeCaption(`Since ${LAST_YEAR}`)).toBeVisible();
 
-  // This year and last 4: by year, the first four years before this one.
+  // Since four years ago: by year, the first four years before this one.
   await preset.selectOption('this-year-and-last-4');
   await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-4$/);
   await expect(heatmap(page, name).getByRole('columnheader').nth(4)).toHaveText(`${YEAR}*`);
   headers = await columns(page, name);
   expect(headers).toHaveLength(5 + 1);
   expect(headers[0]).toBe(String(Number(YEAR) - 4));
-  await expect(incomeCaption('This year and last 4')).toBeVisible();
+  await expect(incomeCaption(`Since ${Number(YEAR) - 4}`)).toBeVisible();
   await expect(
     region(page, 'Net cash flow').getByRole('link', {
       name: new RegExp(`^${YEAR} \\(partial\\): `),
@@ -243,7 +243,7 @@ test('Spending Insights judges the last complete month whatever the Period and o
   // Income too: the insight reads income against expense, so it needs both.
   await seedSalary(suffix);
 
-  // Rolling 30 days holds no complete month, yet the insight still speaks of the last one.
+  // Last 30 days holds no complete month, yet the insight still speaks of the last one.
   await page.goto('/analytics?period=rolling-30-days');
   const latest = page.getByRole('link', { name: 'See the Transactions' });
   await expect(page.getByRole('heading', { name: /^Spending is / })).toBeVisible();
@@ -353,7 +353,7 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   for (const index of [0, 1, 2, 3]) await expect(amountOf(index)).toBeVisible();
   await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
   for (const tile of tiles.slice(1)) {
-    await expect(tile.getByText('Rolling 12 months', { exact: true })).toBeVisible();
+    await expect(tile.getByText('Last 12 months', { exact: true })).toBeVisible();
   }
   // Above the overview row, all four in one row of equal tiles.
   const wide = await boxes();
@@ -398,7 +398,7 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   // Net worth stays today's whatever the Period, and opens the Accounts as of today.
   await page.goto('/analytics?period=this-year-and-last-4');
   await expect(tiles[0]!.getByText('Today', { exact: true })).toBeVisible();
-  await expect(tiles[1]!.getByText('This year and last 4', { exact: true })).toBeVisible();
+  await expect(tiles[1]!.getByText(`Since ${Number(YEAR) - 4}`, { exact: true })).toBeVisible();
   await amountOf(0).click();
   await expect(page).toHaveURL(new RegExp(`/accounts\\?date=${swissToday()}$`));
 });
@@ -408,7 +408,7 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
 }) => {
   const suffix = Date.now();
   const { description } = await seedSalary(suffix);
-  // The day before Rolling 12 months starts: the last day of its Comparison period.
+  // The day before Last 12 months starts: the last day of its Comparison period.
   const beforePeriod = addDays(ROLLING_START, -1);
   const earlier = `Analytics earlier groceries ${suffix}`;
   await withServices(async (ctx) => {
@@ -649,7 +649,7 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
-  // Always by day: one point per day of Rolling 12 months, today to date.
+  // Always by day: one point per day of Last 12 months, today to date.
   const days = (Date.parse(TODAY) - Date.parse(ROLLING_START)) / 86_400_000 + 1;
   await expect(plot).toHaveAccessibleName(
     new RegExp(`^Income and expense, ${days} points from .+ \\(to date\\)\\.`),

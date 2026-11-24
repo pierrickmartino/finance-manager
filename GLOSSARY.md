@@ -210,7 +210,7 @@ One day, month, quarter or year a Period is split into, the same for the whole C
 _Avoid_: Period, bucket, step
 
 **Period preset**:
-A named way of choosing a Period's start date, such as "Rolling 90 days", "Year to date" or "This year and last 2". A Period chosen by preset moves with it as days pass; one chosen by date keeps its start date.
+A named way of choosing a Period's start date: "Last 30 days", "Last 60 days", "Last 90 days", "Quarter to date", "Year to date", "Last 12 months", or "Since <year>" for this calendar year to date and up to four whole ones before it ("Since 2025"). A "Since" preset's name moves on each New Year with its start; its slug in the URL (`this-year-and-last-1`) never changes. A Period chosen by preset moves with it as days pass; one chosen by date keeps its start date.
 _Avoid_: Span preset, quick range, shortcut
 
 **Card Period**:

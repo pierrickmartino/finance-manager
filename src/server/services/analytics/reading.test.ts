@@ -14,7 +14,7 @@ const interval = (flags: Partial<AnalyticsInterval>): AnalyticsInterval => ({
 });
 
 describe('readingOf', () => {
-  it('reads Rolling 90 days by month, its first month cut short and the last to date', () => {
+  it('reads Last 90 days by month, its first month cut short and the last to date', () => {
     const reading = readingOf(presetPeriod('rolling-90-days'), '2026-11-22');
 
     expect(reading).toMatchObject({

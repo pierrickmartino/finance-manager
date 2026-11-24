@@ -8,8 +8,8 @@ import { INPUT_CLASS } from '@/components/named-list';
 import { SECONDARY_BUTTON_CLASS } from '@/components/surface';
 import {
   isPeriodPreset,
-  PERIOD_PRESET_LABELS,
   PERIOD_PRESETS,
+  presetLabels,
   cardPeriodsToParams,
   type CardPeriods,
   type Period,
@@ -21,11 +21,11 @@ interface PeriodControlProps {
   period: Period;
   /** The Period's first day, as read: the date field shows it. */
   from: string;
-  /** The Period in words: "Rolling 90 days · 25 Aug – 22 Nov 2026". */
+  /** The Period in words: "Last 90 days · 25 Aug – 22 Nov 2026". */
   phrase: string;
   /** Each preset's start date today, so picking one fills in its date at once. */
   starts: Record<PeriodPreset, string>;
-  /** Today: the latest start date the field takes. */
+  /** Today: the latest start date the field takes, and what names the presets ("Since 2025"). */
   today: string;
   /** The Cards' pins, sent again as they are: changing the page's Period keeps every one. */
   cardPeriods: CardPeriods;
@@ -68,6 +68,7 @@ export function PeriodControl({
   const [start, setStart] = useState(from);
   const isHydrated = useIsHydrated();
   const isCustom = choice === CUSTOM;
+  const labels = presetLabels(today);
   const onPreset = (event: ChangeEvent<HTMLSelectElement>) => {
     const { value, form } = event.currentTarget;
     if (!isPeriodPreset(value)) {
@@ -96,7 +97,7 @@ export function PeriodControl({
     >
       {/* The field primitive's layout, but each label set beside its control (htmlFor) rather
           than wrapping it: a wrapping label would fold the chosen option into the select's
-          accessible name ("Period Rolling 12 months"). */}
+          accessible name ("Period Last 12 months"). */}
       <div className={FIELD_LABEL_CLASS}>
         <label htmlFor={`${id}-period`}>Period</label>
         <select
@@ -108,7 +109,7 @@ export function PeriodControl({
         >
           {PERIOD_PRESETS.map((preset) => (
             <option key={preset} value={preset}>
-              {PERIOD_PRESET_LABELS[preset]}
+              {labels[preset]}
             </option>
           ))}
           <option value={CUSTOM}>Custom</option>

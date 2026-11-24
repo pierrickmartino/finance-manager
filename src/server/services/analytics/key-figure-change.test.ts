@@ -127,7 +127,7 @@ describe('Key figures change', () => {
     });
   });
 
-  it('compares This year and last 2 with the same dates of the three years before', async () => {
+  it('compares this-year-and-last-2 with the same dates of the three years before', async () => {
     fixToday('2026-11-22');
     const { salary } = await categories();
     const ubs = await seedAccount(t.ctx, 'UBS');
@@ -150,7 +150,7 @@ describe('Key figures change', () => {
     });
   });
 
-  it('compares Rolling 90 days with the 90 days just before it', async () => {
+  it('compares Last 90 days with the 90 days just before it', async () => {
     // 25 Aug – 22 Nov 2026, against 27 May – 24 Aug.
     fixToday('2026-11-22');
     const { salary } = await categories();

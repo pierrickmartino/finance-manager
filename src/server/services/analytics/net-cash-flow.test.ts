@@ -119,7 +119,7 @@ describe('Net cash flow', () => {
     fixToday('2025-03-20');
     await dataset();
 
-    // Rolling 30 days from 19 February: February cut short, March to date, neither complete.
+    // Last 30 days from 19 February: February cut short, March to date, neither complete.
     const card = await loadSection(t.ctx, presetPeriod('rolling-30-days'), 'netCashFlow');
 
     expect(card.data!.rows.map((row) => [row.key, row.isPartial])).toEqual([

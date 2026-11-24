@@ -114,11 +114,12 @@ describe('Spending Insights', () => {
 
     for (const period of periods) {
       const { flow, insight } = await insightAt(period);
-      // Rolling 30 days holds no complete month, This year and last 4 reads by year: the insight
-      // still names February 2025, against the months before it.
-      expect(flow?.period, periodLabel(period)).toBe('month');
-      expect(insight, periodLabel(period)).toEqual(monthly.insight);
-      expect(insight?.detail[0], periodLabel(period)).toBe('Feb 2025 came in ');
+      // Last 30 days holds no complete month, Since 2021 reads by year: the insight still names
+      // February 2025, against the months before it.
+      const label = periodLabel(period, '2025-03-20');
+      expect(flow?.period, label).toBe('month');
+      expect(insight, label).toEqual(monthly.insight);
+      expect(insight?.detail[0], label).toBe('Feb 2025 came in ');
     }
   });
 
@@ -159,7 +160,7 @@ describe('Spending Insights', () => {
 
     for (const view of [MONTHLY, QUARTERLY, YEARLY]) {
       const { card, insight } = await insightAt(view);
-      expect(insight, periodLabel(view)).toBeNull();
+      expect(insight, periodLabel(view, '2025-03-20')).toBeNull();
       expect(card.isEmpty).toBe(false);
     }
   });

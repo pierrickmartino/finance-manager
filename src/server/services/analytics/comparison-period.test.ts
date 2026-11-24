@@ -39,7 +39,7 @@ describe('comparisonPeriod', () => {
     });
   });
 
-  it('compares This year and last 2 with the same dates of the three years before', () => {
+  it('compares this-year-and-last-2 with the same dates of the three years before', () => {
     // 1 Jan 2024 – 22 Nov 2026: three calendar years to date, the three before them.
     expect(comparedOn(presetPeriod('this-year-and-last-2'), '2026-11-22')).toEqual({
       from: '2021-01-01',
@@ -47,14 +47,14 @@ describe('comparisonPeriod', () => {
     });
   });
 
-  it('compares This year and last 1 on 29 February up to 28 February', () => {
+  it('compares this-year-and-last-1 on 29 February up to 28 February', () => {
     expect(comparedOn(presetPeriod('this-year-and-last-1'), '2028-02-29')).toEqual({
       from: '2025-01-01',
       to: '2026-02-28',
     });
   });
 
-  it('compares Rolling 90 days with the 90 days just before it', () => {
+  it('compares Last 90 days with the 90 days just before it', () => {
     // 25 Aug – 22 Nov 2026.
     expect(comparedOn(presetPeriod('rolling-90-days'), '2026-11-22')).toEqual({
       from: '2026-05-27',
@@ -62,7 +62,7 @@ describe('comparisonPeriod', () => {
     });
   });
 
-  it('compares Rolling 12 months with the 365 days before it', () => {
+  it('compares Last 12 months with the 365 days before it', () => {
     // 23 Nov 2025 – 22 Nov 2026.
     expect(comparedOn(presetPeriod('rolling-12-months'), '2026-11-22')).toEqual({
       from: '2024-11-23',
@@ -79,7 +79,7 @@ describe('comparisonPeriod', () => {
   });
 
   it('compares a rolling Period read from a later start than its preset gives by the days read', () => {
-    // Rolling 90 days moved to a first Transaction on 1 November: 1–22 November is read.
+    // Last 90 days moved to a first Transaction on 1 November: 1–22 November is read.
     expect(
       comparisonPeriod(presetPeriod('rolling-90-days'), { from: '2026-11-01', to: '2026-11-22' }),
     ).toEqual({ from: '2026-10-10', to: '2026-10-31' });

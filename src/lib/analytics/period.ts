@@ -18,9 +18,12 @@ export type PresetComparison =
   /** The same dates as many calendar years earlier as the Period reads. */
   | { kind: 'yearsEarlier'; years: number };
 
-/** One Period preset: its name, the start date it gives on `today`, what it is compared with. */
+/**
+ * One Period preset: its name on `today`, the start date it gives on `today`, what it is compared
+ * with.
+ */
 interface PresetRule {
-  label: string;
+  label: (today: string) => string;
   start: (today: string) => string;
   comparison: PresetComparison;
 }
@@ -28,17 +31,23 @@ interface PresetRule {
 const MONTHS_PER_QUARTER = 3;
 const DAYS_BEFORE: PresetComparison = { kind: 'daysBefore' };
 
-/** The `days` days up to today. */
-const rollingDays = (days: number, label: string): PresetRule => ({
-  label,
+/** The `days` days up to today: "Last 30 days". */
+const rollingDays = (days: number): PresetRule => ({
+  label: () => `Last ${days} days`,
   start: (today) => addDays(today, 1 - days),
   comparison: DAYS_BEFORE,
 });
 
-/** This calendar year to date and the `last` whole ones before it. */
-const yearsToDate = (last: number, label: string): PresetRule => ({
-  label,
-  start: (today) => isoDate({ year: dateParts(today).year - last, month: 1, day: 1 }),
+/** The year this calendar year to date and the `last` whole ones before it start in. */
+const firstYear = (today: string, last: number): number => dateParts(today).year - last;
+
+/**
+ * This calendar year to date and the `last` whole ones before it: "Year to date" alone, else named
+ * by the year it starts in ("Since 2025"), which moves on each New Year as its start does.
+ */
+const yearsToDate = (last: number): PresetRule => ({
+  label: (today) => (last === 0 ? 'Year to date' : `Since ${firstYear(today, last)}`),
+  start: (today) => isoDate({ year: firstYear(today, last), month: 1, day: 1 }),
   comparison: { kind: 'yearsEarlier', years: last + 1 },
 });
 
@@ -47,37 +56,47 @@ const yearsToDate = (last: number, label: string): PresetRule => ({
  * asks for nothing else.
  */
 const PRESET_RULES = {
-  'rolling-30-days': rollingDays(30, 'Rolling 30 days'),
-  'rolling-60-days': rollingDays(60, 'Rolling 60 days'),
-  'rolling-90-days': rollingDays(90, 'Rolling 90 days'),
+  'rolling-30-days': rollingDays(30),
+  'rolling-60-days': rollingDays(60),
+  'rolling-90-days': rollingDays(90),
   'quarter-to-date': {
-    label: 'Quarter to date',
+    label: () => 'Quarter to date',
     start: (today) => {
       const month = monthIndex(today);
       return monthStart(month - (month % MONTHS_PER_QUARTER));
     },
     comparison: { kind: 'previousQuarterToDate' },
   },
-  'year-to-date': yearsToDate(0, 'Year to date'),
+  'year-to-date': yearsToDate(0),
   'rolling-12-months': {
-    label: 'Rolling 12 months',
+    label: () => 'Last 12 months',
     // The same date a year earlier (29 February falls back to the 28th), then the day after.
     start: (today) => addDays(yearsEarlier(today, 1), 1),
     comparison: DAYS_BEFORE,
   },
-  'this-year-and-last-1': yearsToDate(1, 'This year and last 1'),
-  'this-year-and-last-2': yearsToDate(2, 'This year and last 2'),
-  'this-year-and-last-3': yearsToDate(3, 'This year and last 3'),
-  'this-year-and-last-4': yearsToDate(4, 'This year and last 4'),
+  'this-year-and-last-1': yearsToDate(1),
+  'this-year-and-last-2': yearsToDate(2),
+  'this-year-and-last-3': yearsToDate(3),
+  'this-year-and-last-4': yearsToDate(4),
 } as const satisfies Record<string, PresetRule>;
 
 export type PeriodPreset = keyof typeof PRESET_RULES;
 
 export const PERIOD_PRESETS = Object.keys(PRESET_RULES) as readonly PeriodPreset[];
 
-export const PERIOD_PRESET_LABELS = Object.fromEntries(
-  PERIOD_PRESETS.map((preset) => [preset, PRESET_RULES[preset].label]),
-) as Record<PeriodPreset, string>;
+/**
+ * A preset's name on `today` ("Last 90 days", "Since 2025"). Its slug never changes, so links and
+ * pins outlive a name that moves on with the year.
+ */
+export const presetLabel = (preset: PeriodPreset, today: string): string =>
+  PRESET_RULES[preset].label(today);
+
+/** Every preset's name on `today`, for a control that lists them. */
+export function presetLabels(today: string): Record<PeriodPreset, string> {
+  return Object.fromEntries(
+    PERIOD_PRESETS.map((preset) => [preset, presetLabel(preset, today)]),
+  ) as Record<PeriodPreset, string>;
+}
 
 export function isPeriodPreset(value: unknown): value is PeriodPreset {
   return (PERIOD_PRESETS as readonly unknown[]).includes(value);
@@ -148,7 +167,7 @@ export function periodGrain(from: string, to: string): TimeAxis {
   return months <= MAX_QUARTERLY_MONTHS ? 'quarter' : 'year';
 }
 
-/** The Period Analytics opens on: Rolling 12 months, as the former Month view read. */
+/** The Period Analytics opens on: Last 12 months, as the former Month view read. */
 export const DEFAULT_PERIOD: Period = presetPeriod('rolling-12-months');
 
 /** The search parameters a Period is read from. */
@@ -290,19 +309,28 @@ export function analyticsHref(page: AnalyticsPage): string {
 /** Analytics over a Period, no Card pinned: what a bare visit or a former link reads. */
 export const unpinnedPage = (period: Period): AnalyticsPage => ({ period, cardPeriods: NO_PINS });
 
-/** How a Period was chosen, in words: its preset's name, or Custom. */
-export function periodLabel(period: Period): string {
-  return period.kind === 'preset' ? PERIOD_PRESET_LABELS[period.preset] : 'Custom';
+/**
+ * A preset's name at the end of a sentence ("no expense …"): "in the last 30 days", "in the
+ * quarter to date", "since 2025".
+ */
+export function presetNameInSentence(name: string): string {
+  const lower = name.charAt(0).toLowerCase() + name.slice(1);
+  return lower.startsWith('since ') ? lower : `in the ${lower}`;
+}
+
+/** How a Period was chosen, in words on `today`: its preset's name, or Custom. */
+export function periodLabel(period: Period, today: string): string {
+  return period.kind === 'preset' ? presetLabel(period.preset, today) : 'Custom';
 }
 
 /**
- * What a figure over a Period read over `dates` is captioned with: its preset's name ("Rolling 90
+ * What a figure over a Period read over `dates` is captioned with: its preset's name ("Last 90
  * days"), or its start date to today ("1 Jan 2024 – today") for a custom Period, or a preset read
  * from a later start than it gives (cut to the data).
  */
 export function periodCaption(period: Period, { from, to }: DateSpan): string {
   return period.kind === 'preset' && periodStart(period, to) === from
-    ? PERIOD_PRESET_LABELS[period.preset]
+    ? presetLabel(period.preset, to)
     : `${dayInWords(from, true)} – today`;
 }
 
@@ -319,7 +347,7 @@ export function periodDates({ from, to }: DateSpan): string {
   return `${dayInWords(from, from.slice(0, 4) !== to.slice(0, 4))} – ${dayInWords(to, true)}`;
 }
 
-/** The Period as the control names it: "Rolling 90 days · 25 Aug – 22 Nov 2026". */
+/** The Period as the control names it: "Last 90 days · 25 Aug – 22 Nov 2026". */
 export function periodPhrase(period: Period, dates: DateSpan): string {
-  return `${periodLabel(period)} · ${periodDates(dates)}`;
+  return `${periodLabel(period, dates.to)} · ${periodDates(dates)}`;
 }

@@ -4,6 +4,8 @@ import {
   cardPeriodsFromParams,
   legacyPeriod,
   PINNABLE_SECTIONS,
+  presetLabels,
+  presetNameInSentence,
   presetPeriod,
   presetStarts,
   periodCaption,
@@ -36,7 +38,7 @@ describe('a Period preset', () => {
     });
   });
 
-  it('starts Rolling 12 months the day after a year earlier, 29 February included', () => {
+  it('starts Last 12 months the day after a year earlier, 29 February included', () => {
     expect(periodStart(preset('rolling-12-months'), '2024-02-29')).toBe('2023-03-01');
     expect(periodStart(preset('rolling-12-months'), '2026-01-01')).toBe('2025-01-02');
     expect(periodStart(preset('quarter-to-date'), '2026-03-31')).toBe('2026-01-01');
@@ -49,6 +51,34 @@ describe('a Period preset', () => {
       'rolling-90-days': '2026-09-01',
       'year-to-date': '2026-09-01',
     });
+  });
+});
+
+describe("a Period preset's name", () => {
+  it('names a rolling Period by its length, and a run of whole years by its first one', () => {
+    expect(presetLabels('2026-11-22')).toEqual({
+      'rolling-30-days': 'Last 30 days',
+      'rolling-60-days': 'Last 60 days',
+      'rolling-90-days': 'Last 90 days',
+      'quarter-to-date': 'Quarter to date',
+      'year-to-date': 'Year to date',
+      'rolling-12-months': 'Last 12 months',
+      'this-year-and-last-1': 'Since 2025',
+      'this-year-and-last-2': 'Since 2024',
+      'this-year-and-last-3': 'Since 2023',
+      'this-year-and-last-4': 'Since 2022',
+    });
+  });
+
+  it('ends a sentence as written mid-sentence', () => {
+    expect(presetNameInSentence('Last 30 days')).toBe('in the last 30 days');
+    expect(presetNameInSentence('Quarter to date')).toBe('in the quarter to date');
+    expect(presetNameInSentence('Since 2025')).toBe('since 2025');
+  });
+
+  it('moves its year on with the new year', () => {
+    expect(presetLabels('2027-01-01')['this-year-and-last-1']).toBe('Since 2026');
+    expect(presetLabels('2026-12-31')['this-year-and-last-1']).toBe('Since 2025');
   });
 });
 
@@ -70,7 +100,7 @@ describe("a Period's grain", () => {
     const today = '2026-11-22';
 
     expect(periodGrain('2026-11-01', today)).toBe('month');
-    // Rolling 12 months reaches into 13 calendar months.
+    // Last 12 months reaches into 13 calendar months.
     expect(periodGrain('2025-11-23', today)).toBe('month');
     expect(periodGrain('2025-10-31', today)).toBe('quarter');
     expect(periodGrain('2024-12-01', today)).toBe('quarter');
@@ -79,7 +109,7 @@ describe("a Period's grain", () => {
 });
 
 describe('the Period in the URL', () => {
-  it('reads `period` as its preset, and a missing or unknown one as Rolling 12 months', () => {
+  it('reads `period` as its preset, and a missing or unknown one as Last 12 months', () => {
     expect(periodFromParams({ period: 'rolling-90-days' }, '2026-11-22')).toEqual(
       preset('rolling-90-days'),
     );
@@ -111,7 +141,7 @@ describe('the Period in the URL', () => {
     ).toBe('2027-04-04');
   });
 
-  it('reads a future or malformed `from` as Rolling 12 months', () => {
+  it('reads a future or malformed `from` as Last 12 months', () => {
     const today = '2026-11-22';
     for (const from of ['2026-11-23', '2030-01-01', '2026-02-30', '2026-13-01', '1-3-2024', '']) {
       expect(periodFromParams({ from }, today)).toEqual(preset('rolling-12-months'));
@@ -243,11 +273,14 @@ describe('the Card Periods in the URL', () => {
 describe('the Period in words', () => {
   it('names the preset and its dates, the year once when both ends share it', () => {
     expect(periodPhrase(preset('rolling-90-days'), { from: '2026-08-25', to: '2026-11-22' })).toBe(
-      'Rolling 90 days · 25 Aug – 22 Nov 2026',
+      'Last 90 days · 25 Aug – 22 Nov 2026',
     );
     expect(
       periodPhrase(preset('rolling-12-months'), { from: '2025-11-23', to: '2026-11-22' }),
-    ).toBe('Rolling 12 months · 23 Nov 2025 – 22 Nov 2026');
+    ).toBe('Last 12 months · 23 Nov 2025 – 22 Nov 2026');
+    expect(
+      periodPhrase(preset('this-year-and-last-1'), { from: '2025-01-01', to: '2026-11-22' }),
+    ).toBe('Since 2025 · 1 Jan 2025 – 22 Nov 2026');
     expect(
       periodPhrase(
         { kind: 'custom', from: '2026-11-22' },

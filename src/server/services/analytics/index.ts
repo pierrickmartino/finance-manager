@@ -1,6 +1,6 @@
 import {
   NO_PINS,
-  PERIOD_PRESET_LABELS,
+  presetLabel,
   presetStarts,
   type CardPeriods,
   type PinnableSection,
@@ -99,7 +99,7 @@ function sectionReadings(
       : {
           reading: cardReading(page, preset, dataStart),
           isPinned: true,
-          periodName: PERIOD_PRESET_LABELS[preset],
+          periodName: presetLabel(preset, page.to),
         };
   };
 }
