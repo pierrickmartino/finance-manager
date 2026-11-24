@@ -16,7 +16,7 @@ import { incomeVsExpense } from './income-vs-expense';
 import { loadComparison, type Comparison } from './key-figure-change';
 import { netCashFlow } from './net-cash-flow';
 import { keyFigures, type AnalyticsKeyFigures } from './key-figures';
-import { netWorth, netWorthTrend, type AnalyticsNetWorth } from './net-worth';
+import { netWorthTrend } from './net-worth';
 import { profitAndLoss, type AnalyticsProfitAndLoss } from './profit-and-loss';
 import { recentTransactions, type RecentTransactions } from './recent-transactions';
 import { spendingByCategory } from './spending-by-category';
@@ -57,7 +57,6 @@ export type Pinnable<Result> = Result & SectionReading;
 /** Each section's promise, by name. */
 export interface AnalyticsSections {
   keyFigures: Promise<AnalyticsKeyFigures>;
-  netWorth: Promise<Pinnable<AnalyticsNetWorth>>;
   spendingInsights: Promise<AnalyticsCard>;
   recentTransactions: Promise<RecentTransactions>;
   incomeVsExpense: Promise<Pinnable<AnalyticsCard>>;
@@ -111,7 +110,6 @@ async function pinnable<Result>(
 /** The pinnable sections' promises. */
 type PinnableSections = Pick<
   AnalyticsSections,
-  | 'netWorth'
   | 'incomeVsExpense'
   | 'netCashFlow'
   | 'spendingByCategory'
@@ -122,14 +120,12 @@ type PinnableSections = Pick<
 
 /** What the pinnable sections share with the Key figures while they follow the page. */
 interface PageShared {
-  sections: SharedSections;
   comparison: Promise<Comparison>;
 }
 
 /**
- * Starts the pinnable sections, each over its reading (`sectionReadings`). Unpinned, Net worth and
- * Profit and loss share the Key figures' figures (`PageShared`); pinned, Net worth runs its own
- * trend and income and expense, and Profit and loss its own comparison.
+ * Starts the pinnable sections, each over its reading (`sectionReadings`). Unpinned, Profit and
+ * loss shares the Key figures' comparison (`PageShared`); pinned, it runs its own.
  */
 function loadPinnableSections(
   ctx: ServiceContext,
@@ -137,16 +133,7 @@ function loadPinnableSections(
   shared: PageShared,
   dataStart: DataStart,
 ): PinnableSections {
-  const { balances } = shared.sections;
   return {
-    netWorth: pinnable(readingFor('net-worth'), ({ reading, isPinned }) =>
-      netWorth(
-        reading,
-        isPinned
-          ? { trend: netWorthTrend(ctx, reading), balances, flow: spendingInsights(ctx, reading) }
-          : shared.sections,
-      ),
-    ),
     incomeVsExpense: pinnable(readingFor('income-vs-expense'), ({ reading }) =>
       incomeVsExpense(ctx, reading),
     ),
@@ -174,17 +161,16 @@ function loadPinnableSections(
  * Starts every section of Analytics over a Period, once it is cut to the data: no Period, preset or
  * custom, starts before the first Transaction (`readingOf`; a custom Period's date moves, a preset
  * keeps its name, and the reading carries the effective Period). The sections' promises are not
- * awaited here: the page awaits each where it shows it. Net worth reads the Account balances and
- * the Period's income and expense, and Key figures the Account balances, Net worth's trend and the
- * Period's income and expense, so they share those promises rather than run them again; Key
- * figures and Profit and loss share what their changes compare with (`loadComparison`). Spending
+ * awaited here: the page awaits each where it shows it. Key figures read the Account balances, Net
+ * worth's trend and the Period's income and expense, the Account balances shared with their own
+ * section rather than run again; Key figures and Profit and loss share what their changes compare
+ * with (`loadComparison`). Spending
  * Insights reads its own months: the last complete one and those before it, whatever the Period.
  *
  * A pinned section (GLOSSARY: Card Period, ADR-0018; `cardPeriods`, none by default) is read over
  * its own preset instead, resolved from the same today and first Transaction, so it is cut to the
  * data like any Period; its result names the reading it was read over. Every Drill-down, pinned or
- * not, leads back to the page with its Period and every pin (the readings' `page`). A pinned Net
- * worth runs its own trend and income and expense; the Key figures keep the page's. A pinned
+ * not, leads back to the page with its Period and every pin (the readings' `page`). A pinned
  * Profit and loss runs its own comparison, over its own Comparison period.
  */
 export async function loadAnalytics(
@@ -215,7 +201,7 @@ export async function loadAnalytics(
       spendingInsights: lastCompleteMonthInsights(ctx, reading),
       recentTransactions: recentTransactions(ctx),
       accountBalances: balances,
-      ...loadPinnableSections(ctx, readingFor, { sections, comparison }, dataStart),
+      ...loadPinnableSections(ctx, readingFor, { comparison }, dataStart),
     },
   };
 }
@@ -224,7 +210,6 @@ export type { AnalyticsInterval, AnalyticsReading } from './reading';
 export type { AnalyticsCard, SectionStatus } from './figures';
 export type { AnalyticsKeyFigures, KeyFigure, KeyFigureId } from './key-figures';
 export type { KeyFigureChange } from './key-figure-change';
-export type { AnalyticsNetWorth } from './net-worth';
 export type {
   AnalyticsProfitAndLoss,
   ProfitAndLossRow,

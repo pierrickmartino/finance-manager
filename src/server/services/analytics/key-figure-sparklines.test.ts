@@ -10,6 +10,10 @@ import { MONTHLY, QUARTERLY, YEARLY } from '@test/support/periods';
 import { periodLabel } from '@/lib/analytics/period';
 import { setupTestDatabase } from '@test/support/db';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
+import { swissToday } from '../fx/dates';
+import { loadDataStart } from './data-start';
+import { netWorthTrend } from './net-worth';
+import { readingOf } from './reading';
 import type { KeyFigure, KeyFigureId } from './key-figures';
 
 /** Key figures' sparklines (spec #225, user stories 24-27; ticket #230). */
@@ -140,7 +144,8 @@ describe('Key figures sparklines', () => {
 
     for (const view of [MONTHLY, QUARTERLY, YEARLY]) {
       const { netWorth } = byId((await loadSection(t.ctx, view, 'keyFigures')).figures);
-      const { trend } = await loadSection(t.ctx, view, 'netWorth');
+      const { firstTransaction } = await loadDataStart(t.ctx);
+      const trend = await netWorthTrend(t.ctx, readingOf(view, swissToday(), firstTransaction));
 
       const label = periodLabel(view, '2025-05-20');
       expect(values(netWorth), label).toEqual(trend.rowTotals.map((total) => total ?? 0));

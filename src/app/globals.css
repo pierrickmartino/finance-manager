@@ -45,11 +45,11 @@
   --color-insight: color-mix(in srgb, var(--color-ramp-4) 40%, var(--color-surface));
 
   /* Meaning, kept apart from the accent: never use these for decoration. positive is a
-     yellowish green, clear of teal and cyan; warning an orange, well apart from the cyan accent
+     vivid neon lime (yellowish, clear of teal and cyan) and negative a vivid neon pink-red; warning an orange, well apart from the cyan accent
      so attention never reads as a link or a selection. */
-  --color-positive: #a3d94e;
+  --color-positive: #a6ff2e;
   --color-positive-tint: #1b2e17;
-  --color-negative: #ff7a8a;
+  --color-negative: #ff6685;
   --color-negative-tint: #3a1825;
   --color-warning: #ff9d5c;
   --color-warning-tint: #36210f;

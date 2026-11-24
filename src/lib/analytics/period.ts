@@ -235,7 +235,6 @@ export function legacyPeriod({ period, span, from }: LegacyPeriodParams): Period
  * figures, the spending insight, the most recent Transactions and the Account balances have none.
  */
 export const PINNABLE_SECTIONS = [
-  'net-worth',
   'income-vs-expense',
   'spending-by-category',
   'profit-and-loss',
