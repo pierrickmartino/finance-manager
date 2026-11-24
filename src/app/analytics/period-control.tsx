@@ -29,8 +29,6 @@ interface PeriodControlProps {
   today: string;
   /** The Cards' pins, sent again as they are: changing the page's Period keeps every one. */
   cardPeriods: CardPeriods;
-  /** PROTOTYPE: the `?variant=` being viewed, kept when the Period changes. */
-  variant?: string;
 }
 
 const noSubscription = () => () => {};
@@ -64,7 +62,6 @@ export function PeriodControl({
   starts,
   today,
   cardPeriods,
-  variant,
 }: PeriodControlProps) {
   const id = useId();
   const [choice, setChoice] = useState<string>(period.kind === 'preset' ? period.preset : CUSTOM);
@@ -131,7 +128,6 @@ export function PeriodControl({
         />
       </div>
       <HiddenFields params={cardPeriodsToParams(cardPeriods)} />
-      {variant && <input type="hidden" name="variant" value={variant} />}
       <button type="submit" className={SECONDARY_BUTTON_CLASS}>
         Show
       </button>

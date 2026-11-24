@@ -1,6 +1,4 @@
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { redirect } from 'next/navigation';
 import { PAGE_TITLE_CLASS } from '@/components/surface';
 import { rowsHeight } from '@/lib/reporting/board';
@@ -38,17 +36,6 @@ import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transac
 import { StreamedSection } from './section';
 import { PeriodControl } from './period-control';
 import { SpendingInsightsSection } from './spending-insights';
-import {
-  BandKeyFigures,
-  MockupKeyFigures,
-  PROTOTYPE_VARIANTS,
-  RailKeyFigures,
-  VariantA,
-  VariantB,
-  VariantC,
-  type PrototypeVariant,
-  type Slots,
-} from './prototype-variants';
 import { WidgetCardPlaceholder } from '../dashboards/(dashboard)/[id]/overview/card-placeholder';
 
 export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
@@ -97,25 +84,13 @@ export default async function AnalyticsPage({
   const { period } = reading;
   const retryHref = analyticsHref(reading.page);
 
-  // PROTOTYPE (?variant=, throwaway): every arrangement draws these same streamed sections.
-  const rawVariant = typeof params.variant === 'string' ? params.variant : undefined;
-  const variant: PrototypeVariant =
-    process.env.NODE_ENV === 'production'
-      ? 'current'
-      : (PROTOTYPE_VARIANTS.find((v) => v.key === rawVariant)?.key ?? 'A');
-  const figures =
-    variant === 'A' ? (
-      <MockupKeyFigures keyFigures={sections.keyFigures} fmt={fmt} />
-    ) : variant === 'B' ? (
-      <RailKeyFigures keyFigures={sections.keyFigures} fmt={fmt} />
-    ) : variant === 'C' ? (
-      <BandKeyFigures keyFigures={sections.keyFigures} fmt={fmt} />
-    ) : (
-      <KeyFiguresSection keyFigures={sections.keyFigures} fmt={fmt} />
-    );
-  const s: Slots = {
-    completeness: <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />,
-    period: (
+  return (
+    <section className="flex flex-col gap-5">
+      <header className="flex flex-col gap-1">
+        <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
+        <p className="text-muted">Your finances over the Period you choose, up to today.</p>
+      </header>
+      <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
       <PeriodControl
         key={analyticsHref(unpinnedPage(period))}
         period={period}
@@ -124,140 +99,91 @@ export default async function AnalyticsPage({
         starts={starts}
         today={today}
         cardPeriods={cardPeriods}
-        variant={variant === 'A' ? undefined : variant}
       />
-    ),
-    keyFigures: (
-      <StreamedSection
-        name={KEY_FIGURES}
-        retryHref={retryHref}
-        placeholder={<KeyFiguresPlaceholder />}
-      >
-        {figures}
-      </StreamedSection>
-    ),
-    netWorth: (
-      <StreamedSection name={NET_WORTH} retryHref={retryHref}>
-        <NetWorthSection netWorth={sections.netWorth} />
-      </StreamedSection>
-    ),
-    insights: (
-      <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
-        <SpendingInsightsSection flow={sections.spendingInsights} />
-      </StreamedSection>
-    ),
-    recent: (
-      <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
-        <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
-      </StreamedSection>
-    ),
-    incomeVsExpense: (
-      <StreamedSection
-        name={INCOME_VS_EXPENSE}
-        retryHref={retryHref}
-        isCard
-        placeholder={
-          <WidgetCardPlaceholder
-            name={INCOME_VS_EXPENSE}
-            shape={INCOME_VS_EXPENSE_FRAME.placeholder}
-            height={rowsHeight(INCOME_VS_EXPENSE_FRAME.sizes.initial.h)}
-          />
-        }
-      >
-        <CardSection
-          card={sections.incomeVsExpense}
-          section="income-vs-expense"
-          empty="no income or expense"
-        />
-      </StreamedSection>
-    ),
-    accountBalances: (
-      <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref} isCard>
-        <CardSection card={sections.accountBalances} empty="no Accounts" />
-      </StreamedSection>
-    ),
-    spendingByCategory: (
-      <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref} isCard>
-        <CardSection
-          card={sections.spendingByCategory}
-          section="spending-by-category"
-          empty="no expense"
-        />
-      </StreamedSection>
-    ),
-    profitAndLoss: (
-      <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
-        <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
-      </StreamedSection>
-    ),
-    netCashFlow: (
-      <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
-        <CardSection card={sections.netCashFlow} section="net-cash-flow" empty="no Transactions" />
-      </StreamedSection>
-    ),
-    profitPerInterval: (
-      <StreamedSection name={PROFIT_PER_INTERVAL} retryHref={retryHref} isCard>
-        <CardSection
-          card={sections.profitPerInterval}
-          section="profit-per-interval"
-          empty="no income, expense or Capital"
-        />
-      </StreamedSection>
-    ),
-    categoriesPerInterval: (
-      <StreamedSection name={CATEGORIES_PER_INTERVAL} retryHref={retryHref} isCard>
-        <CardSection
-          card={sections.categoriesPerInterval}
-          section="categories-per-interval"
-          empty="no classified Transactions"
-        />
-      </StreamedSection>
-    ),
-  };
-  const switcher =
-    process.env.NODE_ENV === 'production' ? null : (
-      <Suspense>
-        <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} current={variant} />
-      </Suspense>
-    );
-  if (variant !== 'current') {
-    const Variant = { A: VariantA, B: VariantB, C: VariantC }[variant];
-    return (
-      <>
-        <Variant s={s} />
-        {switcher}
-      </>
-    );
-  }
-
-  return (
-    <section className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
-        <p className="text-muted">Your finances over the Period you choose, up to today.</p>
-      </header>
-      {s.completeness}
-      {s.period}
       <div className="grid min-w-0 grid-cols-1 gap-5">
-        {s.keyFigures}
+        {/* Key figures: four tiles in a row on wide screens, 2×2 below. */}
+        <StreamedSection
+          name={KEY_FIGURES}
+          retryHref={retryHref}
+          placeholder={<KeyFiguresPlaceholder />}
+        >
+          <KeyFiguresSection keyFigures={sections.keyFigures} fmt={fmt} />
+        </StreamedSection>
+        {/* The overview: three side by side on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          {s.netWorth}
-          {s.insights}
-          {s.recent}
+          <StreamedSection name={NET_WORTH} retryHref={retryHref}>
+            <NetWorthSection netWorth={sections.netWorth} />
+          </StreamedSection>
+          <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
+            <SpendingInsightsSection flow={sections.spendingInsights} />
+          </StreamedSection>
+          <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
+            <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
+          </StreamedSection>
         </div>
+        {/* Income vs. expense, Account balances and Spending by Category side by side on wide
+            screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          {s.incomeVsExpense}
-          {s.accountBalances}
-          {s.spendingByCategory}
+          <StreamedSection
+            name={INCOME_VS_EXPENSE}
+            retryHref={retryHref}
+            isCard
+            placeholder={
+              <WidgetCardPlaceholder
+                name={INCOME_VS_EXPENSE}
+                shape={INCOME_VS_EXPENSE_FRAME.placeholder}
+                height={rowsHeight(INCOME_VS_EXPENSE_FRAME.sizes.initial.h)}
+              />
+            }
+          >
+            <CardSection
+              card={sections.incomeVsExpense}
+              section="income-vs-expense"
+              empty="no income or expense"
+            />
+          </StreamedSection>
+          <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref} isCard>
+            <CardSection card={sections.accountBalances} empty="no Accounts" />
+          </StreamedSection>
+          <StreamedSection name={SPENDING_BY_CATEGORY} retryHref={retryHref} isCard>
+            <CardSection
+              card={sections.spendingByCategory}
+              section="spending-by-category"
+              empty="no expense"
+            />
+          </StreamedSection>
         </div>
+        {/* The whole Period's statement beside its Net cash flow on wide screens, then its
+            intervals. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="grid min-w-0 lg:col-span-2">{s.profitAndLoss}</div>
-          {s.netCashFlow}
+          <div className="grid min-w-0 lg:col-span-2">
+            <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
+              <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
+            </StreamedSection>
+          </div>
+          <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
+            <CardSection
+              card={sections.netCashFlow}
+              section="net-cash-flow"
+              empty="no Transactions"
+            />
+          </StreamedSection>
         </div>
-        {s.profitPerInterval}
-        {s.categoriesPerInterval}
+        <StreamedSection name={PROFIT_PER_INTERVAL} retryHref={retryHref} isCard>
+          <CardSection
+            card={sections.profitPerInterval}
+            section="profit-per-interval"
+            empty="no income, expense or Capital"
+          />
+        </StreamedSection>
+        <StreamedSection name={CATEGORIES_PER_INTERVAL} retryHref={retryHref} isCard>
+          <CardSection
+            card={sections.categoriesPerInterval}
+            section="categories-per-interval"
+            empty="no classified Transactions"
+          />
+        </StreamedSection>
       </div>
-      {switcher}
     </section>
   );
 }
