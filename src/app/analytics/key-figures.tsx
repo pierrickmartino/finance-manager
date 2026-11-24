@@ -50,13 +50,17 @@ interface TileLook {
 }
 
 const CLASSIC_LOOK: TileLook = { isCaptionBeside: false, isPercentOnly: false, isSmooth: false };
+const FLOW_LOOK: TileLook = { isCaptionBeside: true, isPercentOnly: true, isSmooth: true };
 
-/** Expense reads its Period beside its label, its change as a %, and its trend as a curve. */
+/**
+ * Income, Expense and Profit read their Period beside their label, their change as a %, and
+ * their trend as a curve; Net worth keeps its "Today" under its label and its change in CHF.
+ */
 const TILE_LOOKS: Record<KeyFigureId, TileLook> = {
   netWorth: CLASSIC_LOOK,
-  income: CLASSIC_LOOK,
-  expense: { isCaptionBeside: true, isPercentOnly: true, isSmooth: true },
-  profit: CLASSIC_LOOK,
+  income: FLOW_LOOK,
+  expense: FLOW_LOOK,
+  profit: FLOW_LOOK,
 };
 
 interface FigureTileProps {
