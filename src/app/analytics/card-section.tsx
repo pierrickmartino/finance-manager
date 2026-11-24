@@ -60,7 +60,15 @@ export async function CardSection({ card, section, empty, className = '' }: Card
       </SectionCard>
     );
   }
-  return <WidgetCard card={loaded} className={`min-w-0 ${className}`} titleAside={titleAside} />;
+  return (
+    <WidgetCard
+      card={loaded}
+      className={`min-w-0 ${className}`}
+      titleAside={titleAside}
+      // Income vs. expense reads from its chart alone: no facts, its legend under the Period.
+      isCompact={section === 'income-vs-expense'}
+    />
+  );
 }
 
 interface SectionCardPeriodProps extends Pick<SectionReading, 'reading' | 'isPinned'> {

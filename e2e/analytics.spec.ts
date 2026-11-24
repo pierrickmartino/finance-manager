@@ -605,9 +605,17 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
     // Through about a point a month over the year, not one a day.
     expect(d.match(/C/g)!.length).toBeLessThanOrEqual(16);
   }
-  for (const fact of ['Came in', 'Went out']) {
-    await expect(card.getByRole('term').filter({ hasText: fact })).toBeVisible();
+  // No facts under the chart; its legend sits at the top right, under the Card's Period.
+  await expect(card.getByRole('term')).toHaveCount(0);
+  await expect(card.locator('figcaption')).toHaveCount(0);
+  const periodBox = (await card.getByTestId('card-period').boundingBox())!;
+  for (const series of ['Income', 'Expense']) {
+    const swatch = card.getByText(series, { exact: true });
+    await expect(swatch).toBeVisible();
+    expect((await swatch.boundingBox())!.y).toBeGreaterThan(periodBox.y);
   }
+  const plotTop = (await plot.boundingBox())!.y;
+  expect((await card.getByText('Expense', { exact: true }).boundingBox())!.y).toBeLessThan(plotTop);
   const lead = card.getByTestId('card-lead').getByRole('link');
   const kept = francs(await lead.innerText());
 

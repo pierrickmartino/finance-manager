@@ -252,22 +252,33 @@ function PointTooltip({ point, index, scale, money, isRunning, isTappable }: Poi
   );
 }
 
-/** The first and last point under the plot, and a swatch per series. */
-function FlowLegend({ points }: { points: FlowPoint[] }) {
+/** A swatch per series, naming each area. */
+export function FlowSwatches({ className = '' }: { className?: string }) {
+  return (
+    <span className={`flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted ${className}`}>
+      {SERIES_ORDER.map((series) => (
+        <span key={series} className="flex items-center gap-1.5">
+          <span className={`h-2 w-2 rounded-sm ${SERIES[series].swatch}`} aria-hidden />
+          {SERIES[series].label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** The first and last point under the plot, and, unless drawn elsewhere, the swatches. */
+function FlowLegend({ points, hasSwatches }: { points: FlowPoint[]; hasSwatches: boolean }) {
   return (
     <>
       <div className="mt-3 flex justify-between text-xs text-muted" aria-hidden>
         <span>{intervalLabel(points[0]!)}</span>
         {points.length > 1 && <span>{intervalLabel(points.at(-1)!)}</span>}
       </div>
-      <figcaption className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
-        {SERIES_ORDER.map((series) => (
-          <span key={series} className="flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-sm ${SERIES[series].swatch}`} aria-hidden />
-            {SERIES[series].label}
-          </span>
-        ))}
-      </figcaption>
+      {hasSwatches && (
+        <figcaption className="mt-2">
+          <FlowSwatches />
+        </figcaption>
+      )}
     </>
   );
 }
@@ -276,6 +287,8 @@ interface FlowAreasProps {
   points: FlowPoint[];
   /** Each point is a running total from the first: its Drill-downs cover the rows through it. */
   isRunning: boolean;
+  /** The swatches are drawn elsewhere (in the card's header), so not under the plot. */
+  hasLegendElsewhere?: boolean;
 }
 
 /**
@@ -284,7 +297,7 @@ interface FlowAreasProps {
  * area under the pointer, and Enter moves to the figures' links, one per column, each summing
  * to its point (`useFlowPointer`).
  */
-export function FlowAreas({ points, isRunning }: FlowAreasProps) {
+export function FlowAreas({ points, isRunning, hasLegendElsewhere = false }: FlowAreasProps) {
   const money = useMoney();
   const scale = scaleOf(
     points.length,
@@ -331,7 +344,7 @@ export function FlowAreas({ points, isRunning }: FlowAreasProps) {
               .join(', ')}`}
         </p>
       </div>
-      <FlowLegend points={points} />
+      <FlowLegend points={points} hasSwatches={!hasLegendElsewhere} />
     </figure>
   );
 }

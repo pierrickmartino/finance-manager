@@ -9,7 +9,7 @@ import { TitleRow } from '@/components/title-row';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
 import { CARD_LEAD_SIZE_CLASS } from './card-layout';
-import { FlowAreas } from './flow-areas';
+import { FlowAreas, FlowSwatches } from './flow-areas';
 import { HeatmapGrid } from './heatmap-grid';
 import { DotMatrix, EmptyChart, MonthBars, TickList } from './marks';
 import { NetWorthLine } from './net-worth-mark';
@@ -21,7 +21,15 @@ type Money = (minor: number) => string;
  * The card's mark, as its reading chose it: dots or two areas for in and out, bars per period,
  * ticks for parts.
  */
-function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
+function CardBody({
+  mark,
+  money,
+  hasLegendInHeader,
+}: {
+  mark: CardMark;
+  money: Money;
+  hasLegendInHeader: boolean;
+}) {
   switch (mark.type) {
     case 'none':
       return null;
@@ -46,7 +54,13 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
     case 'dots':
       return <DotMatrix months={mark.months} />;
     case 'areas':
-      return <FlowAreas points={mark.points} isRunning={mark.isRunning} />;
+      return (
+        <FlowAreas
+          points={mark.points}
+          isRunning={mark.isRunning}
+          hasLegendElsewhere={hasLegendInHeader}
+        />
+      );
     case 'bars':
       return <MonthBars periods={mark.periods} />;
     case 'netWorthLine':
@@ -61,16 +75,37 @@ interface WidgetCardProps {
   toolbar?: ReactNode;
   /** Drawn beside the card's title: an Analytics Card's Period mark and dropdown. */
   titleAside?: ReactNode;
+  /**
+   * A compact chart card (Analytics' Income vs. expense): no facts under the chart, and a
+   * flow's swatches at the top right, under the title's aside.
+   */
+  isCompact?: boolean;
 }
 
 /**
  * One Widget as a card of the Dashboard's grid: its name, a sentence saying what its chart
  * shows, the chart, and the facts behind it (GLOSSARY: Dashboard Story).
  */
-export function WidgetCard({ card, className = '', toolbar, titleAside }: WidgetCardProps) {
+export function WidgetCard({
+  card,
+  className = '',
+  toolbar,
+  titleAside,
+  isCompact = false,
+}: WidgetCardProps) {
   const fmt = useFormatter();
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const reading = readCard(card, money);
+  const hasLegendInHeader = isCompact && reading.mark.type === 'areas';
+  const aside = hasLegendInHeader ? (
+    <div className="flex flex-col items-end gap-1.5">
+      {titleAside}
+      <FlowSwatches className="justify-end" />
+    </div>
+  ) : (
+    titleAside
+  );
+  const facts = isCompact ? [] : reading.facts;
   return (
     <section
       aria-labelledby={`card-${card.id}`}
@@ -78,7 +113,7 @@ export function WidgetCard({ card, className = '', toolbar, titleAside }: Widget
     >
       {toolbar}
       <div>
-        <TitleRow aside={titleAside}>
+        <TitleRow aside={aside}>
           <h2 id={`card-${card.id}`} className="font-medium">
             {card.name}
           </h2>
@@ -99,10 +134,10 @@ export function WidgetCard({ card, className = '', toolbar, titleAside }: Widget
       {card.unconvertedCount > 0 && (
         <p className="text-sm text-warning">{card.unconvertedCount} left out: no FX rate yet.</p>
       )}
-      <CardBody mark={reading.mark} money={money} />
-      {reading.facts.length > 0 && (
+      <CardBody mark={reading.mark} money={money} hasLegendInHeader={hasLegendInHeader} />
+      {facts.length > 0 && (
         <dl className="grid grid-cols-1 gap-3 border-t border-rule pt-3 @2xs:grid-cols-2 @2xl:grid-cols-3">
-          {reading.facts.map((fact) => (
+          {facts.map((fact) => (
             <div key={fact.label}>
               <dt className="text-xs text-muted">{fact.label}</dt>
               <dd className="text-sm tabular-nums">
