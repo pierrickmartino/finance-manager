@@ -6,12 +6,7 @@ import {
   TITLE_ROW_CLASS,
 } from '@/components/surface';
 import type { Formatter } from '@/lib/format';
-import {
-  KEY_FIGURES,
-  type AnalyticsKeyFigures,
-  type KeyFigure,
-  type KeyFigureId,
-} from '@/server/services/analytics';
+import { KEY_FIGURES, type AnalyticsKeyFigures, type KeyFigure } from '@/server/services/analytics';
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { FigureSparklineMark } from './figure-sparkline-mark';
 import { ChangeLine } from './key-figure-change';
@@ -39,71 +34,36 @@ export function KeyFiguresPlaceholder() {
   );
 }
 
-/** How a tile lays out what it carries. */
-interface TileLook {
-  /** Its caption beside its label, top right, rather than under it. */
-  isCaptionBeside: boolean;
-  /** Its change line gives the % alone, without the absolute change. */
-  isPercentOnly: boolean;
-  /** Its sparkline curves through the points rather than joining them straight. */
-  isSmooth: boolean;
-}
-
-const CLASSIC_LOOK: TileLook = { isCaptionBeside: false, isPercentOnly: false, isSmooth: false };
-const FLOW_LOOK: TileLook = { isCaptionBeside: true, isPercentOnly: true, isSmooth: true };
-
-/**
- * Income, Expense and Profit read their Period beside their label, their change as a %, and
- * their trend as a curve; Net worth keeps its "Today" under its label and its change in CHF.
- */
-const TILE_LOOKS: Record<KeyFigureId, TileLook> = {
-  netWorth: CLASSIC_LOOK,
-  income: FLOW_LOOK,
-  expense: FLOW_LOOK,
-  profit: FLOW_LOOK,
-};
-
 interface FigureTileProps {
   figure: KeyFigure;
   fmt: Formatter;
 }
 
 /**
- * One figure's tile: its label and when it stands, then its amount opening what is behind it,
- * and its sparkline at the foot.
+ * One figure's tile: its label with when it stands top right, then its amount opening what is
+ * behind it, its change as a %, and its smooth sparkline at the foot.
  */
 function FigureTile({ figure, fmt }: FigureTileProps) {
-  const look = TILE_LOOKS[figure.id];
-  const caption = <p className="text-sm text-muted">{figure.caption}</p>;
   return (
     <section aria-label={figure.label} className={FIGURE_CLASS}>
-      {look.isCaptionBeside && !figure.isEmpty ? (
-        <div className={`${TITLE_ROW_CLASS} items-baseline`}>
-          <h3 className="font-medium">{figure.label}</h3>
-          {caption}
-        </div>
-      ) : (
+      <div className={`${TITLE_ROW_CLASS} items-baseline`}>
         <h3 className="font-medium">{figure.label}</h3>
-      )}
+        {!figure.isEmpty && <p className="text-sm text-muted">{figure.caption}</p>}
+      </div>
       {figure.isEmpty ? (
         <p className="mt-2 text-sm text-muted">Nothing to show yet: no Account holds money.</p>
       ) : (
         <>
-          {!look.isCaptionBeside && caption}
           <Link
             href={figure.href}
             className={`${TILE_AMOUNT_CLASS} mt-2 hover:underline ${figure.value < 0 ? 'text-negative' : ''}`}
           >
             {fmt.amount(figure.value, { currency: BASE_CURRENCY, isWhole: true })}
           </Link>
-          {figure.change && (
-            <ChangeLine change={figure.change} fmt={fmt} isPercentOnly={look.isPercentOnly} />
-          )}
+          {figure.change && <ChangeLine change={figure.change} fmt={fmt} isPercentOnly />}
         </>
       )}
-      {!figure.isEmpty && (
-        <FigureSparklineMark points={figure.sparkline} isSmooth={look.isSmooth} />
-      )}
+      {!figure.isEmpty && <FigureSparklineMark points={figure.sparkline} />}
       {figure.unconverted.count > 0 && <UnconvertedNote {...figure.unconverted} />}
     </section>
   );

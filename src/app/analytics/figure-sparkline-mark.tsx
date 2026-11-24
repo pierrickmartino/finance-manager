@@ -3,18 +3,17 @@ import { figureSparkline, type FigureSparklineInput } from '@/lib/analytics/figu
 
 interface FigureSparklineMarkProps {
   points: readonly FigureSparklineInput[];
-  /** Curve through the points instead of joining them with straight segments. */
-  isSmooth?: boolean;
 }
 
 /**
- * A Key figure's sparkline, drawn as the overview's headline trend and scaled to its own low
- * and high. A partial current interval is a dashed last segment to a hollow dot, and a Period's
- * first interval cut short a dashed first segment (ADR-0016).
+ * A Key figure's sparkline, drawn as the overview's headline trend but curving smoothly through
+ * its points, scaled to its own low and high. A partial current interval is a dashed last
+ * segment to a hollow dot, and a Period's first interval cut short a dashed first segment
+ * (ADR-0016).
  * Hidden from assistive technology: the tile says every value it carries as text.
  */
-export function FigureSparklineMark({ points, isSmooth = false }: FigureSparklineMarkProps) {
-  const shape = figureSparkline(points, { isSmooth });
+export function FigureSparklineMark({ points }: FigureSparklineMarkProps) {
+  const shape = figureSparkline(points, { isSmooth: true });
   if (!shape) return null;
   return (
     // At the tile's foot, so the sparklines of a row line up whatever stands above them.
