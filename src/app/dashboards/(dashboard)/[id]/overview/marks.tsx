@@ -156,7 +156,7 @@ export function TickList({ items }: { items: TickItem[] }) {
       {items.map((item) => {
         const lit = litTicks(item.share, TICKS);
         const row = (
-          <span className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl bg-paper px-4 py-3 hover:bg-sunken @2xs:grid-cols-[1fr_auto_auto]">
+          <span className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl px-4 py-3 hover:bg-sunken @2xs:grid-cols-[1fr_auto_auto]">
             <span className="min-w-0">
               <span className="block truncate font-medium">{item.title}</span>
               <span className="block truncate text-xs text-muted">{item.detail}</span>
