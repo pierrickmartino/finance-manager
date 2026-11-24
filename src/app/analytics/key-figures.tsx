@@ -3,6 +3,7 @@ import { PLACEHOLDER_CLASS, TILE_AMOUNT_CLASS, TILE_CLASS } from '@/components/s
 import type { Formatter } from '@/lib/format';
 import { KEY_FIGURES, type AnalyticsKeyFigures, type KeyFigure } from '@/server/services/analytics';
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
+import { EXPENSE_VARIANT_COMPONENTS, type ExpenseVariantKey } from './expense-tile.prototype';
 import { FigureSparklineMark } from './figure-sparkline-mark';
 import { ChangeLine } from './key-figure-change';
 import { UnconvertedNote } from './section';
@@ -65,22 +66,33 @@ function FigureTile({ figure, fmt }: FigureTileProps) {
 interface KeyFiguresSectionProps {
   keyFigures: Promise<AnalyticsKeyFigures>;
   fmt: Formatter;
+  /** PROTOTYPE: which Expense tile variant to draw (expense-tile.prototype.tsx). */
+  expenseVariant?: ExpenseVariantKey;
 }
 
 /**
  * Analytics' Key figures, once they arrive: Net worth today, then Income, Expense and Profit
  * over the current interval to date, each a tile whose amount opens what is behind it.
  */
-export async function KeyFiguresSection({ keyFigures, fmt }: KeyFiguresSectionProps) {
+export async function KeyFiguresSection({
+  keyFigures,
+  fmt,
+  expenseVariant = 'current',
+}: KeyFiguresSectionProps) {
   const { figures } = await keyFigures;
+  const income = figures.find((figure) => figure.id === 'income');
   return (
     <section aria-labelledby="key-figures-title" className={ROW_CLASS}>
       <h2 id="key-figures-title" className="sr-only">
         {KEY_FIGURES}
       </h2>
-      {figures.map((figure) => (
-        <FigureTile key={figure.id} figure={figure} fmt={fmt} />
-      ))}
+      {figures.map((figure) => {
+        if (figure.id === 'expense' && expenseVariant !== 'current') {
+          const Variant = EXPENSE_VARIANT_COMPONENTS[expenseVariant];
+          return <Variant key={figure.id} expense={figure} income={income} fmt={fmt} />;
+        }
+        return <FigureTile key={figure.id} figure={figure} fmt={fmt} />;
+      })}
     </section>
   );
 }

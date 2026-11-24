@@ -26,7 +26,10 @@ import {
   SPENDING_BY_CATEGORY,
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
+import { Suspense } from 'react';
+import { PrototypeSwitcher } from '@/components/prototype-switcher';
 import { CardSection } from './card-section';
+import { EXPENSE_VARIANTS, expenseVariantOf } from './expense-tile.prototype';
 import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
 import { NET_WORTH, NetWorthSection } from './net-worth';
 import { ProfitAndLossSection } from './profit-and-loss';
@@ -98,8 +101,16 @@ export default async function AnalyticsPage({
           retryHref={retryHref}
           placeholder={<KeyFiguresPlaceholder />}
         >
-          <KeyFiguresSection keyFigures={sections.keyFigures} fmt={fmt} />
+          <KeyFiguresSection
+            keyFigures={sections.keyFigures}
+            fmt={fmt}
+            expenseVariant={expenseVariantOf(params.variant)}
+          />
         </StreamedSection>
+        {/* PROTOTYPE: cycles the Expense tile's `?variant=`. */}
+        <Suspense>
+          <PrototypeSwitcher variants={EXPENSE_VARIANTS} />
+        </Suspense>
         {/* The overview: three side by side on wide screens, one after the other below. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
           <StreamedSection name={NET_WORTH} retryHref={retryHref}>
