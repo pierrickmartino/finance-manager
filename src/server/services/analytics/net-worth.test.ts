@@ -109,7 +109,7 @@ describe('Net worth', () => {
     const { netWorth, hero } = await headlineAt(MONTHLY, 'month');
 
     expect(hero).toMatchObject({ label: 'Your net worth today', value: TODAY, href: '/accounts' });
-    // Rolling 12 months starts on 21 Mar 2024: the start, labelled with that day, reads the end
+    // Last 12 months starts on 21 Mar 2024: the start, labelled with that day, reads the end
     // of 20 March, before any Account.
     expect(dated(netWorth.trend).slice(0, 2)).toEqual([
       ['21 Mar 2024', 0, '/accounts?date=2024-03-20'],
@@ -293,7 +293,7 @@ describe('Net worth', () => {
       '2025-02',
       '2025-03',
     ]);
-    // The Key figures' Net worth tile, sparkline and change still read Rolling 12 months.
+    // The Key figures' Net worth tile, sparkline and change still read Last 12 months.
     expect(pinned.tile).toEqual(unpinned.tile);
     expect(pinned.tile?.sparkline).toHaveLength(14);
   });

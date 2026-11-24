@@ -44,7 +44,7 @@ const INCOME_VS_EXPENSE_FRAME = cardFrame(INCOME_VS_EXPENSE_WIDGET);
 
 /**
  * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Period in the URL: a
- * preset's `period`, or a custom start date's `from` (Rolling 12 months when missing, unknown or
+ * preset's `period`, or a custom start date's `from` (Last 12 months when missing, unknown or
  * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
  * its nearest Period. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
  * parameter each beside the Period (`net-worth=<slug>`, `income-vs-expense=<slug>`,

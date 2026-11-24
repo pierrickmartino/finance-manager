@@ -96,9 +96,9 @@ export const QUARTER = `${YEAR}-Q${Math.ceil(Number(MONTH) / 3)}`;
 export const CURRENT_MONTH = formatPeriod(`${YEAR}-${MONTH}`);
 export const STARTS = presetStarts(TODAY);
 export const ROLLING_START = STARTS['rolling-12-months'];
-/** Rolling 12 months reaches into 13 calendar months, unless it starts on a month's first day. */
+/** Last 12 months reaches into 13 calendar months, unless it starts on a month's first day. */
 export const ROLLING_MONTHS = ROLLING_START.endsWith('-01') ? 12 : 13;
-/** This year and last 1, by quarter: last year's four, then this year's up to the current one. */
+/** Since last year (this-year-and-last-1), by quarter: last year's four, then this year's up to the current one. */
 export const QUARTERS = 4 + Math.ceil(Number(MONTH) / 3);
 
 /** Analytics' Period control: a form named "Period". */

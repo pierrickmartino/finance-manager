@@ -1,4 +1,4 @@
-import { analyticsHref, type PinnableSection } from '@/lib/analytics/period';
+import { analyticsHref, presetNameInSentence, type PinnableSection } from '@/lib/analytics/period';
 import type { AnalyticsCard, Pinnable, SectionReading } from '@/server/services/analytics';
 import { WidgetCard } from '../dashboards/(dashboard)/[id]/overview/widget-card';
 import { CardPeriod } from './card-period';
@@ -55,7 +55,7 @@ export async function CardSection({ card, section, empty, className = '' }: Card
       >
         <SectionEmpty>
           Nothing to show yet: {empty}
-          {section && (periodName ? ` over ${periodName}` : ' in these intervals')}.
+          {section && ` ${periodName ? presetNameInSentence(periodName) : 'in this Period'}`}.
         </SectionEmpty>
       </SectionCard>
     );
@@ -83,6 +83,7 @@ export function SectionCardPeriod({ name, section, reading, isPinned }: SectionC
       section={section}
       page={reading.page}
       pinned={isPinned && reading.period.kind === 'preset' ? reading.period.preset : null}
+      today={reading.to}
     />
   );
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { periodDates } from '@/lib/analytics/period';
 import type { Formatter } from '@/lib/format';
 import {
   PROFIT_AND_LOSS,
@@ -7,6 +8,7 @@ import {
   type ProfitAndLossRow,
   type ProfitAndLossRowId,
 } from '@/server/services/analytics';
+import { comparisonPeriod } from '@/server/services/analytics/comparison-period';
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
 import { SectionCardPeriod } from './card-section';
 import { ChangeLine } from './key-figure-change';
@@ -105,8 +107,10 @@ interface ProfitAndLossSectionProps {
  * the statement reads over its own preset and compares with that preset's Comparison period.
  */
 export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLossSectionProps) {
-  const { rows, reading, isPinned, periodName } = await profitAndLoss;
+  const { rows, reading, isPinned } = await profitAndLoss;
   const hasComparison = rows.some((row) => row.change !== null);
+  const dates = { from: reading.from, to: reading.to };
+  const periodWords = periodDates(dates);
   return (
     <SectionCard
       name={PROFIT_AND_LOSS}
@@ -121,17 +125,18 @@ export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLoss
     >
       <table className="w-full max-w-2xl border-collapse text-sm">
         <caption className="sr-only">
-          {PROFIT_AND_LOSS} over {periodName ?? 'the Period'}
+          {PROFIT_AND_LOSS}, {periodWords}
         </caption>
         {hasComparison && (
           <thead>
             <tr className="text-muted">
               <td />
               <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
-                Period
+                {periodWords}
               </th>
               <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
-                Comparison period
+                <span className="sr-only">Compared with </span>
+                {periodDates(comparisonPeriod(reading.period, dates))}
               </th>
             </tr>
           </thead>

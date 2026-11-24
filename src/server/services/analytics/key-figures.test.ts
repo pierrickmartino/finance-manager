@@ -102,9 +102,9 @@ describe('Key figures', () => {
     ]);
     expect(section.figures.map((figure) => figure.caption)).toEqual([
       'Today',
-      'Rolling 12 months',
-      'Rolling 12 months',
-      'Rolling 12 months',
+      'Last 12 months',
+      'Last 12 months',
+      'Last 12 months',
     ]);
   });
 

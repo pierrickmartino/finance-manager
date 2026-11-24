@@ -109,6 +109,16 @@ export type BadgeTone = keyof typeof BADGE_CLASS;
  */
 export const CARD_PERIOD_MARK_CLASS = `${BADGE_BASE} bg-accent-tint text-accent-ink`;
 /**
+ * An Analytics Card's Period picker (GLOSSARY: Card Period): one badge-shaped chip naming what the
+ * Card reads, its native dropdown laid invisibly over it, by state: `pinned` in the accent (the
+ * mark), `following` quiet, as a plain fact. The chip shows the dropdown's focus ring.
+ */
+const CARD_PERIOD_PICKER_BASE = `${BADGE_BASE} relative inline-flex max-w-full items-center gap-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent-ink`;
+export const CARD_PERIOD_PICKER_CLASS = {
+  pinned: `${CARD_PERIOD_PICKER_BASE} bg-accent-tint text-accent-ink`,
+  following: `${CARD_PERIOD_PICKER_BASE} bg-sunken text-ink-soft hover:text-ink`,
+} as const;
+/**
  * A title with something beside it (an Analytics Card's Period mark and dropdown): the title on
  * the left, the aside on the right, wrapping onto two lines when narrow. `TitleRow` draws it.
  */

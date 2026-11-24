@@ -32,7 +32,7 @@ afterEach(() => {
  * Capital order cannot come from creation order. Salary in January and March (to date); a
  * Bonus with nothing booked; groceries with a refund and an EUR purchase in January; a split
  * purchase in February, part groceries and part property; a restaurant meal in March; groceries
- * in February 2024, before Rolling 12 months; a Transfer out to the EUR Account; and a Travel
+ * in February 2024, before Last 12 months; a Transfer out to the EUR Account; and a Travel
  * group whose only Category has nothing booked.
  */
 async function dataset(): Promise<void> {
@@ -168,7 +168,7 @@ describe('Categories per interval', () => {
     const years = (await loadSection(t.ctx, YEARLY, 'categoriesPerInterval')).data!;
 
     const groceries = 3;
-    // February 2024 is in both Periods (not in Rolling 12 months); the current interval is to date.
+    // February 2024 is in both Periods (not in Last 12 months); the current interval is to date.
     expect(quarters.cells[groceries]).toEqual([-999, null, null, null, -39_400]);
     expect(quarters.rowTotals[groceries]).toBe(-40_399);
     expect(years.cells[groceries]).toEqual([null, null, null, -999, -39_400]);
@@ -198,7 +198,7 @@ describe('Categories per interval', () => {
     },
   );
 
-  it('pinned, reads its own Period by year while the page reads Rolling 90 days by month', async () => {
+  it('pinned, reads its own Period by year while the page reads Last 90 days by month', async () => {
     fixToday('2025-03-20');
     await dataset();
     const page = presetPeriod('rolling-90-days');
@@ -270,7 +270,7 @@ describe('Categories per interval', () => {
     });
     const unpinned = await loadSection(t.ctx, QUARTERLY, 'categoriesPerInterval');
 
-    expect(pinned.periodName).toBe('This year and last 4');
+    expect(pinned.periodName).toBe('Since 2021');
     expect(unpinned.periodName).toBeNull();
   });
 

@@ -139,7 +139,7 @@ describe('a preset Period', () => {
 });
 
 describe('the reading', () => {
-  it('opens on Rolling 12 months by month, its first month cut short and the last to date', async () => {
+  it('opens on Last 12 months by month, its first month cut short and the last to date', async () => {
     fixToday('2025-03-20');
 
     const { reading, sections } = await settled(await loadAnalytics(t.ctx, DEFAULT_PERIOD));

@@ -31,7 +31,7 @@ afterEach(() => {
 const ROLLING_30 = presetPeriod('rolling-30-days');
 
 /**
- * Today is 20 March 2025; Rolling 30 days reads from 19 February. A salary on 25 February;
+ * Today is 20 March 2025; Last 30 days reads from 19 February. A salary on 25 February;
  * groceries on 20 February, an EUR purchase on 21 February, a refund on 1 March, a split purchase
  * on 3 March (part groceries, part property, part a Transfer to Savings), groceries today; a property purchase (Capital), an
  * Unclassified purchase and a Transfer classified as Salary, all left out; groceries on
@@ -221,14 +221,14 @@ describe('Income vs. expense', () => {
     const { points } = areasOf(readCard(card, money).mark);
 
     expect(card.isPinned).toBe(true);
-    expect(card.periodName).toBe('Rolling 60 days');
+    expect(card.periodName).toBe('Last 60 days');
     expect(card.reading).toMatchObject({
       period: presetPeriod('rolling-60-days'),
       from: '2025-01-20',
     });
     expect(points).toHaveLength(60);
     expect(points[0]!.key).toBe('2025-01-20');
-    // Groceries on 10 February fall inside the pin, outside the page's Rolling 30 days.
+    // Groceries on 10 February fall inside the pin, outside the page's Last 30 days.
     expect(points.at(-1)).toMatchObject({ income: 600_000, expense: 44_400 + 999 });
     const lead = readCard(card, money).lead!;
     expect(lead.detail).toBe(String(600_000 - 44_400 - 999));

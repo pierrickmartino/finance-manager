@@ -142,7 +142,7 @@ describe('Key figures sparklines', () => {
       const { netWorth } = byId((await loadSection(t.ctx, view, 'keyFigures')).figures);
       const { trend } = await loadSection(t.ctx, view, 'netWorth');
 
-      const label = periodLabel(view);
+      const label = periodLabel(view, '2025-05-20');
       expect(values(netWorth), label).toEqual(trend.rowTotals.map((total) => total ?? 0));
       expect(partials(netWorth), label).toEqual(trend.rows.map((row) => row.isPartial));
       expect(netWorth.sparkline.at(-1)!.isPartial, label).toBe(true);

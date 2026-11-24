@@ -35,7 +35,7 @@ afterEach(() => {
  * Today is 20 March 2025. A salary in January, February and March (to date); groceries with a
  * refund and an EUR purchase in January; a split purchase in February, part groceries and part
  * property (Capital); a property purchase in February; groceries in March; groceries in
- * February 2024, before Rolling 12 months; and a Transfer out to the EUR Account.
+ * February 2024, before Last 12 months; and a Transfer out to the EUR Account.
  */
 async function dataset(): Promise<void> {
   const income = await createCategoryGroup(t.ctx, { name: 'Income', type: 'income' });
@@ -227,7 +227,7 @@ describe('Profit per interval', () => {
     expect(labels(quarters.columns)).toEqual([
       ...['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024', 'Q1 2025'],
     ]);
-    // February 2024 is in both Periods (not in Rolling 12 months); the current interval is to date.
+    // February 2024 is in both Periods (not in Last 12 months); the current interval is to date.
     expect(quarters.cells[expense(quarters)]).toEqual([-999, null, null, null, -44_400]);
     expect(quarters.rowTotals[expense(quarters)]).toBe(-45_399);
     expect(labels(years.columns)).toEqual(['2021', '2022', '2023', '2024', '2025']);
@@ -274,7 +274,7 @@ describe('Profit per interval', () => {
       ['Q1 2025', true],
     ]);
     const expense = data.rows.findIndex((row) => row.key === 'expense');
-    // February 2024's groceries are outside the page's Rolling 12 months, inside the pin.
+    // February 2024's groceries are outside the page's Last 12 months, inside the pin.
     expect(data.cells[expense]).toEqual([-999, null, null, null, -44_400]);
     for (const { value, href } of linkedValues(data)) {
       expect(originOf(href)).toEqual({
@@ -326,7 +326,7 @@ describe('Profit per interval', () => {
     });
     const unpinned = await loadSection(t.ctx, YEARLY, 'profitPerInterval');
 
-    expect(pinned.periodName).toBe('Rolling 90 days');
+    expect(pinned.periodName).toBe('Last 90 days');
     expect(unpinned.periodName).toBeNull();
   });
 

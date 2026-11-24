@@ -49,20 +49,20 @@ test("pinning Spending by Category reads it over its own Period, which it keeps 
   await expect(cardPeriodMark(page, name)).toHaveCount(0);
   await expect(section.getByText(/^Monthly average$/)).toBeVisible();
 
-  // Pinned by keyboard: read by quarter over This year and last 1, its preset marked; the rest of
-  // the page still reads Rolling 90 days.
+  // Pinned by keyboard: read by quarter over Since last year, its preset marked; the rest of
+  // the page still reads Last 90 days.
   await picker.focus();
   await picker.selectOption('this-year-and-last-1');
   await expect
     .poll(() => searchOf(page))
     .toEqual({ period: 'rolling-90-days', 'spending-by-category': 'this-year-and-last-1' });
-  await expect(cardPeriodMark(page, name)).toHaveText('Pinned to This year and last 1');
+  await expect(cardPeriodMark(page, name)).toHaveText(`Pinned to Since ${LAST_YEAR}`);
   await expect(section.getByText(/^Quarterly average$/)).toBeVisible();
   await expect(section.getByText(/^Heaviest quarter: /)).toBeVisible();
   await expect(
     region(page, 'Key figures')
       .getByRole('region', { name: 'Income', exact: true })
-      .getByText('Rolling 90 days', { exact: true }),
+      .getByText('Last 90 days', { exact: true }),
   ).toBeVisible();
   expect((await columns(page, 'Profit per interval')).length).toBeLessThanOrEqual(5);
 
@@ -89,7 +89,7 @@ test("pinning Spending by Category reads it over its own Period, which it keeps 
   await expect(cardPeriodMark(page, name)).toBeVisible();
 
   // Same as page: the pin and its mark go, and the Card reads the page's Period again.
-  await picker.selectOption({ label: 'Same as page' });
+  await picker.selectOption({ value: '' });
   await expect.poll(() => searchOf(page)).toEqual({ period: 'year-to-date' });
   await expect(cardPeriodMark(page, name)).toHaveCount(0);
   await expect(section.getByText(/^Monthly average$|^Heaviest month: /).first()).toBeVisible();
@@ -150,19 +150,19 @@ test('pinning Categories per interval reads it by year while the page reads mont
     'categories-per-interval': 'this-year-and-last-4',
   };
 
-  // Unpinned: by month, as the page's Rolling 90 days, and no mark.
+  // Unpinned: by month, as the page's Last 90 days, and no mark.
   await page.goto('/analytics?period=rolling-90-days');
   await expect(group).toBeVisible();
   await expect(picker).toHaveValue('');
   await expect(cardPeriodMark(page, name)).toHaveCount(0);
   expect((await columns(page, name)).length).toBeLessThanOrEqual(5);
 
-  // Pinned to This year and last 4: five years, this one to date; the page still reads months.
+  // Pinned to Since four years ago: five years, this one to date; the page still reads months.
   await picker.selectOption('this-year-and-last-4');
   await expect
     .poll(() => searchOf(page))
     .toEqual({ period: 'rolling-90-days', 'categories-per-interval': 'this-year-and-last-4' });
-  await expect(cardPeriodMark(page, name)).toHaveText('Pinned to This year and last 4');
+  await expect(cardPeriodMark(page, name)).toHaveText(`Pinned to Since ${Number(YEAR) - 4}`);
   await expect(group.getByRole('link', { name: partialYear })).toBeVisible();
   expect(await columns(page, name)).toHaveLength(6);
   expect((await columns(page, 'Profit per interval')).length).toBeLessThanOrEqual(5);
@@ -176,7 +176,7 @@ test('pinning Categories per interval reads it by year while the page reads mont
       'net-cash-flow': 'this-year-and-last-1',
       'categories-per-interval': 'this-year-and-last-4',
     });
-  await expect(cardPeriodMark(page, 'Net cash flow')).toHaveText('Pinned to This year and last 1');
+  await expect(cardPeriodMark(page, 'Net cash flow')).toHaveText(`Pinned to Since ${LAST_YEAR}`);
   await expect(region(page, 'Net cash flow').getByText(/^Quarterly average$/)).toBeVisible();
   await cardPeriod(page, 'Profit per interval').selectOption('this-year-and-last-1');
   await expect.poll(() => searchOf(page)).toEqual(allPinned);
@@ -198,7 +198,7 @@ test('pinning Categories per interval reads it by year while the page reads mont
   await expect(cardPeriodMark(page, name)).toBeVisible();
 
   // Same as page: back to months, its mark gone, the other pins kept.
-  await picker.selectOption({ label: 'Same as page' });
+  await picker.selectOption({ value: '' });
   const { 'categories-per-interval': _unpinned, ...others } = allPinned;
   await expect.poll(() => searchOf(page)).toEqual(others);
   await expect(cardPeriodMark(page, name)).toHaveCount(0);
@@ -247,11 +247,11 @@ test("pinning Net worth runs its line and change from its own Period's start, th
     new RegExp(`^Period: .* since the start of ${startLabel}$`),
   );
   await expect(netWorth.getByText(/profit over \d+ month/)).toBeVisible();
-  // The Key figures still read Rolling 90 days.
+  // The Key figures still read Last 90 days.
   await expect(
     region(page, 'Key figures')
       .getByRole('region', { name: 'Income', exact: true })
-      .getByText('Rolling 90 days', { exact: true }),
+      .getByText('Last 90 days', { exact: true }),
   ).toBeVisible();
 
   // Its change opens the Accounts as of the day before its start; back, the pin is kept.
@@ -261,7 +261,7 @@ test("pinning Net worth runs its line and change from its own Period's start, th
   await expect(mark).toHaveText('Pinned to Year to date');
 
   // Same as page: the pin and its mark go, and the line reads the page's Period again.
-  await picker.selectOption({ label: 'Same as page' });
+  await picker.selectOption({ value: '' });
   await expect.poll(() => searchOf(page)).toEqual({ period: 'rolling-90-days' });
   await expect(mark).toHaveCount(0);
   await expect(trendOver(STARTS['rolling-90-days'])).toBeVisible();
@@ -300,7 +300,7 @@ test("pinning Profit and loss compares it with its own Comparison period, the Ke
   expect(unpinned).toBe(keyFigures[0]);
 
   // Pinned to Year to date: compared with the same stretch of last year, the Key figures still
-  // compared over Rolling 90 days.
+  // compared over Last 90 days.
   await picker.focus();
   await picker.selectOption('year-to-date');
   await expect
@@ -343,7 +343,7 @@ test("pinning Profit and loss compares it with its own Comparison period, the Ke
   await expect(cardPeriodMark(page, name)).toBeVisible();
 
   // Same as page: the pin and its mark go, and it shares the Key figures' comparison again.
-  await picker.selectOption({ label: 'Same as page' });
+  await picker.selectOption({ value: '' });
   await expect.poll(() => searchOf(page)).toEqual({ period: 'rolling-30-days' });
   await expect(cardPeriodMark(page, name)).toHaveCount(0);
   await expect(statementChange('Income')).toHaveAccessibleName(

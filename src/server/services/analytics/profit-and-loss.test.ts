@@ -575,7 +575,7 @@ describe('Profit and loss pinned to its own Card Period', () => {
     expect(profitAndLoss.rows.every((row) => row.earlier === null && row.change === null)).toBe(
       true,
     );
-    // Rolling 30 days, 21 Apr – 20 May, against 22 Mar – 20 Apr: the data reaches back.
+    // Last 30 days, 21 Apr – 20 May, against 22 Mar – 20 Apr: the data reaches back.
     expect(income.change).toMatchObject({ amount: -100_000, label: 'vs 22 Mar – 20 Apr' });
   });
 
