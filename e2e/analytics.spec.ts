@@ -46,13 +46,16 @@ test('/ lands on Analytics over Last 12 months, its dates in words', async ({ pa
   await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
   const control = periodControl(page);
   await expect(control.getByLabel('Period', { exact: true })).toHaveValue('rolling-12-months');
-  await expect(control.getByLabel('From', { exact: true })).toHaveValue(ROLLING_START);
+  // One dropdown of presets: no Custom, no start date to type, no Show button.
+  await expect(control.getByRole('option', { name: 'Custom' })).toHaveCount(0);
+  await expect(control.getByLabel('From', { exact: true })).toHaveCount(0);
+  await expect(control.getByRole('button')).toHaveCount(0);
   await expect(
     control.getByText(periodPhrase(DEFAULT_PERIOD, { from: ROLLING_START, to: TODAY })),
   ).toBeVisible();
 });
 
-test('picking a Period preset fills in its date, reads every section over it, and a Drill-down returns to it', async ({
+test('picking a Period preset reads every section over it, and a Drill-down returns to it', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -88,7 +91,6 @@ test('picking a Period preset fills in its date, reads every section over it, an
   // Since last year: by quarter, from 1 January last year.
   await preset.selectOption('this-year-and-last-1');
   await expect(page).toHaveURL(/\/analytics\?period=this-year-and-last-1$/);
-  await expect(control.getByLabel('From', { exact: true })).toHaveValue(`${LAST_YEAR}-01-01`);
   await expect(
     heatmap(page, name)
       .getByRole('columnheader')
@@ -129,62 +131,16 @@ test('picking a Period preset fills in its date, reads every section over it, an
   await expect(preset).toHaveValue('this-year-and-last-4');
 });
 
-test('typing a start date switches the Period to Custom, reads every section from it, and a Drill-down returns to it', async ({
+test('a former custom start date link redirects to the default Period, keeping its pins', async ({
   page,
 }) => {
-  const suffix = Date.now();
-  const { description } = await seedSalary(suffix);
-  // So the typed date is never before the first Transaction (and stays as typed).
-  await seedOldPurchase(suffix);
-  const from = monthsAgo(2);
-  const atFrom = new RegExp(`/analytics\\?from=${from}$`);
-  const control = periodControl(page);
-  const preset = control.getByLabel('Period', { exact: true });
-  const date = control.getByLabel('From', { exact: true });
-  const name = 'Profit per interval';
-
-  await page.goto('/analytics');
-  await date.fill(from);
-  await expect(preset).toHaveValue('custom');
-  await control.getByRole('button', { name: 'Show' }).click();
-
-  await expect(page).toHaveURL(atFrom);
-  await expect(preset).toHaveValue('custom');
-  await expect(date).toHaveValue(from);
-  await expect(
-    control.getByText(periodPhrase({ kind: 'custom', from }, { from, to: TODAY })),
-  ).toBeVisible();
-  // Three months, the first cut short at the 15th and the current one running, then Total.
-  await expect(heatmap(page, name).getByRole('columnheader')).toHaveCount(3 + 1);
-  const headers = await columns(page, name);
-  expect(headers[0]!.endsWith('*')).toBe(true);
-  expect(headers.slice(-2)).toEqual([`${CURRENT_MONTH.split(' ')[0]}*`, 'Total']);
-  await expect(
-    region(page, 'Net cash flow').getByRole('link', {
-      name: new RegExp(`^${CURRENT_MONTH} \\(partial\\): `),
-    }),
-  ).toBeVisible();
-
-  // A bookmark keeps its start date: reloading reads from it again.
-  await page.reload();
-  await expect(date).toHaveValue(from);
-
-  // The current month's income opens the Transactions behind it, with a way back to the Period.
-  await heatmap(page, name)
-    .getByRole('link', { name: new RegExp(`^Income, ${CURRENT_MONTH} \\(partial\\): `) })
-    .click();
-  await expect(page).toHaveURL(/\/widgets\/drill\?.*originFrom=/);
-  await expect(
-    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
-  ).toBeVisible();
-  await page.getByRole('link', { name: 'Back to Analytics' }).click();
-  await expect(page).toHaveURL(atFrom);
-  await expect(preset).toHaveValue('custom');
-
-  // Picking a preset refills the date.
-  await preset.selectOption('year-to-date');
-  await expect(page).toHaveURL(/\/analytics\?period=year-to-date$/);
-  await expect(date).toHaveValue(`${YEAR}-01-01`);
+  await page.goto('/analytics?from=2024-03-01&spending-by-category=year-to-date');
+  await expect(page).toHaveURL(
+    /\/analytics\?period=rolling-12-months&spending-by-category=year-to-date$/,
+  );
+  await expect(periodControl(page).getByLabel('Period', { exact: true })).toHaveValue(
+    'rolling-12-months',
+  );
 });
 
 test('a former Period view link redirects to its nearest Period', async ({ page }) => {

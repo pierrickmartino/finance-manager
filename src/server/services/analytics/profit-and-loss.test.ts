@@ -9,7 +9,13 @@ import {
   seedEarlyStart,
 } from '@test/support/analytics';
 import { setupTestDatabase } from '@test/support/db';
-import { NO_PINS, presetPeriod, type CardPeriods, type Period } from '@/lib/analytics/period';
+import {
+  DEFAULT_PERIOD,
+  NO_PINS,
+  presetPeriod,
+  type CardPeriods,
+  type Period,
+} from '@/lib/analytics/period';
 import { readTransactionSearch } from '@/app/transactions/search';
 import { createCategory, createCategoryGroup, type Category } from '../categories';
 import { listTransactions, splitTransaction } from '../transactions';
@@ -170,9 +176,10 @@ describe('Profit and loss', () => {
     for (const row of rows.filter((row) => row.id !== 'unclassified')) {
       const page = await openDrill(t.ctx, row.href);
       drilled.push([row.label, page.sumChfMinor]);
+      // The page no longer chooses a custom Period, so its way back is the default one.
       expect(originOf(row.href), row.label).toEqual({
         kind: 'analytics',
-        page: { period: SINCE_MID_FEBRUARY, cardPeriods: {} },
+        page: { period: DEFAULT_PERIOD, cardPeriods: {} },
       });
     }
     // Expense opens what went out, booked negative.
@@ -491,9 +498,10 @@ describe('Profit and loss pinned to its own Card Period', () => {
 
     const { rows } = (await pageWith(SINCE_MID_FEBRUARY, QUARTER_TO_DATE)).profitAndLoss;
 
+    // The page no longer chooses a custom Period: the way back is the default one, the pin kept.
     const origin = {
       kind: 'analytics',
-      page: { period: SINCE_MID_FEBRUARY, cardPeriods: QUARTER_TO_DATE },
+      page: { period: DEFAULT_PERIOD, cardPeriods: QUARTER_TO_DATE },
     };
     const drilled: [string, number | null][] = [];
     const both: [string, number | null][] = [];

@@ -106,11 +106,20 @@ export function isPeriodPreset(value: unknown): value is PeriodPreset {
 export const presetComparison = (preset: PeriodPreset): PresetComparison =>
   PRESET_RULES[preset].comparison;
 
-/** How a Period was chosen: a preset moves with today, a custom start date stays put. */
-export type Period = { kind: 'preset'; preset: PeriodPreset } | { kind: 'custom'; from: string };
+/** A Period chosen by preset: it moves with today. The only kind the page's control chooses. */
+export interface PresetPeriod {
+  kind: 'preset';
+  preset: PeriodPreset;
+}
+
+/**
+ * How a Period was chosen: a preset moves with today, a custom start date stays put. A custom one
+ * is only read internally now (the spending insight's months); the page never chooses one.
+ */
+export type Period = PresetPeriod | { kind: 'custom'; from: string };
 
 /** The Period a preset chooses. */
-export const presetPeriod = (preset: PeriodPreset): Period => ({ kind: 'preset', preset });
+export const presetPeriod = (preset: PeriodPreset): PresetPeriod => ({ kind: 'preset', preset });
 
 /** The start date a preset gives on `today`. */
 const presetStart = (preset: PeriodPreset, today: string): string =>
@@ -168,33 +177,23 @@ export function periodGrain(from: string, to: string): TimeAxis {
 }
 
 /** The Period Analytics opens on: Last 12 months, as the former Month view read. */
-export const DEFAULT_PERIOD: Period = presetPeriod('rolling-12-months');
+export const DEFAULT_PERIOD: PresetPeriod = presetPeriod('rolling-12-months');
 
 /** The search parameters a Period is read from. */
 export interface PeriodParams {
   period?: string | string[];
-  from?: string | string[];
 }
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-/** Whether a value is a real calendar day as `YYYY-MM-DD`. */
-function isIsoDay(value: string | undefined): value is string {
-  if (value === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const time = Date.parse(`${value}T00:00:00Z`);
-  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === value;
-}
-
 /**
- * The Period in Analytics' URL on `today`: `period=<slug>` gives that preset (so a chosen preset wins
- * over the date sent beside it); otherwise `from=YYYY-MM-DD`, on or before today, gives a custom
- * Period. Anything else is the default.
+ * The Period in Analytics' URL: `period=<slug>` gives that preset; anything else is the default.
+ * A start date is no longer typed in, so a former `from` reads as nothing here (`legacyPeriod`
+ * redirects it).
  */
-export function periodFromParams(params: PeriodParams, today: string): Period {
+export function periodFromParams(params: PeriodParams): PresetPeriod {
   const slug = first(params.period);
-  if (isPeriodPreset(slug)) return presetPeriod(slug);
-  const from = first(params.from);
-  return isIsoDay(from) && from <= today ? { kind: 'custom', from } : DEFAULT_PERIOD;
+  return isPeriodPreset(slug) ? presetPeriod(slug) : DEFAULT_PERIOD;
 }
 
 /** The nearest preset of each former Period view (`?period=month`), which the page redirects to. */
@@ -204,24 +203,30 @@ const LEGACY_PRESETS: ReadonlyMap<string | undefined, PeriodPreset> = new Map([
   ['year', 'this-year-and-last-4'],
 ]);
 
-/** The search parameters of a former link: a Period view's `period`, or a Span's `span`. */
+/**
+ * The search parameters of a former link: a Period view's `period`, a Span's `span`, or a typed
+ * start date's `from`.
+ */
 export interface LegacyPeriodParams {
   period?: string | string[];
   span?: string | string[];
+  from?: string | string[];
 }
 
 /**
  * The Period a former link stands for, which the page redirects to: a former Period view's
- * nearest preset (`?period=month`), or the preset a former Span named (`?span=<slug>`, when no
- * preset `period` is sent beside it). None for a current link, or a missing or unknown value.
+ * nearest preset (`?period=month`), the preset a former Span named (`?span=<slug>`), or the
+ * default for a former custom start date (`?from=YYYY-MM-DD`), each when no preset `period` is
+ * sent beside it. None for a current link, or a missing or unknown value.
  */
-export function legacyPeriod({ period, span }: LegacyPeriodParams): Period | null {
+export function legacyPeriod({ period, span, from }: LegacyPeriodParams): Period | null {
   const value = first(period);
   if (isPeriodPreset(value)) return null;
   const preset = LEGACY_PRESETS.get(value);
   if (preset !== undefined) return presetPeriod(preset);
   const slug = first(span);
-  return isPeriodPreset(slug) ? presetPeriod(slug) : null;
+  if (isPeriodPreset(slug)) return presetPeriod(slug);
+  return first(from) === undefined ? null : DEFAULT_PERIOD;
 }
 
 /**
