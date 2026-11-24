@@ -7,10 +7,12 @@ export { runWidgetQuery, type ReportTable } from './engine';
 export {
   ends,
   isExcept,
+  isThrough,
   keptBy,
   listCellTransactions,
   type AxisExcept,
   type AxisSelector,
+  type AxisThrough,
   type CellRef,
   type PeriodSubtotal,
   type CellTransaction,

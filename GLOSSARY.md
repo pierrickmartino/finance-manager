@@ -194,19 +194,19 @@ A Dashboard read as a grid of cards: an overview row (the headline amount, with 
 _Avoid_: Report, overview page, presentation
 
 **Card**:
-How one Widget is drawn on the Dashboard Story, or one section of Analytics: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per month, quarter or year, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data; a section of Analytics is drawn as the card of the Widget that would show the same figures, so the two pages read alike. A bars or line Widget whose two columns are its income and its expense is read as a flow.
+How one Widget is drawn on the Dashboard Story, or one section of Analytics: a sentence saying what its chart shows, its mark (a figure, ticks, a ring, a heatmap, dots or bars per month, quarter or year, or Net worth bands by Account kind) and the facts behind it, each linking to its Drill-down, or for balances to their Accounts. A card's kind follows from its Widget's source, visualisation and data; a section of Analytics is drawn as the card of the Widget that would show the same figures, so the two pages read alike. A bars or line Widget whose two columns are its income and its expense is read as a flow: a bars flow is drawn as dots, a line flow as two overlapping areas, income and expense, whose gap is its Profit. A line flow by day is drawn as running totals from its first day, so its last gap is the Profit of the whole stretch.
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The landing page: a single fixed page of reports, read over one Period at a time, which some Cards may replace with their own Card Period: the Key figures (Net worth today; Income, Expense and Profit over the Period) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, cash-flow and income-versus-expense figures per Interval of the Period, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read over one Period at a time, which some Cards may replace with their own Card Period: the Key figures (Net worth today; Income, Expense and Profit over the Period) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, Net cash flow and Profit figures per Interval of the Period, and Income vs. expense day by day, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
 **Period**:
-The stretch of days Analytics, or one of its Cards, is read over: from a start date, never before the first Transaction, to today. It is split into Intervals by its length; its first Interval starts at the start date and its last is shown "to date", both set apart from complete ones. The spending insight always speaks of the last complete month, whatever the Period.
+The stretch of days Analytics, or one of its Cards, is read over: from a start date, never before the first Transaction, to today. It is split into months, quarters or years by its length, except on the Income vs. expense Card, which is always split into days; its first Interval starts at the start date and its last is shown "to date", both set apart from complete ones. The spending insight always speaks of the last complete month, whatever the Period.
 _Avoid_: Span, date range, period window, period view, lookback
 
 **Interval**:
-One month, quarter or year a Period is split into, the same for the whole Period. Only its first and last may be partial; averages use complete ones only.
+One day, month, quarter or year a Period is split into, the same for the whole Card. Only its first and last may be partial; averages use complete ones only.
 _Avoid_: Period, bucket, step
 
 **Period preset**:

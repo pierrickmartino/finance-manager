@@ -4,9 +4,18 @@ import { divideRounded } from './average';
 import type { Size } from './board';
 import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
 import { averaged, drillUrl } from './drill-link';
+import { isDayKey } from './interval-label';
+import {
+  areasMark,
+  asExpense,
+  runningFlowSentences,
+  type AreasMark,
+  type FlowSlots,
+} from './line-flow';
 import { readNetWorth, type NetWorthLineMark } from './net-worth-card';
 import { periodValues, type PeriodValue } from './period-values';
 
+export type { FlowPoint } from './line-flow';
 export type { LineMarker, NetWorthBand } from './net-worth-card';
 export type { PeriodValue } from './period-values';
 
@@ -27,11 +36,13 @@ export interface CardWidget {
 }
 
 /**
- * Of a Widget's query, what its card reads: the row axis. A time axis makes the Account
- * balances Net worth over time.
+ * Of a Widget's query, what its card reads: the row axis, and the column axis. A time axis
+ * of rows makes the Account balances Net worth over time; columns by Category group type are
+ * how a flow's income and expense columns come, which its placeholder hints at.
  */
 export interface CardQuery {
   rows?: ReportAxis | null;
+  columns?: ReportAxis | null;
 }
 
 /** A Widget as its card draws it: its data, and how its query went. */
@@ -53,8 +64,11 @@ export type CardSource = Pick<CardWidget, 'source' | 'visualisation' | 'query'> 
 export type CardKind =
   'trend' | 'bars' | 'ranking' | 'share' | 'grid' | 'ring' | 'number' | 'netWorthTrend';
 
-/** The quiet mark a placeholder draws: a figure, tick rows, a ring, a grid of cells or bars. */
-export type PlaceholderShape = 'number' | 'ticks' | 'ring' | 'grid' | 'bars';
+/**
+ * The quiet mark a placeholder draws: a figure, tick rows, a ring, a grid of cells, bars or
+ * two overlapping areas.
+ */
+export type PlaceholderShape = 'number' | 'ticks' | 'ring' | 'grid' | 'bars' | 'areas';
 
 /** The size a new Widget's card starts at, and the smallest it can be read at. */
 export interface CardSizes {
@@ -115,6 +129,14 @@ function kindOf(widget: CardSource): CardKind {
   return (widget.data?.columns.length ?? 0) >= RANKING_FROM_SERIES ? 'ranking' : 'bars';
 }
 
+/**
+ * Whether a trend's placeholder hints at a flow's two areas. Whether it is a flow is only known
+ * once its totals are (one column positive, one negative), so the hint goes by how a flow's
+ * columns come: one per Category group type.
+ */
+const hintsAtFlow = (kind: CardKind, query: CardQuery): boolean =>
+  kind === 'trend' && query.columns === 'categoryGroupType';
+
 /** A card's kind, sizes and placeholder, from its Widget alone (and the series, once known). */
 export function cardFrame(widget: CardSource): CardFrame {
   const kind = kindOf(widget);
@@ -122,7 +144,7 @@ export function cardFrame(widget: CardSource): CardFrame {
   return {
     kind,
     sizes: { initial: { ...sizes.initial }, min: { ...sizes.min } },
-    placeholder,
+    placeholder: hintsAtFlow(kind, widget.query) ? 'areas' : placeholder,
   };
 }
 
@@ -132,7 +154,10 @@ export function cardFrame(widget: CardSource): CardFrame {
  */
 export const STORY_SHOWN_AS: Record<Visualisation, { short: string; full: string }> = {
   table: { short: 'as a heatmap', full: 'In the Story: a heatmap of its rows and columns' },
-  line: { short: 'as a trend', full: 'In the Story: a trend line' },
+  line: {
+    short: 'as a trend',
+    full: 'In the Story: a trend line, or two areas when its columns are income and expense',
+  },
   stacked_bar: {
     short: 'as bars',
     full: `In the Story: bars per period, or a ranking from ${RANKING_FROM_SERIES} series`,
@@ -186,6 +211,8 @@ export type CardMark =
   | { type: 'ring'; data: ChartSource }
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
+  /** A line flow: two overlapping areas, income and expense, whose gap is its Profit. */
+  | AreasMark
   | { type: 'bars'; periods: PeriodValue[] }
   | NetWorthLineMark;
 
@@ -227,12 +254,6 @@ function splitPath(label: string): [group: string, name: string] {
   return rest.length > 0 ? [group!, rest.join(' › ')] : [label, label];
 }
 
-/** Which column holds the income and which the expense. */
-interface FlowSlots {
-  incomeSlot: number;
-  expenseSlot: number;
-}
-
 /**
  * The income and expense columns, when the source has one positive and one negative column
  * (an income-vs-expense Widget): the one with the larger total is the income, so a refund
@@ -253,9 +274,19 @@ function flowSlotsOf(data: ChartSource): FlowSlots | null {
 function monthsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): MonthFlow[] {
   return data.rows.map((row, r) => {
     const income = data.cells[r]?.[incomeSlot] ?? 0;
-    const expense = 0 - (data.cells[r]?.[expenseSlot] ?? 0);
+    const expense = asExpense(data.cells[r]?.[expenseSlot]);
     return { label: row.label, isPartial: row.isPartial, income, expense, net: income - expense };
   });
+}
+
+/** A line flow by day reads as running totals (ADR-0020); by any other Interval, its own. */
+const isRunningFlow = (kind: CardKind, data: ChartSource): boolean =>
+  kind === 'trend' && periodWords(data).noun === 'day';
+
+/** How a flow is drawn: a line as two areas, bars as dots. */
+function flowMark(kind: CardKind, data: ChartSource, slots: FlowSlots): CardMark {
+  if (kind !== 'trend') return { type: 'dots', months: monthsOf(data, slots) };
+  return areasMark(data, slots, isRunningFlow(kind, data));
 }
 
 /**
@@ -372,6 +403,7 @@ interface PeriodWords {
 }
 
 const PERIOD_WORDS = {
+  day: { noun: 'day', adjective: 'Daily' },
   month: { noun: 'month', adjective: 'Monthly' },
   quarter: { noun: 'quarter', adjective: 'Quarterly' },
   year: { noun: 'year', adjective: 'Yearly' },
@@ -408,12 +440,16 @@ function periodAverage(
 const averageText = (value: number | null, money: Money): string =>
   value === null ? NO_AVERAGE : money(value);
 
-/** The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`); months by default. */
+/**
+ * The period of the rows, read from their keys (`2025`, `2025-Q1`, `2025-03`, `2025-03-14`);
+ * months by default.
+ */
 function periodWords(data: ChartSource): PeriodWords {
   const keys = data.rows.map((row) => row.key).filter((key): key is string => key !== null);
   if (keys.length === 0) return PERIOD_WORDS.month;
   if (keys.every((key) => /^\d{4}$/.test(key))) return PERIOD_WORDS.year;
   if (keys.every((key) => /^\d{4}-Q[1-4]$/.test(key))) return PERIOD_WORDS.quarter;
+  if (keys.every(isDayKey)) return PERIOD_WORDS.day;
   return PERIOD_WORDS.month;
 }
 
@@ -426,7 +462,7 @@ function flowSentences(
   const { noun } = periodWords(data);
   const chart = toSeriesChart(data);
   const income = data.rows.map((_, r) => data.cells[r]?.[incomeSlot] ?? 0);
-  const expense = data.rows.map((_, r) => -(data.cells[r]?.[expenseSlot] ?? 0));
+  const expense = data.rows.map((_, r) => asExpense(data.cells[r]?.[expenseSlot]));
   const most = (values: number[]) => values.indexOf(Math.max(...values));
   const [inMost, outMost] = [most(income), most(expense)];
   const month = (index: number) => chart.points[index]!.label;
@@ -525,8 +561,10 @@ function readRows(
     case 'bars':
       return slots
         ? {
-            ...flowSentences(data, slots, money),
-            mark: { type: 'dots', months: monthsOf(data, slots) },
+            ...(isRunningFlow(kind, data)
+              ? runningFlowSentences(data, slots, money)
+              : flowSentences(data, slots, money)),
+            mark: flowMark(kind, data, slots),
           }
         : {
             ...periodSentences(kind, data, money),

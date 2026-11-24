@@ -13,14 +13,16 @@ const CHANGE_MONTHS = { '1M': 1, '1Q': 3, '1Y': 12, '2Y': 24 } as const;
 
 type ChangeLabel = keyof typeof CHANGE_MONTHS;
 
+type MonthAxis = Exclude<TimeAxis, 'day'>;
+
 /** The changes a trend of each period tells: the previous period's end first. */
-const CHANGES: Record<TimeAxis, readonly ChangeLabel[]> = {
+const CHANGES: Record<MonthAxis, readonly ChangeLabel[]> = {
   month: ['1M', '1Y', '2Y'],
   quarter: ['1Q', '1Y', '2Y'],
   year: ['1Y', '2Y'],
 };
 
-const MONTHS_PER: Record<TimeAxis, number> = { month: 1, quarter: 3, year: 12 };
+const MONTHS_PER: Record<MonthAxis, number> = { month: 1, quarter: 3, year: 12 };
 
 /** Net worth now against the point `months` months before the latest. */
 export interface HeadlineChange {
@@ -52,6 +54,8 @@ export function readHeadlineTrend(data: ChartSource, period: TimeAxis = 'month')
   if (first < 0) return { points: [], changes: [] };
   const points = all.slice(first);
   const latest = points.at(-1)!;
+  // A trend by day counts no months back, so it tells no change.
+  if (period === 'day') return { points, changes: [] };
   const changes = CHANGES[period].flatMap((label) => {
     const months = CHANGE_MONTHS[label];
     const then = points.at(-1 - months / MONTHS_PER[period]);

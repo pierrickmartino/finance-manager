@@ -19,7 +19,7 @@ import type { Tag } from '@/server/services/tags';
 import { AutoSubmitForm } from './auto-submit-form';
 import { PANEL_INPUT, PanelRow, PanelSection } from './editor-panel';
 
-const UNIT_LABELS = { month: 'months', quarter: 'quarters', year: 'years' } as const;
+const UNIT_LABELS = { day: 'days', month: 'months', quarter: 'quarters', year: 'years' } as const;
 
 /*
  * Fields that apply only to some choices stay in the form (so switching keeps their values)

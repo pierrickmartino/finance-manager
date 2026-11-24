@@ -13,6 +13,7 @@ import { accountBalances } from './account-balances';
 import { categoriesPerInterval } from './categories-per-interval';
 import { loadDataStart, type DataStart } from './data-start';
 import type { AnalyticsCard, SharedSections } from './figures';
+import { profitPerInterval } from './profit-per-interval';
 import { incomeVsExpense } from './income-vs-expense';
 import { loadComparison, type Comparison } from './key-figure-change';
 import { netCashFlow } from './net-cash-flow';
@@ -61,11 +62,12 @@ export interface AnalyticsSections {
   netWorth: Promise<Pinnable<AnalyticsNetWorth>>;
   spendingInsights: Promise<AnalyticsCard>;
   recentTransactions: Promise<RecentTransactions>;
+  incomeVsExpense: Promise<Pinnable<AnalyticsCard>>;
   netCashFlow: Promise<Pinnable<AnalyticsCard>>;
   accountBalances: Promise<AnalyticsCard>;
   spendingByCategory: Promise<Pinnable<AnalyticsCard>>;
   profitAndLoss: Promise<Pinnable<AnalyticsProfitAndLoss>>;
-  incomeVsExpense: Promise<Pinnable<AnalyticsCard>>;
+  profitPerInterval: Promise<Pinnable<AnalyticsCard>>;
   categoriesPerInterval: Promise<Pinnable<AnalyticsCard>>;
 }
 
@@ -114,10 +116,11 @@ async function pinnable<Result>(
 type PinnableSections = Pick<
   AnalyticsSections,
   | 'netWorth'
+  | 'incomeVsExpense'
   | 'netCashFlow'
   | 'spendingByCategory'
   | 'profitAndLoss'
-  | 'incomeVsExpense'
+  | 'profitPerInterval'
   | 'categoriesPerInterval'
 >;
 
@@ -148,6 +151,9 @@ function loadPinnableSections(
           : shared.sections,
       ),
     ),
+    incomeVsExpense: pinnable(readingFor('income-vs-expense'), ({ reading }) =>
+      incomeVsExpense(ctx, reading),
+    ),
     netCashFlow: pinnable(readingFor('net-cash-flow'), ({ reading }) => netCashFlow(ctx, reading)),
     spendingByCategory: pinnable(readingFor('spending-by-category'), ({ reading }) =>
       spendingByCategory(ctx, reading),
@@ -159,8 +165,8 @@ function loadPinnableSections(
         isPinned ? loadComparison(ctx, reading, dataStart.accountData) : shared.comparison,
       ),
     ),
-    incomeVsExpense: pinnable(readingFor('income-vs-expense'), ({ reading }) =>
-      incomeVsExpense(ctx, reading),
+    profitPerInterval: pinnable(readingFor('profit-per-interval'), ({ reading }) =>
+      profitPerInterval(ctx, reading),
     ),
     categoriesPerInterval: pinnable(readingFor('categories-per-interval'), ({ reading }) =>
       categoriesPerInterval(ctx, reading),
@@ -232,9 +238,10 @@ export type {
 export type { RecentTransactions } from './recent-transactions';
 export { ACCOUNT_BALANCES } from './account-balances';
 export { CATEGORIES_PER_INTERVAL } from './categories-per-interval';
-export { INCOME_VS_EXPENSE } from './income-vs-expense';
+export { INCOME_VS_EXPENSE, INCOME_VS_EXPENSE_WIDGET } from './income-vs-expense';
 export { KEY_FIGURES } from './key-figures';
 export { NET_CASH_FLOW } from './net-cash-flow';
 export { PROFIT_AND_LOSS } from './profit-and-loss';
+export { PROFIT_PER_INTERVAL } from './profit-per-interval';
 export { SPENDING_BY_CATEGORY } from './spending-by-category';
 export { SPENDING_INSIGHTS } from './spending-insights';

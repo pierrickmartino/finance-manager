@@ -91,7 +91,8 @@ export async function runWidgetQuery(
   input: WidgetQueryInput,
 ): Promise<ReportTable> {
   const query = parseInput(widgetQueryInput, input);
-  const { range, partialPeriod } = resolveRange(query.dateRange, swissToday());
+  const today = swissToday();
+  const { range, partialPeriod } = resolveRange(query.dateRange, today);
   const params = new SqlParams();
   const sql = `${baseCte(query, range, await currenciesInUse(ctx), params)}
     ${groupedSelect('cell', query.rows, query.columns)}
@@ -106,13 +107,21 @@ export async function runWidgetQuery(
   const byGrouping = (grouping: Grouping) => aggregates.filter((row) => row.grouping === grouping);
   const cellRows = byGrouping('cell');
   const [rows, columns] = await Promise.all([
-    axisHeaders(ctx.db, query.rows, new Set(cellRows.map((r) => r.rowKey)), range, partialPeriod),
+    axisHeaders(
+      ctx.db,
+      query.rows,
+      new Set(cellRows.map((r) => r.rowKey)),
+      range,
+      partialPeriod,
+      today,
+    ),
     axisHeaders(
       ctx.db,
       query.columns,
       new Set(cellRows.map((r) => r.columnKey)),
       range,
       partialPeriod,
+      today,
     ),
   ]);
 

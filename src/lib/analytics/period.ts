@@ -212,10 +212,11 @@ export function legacyPeriod({ period, span }: LegacyPeriodParams): Period | nul
  */
 export const PINNABLE_SECTIONS = [
   'net-worth',
-  'net-cash-flow',
+  'income-vs-expense',
   'spending-by-category',
   'profit-and-loss',
-  'income-vs-expense',
+  'net-cash-flow',
+  'profit-per-interval',
   'categories-per-interval',
 ] as const;
 

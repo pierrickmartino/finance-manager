@@ -3,6 +3,18 @@ import { PLACEHOLDER_CLASS, TILE_CLASS, WIDGET_CARD_CLASS } from '@/components/s
 import type { PlaceholderShape } from '@/lib/reporting/card';
 import { CARD_LEAD_SIZE_CLASS, RING, RING_LAYOUT_CLASS, RING_LIST_CLASS } from './card-layout';
 
+/** The two areas a line flow's placeholder hints at: income behind, expense in front. */
+const AREA_HILLS = [
+  {
+    clipPath: 'polygon(0 70%, 20% 45%, 40% 50%, 60% 25%, 80% 30%, 100% 10%, 100% 100%, 0 100%)',
+    className: 'opacity-60',
+  },
+  {
+    clipPath: 'polygon(0 85%, 20% 65%, 40% 72%, 60% 50%, 80% 58%, 100% 40%, 100% 100%, 0 100%)',
+    className: '',
+  },
+];
+
 /** The quiet mark standing in for a card's chart, shaped like the one it will draw. */
 function ShapeMark({ shape }: { shape: PlaceholderShape }) {
   switch (shape) {
@@ -32,6 +44,19 @@ function ShapeMark({ shape }: { shape: PlaceholderShape }) {
         <div className="grid grid-cols-6 gap-1">
           {Array.from({ length: 18 }, (_, i) => (
             <div key={i} className={`${PLACEHOLDER_CLASS} h-6`} />
+          ))}
+        </div>
+      );
+    case 'areas':
+      // Two overlapping hills, the further one quieter, as tall as the bars would be.
+      return (
+        <div className="relative h-24" data-testid="areas">
+          {AREA_HILLS.map((hill) => (
+            <div
+              key={hill.clipPath}
+              className={`${PLACEHOLDER_CLASS} absolute inset-0 rounded-none ${hill.className}`}
+              style={{ clipPath: hill.clipPath }}
+            />
           ))}
         </div>
       );

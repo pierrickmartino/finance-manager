@@ -9,6 +9,7 @@ import { TitleRow } from '@/components/title-row';
 import { readCard, type CardMark, type WidgetCardData } from '@/lib/reporting/card';
 import { FigureLink } from '../figure-link';
 import { CARD_LEAD_SIZE_CLASS } from './card-layout';
+import { FlowAreas } from './flow-areas';
 import { HeatmapGrid } from './heatmap-grid';
 import { DotMatrix, EmptyChart, MonthBars, TickList } from './marks';
 import { NetWorthLine } from './net-worth-mark';
@@ -16,7 +17,10 @@ import { DonutRing } from './ring';
 
 type Money = (minor: number) => string;
 
-/** The card's mark, as its reading chose it: dots for in and out, bars per period, ticks for parts. */
+/**
+ * The card's mark, as its reading chose it: dots or two areas for in and out, bars per period,
+ * ticks for parts.
+ */
 function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
   switch (mark.type) {
     case 'none':
@@ -41,6 +45,8 @@ function CardBody({ mark, money }: { mark: CardMark; money: Money }) {
       return <HeatmapGrid data={mark.data} />;
     case 'dots':
       return <DotMatrix months={mark.months} />;
+    case 'areas':
+      return <FlowAreas points={mark.points} isRunning={mark.isRunning} />;
     case 'bars':
       return <MonthBars periods={mark.periods} />;
     case 'netWorthLine':

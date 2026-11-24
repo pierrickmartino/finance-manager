@@ -1,86 +1,52 @@
+import type { CardSource } from '@/lib/reporting/card';
 import type { ServiceContext } from '../context';
 import { runWidgetQuery } from '../reporting';
-import type { AxisSelector } from '../reporting/cell-ref';
-import {
-  byGroupType,
-  cellCount,
-  hasTransactions,
-  UNCLASSIFIED_CELL,
-  type GroupTypeKey,
-} from './by-group-type';
-import {
-  analyticsCard,
-  cellOf,
-  intervalRow,
-  intervalRowsSource,
-  statusOf,
-  sumOf,
-  type AnalyticsCard,
-} from './figures';
+import type { WidgetQueryInput } from '../reporting/query';
+import { analyticsCard, reportSource, statusOf, type AnalyticsCard } from './figures';
 import type { AnalyticsReading } from './reading';
 
 /**
- * Analytics' Income vs. expense, drawn as the Dashboard's heatmap card: Income, Expense and
- * Capital per interval of the Period, then Profit (Income − Expense), Unclassified (only when the
- * Period has any) and Net cash flow (Profit + Capital + Unclassified), each with its Total.
- * Signed CHF amounts, as booked: expense is negative and a refund nets within it. Figures go
- * by Category group type; Transfers (whole Transactions and Split-line sides) are left out and
- * Split lines count by their own Category (the reporting engine's base rows). Net cash flow is
- * every flow the report holds, as the Net cash flow section reads it.
+ * Analytics' Income vs. expense (ADR-0020), drawn as the Dashboard's card for a line Widget by
+ * Day with income and expense columns: two overlapping areas, each point the running total from
+ * the reading's first day, so the last gap is the Period's Profit. Always by day, whatever the
+ * Period's length. Only the Income and Expense Category groups count: Capital and Unclassified
+ * Transactions are left out, as are Transfers (whole and Split-line sides); Split lines count by
+ * their own Category, refunds net within expense and foreign amounts are in CHF at each
+ * Transaction's date (the reporting engine's base rows).
  */
 
 export const INCOME_VS_EXPENSE = 'Income vs. expense';
 
-export type IncomeVsExpenseRow =
-  'income' | 'expense' | 'capital' | 'profit' | 'unclassified' | 'netCashFlow';
+/**
+ * The Widget the card is drawn as, before its figures arrive: a line by Day with a column per
+ * Category group type, so its placeholder hints at the two areas.
+ */
+export const INCOME_VS_EXPENSE_WIDGET = {
+  source: 'query',
+  visualisation: 'line',
+  query: { rows: 'day', columns: 'categoryGroupType' },
+  data: null,
+} as const satisfies CardSource;
 
-interface RowDefinition {
-  key: IncomeVsExpenseRow;
-  label: string;
-  /** The Category group types the row adds up. */
-  types: readonly GroupTypeKey[];
-  /** The same types as a selector on the report's rows; absent for all of them. */
-  selector?: AxisSelector;
-}
-
-const ROWS: readonly RowDefinition[] = [
-  { key: 'income', label: 'Income', types: ['income'], selector: 'income' },
-  { key: 'expense', label: 'Expense', types: ['expense'], selector: 'expense' },
-  { key: 'capital', label: 'Capital', types: ['capital'], selector: 'capital' },
-  {
-    key: 'profit',
-    label: 'Profit',
-    types: ['income', 'expense'],
-    selector: { except: ['capital', null] },
-  },
-  { key: 'unclassified', label: 'Unclassified', types: [null], selector: null },
-  { key: 'netCashFlow', label: 'Net cash flow', types: ['income', 'expense', 'capital', null] },
-];
+/** The query behind the card: income and expense, a row per day of the reading. */
+const incomeAndExpenseByDay = (reading: AnalyticsReading): WidgetQueryInput => ({
+  filters: { categoryGroupTypes: ['income', 'expense'] },
+  dateRange: reading.range,
+  ...INCOME_VS_EXPENSE_WIDGET.query,
+});
 
 export async function incomeVsExpense(
   ctx: ServiceContext,
   reading: AnalyticsReading,
 ): Promise<AnalyticsCard> {
-  const report = await runWidgetQuery(ctx, byGroupType(reading.range, reading.grain));
-  // Unclassified shows when the Period has any Unclassified Transactions, even netting to zero.
-  const hasUnclassified = hasTransactions(await cellCount(ctx, report, UNCLASSIFIED_CELL));
-  const cell = cellOf(report);
-  const shown = ROWS.filter(({ key }) => key !== 'unclassified' || hasUnclassified);
-  const rows = shown.map(({ key, label, types, selector }) =>
-    intervalRow(reading, {
-      key,
-      label,
-      query: report.query,
-      selector,
-      valueAt: (interval) => sumOf(types.map((type) => cell(type, interval))),
-    }),
-  );
+  const report = await runWidgetQuery(ctx, incomeAndExpenseByDay(reading));
+  const { visualisation, query } = INCOME_VS_EXPENSE_WIDGET;
   return analyticsCard({
     id: 'income-vs-expense',
     name: INCOME_VS_EXPENSE,
-    visualisation: 'table',
-    rows: 'categoryGroupType',
-    data: intervalRowsSource(reading, rows, report),
+    visualisation,
+    ...query,
+    data: reportSource(report, reading),
     status: statusOf(report),
   });
 }

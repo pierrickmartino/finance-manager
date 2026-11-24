@@ -215,6 +215,18 @@ describe('cardFrame', () => {
     expect(before('query', 'line')).toBe('bars');
     expect(before('query', 'stacked_bar')).toBe('bars');
   });
+
+  it('hints at two areas for a line whose columns are income and expense', () => {
+    const before = (visualisation: Visualisation, columns: ReportAxis | null) =>
+      cardFrame({ source: 'query', visualisation, query: { rows: 'month', columns }, data: null })
+        .placeholder;
+
+    expect(before('line', 'categoryGroupType')).toBe('areas');
+    // A bars flow keeps its dots, drawn where the bars stand; any other line keeps its bars.
+    expect(before('stacked_bar', 'categoryGroupType')).toBe('bars');
+    expect(before('line', 'category')).toBe('bars');
+    expect(before('line', null)).toBe('bars');
+  });
 });
 
 describe('readCard: income vs. expense', () => {
@@ -287,12 +299,157 @@ describe('readCard: income vs. expense', () => {
     });
   });
 
-  it('tells and draws a line of income vs. expense as a flow, as it does bars', () => {
+  it('tells a line of income vs. expense as a flow, as it does bars', () => {
     const line = read(widget({ visualisation: 'line', data: incomeVsExpense.data }));
     const bars = read(incomeVsExpense);
 
     expect(line.kind).toBe('trend');
-    expect({ ...line, kind: 'bars' }).toEqual(bars);
+    expect(line.lead).toEqual(bars.lead);
+    expect(line.facts).toEqual(bars.facts);
+    expect(line.flow).toEqual(bars.flow);
+  });
+
+  it("draws a line flow as two areas, each point that row's own income and expense", () => {
+    const flow = source(
+      ['2025-01', '2025-02', '2025-03'],
+      ['expense', 'income'],
+      [
+        [-600_00, 1000_00],
+        [50_00, 1000_00],
+        [-300_00, 0],
+      ],
+      { lastIsPartial: true },
+    );
+
+    expect(read(widget({ visualisation: 'line', data: flow })).mark).toEqual({
+      type: 'areas',
+      isRunning: false,
+      points: [
+        {
+          label: '2025-01',
+          key: '2025-01',
+          isPartial: false,
+          income: 1000_00,
+          expense: 600_00,
+          href: 'row:2025-01',
+          incomeHref: 'cell:2025-01/income',
+          expenseHref: 'cell:2025-01/expense',
+        },
+        {
+          label: '2025-02',
+          key: '2025-02',
+          isPartial: false,
+          // A refund month: what went out nets below zero.
+          income: 1000_00,
+          expense: -50_00,
+          href: 'row:2025-02',
+          incomeHref: 'cell:2025-02/income',
+          expenseHref: 'cell:2025-02/expense',
+        },
+        {
+          label: '2025-03',
+          key: '2025-03',
+          isPartial: true,
+          income: 0,
+          expense: 300_00,
+          href: 'row:2025-03',
+          incomeHref: 'cell:2025-03/income',
+          expenseHref: 'cell:2025-03/expense',
+        },
+      ],
+    });
+  });
+
+  it('draws a line flow by day as running totals from its first day, each point opening the days through it', () => {
+    const days = drillable(
+      source(
+        ['2025-03-01', '2025-03-02', '2025-03-03', '2025-03-04'],
+        ['Income', 'Expense'],
+        [
+          [5000_00, -40_00],
+          [null, null],
+          // A refund: what went out so far falls.
+          [null, 10_00],
+          [null, -60_00],
+        ],
+        { lastIsPartial: true },
+      ),
+      'day',
+      'categoryGroupType',
+    );
+
+    const { mark } = read(widget({ visualisation: 'line', data: days }));
+
+    if (mark.type !== 'areas') throw new Error(`expected areas, got ${mark.type}`);
+    expect(mark.isRunning).toBe(true);
+    expect(
+      mark.points.map(({ key, income, expense, isPartial }) => ({
+        key,
+        income,
+        expense,
+        isPartial,
+      })),
+    ).toEqual([
+      { key: '2025-03-01', income: 5000_00, expense: 40_00, isPartial: false },
+      // A quiet day keeps the totals flat.
+      { key: '2025-03-02', income: 5000_00, expense: 40_00, isPartial: false },
+      { key: '2025-03-03', income: 5000_00, expense: 30_00, isPartial: false },
+      { key: '2025-03-04', income: 5000_00, expense: 90_00, isPartial: true },
+    ]);
+    const second = mark.points[1]!;
+    expect(drillOf(second.incomeHref).cell).toMatchObject({
+      row: { through: '2025-03-02' },
+      column: 'Income',
+    });
+    expect(drillOf(second.expenseHref).cell).toMatchObject({
+      row: { through: '2025-03-02' },
+      column: 'Expense',
+    });
+    expect(drillOf(second.href).cell).toMatchObject({ row: { through: '2025-03-02' } });
+    expect(drillOf(second.href).cell.column).toBeUndefined();
+  });
+
+  it('tells a line flow by day as what was kept so far, what came in and what went out', () => {
+    const days = source(
+      ['2025-03-01', '2025-03-02', '2025-03-03'],
+      ['Expense', 'Income'],
+      [
+        [-40_00, 5000_00],
+        [null, null],
+        [-60_00, null],
+      ],
+      { lastIsPartial: true },
+    );
+
+    const reading = read(widget({ visualisation: 'line', data: days }));
+
+    expect(reading.lead).toEqual({ headline: 'Kept so far', detail: 'CHF 4900', href: 'total' });
+    expect(reading.facts).toEqual([
+      { label: 'Came in', value: 'CHF 5000', href: 'column:Income' },
+      { label: 'Went out', value: 'CHF 100', href: 'column:Expense' },
+    ]);
+  });
+
+  it('tells a bars flow by day by its days, today to date, drawn as dots', () => {
+    const days = source(
+      ['2025-03-01', '2025-03-02', '2025-03-03'],
+      ['Income', 'Expense'],
+      [
+        [5000_00, -40_00],
+        [null, null],
+        [null, -60_00],
+      ],
+      { lastIsPartial: true },
+    );
+
+    const reading = read(widget({ visualisation: 'stacked_bar', data: days }));
+
+    expect(reading.lead).toMatchObject({ headline: 'Most came in: 2025-03-01' });
+    expect(reading.facts.map((fact) => fact.label)).toEqual([
+      'Most went out: 2025-03-03 (to date)',
+      'Kept per day, on average',
+    ]);
+    expect(reading.mark.type).toBe('dots');
   });
 
   it('counts an empty cell as nothing', () => {
@@ -977,6 +1134,10 @@ describe('STORY_SHOWN_AS', () => {
   it('mentions the ranking a stacked bar becomes with many series', () => {
     expect(cardFrame(framed('query', 'stacked_bar', 3)).kind).toBe('ranking');
     expect(STORY_SHOWN_AS.stacked_bar.full).toContain('ranking');
+  });
+
+  it('mentions the two areas a line of income and expense becomes', () => {
+    expect(STORY_SHOWN_AS.line.full).toContain('two areas');
   });
 });
 
