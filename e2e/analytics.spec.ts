@@ -637,6 +637,8 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   expect(await marks.count()).toBeGreaterThanOrEqual(4);
   for (const d of await marks.evaluateAll((paths) => paths.map((p) => p.getAttribute('d')!))) {
     expect(d).toMatch(/^M[^L]* C/);
+    // Through about a point a month over the year, not one a day.
+    expect(d.match(/C/g)!.length).toBeLessThanOrEqual(16);
   }
   for (const fact of ['Came in', 'Went out']) {
     await expect(card.getByRole('term').filter({ hasText: fact })).toBeVisible();

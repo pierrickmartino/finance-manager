@@ -6,6 +6,7 @@ import { RAMP_FILLS, type RampFill } from '@/lib/color/ramp-fills';
 import type { FlowPoint } from '@/lib/reporting/card';
 import { intervalLabel } from '@/lib/reporting/interval-label';
 import { labelSide, scaleOf, type LabelSide, type Scale } from '@/lib/reporting/net-worth-chart';
+import { flowKnots } from '@/lib/reporting/flow-knots';
 import { pathThrough, type Spot } from '@/lib/reporting/smooth-path';
 import { useMoney } from './marks';
 import { FIGURES_ATTRIBUTE, useFlowPointer, type FlowSeries } from './use-flow-pointer';
@@ -13,7 +14,8 @@ import { FIGURES_ATTRIBUTE, useFlowPointer, type FlowSeries } from './use-flow-p
 /**
  * A line flow's mark (docs/design-system.md, "Charts"; GLOSSARY: Card): two overlapping areas,
  * income and expense, each a ramp gradient under its flat line curving smoothly through its
- * points, so the gap between them is the Profit. Each series is one path, whatever the number of points; only the hovered or focused
+ * points (one a week by day: src/lib/reporting/flow-knots.ts), so the gap between
+ * them is the Profit. Each series is one path, whatever the number of points; only the hovered or focused
  * point draws more: a crosshair, its dots and its figures, Income and Expense each a link to
  * its column's Drill-down. A segment reaching a partial point is dashed and that point's dots
  * are hollow. Amounts in minor units, shown in CHF.
@@ -71,12 +73,9 @@ function runsOf(points: readonly FlowPoint[]): Run[] {
   }, []);
 }
 
-const spotsOf = (values: readonly number[], scale: Scale): Spot[] =>
-  values.map((value, i) => ({ x: scale.x(i), y: scale.y(value) }));
-
-/** A stretch of a series' line, curving through its points (and on through its neighbours). */
-const curveOf = (spots: readonly Spot[], from: number, to: number) =>
-  pathThrough(spots, from, to, { isSmooth: true });
+/** Where a series' knots sit: the points its curve passes through. */
+const spotsOf = (values: readonly number[], knots: readonly number[], scale: Scale): Spot[] =>
+  knots.map((i) => ({ x: scale.x(i), y: scale.y(values[i]!) }));
 
 interface PlotProps {
   points: FlowPoint[];
@@ -88,6 +87,10 @@ function FlowPlot({ points, scale }: PlotProps) {
   const idOf = useRampGradientIds();
   const runs = runsOf(points);
   const last = points.length - 1;
+  const knots = flowKnots(points);
+  /** A stretch of a series' curve, between two points that are both knots. */
+  const curveOf = (spots: readonly Spot[], from: number, to: number) =>
+    pathThrough(spots, knots.indexOf(from), knots.indexOf(to), { isSmooth: true });
   return (
     <svg
       viewBox="0 0 100 100"
@@ -103,6 +106,7 @@ function FlowPlot({ points, scale }: PlotProps) {
       {[...SERIES_ORDER].reverse().map((series) => {
         const spots = spotsOf(
           points.map((point) => point[series]),
+          knots,
           scale,
         );
         const zero = scale.y(0);
