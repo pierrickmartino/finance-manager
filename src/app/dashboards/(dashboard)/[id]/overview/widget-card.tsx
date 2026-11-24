@@ -97,14 +97,6 @@ export function WidgetCard({
   const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
   const reading = readCard(card, money);
   const hasLegendInHeader = isCompact && reading.mark.type === 'areas';
-  const aside = hasLegendInHeader ? (
-    <div className="flex flex-col items-end gap-1.5">
-      {titleAside}
-      <FlowSwatches className="justify-end" />
-    </div>
-  ) : (
-    titleAside
-  );
   const facts = isCompact ? [] : reading.facts;
   return (
     <section
@@ -113,14 +105,23 @@ export function WidgetCard({
     >
       {toolbar}
       <div>
-        <TitleRow aside={aside}>
+        <TitleRow aside={titleAside}>
           <h2 id={`card-${card.id}`} className="font-medium">
             {card.name}
           </h2>
         </TitleRow>
+        {/* A compact flow's legend: on the headline's line, at the right under the title's aside. */}
+        {hasLegendInHeader && (
+          <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="text-sm text-muted">{reading.lead?.headline}</p>
+            <FlowSwatches className="ml-auto justify-end" />
+          </div>
+        )}
         {reading.lead && (
           <>
-            <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>
+            {!hasLegendInHeader && (
+              <p className="mt-1 text-sm text-muted">{reading.lead.headline}</p>
+            )}
             <p
               data-testid="card-lead"
               className={`font-display tracking-tight tabular-nums ${CARD_LEAD_SIZE_CLASS}`}
