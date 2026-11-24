@@ -110,52 +110,22 @@ describe("a Period's grain", () => {
 
 describe('the Period in the URL', () => {
   it('reads `period` as its preset, and a missing or unknown one as Last 12 months', () => {
-    expect(periodFromParams({ period: 'rolling-90-days' }, '2026-11-22')).toEqual(
-      preset('rolling-90-days'),
-    );
-    expect(periodFromParams({ period: ['year-to-date', 'rolling-30-days'] }, '2026-11-22')).toEqual(
+    expect(periodFromParams({ period: 'rolling-90-days' })).toEqual(preset('rolling-90-days'));
+    expect(periodFromParams({ period: ['year-to-date', 'rolling-30-days'] })).toEqual(
       preset('year-to-date'),
     );
     for (const params of [{}, { period: 'rolling-7-days' }, { period: '' }]) {
-      expect(periodFromParams(params, '2026-11-22')).toEqual(preset('rolling-12-months'));
+      expect(periodFromParams(params)).toEqual(preset('rolling-12-months'));
     }
   });
 
-  it('reads a valid `from` on or before today as a custom Period', () => {
-    const today = '2026-11-22';
-    expect(periodFromParams({ from: '2024-03-01' }, today)).toEqual(custom('2024-03-01'));
-    expect(periodFromParams({ from: '2026-11-22' }, today)).toEqual(custom('2026-11-22'));
-    expect(periodFromParams({ from: ['2025-01-31', '2020-01-01'] }, today)).toEqual(
-      custom('2025-01-31'),
-    );
-  });
-
-  it('keeps a custom start date on a later day, where a preset rolls forward', () => {
-    for (const today of ['2026-11-22', '2027-05-03']) {
-      expect(periodStart(periodFromParams({ from: '2024-03-01' }, today), today)).toBe(
-        '2024-03-01',
-      );
+  it('reads `from` as nothing: a start date is no longer typed in', () => {
+    // The page's whole search parameters, as it passes them.
+    const read = (params: Record<string, string>) => periodFromParams(params);
+    for (const from of ['2024-03-01', '2026-11-22', '2030-01-01', '']) {
+      expect(read({ from })).toEqual(preset('rolling-12-months'));
     }
-    expect(
-      periodStart(periodFromParams({ period: 'rolling-30-days' }, '2027-05-03'), '2027-05-03'),
-    ).toBe('2027-04-04');
-  });
-
-  it('reads a future or malformed `from` as Last 12 months', () => {
-    const today = '2026-11-22';
-    for (const from of ['2026-11-23', '2030-01-01', '2026-02-30', '2026-13-01', '1-3-2024', '']) {
-      expect(periodFromParams({ from }, today)).toEqual(preset('rolling-12-months'));
-    }
-  });
-
-  it('lets a chosen preset win over `from`, and an unknown `period` (Custom) defer to it', () => {
-    const today = '2026-11-22';
-    expect(periodFromParams({ period: 'year-to-date', from: '2024-03-01' }, today)).toEqual(
-      preset('year-to-date'),
-    );
-    expect(periodFromParams({ period: 'custom', from: '2024-03-01' }, today)).toEqual(
-      custom('2024-03-01'),
-    );
+    expect(read({ period: 'year-to-date', from: '2024-03-01' })).toEqual(preset('year-to-date'));
   });
 
   it('maps a former Period view `period` to its nearest preset, and anything else to none', () => {
@@ -171,6 +141,17 @@ describe('the Period in the URL', () => {
     expect(legacyPeriod({ span: 'year-to-date', period: 'quarter-to-date' })).toBeNull();
     expect(legacyPeriod({ period: 'quarter-to-date' })).toBeNull();
     expect(legacyPeriod({ span: 'nonsense' })).toBeNull();
+  });
+
+  it('maps a former custom start date `from` to the default, unless a preset is sent beside it', () => {
+    expect(legacyPeriod({ from: '2024-03-01' })).toEqual(preset('rolling-12-months'));
+    expect(legacyPeriod({ from: '2024-03-01', period: 'custom' })).toEqual(
+      preset('rolling-12-months'),
+    );
+    expect(legacyPeriod({ from: '2024-03-01', span: 'year-to-date' })).toEqual(
+      preset('year-to-date'),
+    );
+    expect(legacyPeriod({ from: '2024-03-01', period: 'year-to-date' })).toBeNull();
   });
 
   it('links Analytics with a preset by its slug, and a custom Period by its start date', () => {
@@ -218,21 +199,8 @@ describe('the Card Periods in the URL', () => {
       '/analytics?period=rolling-90-days&net-worth=year-to-date&spending-by-category=this-year-and-last-2',
     );
     const params = paramsOf(href);
-    expect(periodFromParams(params, '2026-11-22')).toEqual(preset('rolling-90-days'));
+    expect(periodFromParams(params)).toEqual(preset('rolling-90-days'));
     expect(cardPeriodsFromParams(params)).toEqual(pins);
-  });
-
-  it('keeps pins beside a custom page Period', () => {
-    const href = analyticsHref({
-      period: custom('2024-03-01'),
-      cardPeriods: { 'spending-by-category': 'year-to-date' },
-    });
-
-    expect(href).toBe('/analytics?from=2024-03-01&spending-by-category=year-to-date');
-    expect(periodFromParams(paramsOf(href), '2026-11-22')).toEqual(custom('2024-03-01'));
-    expect(cardPeriodsFromParams(paramsOf(href))).toEqual({
-      'spending-by-category': 'year-to-date',
-    });
   });
 
   it('keeps a pin equal to the page Period: a pick is a pin', () => {

@@ -1,11 +1,9 @@
 import {
   NO_PINS,
   presetLabel,
-  presetStarts,
   type CardPeriods,
   type PinnableSection,
   type Period,
-  type PeriodPreset,
 } from '@/lib/analytics/period';
 import type { ServiceContext } from '../context';
 import { swissToday } from '../fx/dates';
@@ -79,8 +77,6 @@ export interface AnalyticsView {
    * on the page with its Cards' pins.
    */
   reading: AnalyticsReading;
-  /** Each preset's start date today, cut to the data as it would be read. */
-  starts: Record<PeriodPreset, string>;
   sections: AnalyticsSections;
 }
 
@@ -214,7 +210,6 @@ export async function loadAnalytics(
   return {
     today,
     reading,
-    starts: presetStarts(today, dataStart.firstTransaction),
     sections: {
       keyFigures: keyFigures(ctx, reading, sections, comparison),
       spendingInsights: lastCompleteMonthInsights(ctx, reading),

@@ -88,13 +88,11 @@ describe('Drill-down origin', () => {
     });
   });
 
-  it('round-trips Analytics over a custom Period by its start date', () => {
-    const period = { kind: 'custom', from: '2024-03-01' } as const;
-    const origin: DrillOrigin = { kind: 'analytics', page: unpinnedPage(period) };
-    const params = Object.fromEntries(originToParams(origin));
-    expect(params).toEqual({ origin: 'analytics', originFrom: '2024-03-01' });
-    expect(originFromParams(params)).toEqual(origin);
-    expect(backLink(origin).href).toBe('/analytics?from=2024-03-01');
+  it("reads a former custom Period's start date as the default Period", () => {
+    expect(originFromParams({ origin: 'analytics', originFrom: '2024-03-01' })).toEqual({
+      kind: 'analytics',
+      page: unpinnedPage(DEFAULT_PERIOD),
+    });
   });
 
   it('reads Analytics with a missing or unknown Period as the default one', () => {
@@ -132,7 +130,7 @@ describe('Drill-down origin', () => {
     });
   });
 
-  it('keeps pins beside a custom Period on the way back', () => {
+  it('keeps pins beside a former custom Period on the way back, to the default Period', () => {
     const params = {
       origin: 'analytics',
       originFrom: '2024-03-01',
@@ -140,7 +138,7 @@ describe('Drill-down origin', () => {
     };
 
     expect(backLink(originFromParams(params)).href).toBe(
-      '/analytics?from=2024-03-01&spending-by-category=year-to-date',
+      '/analytics?period=rolling-12-months&spending-by-category=year-to-date',
     );
   });
 

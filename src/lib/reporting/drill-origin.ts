@@ -7,7 +7,6 @@ import {
   periodToParams,
   type AnalyticsPage,
 } from '@/lib/analytics/period';
-import { swissToday } from '@/lib/dates';
 import type { WidgetQueryInput } from '@/server/services/reporting/query';
 import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-params';
 
@@ -16,8 +15,8 @@ import { DEFAULT_WIDGET_QUERY, queryToParams, type UrlParams } from './widget-pa
  * saved Widget, the Widget editor (with the query in the URL), the Recurring payments page (a
  * Recurring payment's charges), or Analytics over a Period with its Cards' pins. It travels in the
  * URL as a type and an id (`origin=dashboard&originId=<uuid>`) or a Period and its pins, their
- * parameters prefixed `origin` (`origin=analytics&originPeriod=year-to-date`, or
- * `originFrom=2024-03-01` for a custom one; `originSpendingByCategory=rolling-90-days` for a pin),
+ * parameters prefixed `origin` (`origin=analytics&originPeriod=year-to-date`;
+ * `originSpendingByCategory=rolling-90-days` for a pin),
  * never as a path, so a forged value can only ever fall back to the editor (or to Analytics over
  * the default Period).
  */
@@ -50,7 +49,7 @@ const originName = (name: string) =>
 /** The Analytics parameters an origin carries, each by its own name, read from their `origin` twins. */
 function analyticsParams(params: UrlParams): Record<string, string | string[] | undefined> {
   return Object.fromEntries(
-    ['period', 'from', ...PINNABLE_SECTIONS].map((name) => [name, params[originName(name)]]),
+    ['period', ...PINNABLE_SECTIONS].map((name) => [name, params[originName(name)]]),
   );
 }
 
@@ -83,7 +82,7 @@ export function originFromParams(params: UrlParams): DrillOrigin {
   if (kind === 'analytics') {
     const analytics = analyticsParams(params);
     return analyticsDrillOrigin({
-      period: periodFromParams(analytics, swissToday()),
+      period: periodFromParams(analytics),
       cardPeriods: cardPeriodsFromParams(analytics),
     });
   }

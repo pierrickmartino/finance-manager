@@ -1,91 +1,41 @@
 'use client';
 
 import Form from 'next/form';
-import { useId, useState, useSyncExternalStore, type ChangeEvent } from 'react';
-import { flushSync } from 'react-dom';
+import { useId, type ChangeEvent } from 'react';
 import { FIELD_LABEL_CLASS } from '@/components/form';
 import { INPUT_CLASS } from '@/components/named-list';
-import { SECONDARY_BUTTON_CLASS } from '@/components/surface';
 import {
-  isPeriodPreset,
   PERIOD_PRESETS,
-  presetLabels,
   cardPeriodsToParams,
+  presetLabels,
   type CardPeriods,
-  type Period,
   type PeriodPreset,
 } from '@/lib/analytics/period';
 import { HiddenFields } from './hidden-fields';
 
 interface PeriodControlProps {
-  period: Period;
-  /** The Period's first day, as read: the date field shows it. */
-  from: string;
+  /** The page's Period preset: the dropdown shows it. */
+  preset: PeriodPreset;
   /** The Period in words: "Last 90 days · 25 Aug – 22 Nov 2026". */
   phrase: string;
-  /** Each preset's start date today, so picking one fills in its date at once. */
-  starts: Record<PeriodPreset, string>;
-  /** Today: the latest start date the field takes, and what names the presets ("Since 2025"). */
+  /** Today, which names the presets ("Since 2025"). */
   today: string;
   /** The Cards' pins, sent again as they are: changing the page's Period keeps every one. */
   cardPeriods: CardPeriods;
 }
 
-const noSubscription = () => () => {};
-
-/** Whether the control runs in the browser: false while server-rendering and hydrating. */
-function useIsHydrated(): boolean {
-  return useSyncExternalStore(
-    noSubscription,
-    () => true,
-    () => false,
-  );
-}
-
-/** The select's value for a typed start date. */
-const CUSTOM = 'custom';
-
 /**
- * Analytics' only control (GLOSSARY: Period, ADR-0016): a GET form of the Period presets (and
- * Custom) and the Period's start date, under the Period in words. Picking a preset fills in its date
- * and reads Analytics over it; typing a date switches the list to Custom, and Show reads
- * Analytics from it. Once hydrated, the form sends only `period` for a preset or only `from` for
- * Custom; without JavaScript it sends both, and the chosen preset wins unless Custom is
- * selected. The Cards' pins ride along in hidden fields, so a pinned Card keeps its own Period
- * (GLOSSARY: Card Period). It sticks to the top of the screen as the page scrolls, so the Period can change from
- * anywhere.
+ * Analytics' Period control (GLOSSARY: Period, ADR-0016, ADR-0021): a GET form of one dropdown of
+ * the Period presets, beside the Period in words. Picking a preset reads Analytics over it at once,
+ * as a Card's Period does. The Cards' pins ride along in hidden fields, so a pinned Card keeps its
+ * own Period (GLOSSARY: Card Period). It sticks to the top of the screen as the page scrolls, so
+ * the Period can change from anywhere.
  */
-export function PeriodControl({
-  period,
-  from,
-  phrase,
-  starts,
-  today,
-  cardPeriods,
-}: PeriodControlProps) {
+export function PeriodControl({ preset, phrase, today, cardPeriods }: PeriodControlProps) {
   const id = useId();
-  const [choice, setChoice] = useState<string>(period.kind === 'preset' ? period.preset : CUSTOM);
-  const [start, setStart] = useState(from);
-  const isHydrated = useIsHydrated();
-  const isCustom = choice === CUSTOM;
   const labels = presetLabels(today);
-  const onPreset = (event: ChangeEvent<HTMLSelectElement>) => {
-    const { value, form } = event.currentTarget;
-    if (!isPeriodPreset(value)) {
-      setChoice(value);
-      return;
-    }
-    // Rendered before submitting, so the form names the preset's field, not the date's.
-    flushSync(() => {
-      setChoice(value);
-      setStart(starts[value]);
-    });
-    form?.requestSubmit();
-  };
-  const onDate = (event: ChangeEvent<HTMLInputElement>) => {
-    setStart(event.currentTarget.value);
-    setChoice(CUSTOM);
-  };
+  const onChange = (event: ChangeEvent<HTMLSelectElement>) =>
+    event.currentTarget.form?.requestSubmit();
 
   return (
     <Form
@@ -95,44 +45,27 @@ export function PeriodControl({
       data-testid="period-control"
       className="sticky top-0 z-10 -mx-1 flex flex-wrap items-end gap-x-3 gap-y-2 glass-paper px-1 py-2"
     >
-      {/* The field primitive's layout, but each label set beside its control (htmlFor) rather
+      {/* The field primitive's layout, but the label set beside its control (htmlFor) rather
           than wrapping it: a wrapping label would fold the chosen option into the select's
           accessible name ("Period Last 12 months"). */}
       <div className={FIELD_LABEL_CLASS}>
         <label htmlFor={`${id}-period`}>Period</label>
         <select
           id={`${id}-period`}
-          name={isHydrated && isCustom ? undefined : 'period'}
-          value={choice}
-          onChange={onPreset}
+          name="period"
+          defaultValue={preset}
+          onChange={onChange}
           className={INPUT_CLASS}
         >
-          {PERIOD_PRESETS.map((preset) => (
-            <option key={preset} value={preset}>
-              {labels[preset]}
+          {PERIOD_PRESETS.map((value) => (
+            <option key={value} value={value}>
+              {labels[value]}
             </option>
           ))}
-          <option value={CUSTOM}>Custom</option>
         </select>
       </div>
-      <div className={FIELD_LABEL_CLASS}>
-        <label htmlFor={`${id}-from`}>From</label>
-        <input
-          id={`${id}-from`}
-          type="date"
-          name={isHydrated && !isCustom ? undefined : 'from'}
-          value={start}
-          max={today}
-          required
-          onChange={onDate}
-          className={INPUT_CLASS}
-        />
-      </div>
       <HiddenFields params={cardPeriodsToParams(cardPeriods)} />
-      <button type="submit" className={SECONDARY_BUTTON_CLASS}>
-        Show
-      </button>
-      <p className="basis-full text-sm text-muted sm:basis-auto sm:self-center" aria-live="polite">
+      <p className="basis-full text-sm text-muted sm:basis-auto sm:pb-1.5" aria-live="polite">
         {phrase}
       </p>
     </Form>

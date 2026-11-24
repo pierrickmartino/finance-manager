@@ -13,7 +13,6 @@ import {
 } from '@/lib/analytics/period';
 import { getServiceContext } from '@/server/app-context';
 import { getFormatter } from '@/server/formatter';
-import { swissToday } from '@/server/services/fx/dates';
 import {
   ACCOUNT_BALANCES,
   CATEGORIES_PER_INTERVAL,
@@ -43,10 +42,10 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 const INCOME_VS_EXPENSE_FRAME = cardFrame(INCOME_VS_EXPENSE_WIDGET);
 
 /**
- * Analytics (GLOSSARY, ADR-0016): one fixed page of reports read over the Period in the URL: a
- * preset's `period`, or a custom start date's `from` (Last 12 months when missing, unknown or
- * after today); a former Period view's `period` link, or a former Span's `span` link, redirects to
- * its nearest Period. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
+ * Analytics (GLOSSARY, ADR-0016, ADR-0021): one fixed page of reports read over the Period preset
+ * in the URL's `period` (Last 12 months when missing or unknown); a former Period view's `period`
+ * link, a former Span's `span` link, or a former custom start date's `from` link, redirects to its
+ * nearest Period, keeping any pins. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
  * parameter each beside the Period (`net-worth=<slug>`, `income-vs-expense=<slug>`,
  * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `net-cash-flow=<slug>`,
  * `profit-per-interval=<slug>`, `categories-per-interval=<slug>`); a bare visit has none, and a former link carries none. The
@@ -68,18 +67,14 @@ export default async function AnalyticsPage({
 }) {
   const params = await searchParams;
   const legacy = legacyPeriod(params);
-  if (legacy) redirect(analyticsHref(unpinnedPage(legacy)));
+  const cardPeriods = cardPeriodsFromParams(params);
+  if (legacy) redirect(analyticsHref({ period: legacy, cardPeriods }));
   const ctx = await getServiceContext();
   const fmt = await getFormatter();
+  const chosen = periodFromParams(params);
   // Started now, and awaited by the section that shows each (nothing is awaited in between).
-  const cardPeriods = cardPeriodsFromParams(params);
-  const { sections, today, reading, starts } = await loadAnalytics(
-    ctx,
-    periodFromParams(params, swissToday()),
-    cardPeriods,
-  );
-  // The effective Period: no Period starts before the first Transaction (a custom date moves to it,
-  // a preset keeps its name), and the control shows the start it is read from.
+  const { sections, today, reading } = await loadAnalytics(ctx, chosen, cardPeriods);
+  // The Period is read from no earlier than the first Transaction; the phrase gives those dates.
   const { period } = reading;
   const retryHref = analyticsHref(reading.page);
 
@@ -91,10 +86,8 @@ export default async function AnalyticsPage({
       </header>
       <PeriodControl
         key={analyticsHref(unpinnedPage(period))}
-        period={period}
-        from={reading.from}
+        preset={chosen.preset}
         phrase={periodPhrase(period, reading)}
-        starts={starts}
         today={today}
         cardPeriods={cardPeriods}
       />

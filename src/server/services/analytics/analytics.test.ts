@@ -99,7 +99,7 @@ describe('a preset Period', () => {
       { bookingDate: '2025-02-01', amountMinor: 6_000 },
     ]);
 
-    const { reading, starts, sections } = await settled(
+    const { reading, sections } = await settled(
       await loadAnalytics(t.ctx, presetPeriod('this-year-and-last-4')),
     );
 
@@ -109,12 +109,6 @@ describe('a preset Period', () => {
       grain: 'month',
     });
     expect(keys(reading.intervals)[0]).toBe('2024-09');
-    // Picking a preset fills in the start it is read from.
-    expect(starts).toMatchObject({
-      'this-year-and-last-4': '2024-09-10',
-      'rolling-12-months': '2024-09-10',
-      'rolling-30-days': '2025-02-19',
-    });
     // Its figures are captioned with the clamped start, not the preset's.
     const income = sections.keyFigures.figures.find((figure) => figure.id === 'income')!;
     expect(income.caption).toBe('10 Sep 2024 – today');
