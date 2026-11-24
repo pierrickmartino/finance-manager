@@ -13,7 +13,8 @@ export const metadata: Metadata = { title: 'Dashboard · Finance Manager' };
 /**
  * A Dashboard, read as a grid of cards: an overview row, then the board, one card per Widget at
  * its place and size (GLOSSARY: Dashboard Story, ADR-0009, ADR-0010). Values in CHF. Changing the Widgets
- * happens in Edit mode (./edit). The Completeness check sits above Analytics instead (ADR-0015).
+ * happens in Edit mode (./edit). The Completeness check shows in the notifications bell instead
+ * (ADR-0019).
  *
  * The page shell (tabs, name, actions) renders as soon as the Dashboard is found; each part that
  * waits on a query streams in behind its own placeholder (./streamed).
