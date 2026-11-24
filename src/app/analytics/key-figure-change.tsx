@@ -15,6 +15,8 @@ interface ChangeLineProps {
   fmt: Formatter;
   /** Show the % alone, without the absolute change (the amount when there is no %). */
   isPercentOnly?: boolean;
+  /** Leave out the dates it is compared with, when a column header already names them. */
+  isLabelHidden?: boolean;
 }
 
 /**
@@ -22,7 +24,12 @@ interface ChangeLineProps {
  * is one, and the dates it is compared with ("↗ +CHF 500 · +25.0% vs 1–22 Oct"). It opens the
  * Transactions of both stretches, or for Net worth the Accounts it is compared with.
  */
-export function ChangeLine({ change, fmt, isPercentOnly = false }: ChangeLineProps) {
+export function ChangeLine({
+  change,
+  fmt,
+  isPercentOnly = false,
+  isLabelHidden = false,
+}: ChangeLineProps) {
   const { arrow, sign, word } = directionOf(change.amount);
   const amount = `${sign}${fmt.amount(Math.abs(change.amount), { currency: BASE_CURRENCY, isWhole: true })}`;
   const percent =
@@ -44,7 +51,7 @@ export function ChangeLine({ change, fmt, isPercentOnly = false }: ChangeLinePro
         </span>
         {figures}
       </span>
-      <span className="text-muted">{change.label}</span>
+      {!isLabelHidden && <span className="text-muted">{change.label}</span>}
     </Link>
   );
 }
