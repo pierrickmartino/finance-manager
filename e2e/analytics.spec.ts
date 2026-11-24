@@ -311,6 +311,16 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   for (const tile of tiles.slice(1)) {
     await expect(tile.getByText('Last 12 months', { exact: true })).toBeVisible();
   }
+  // Each tile reads when it stands top right, beside its label.
+  const captionBeside = async (tile: (typeof tiles)[number], caption: string) => {
+    const label = (await tile.getByRole('heading').boundingBox())!;
+    const box = (await tile.getByText(caption, { exact: true }).boundingBox())!;
+    return box.x > label.x + label.width && box.y < label.y + label.height;
+  };
+  expect(await captionBeside(tiles[0]!, 'Today')).toBe(true);
+  for (const tile of tiles.slice(1)) {
+    expect(await captionBeside(tile, 'Last 12 months')).toBe(true);
+  }
   // Above the overview row, all four in one row of equal tiles.
   const wide = await boxes();
   const overview = (await region(page, 'Your net worth today').boundingBox())!;
@@ -394,6 +404,14 @@ test("a Key figure's change line opens both stretches of days, and Net worth's t
   for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
     await expect(changeOf(name)).toBeVisible();
   }
+  // Each change shows its % alone, still saying both; with no % (Income had none before,
+  // Profit lost money) it falls back to the amount.
+  await expect(changeOf('Expense')).toContainText('%');
+  await expect(changeOf('Expense')).toHaveAccessibleName(/CHF .*%/);
+  for (const name of ['Net worth', 'Income', 'Expense', 'Profit']) {
+    const text = (await changeOf(name).textContent())!;
+    expect(text.includes('%') !== text.includes('CHF'), `${name}: ${text}`).toBe(true);
+  }
   // The 365 days before the Period, which end last year.
   await expect(changeOf('Income')).toHaveAccessibleName(
     new RegExp(
@@ -440,6 +458,9 @@ test('each Key figure carries a sparkline, hidden from assistive technology, tha
       await expect(sparkline).toHaveAttribute('aria-hidden', 'true');
       // The current interval is partial: a dashed last segment to a hollow dot.
       await expect(sparkline.locator('path[stroke-dasharray]')).toHaveCount(1);
+      // Each line curves smoothly through its points.
+      const dashed = await sparkline.locator('path[stroke-dasharray]').getAttribute('d');
+      expect(dashed, `${width}px`).toContain(' C');
       await expect(sparkline.locator('span.bg-surface')).toHaveCount(1);
       // Inside its tile, dot and line included, and the tile not overflowing either.
       const box = (await tile.boundingBox())!;
@@ -611,6 +632,14 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
     new RegExp(`^Income and expense, ${days} points from .+ \\(to date\\)\\.`),
   );
   await expect(card.getByText('Kept so far', { exact: true })).toBeVisible();
+  // Each area and each line curves smoothly through its points: no straight segments.
+  const marks = card.locator('svg path');
+  expect(await marks.count()).toBeGreaterThanOrEqual(4);
+  for (const d of await marks.evaluateAll((paths) => paths.map((p) => p.getAttribute('d')!))) {
+    expect(d).toMatch(/^M[^L]* C/);
+    // Through about a point a month over the year, not one a day.
+    expect(d.match(/C/g)!.length).toBeLessThanOrEqual(16);
+  }
   for (const fact of ['Came in', 'Went out']) {
     await expect(card.getByRole('term').filter({ hasText: fact })).toBeVisible();
   }

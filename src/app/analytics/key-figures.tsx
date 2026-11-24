@@ -1,5 +1,10 @@
 import Link from 'next/link';
-import { PLACEHOLDER_CLASS, TILE_AMOUNT_CLASS, TILE_CLASS } from '@/components/surface';
+import {
+  PLACEHOLDER_CLASS,
+  TILE_AMOUNT_CLASS,
+  TILE_CLASS,
+  TITLE_ROW_CLASS,
+} from '@/components/surface';
 import type { Formatter } from '@/lib/format';
 import { KEY_FIGURES, type AnalyticsKeyFigures, type KeyFigure } from '@/server/services/analytics';
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
@@ -35,25 +40,27 @@ interface FigureTileProps {
 }
 
 /**
- * One figure's tile: its label and when it stands, then its amount opening what is behind it,
- * and its sparkline at the foot.
+ * One figure's tile: its label with when it stands top right, then its amount opening what is
+ * behind it, its change as a %, and its smooth sparkline at the foot.
  */
 function FigureTile({ figure, fmt }: FigureTileProps) {
   return (
     <section aria-label={figure.label} className={FIGURE_CLASS}>
-      <h3 className="font-medium">{figure.label}</h3>
+      <div className={`${TITLE_ROW_CLASS} items-baseline`}>
+        <h3 className="font-medium">{figure.label}</h3>
+        {!figure.isEmpty && <p className="text-sm text-muted">{figure.caption}</p>}
+      </div>
       {figure.isEmpty ? (
         <p className="mt-2 text-sm text-muted">Nothing to show yet: no Account holds money.</p>
       ) : (
         <>
-          <p className="text-sm text-muted">{figure.caption}</p>
           <Link
             href={figure.href}
             className={`${TILE_AMOUNT_CLASS} mt-2 hover:underline ${figure.value < 0 ? 'text-negative' : ''}`}
           >
             {fmt.amount(figure.value, { currency: BASE_CURRENCY, isWhole: true })}
           </Link>
-          {figure.change && <ChangeLine change={figure.change} fmt={fmt} />}
+          {figure.change && <ChangeLine change={figure.change} fmt={fmt} isPercentOnly />}
         </>
       )}
       {!figure.isEmpty && <FigureSparklineMark points={figure.sparkline} />}

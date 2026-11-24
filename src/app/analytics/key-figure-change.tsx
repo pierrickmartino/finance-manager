@@ -13,6 +13,8 @@ function toneOf(isGood: boolean | null): string {
 interface ChangeLineProps {
   change: KeyFigureChange;
   fmt: Formatter;
+  /** Show the % alone, without the absolute change (the amount when there is no %). */
+  isPercentOnly?: boolean;
 }
 
 /**
@@ -20,14 +22,15 @@ interface ChangeLineProps {
  * is one, and the dates it is compared with ("↗ +CHF 500 · +25.0% vs 1–22 Oct"). It opens the
  * Transactions of both stretches, or for Net worth the Accounts it is compared with.
  */
-export function ChangeLine({ change, fmt }: ChangeLineProps) {
+export function ChangeLine({ change, fmt, isPercentOnly = false }: ChangeLineProps) {
   const { arrow, sign, word } = directionOf(change.amount);
   const amount = `${sign}${fmt.amount(Math.abs(change.amount), { currency: BASE_CURRENCY, isWhole: true })}`;
   const percent =
     change.percent === null ? null : `${sign}${fmt.percent(Math.abs(change.percent))}`;
-  const figures = [amount, percent].filter(Boolean).join(' · ');
-  // The whole line in words, for assistive technology and the tooltip.
-  const spoken = `${word[0]!.toUpperCase()}${word.slice(1)} ${figures} ${change.label}`;
+  const allFigures = [amount, percent].filter(Boolean).join(' · ');
+  const figures = isPercentOnly && percent ? percent : allFigures;
+  // The whole line in words, both figures always, for assistive technology and the tooltip.
+  const spoken = `${word[0]!.toUpperCase()}${word.slice(1)} ${allFigures} ${change.label}`;
   return (
     <Link
       href={change.href}

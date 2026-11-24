@@ -56,3 +56,59 @@ describe("a Key figure's sparkline", () => {
     expect(figureSparkline([])).toBeNull();
   });
 });
+
+describe("a Key figure's smooth sparkline", () => {
+  /** The ends of every segment of a path, in order: its first point and each curve's end. */
+  const endsOf = (path: string) =>
+    [...path.matchAll(/(?:M|C[^C]*?\s)(-?[\d.]+),(-?[\d.]+)(?=\s*(?:C|M|$))/g)].map(
+      ([, x, y]) => `${Number(x)},${Number(y)}`,
+    );
+
+  it('curves through the same points as the straight line, ending at the same dot', () => {
+    const straight = figureSparkline([point(0), point(50), point(100, true)])!;
+    const smooth = figureSparkline([point(0), point(50), point(100, true)], { isSmooth: true })!;
+
+    expect(smooth.solid).toMatch(/^M0,90 C/);
+    expect(smooth.solid).not.toContain('L');
+    expect(endsOf(smooth.solid)).toEqual(['0,90', '50,50']);
+    expect(endsOf(smooth.partial!)).toEqual(['50,50', '100,10']);
+    expect(smooth.last).toEqual(straight.last);
+  });
+
+  it('keeps the dashed segments apart at both ends, as the straight line does', () => {
+    const smooth = figureSparkline(
+      [point(0, true), point(25), point(50), point(75), point(100, true)],
+      { isSmooth: true },
+    )!;
+
+    expect(endsOf(smooth.solid)).toEqual(['25,70', '50,50', '75,30']);
+    expect(smooth.partial!.match(/M/g)).toHaveLength(2);
+    expect(endsOf(smooth.partial!)).toEqual(['0,90', '25,70', '75,30', '100,10']);
+  });
+
+  it('never overshoots a peak or a trough: a curve stays between its two points', () => {
+    const smooth = figureSparkline([point(0), point(100), point(0), point(100)], {
+      isSmooth: true,
+    })!;
+    const curves = [...smooth.solid.matchAll(/C([^C]+)/g)].map(([, body]) =>
+      body!
+        .trim()
+        .split(/\s+/)
+        .map((pair) => Number(pair.split(',')[1])),
+    );
+
+    for (const ys of curves) {
+      for (const y of ys) {
+        expect(y).toBeGreaterThanOrEqual(10);
+        expect(y).toBeLessThanOrEqual(90);
+      }
+    }
+  });
+
+  it('fills under the curve, closed down to the foot', () => {
+    const smooth = figureSparkline([point(0), point(50), point(100)], { isSmooth: true })!;
+
+    expect(smooth.area).toMatch(/^M0,90 C.* L100,100 L0,100 Z$/);
+    expect(smooth.area).toContain(smooth.solid.slice(1));
+  });
+});
