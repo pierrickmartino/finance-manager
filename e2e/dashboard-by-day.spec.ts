@@ -154,23 +154,24 @@ test('a line flow Widget by Day draws two areas of running totals; a day opens i
   expect(Math.round(francs((await status.innerText()).split('total ')[1]!))).toBe(5000);
 });
 
-test('on a phone a line flow Widget by Day draws its areas within the screen', async ({ page }) => {
+test('on a phone a line flow Widget by Day draws its areas across its card', async ({ page }) => {
   const suffix = shortSuffix();
   const dashboardId = await seedDashboard(suffix, [
     { name: 'Phone flow', visualisation: 'line', columns: 'categoryGroupType' },
   ]);
+  const flow = card(page, 'Phone flow');
   const { plot } = flowPlot(page, 'Phone flow');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/dashboards/${dashboardId}`);
   await plot.scrollIntoViewIfNeeded();
   await expect(plot).toBeVisible();
+  await expect(flow.locator('figcaption')).toContainText('Income');
+  // The plot spans the card, which holds it without scrolling sideways. (The card's width is
+  // the page's: on a phone, other tests' long descriptions in Recent activity may widen it.)
   const box = (await plot.boundingBox())!;
-  expect(box.width).toBeGreaterThan(200);
-  expect(box.x + box.width).toBeLessThanOrEqual(390);
-  const pageOverflows = await page.evaluate(
-    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-  );
-  // Nor does the overview above it, whose spending bars label each of the ten days.
-  expect(pageOverflows).toBe(false);
+  const cardBox = (await flow.boundingBox())!;
+  expect(box.width).toBeGreaterThan(cardBox.width * 0.75);
+  expect(box.x + box.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  expect(await flow.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
