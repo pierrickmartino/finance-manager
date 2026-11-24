@@ -128,14 +128,14 @@ describe('Income vs. expense', () => {
     expect(at('2025-03-20')).toEqual(['2025-03-20', 600_000, 44_400]);
   });
 
-  it('says "Kept so far" with "Came in" and "Went out", each what its Drill-down works out', async () => {
+  it('says "Profit" with "Came in" and "Went out", each what its Drill-down works out', async () => {
     fixToday('2025-03-20');
     await dataset();
 
     const card = await loadSection(t.ctx, ROLLING_30, 'incomeVsExpense');
     const { lead, facts } = readCard(card, money);
 
-    expect(lead).toMatchObject({ headline: 'Kept so far', detail: '555600' });
+    expect(lead).toMatchObject({ headline: 'Profit', detail: '555600' });
     expect(facts.map(({ label, value }) => [label, value])).toEqual([
       ['Came in', '600000'],
       ['Went out', '44400'],

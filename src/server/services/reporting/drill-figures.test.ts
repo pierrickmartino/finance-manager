@@ -306,7 +306,7 @@ describe('a Widget by day', () => {
     await withRefund();
     const { lead, facts } = readCard(await widget(januaryByDay, 'line'), money);
 
-    expect(lead).toMatchObject({ headline: 'Kept so far', detail: String(500_000 - 445_009) });
+    expect(lead).toMatchObject({ headline: 'Profit', detail: String(500_000 - 445_009) });
     expect(facts.map((fact) => [fact.label, fact.value])).toEqual([
       ['Came in', '500000'],
       ['Went out', '445009'],
