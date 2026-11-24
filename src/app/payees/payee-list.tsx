@@ -17,7 +17,13 @@ interface PayeeListProps {
 /** The master list: a filter, the Payees A-Z with their Transaction counts, and adding one. */
 export function PayeeList({ payees, selectedId, query }: PayeeListProps) {
   return (
-    <nav aria-label="Payees" className={`${CARD_CLASS} flex flex-col gap-3 p-3`}>
+    // The glass card's backdrop-filter makes it a stacking context, which traps the "New
+    // Payee" menu's z-index inside it: lift the whole card while that menu is open, so the
+    // menu draws over the detail card that follows it.
+    <nav
+      aria-label="Payees"
+      className={`${CARD_CLASS} relative flex flex-col gap-3 p-3 has-[details[open]]:z-20`}
+    >
       {/* A GET form: the filter lives in the URL (?q=), like the selected Payee (?payee=). */}
       <form role="search" action="/payees" className="flex items-center gap-1">
         {selectedId && <input type="hidden" name="payee" value={selectedId} />}
