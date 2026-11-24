@@ -1,9 +1,18 @@
 import Link from 'next/link';
-import { PLACEHOLDER_CLASS, TILE_AMOUNT_CLASS, TILE_CLASS } from '@/components/surface';
+import {
+  PLACEHOLDER_CLASS,
+  TILE_AMOUNT_CLASS,
+  TILE_CLASS,
+  TITLE_ROW_CLASS,
+} from '@/components/surface';
 import type { Formatter } from '@/lib/format';
-import { KEY_FIGURES, type AnalyticsKeyFigures, type KeyFigure } from '@/server/services/analytics';
+import {
+  KEY_FIGURES,
+  type AnalyticsKeyFigures,
+  type KeyFigure,
+  type KeyFigureId,
+} from '@/server/services/analytics';
 import { BASE_CURRENCY } from '@/server/services/fx/constants';
-import { EXPENSE_VARIANT_COMPONENTS, type ExpenseVariantKey } from './expense-tile.prototype';
 import { FigureSparklineMark } from './figure-sparkline-mark';
 import { ChangeLine } from './key-figure-change';
 import { UnconvertedNote } from './section';
@@ -30,6 +39,26 @@ export function KeyFiguresPlaceholder() {
   );
 }
 
+/** How a tile lays out what it carries. */
+interface TileLook {
+  /** Its caption beside its label, top right, rather than under it. */
+  isCaptionBeside: boolean;
+  /** Its change line gives the % alone, without the absolute change. */
+  isPercentOnly: boolean;
+  /** Its sparkline curves through the points rather than joining them straight. */
+  isSmooth: boolean;
+}
+
+const CLASSIC_LOOK: TileLook = { isCaptionBeside: false, isPercentOnly: false, isSmooth: false };
+
+/** Expense reads its Period beside its label, its change as a %, and its trend as a curve. */
+const TILE_LOOKS: Record<KeyFigureId, TileLook> = {
+  netWorth: CLASSIC_LOOK,
+  income: CLASSIC_LOOK,
+  expense: { isCaptionBeside: true, isPercentOnly: true, isSmooth: true },
+  profit: CLASSIC_LOOK,
+};
+
 interface FigureTileProps {
   figure: KeyFigure;
   fmt: Formatter;
@@ -40,24 +69,37 @@ interface FigureTileProps {
  * and its sparkline at the foot.
  */
 function FigureTile({ figure, fmt }: FigureTileProps) {
+  const look = TILE_LOOKS[figure.id];
+  const caption = <p className="text-sm text-muted">{figure.caption}</p>;
   return (
     <section aria-label={figure.label} className={FIGURE_CLASS}>
-      <h3 className="font-medium">{figure.label}</h3>
+      {look.isCaptionBeside && !figure.isEmpty ? (
+        <div className={`${TITLE_ROW_CLASS} items-baseline`}>
+          <h3 className="font-medium">{figure.label}</h3>
+          {caption}
+        </div>
+      ) : (
+        <h3 className="font-medium">{figure.label}</h3>
+      )}
       {figure.isEmpty ? (
         <p className="mt-2 text-sm text-muted">Nothing to show yet: no Account holds money.</p>
       ) : (
         <>
-          <p className="text-sm text-muted">{figure.caption}</p>
+          {!look.isCaptionBeside && caption}
           <Link
             href={figure.href}
             className={`${TILE_AMOUNT_CLASS} mt-2 hover:underline ${figure.value < 0 ? 'text-negative' : ''}`}
           >
             {fmt.amount(figure.value, { currency: BASE_CURRENCY, isWhole: true })}
           </Link>
-          {figure.change && <ChangeLine change={figure.change} fmt={fmt} />}
+          {figure.change && (
+            <ChangeLine change={figure.change} fmt={fmt} isPercentOnly={look.isPercentOnly} />
+          )}
         </>
       )}
-      {!figure.isEmpty && <FigureSparklineMark points={figure.sparkline} />}
+      {!figure.isEmpty && (
+        <FigureSparklineMark points={figure.sparkline} isSmooth={look.isSmooth} />
+      )}
       {figure.unconverted.count > 0 && <UnconvertedNote {...figure.unconverted} />}
     </section>
   );
@@ -66,33 +108,22 @@ function FigureTile({ figure, fmt }: FigureTileProps) {
 interface KeyFiguresSectionProps {
   keyFigures: Promise<AnalyticsKeyFigures>;
   fmt: Formatter;
-  /** PROTOTYPE: which Expense tile variant to draw (expense-tile.prototype.tsx). */
-  expenseVariant?: ExpenseVariantKey;
 }
 
 /**
  * Analytics' Key figures, once they arrive: Net worth today, then Income, Expense and Profit
  * over the current interval to date, each a tile whose amount opens what is behind it.
  */
-export async function KeyFiguresSection({
-  keyFigures,
-  fmt,
-  expenseVariant = 'current',
-}: KeyFiguresSectionProps) {
+export async function KeyFiguresSection({ keyFigures, fmt }: KeyFiguresSectionProps) {
   const { figures } = await keyFigures;
-  const income = figures.find((figure) => figure.id === 'income');
   return (
     <section aria-labelledby="key-figures-title" className={ROW_CLASS}>
       <h2 id="key-figures-title" className="sr-only">
         {KEY_FIGURES}
       </h2>
-      {figures.map((figure) => {
-        if (figure.id === 'expense' && expenseVariant !== 'current') {
-          const Variant = EXPENSE_VARIANT_COMPONENTS[expenseVariant];
-          return <Variant key={figure.id} expense={figure} income={income} fmt={fmt} />;
-        }
-        return <FigureTile key={figure.id} figure={figure} fmt={fmt} />;
-      })}
+      {figures.map((figure) => (
+        <FigureTile key={figure.id} figure={figure} fmt={fmt} />
+      ))}
     </section>
   );
 }

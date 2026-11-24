@@ -3,6 +3,8 @@ import { figureSparkline, type FigureSparklineInput } from '@/lib/analytics/figu
 
 interface FigureSparklineMarkProps {
   points: readonly FigureSparklineInput[];
+  /** Curve through the points instead of joining them with straight segments. */
+  isSmooth?: boolean;
 }
 
 /**
@@ -11,8 +13,8 @@ interface FigureSparklineMarkProps {
  * first interval cut short a dashed first segment (ADR-0016).
  * Hidden from assistive technology: the tile says every value it carries as text.
  */
-export function FigureSparklineMark({ points }: FigureSparklineMarkProps) {
-  const shape = figureSparkline(points);
+export function FigureSparklineMark({ points, isSmooth = false }: FigureSparklineMarkProps) {
+  const shape = figureSparkline(points, { isSmooth });
   if (!shape) return null;
   return (
     // At the tile's foot, so the sparklines of a row line up whatever stands above them.
