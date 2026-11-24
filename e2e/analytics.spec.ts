@@ -632,6 +632,12 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
     new RegExp(`^Income and expense, ${days} points from .+ \\(to date\\)\\.`),
   );
   await expect(card.getByText('Kept so far', { exact: true })).toBeVisible();
+  // Each area and each line curves smoothly through its points: no straight segments.
+  const marks = card.locator('svg path');
+  expect(await marks.count()).toBeGreaterThanOrEqual(4);
+  for (const d of await marks.evaluateAll((paths) => paths.map((p) => p.getAttribute('d')!))) {
+    expect(d).toMatch(/^M[^L]* C/);
+  }
   for (const fact of ['Came in', 'Went out']) {
     await expect(card.getByRole('term').filter({ hasText: fact })).toBeVisible();
   }

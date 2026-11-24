@@ -6,13 +6,14 @@ import { RAMP_FILLS, type RampFill } from '@/lib/color/ramp-fills';
 import type { FlowPoint } from '@/lib/reporting/card';
 import { intervalLabel } from '@/lib/reporting/interval-label';
 import { labelSide, scaleOf, type LabelSide, type Scale } from '@/lib/reporting/net-worth-chart';
+import { pathThrough, type Spot } from '@/lib/reporting/smooth-path';
 import { useMoney } from './marks';
 import { FIGURES_ATTRIBUTE, useFlowPointer, type FlowSeries } from './use-flow-pointer';
 
 /**
  * A line flow's mark (docs/design-system.md, "Charts"; GLOSSARY: Card): two overlapping areas,
- * income and expense, each a ramp gradient under its flat line, so the gap between them is the
- * Profit. Each series is one path, whatever the number of points; only the hovered or focused
+ * income and expense, each a ramp gradient under its flat line curving smoothly through its
+ * points, so the gap between them is the Profit. Each series is one path, whatever the number of points; only the hovered or focused
  * point draws more: a crosshair, its dots and its figures, Income and Expense each a link to
  * its column's Drill-down. A segment reaching a partial point is dashed and that point's dots
  * are hollow. Amounts in minor units, shown in CHF.
@@ -70,8 +71,12 @@ function runsOf(points: readonly FlowPoint[]): Run[] {
   }, []);
 }
 
-const coordinates = (values: readonly number[], scale: Scale): string[] =>
-  values.map((value, i) => `${scale.x(i)},${scale.y(value)}`);
+const spotsOf = (values: readonly number[], scale: Scale): Spot[] =>
+  values.map((value, i) => ({ x: scale.x(i), y: scale.y(value) }));
+
+/** A stretch of a series' line, curving through its points (and on through its neighbours). */
+const curveOf = (spots: readonly Spot[], from: number, to: number) =>
+  pathThrough(spots, from, to, { isSmooth: true });
 
 interface PlotProps {
   points: FlowPoint[];
@@ -96,22 +101,23 @@ function FlowPlot({ points, scale }: PlotProps) {
         ))}
       </defs>
       {[...SERIES_ORDER].reverse().map((series) => {
-        const line = coordinates(
+        const spots = spotsOf(
           points.map((point) => point[series]),
           scale,
         );
+        const zero = scale.y(0);
         return (
           <g key={series}>
             {points.length > 1 && (
               <path
-                d={`M${scale.x(0)},${scale.y(0)} L${line.join(' L')} L${scale.x(last)},${scale.y(0)} Z`}
+                d={`${curveOf(spots, 0, last)} L${scale.x(last)},${zero} L${scale.x(0)},${zero} Z`}
                 fill={gradientFill(idOf(series))}
               />
             )}
             {runs.map((run) => (
-              <polyline
+              <path
                 key={run.from}
-                points={line.slice(run.from, run.to + 1).join(' ')}
+                d={curveOf(spots, run.from, run.to)}
                 fill="none"
                 className={SERIES[series].stroke}
                 strokeWidth={2}
