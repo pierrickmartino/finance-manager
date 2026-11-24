@@ -626,7 +626,7 @@ test('Net cash flow has a bar per interval, the current one partial, each openin
 /** An amount as the page writes it ("CHF 4'234", "CHF -87.00") as a number of francs. */
 const francs = (text: string): number => Number(text.replace(/[^\d.-]/g, ''));
 
-test('Income vs. expense draws the Period day by day as running totals, and a hovered day opens the Transactions that sum to it', async ({
+test("Income vs. expense draws the Period day by day as running totals, and a day's income or expense opens the Transactions that sum to it", async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -638,6 +638,12 @@ test('Income vs. expense draws the Period day by day as running totals, and a ho
   // What the plot says of its active point, for assistive technology.
   const active = card.locator('p[aria-live="polite"]');
   const keptOf = async () => francs((await active.innerText()).split('Kept so far ')[1]!);
+  const figuresOf = async () => {
+    const [, income, expense] = /Income (.+), Expense (.+), Kept so far /.exec(
+      await active.innerText(),
+    )!;
+    return { income: francs(income!), expense: francs(expense!) };
+  };
   const status = page.getByRole('status');
   const drillTotal = async () => Math.round(francs((await status.innerText()).split('total ')[1]!));
 
@@ -663,23 +669,42 @@ test('Income vs. expense draws the Period day by day as running totals, and a ho
   expect(cardBox.y).toBe(balancesBox.y);
   expect(cardBox.x + cardBox.width).toBeLessThan(balancesBox.x);
 
+  // Hovering a day shows its running figures; clicking near the top of the plot, above the
+  // lower line, opens the higher area's column through that day, which sums to its point. The
+  // days are about a pixel apart: the right edge (below its rounded corner) is today, and the
+  // click stays where the hover was.
+  await plot.scrollIntoViewIfNeeded();
+  const box = (await plot.boundingBox())!;
+  await page.mouse.move(box.x + box.width - 0.4, box.y + 10);
+  await expect(active).toHaveText(/\(to date\): Income .+, Expense .+, Kept so far /);
+  const hovered = await figuresOf();
+  const isIncomeHigher = hovered.income >= hovered.expense;
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page).toHaveURL(
+    new RegExp(`/widgets/drill\\?.*rowThrough=.*column=${isIncomeHigher ? 'income' : 'expense'}`),
+  );
+  await expect(status).toHaveText(/Transactions?, total CHF /);
+  expect(await drillTotal()).toBe(isIncomeHigher ? hovered.income : -hovered.expense);
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
+
   // The keyboard reaches today's point: what was kept so far, the card's lead.
   await plot.focus();
   await plot.press('End');
   await expect(active).toHaveText(/\(to date\): Income .+, Expense .+, Kept so far /);
   expect(await keptOf()).toBe(kept);
-  await plot.blur();
-
-  // Hovering a day shows its running figures; clicking it opens the Transactions through it.
-  const box = (await plot.boundingBox())!;
-  await page.mouse.move(box.x + box.width - 3, box.y + box.height / 2);
-  await expect(active).toHaveText(/: Income .+, Expense .+, Kept so far /);
-  const hovered = await keptOf();
-  await page.mouse.down();
-  await page.mouse.up();
-  await expect(page).toHaveURL(/\/widgets\/drill\?.*rowThrough=/);
+  // Enter moves to its figures, one link per column: Expense opens what went out through it.
+  const today = await figuresOf();
+  await plot.press('Enter');
+  await expect(card.getByRole('link', { name: /^Income, .+ \(to date\): / })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(card.getByRole('link', { name: /^Expense, .+ \(to date\): / })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*rowThrough=.*column=expense/);
   await expect(status).toHaveText(/Transactions?, total CHF /);
-  expect(await drillTotal()).toBe(hovered);
+  // Expense is negative in the Drill-down: the point is what went out.
+  expect(await drillTotal()).toBe(-today.expense);
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
   await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
 
