@@ -43,25 +43,23 @@ interface StatementRowProps {
 }
 
 /**
- * A row's amount over the Comparison period, then its change line, which wraps on a phone; a
- * muted "—" for a row without one.
+ * A row's change against the Comparison period: its % alone (the amount when there is no %),
+ * without the dates the column header already names; a muted "—" for a row without one.
  */
 function ComparisonCell({ row, fmt }: Omit<StatementRowProps, 'hasComparison'>) {
   if (row.earlier === null || row.change === null) {
     return <td className="rounded-r-md py-2 pr-2 pl-3 text-right align-top text-muted">—</td>;
   }
-  const earlier = fmt.amount(row.earlier, { currency: BASE_CURRENCY, isWhole: true });
   return (
-    <td className="rounded-r-md py-2 pr-2 pl-3 text-right align-top tabular-nums">
-      <div className={`whitespace-nowrap ${row.earlier < 0 ? 'text-negative' : ''}`}>{earlier}</div>
-      <ChangeLine change={row.change} fmt={fmt} />
+    <td className="rounded-r-md py-2 pr-2 pl-3 text-right align-top whitespace-nowrap tabular-nums">
+      <ChangeLine change={row.change} fmt={fmt} isPercentOnly isLabelHidden />
     </td>
   );
 }
 
 /**
  * One row: its label (and what it leaves out), its amount opening what is behind it, then its
- * amount over the Comparison period and its change.
+ * change against the Comparison period.
  */
 function StatementRow({ row, fmt, hasComparison }: StatementRowProps) {
   const amount = fmt.amount(row.value, { currency: BASE_CURRENCY, isWhole: true });
@@ -102,8 +100,8 @@ interface ProfitAndLossSectionProps {
  * Analytics' Profit and loss, once it arrives (GLOSSARY: Profit and loss): the Period's statement,
  * a row per figure from Income down to Net cash flow, highlighted at its foot. Expense reads
  * positive; each amount opens the Transactions behind it. Beside it, when the Account data
- * reaches back that far, each row's amount over the Comparison period and its change line, which
- * opens the Transactions of both stretches. Its header holds its Card Period (GLOSSARY): pinned,
+ * reaches back that far, each row's % change against the Comparison period, which opens the
+ * Transactions of both stretches. Its header holds its Card Period (GLOSSARY): pinned,
  * the statement reads over its own preset and compares with that preset's Comparison period.
  */
 export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLossSectionProps) {
