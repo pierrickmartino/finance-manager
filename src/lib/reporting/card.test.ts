@@ -423,7 +423,7 @@ describe('readCard: income vs. expense', () => {
 
     const reading = read(widget({ visualisation: 'line', data: days }));
 
-    expect(reading.lead).toEqual({ headline: 'Kept so far', detail: 'CHF 4900', href: 'total' });
+    expect(reading.lead).toEqual({ headline: 'Profit', detail: 'CHF 4900', href: 'total' });
     expect(reading.facts).toEqual([
       { label: 'Came in', value: 'CHF 5000', href: 'column:Income' },
       { label: 'Went out', value: 'CHF 100', href: 'column:Expense' },

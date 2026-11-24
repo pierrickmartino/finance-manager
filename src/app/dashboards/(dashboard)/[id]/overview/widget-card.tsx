@@ -57,7 +57,6 @@ function CardBody({
       return (
         <FlowAreas
           points={mark.points}
-          isRunning={mark.isRunning}
           hasLegendElsewhere={hasLegendInHeader}
         />
       );

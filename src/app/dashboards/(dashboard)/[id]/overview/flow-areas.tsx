@@ -164,18 +164,14 @@ interface PointFigure {
 }
 
 /**
- * What a point says: what came in, what went out and what was kept, through it when the
- * points are running totals.
+ * What a point says: what came in, what went out and the Profit, through it when the points
+ * are running totals.
  */
-function pointFigures(point: FlowPoint, money: Money, isRunning: boolean): PointFigure[] {
+function pointFigures(point: FlowPoint, money: Money): PointFigure[] {
   return [
     { label: SERIES.income.label, value: money(point.income), href: point.incomeHref },
     { label: SERIES.expense.label, value: money(point.expense), href: point.expenseHref },
-    {
-      label: isRunning ? 'Kept so far' : 'Kept',
-      value: money(point.income - point.expense),
-      href: null,
-    },
+    { label: 'Profit', value: money(point.income - point.expense), href: null },
   ];
 }
 
@@ -207,7 +203,6 @@ function ActivePoint({ point, index, scale }: ActivePointProps) {
 
 interface PointTooltipProps extends ActivePointProps {
   money: Money;
-  isRunning: boolean;
   isTappable: boolean;
 }
 
@@ -216,7 +211,7 @@ interface PointTooltipProps extends ActivePointProps {
  * opens a column by clicking its area, so they let its clicks through; a tap or the keyboard
  * reaches their links.
  */
-function PointTooltip({ point, index, scale, money, isRunning, isTappable }: PointTooltipProps) {
+function PointTooltip({ point, index, scale, money, isTappable }: PointTooltipProps) {
   const x = scale.x(index);
   const name = intervalLabel(point);
   return (
@@ -229,7 +224,7 @@ function PointTooltip({ point, index, scale, money, isRunning, isTappable }: Poi
         {...{ [FIGURES_ATTRIBUTE]: '' }}
         className="mt-1 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5"
       >
-        {pointFigures(point, money, isRunning).map((figure) => (
+        {pointFigures(point, money).map((figure) => (
           <div key={figure.label} className="contents">
             <dt className="text-muted">{figure.label}</dt>
             <dd className="text-right text-ink tabular-nums">
@@ -285,8 +280,6 @@ function FlowLegend({ points, hasSwatches }: { points: FlowPoint[]; hasSwatches:
 
 interface FlowAreasProps {
   points: FlowPoint[];
-  /** Each point is a running total from the first: its Drill-downs cover the rows through it. */
-  isRunning: boolean;
   /** The swatches are drawn elsewhere (in the card's header), so not under the plot. */
   hasLegendElsewhere?: boolean;
 }
@@ -297,7 +290,7 @@ interface FlowAreasProps {
  * area under the pointer, and Enter moves to the figures' links, one per column, each summing
  * to its point (`useFlowPointer`).
  */
-export function FlowAreas({ points, isRunning, hasLegendElsewhere = false }: FlowAreasProps) {
+export function FlowAreas({ points, hasLegendElsewhere = false }: FlowAreasProps) {
   const money = useMoney();
   const scale = scaleOf(
     points.length,
@@ -333,13 +326,12 @@ export function FlowAreas({ points, isRunning, hasLegendElsewhere = false }: Flo
             index={active!}
             scale={scale}
             money={money}
-            isRunning={isRunning}
             isTappable={pointer.isTappable}
           />
         )}
         <p className="sr-only" aria-live="polite">
           {point &&
-            `${intervalLabel(point)}: ${pointFigures(point, money, isRunning)
+            `${intervalLabel(point)}: ${pointFigures(point, money)
               .map((figure) => `${figure.label} ${figure.value}`)
               .join(', ')}`}
         </p>

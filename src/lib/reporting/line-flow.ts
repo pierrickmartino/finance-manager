@@ -123,7 +123,7 @@ export function runningFlowSentences(
   const income = data.columnTotals[incomeSlot] ?? 0;
   const expense = asExpense(data.columnTotals[expenseSlot]);
   return {
-    lead: { headline: 'Kept so far', detail: money(income - expense), href: data.hrefs.total },
+    lead: { headline: 'Profit', detail: money(income - expense), href: data.hrefs.total },
     facts: [
       {
         label: 'Came in',

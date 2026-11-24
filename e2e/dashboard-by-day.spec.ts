@@ -133,7 +133,7 @@ test('a line flow Widget by Day draws two areas of running totals; a day opens i
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/dashboards/${dashboardId}`);
   await expect(plot).toHaveAccessibleName(/^Income and expense, 10 points from .+ \(to date\)\./);
-  await expect(flow.getByText('Kept so far', { exact: true })).toBeVisible();
+  await expect(flow.getByText('Profit', { exact: true })).toBeVisible();
   expect(francs(await flow.getByTestId('card-lead').innerText())).toBe(3800);
   for (const series of ['Income', 'Expense']) {
     await expect(flow.locator('figcaption').getByText(series, { exact: true })).toBeVisible();
@@ -144,7 +144,7 @@ test('a line flow Widget by Day draws two areas of running totals; a day opens i
   const box = (await plot.boundingBox())!;
   await page.mouse.move(box.x + box.width - 1, box.y + 10);
   await expect(active).toHaveText(
-    /\(to date\): Income CHF 5.000, Expense CHF 1.200, Kept so far CHF 3.800$/,
+    /\(to date\): Income CHF 5.000, Expense CHF 1.200, Profit CHF 3.800$/,
   );
   // Near the top, above the lower (expense) line: the income area.
   await page.mouse.down();

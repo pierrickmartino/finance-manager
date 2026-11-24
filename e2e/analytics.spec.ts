@@ -579,9 +579,9 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   const plot = card.getByRole('group', { name: /^Income and expense, \d+ points from / });
   // What the plot says of its active point, for assistive technology.
   const active = card.locator('p[aria-live="polite"]');
-  const keptOf = async () => francs((await active.innerText()).split('Kept so far ')[1]!);
+  const keptOf = async () => francs((await active.innerText()).split('Profit ')[1]!);
   const figuresOf = async () => {
-    const [, income, expense] = /Income (.+), Expense (.+), Kept so far /.exec(
+    const [, income, expense] = /Income (.+), Expense (.+), Profit /.exec(
       await active.innerText(),
     )!;
     return { income: francs(income!), expense: francs(expense!) };
@@ -596,7 +596,7 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   await expect(plot).toHaveAccessibleName(
     new RegExp(`^Income and expense, ${days} points from .+ \\(to date\\)\\.`),
   );
-  await expect(card.getByText('Kept so far', { exact: true })).toBeVisible();
+  await expect(card.getByText('Profit', { exact: true })).toBeVisible();
   // Each area and each line curves smoothly through its points: no straight segments.
   const marks = card.locator('svg path');
   expect(await marks.count()).toBeGreaterThanOrEqual(4);
@@ -634,7 +634,7 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   await plot.scrollIntoViewIfNeeded();
   const box = (await plot.boundingBox())!;
   await page.mouse.move(box.x + box.width - 0.4, box.y + 10);
-  await expect(active).toHaveText(/\(to date\): Income .+, Expense .+, Kept so far /);
+  await expect(active).toHaveText(/\(to date\): Income .+, Expense .+, Profit /);
   const hovered = await figuresOf();
   const isIncomeHigher = hovered.income >= hovered.expense;
   await page.mouse.down();
@@ -650,7 +650,7 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   // The keyboard reaches today's point: what was kept so far, the card's lead.
   await plot.focus();
   await plot.press('End');
-  await expect(active).toHaveText(/\(to date\): Income .+, Expense .+, Kept so far /);
+  await expect(active).toHaveText(/\(to date\): Income .+, Expense .+, Profit /);
   expect(await keptOf()).toBe(kept);
   // Enter moves to its figures, one link per column: Expense opens what went out through it.
   const today = await figuresOf();
