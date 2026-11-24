@@ -11,7 +11,8 @@ import { litTicks } from '@/lib/reporting/overview';
  * with the latest full period hatched. Amounts in minor units, shown in CHF.
  */
 
-function useMoney(): (minor: number) => string {
+/** Amounts in minor units, shown as whole CHF. */
+export function useMoney(): (minor: number) => string {
   const fmt = useFormatter();
   return (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
 }

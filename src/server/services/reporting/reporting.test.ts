@@ -456,6 +456,25 @@ describe('date ranges', () => {
     expect(toDate.rows.at(-1)).toMatchObject({ key: '2025-04-10', isPartial: true });
   });
 
+  it('covers the last N days past 120, uncapped', async () => {
+    onApril10();
+
+    const report = await runWidgetQuery(t.ctx, {
+      dateRange: { kind: 'last', count: 400, unit: 'day' },
+      rows: 'day',
+    });
+
+    // 400 complete days up to 9 April 2025: 6 March 2024 to 6 March 2025 is 365, then 35 more.
+    expect(report.range).toEqual({ from: '2024-03-06', to: '2025-04-09' });
+    expect(report.rows).toHaveLength(400);
+  });
+
+  it('still caps the last N months, quarters and years at 120', async () => {
+    await expect(
+      runWidgetQuery(t.ctx, { dateRange: { kind: 'last', count: 121, unit: 'month' } }),
+    ).rejects.toThrow('Show at most 120 periods');
+  });
+
   it('covers complete years and year to date', async () => {
     onApril10();
 

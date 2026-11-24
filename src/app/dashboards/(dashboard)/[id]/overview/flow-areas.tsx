@@ -1,25 +1,26 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { useFormatter } from '@/components/formatter-provider';
+import Link from 'next/link';
 import { gradientFill, RampGradient, useRampGradientIds } from '@/components/ramp-gradient';
 import { RAMP_FILLS, type RampFill } from '@/lib/color/ramp-fills';
 import type { FlowPoint } from '@/lib/reporting/card';
+import { intervalLabel } from '@/lib/reporting/interval-label';
 import { labelSide, scaleOf, type LabelSide, type Scale } from '@/lib/reporting/net-worth-chart';
+import { useMoney } from './marks';
+import { FIGURES_ATTRIBUTE, useFlowPointer, type FlowSeries } from './use-flow-pointer';
 
 /**
  * A line flow's mark (docs/design-system.md, "Charts"; GLOSSARY: Card): two overlapping areas,
  * income and expense, each a ramp gradient under its flat line, so the gap between them is the
  * Profit. Each series is one path, whatever the number of points; only the hovered or focused
- * point draws more: a crosshair, its dots and its figures. A segment reaching a partial point
- * is dashed and that point's dots are hollow. Clicking the plot, or Enter on it, opens the
- * point's Drill-down. Amounts in minor units, shown in CHF.
+ * point draws more: a crosshair, its dots and its figures, Income and Expense each a link to
+ * its column's Drill-down. A segment reaching a partial point is dashed and that point's dots
+ * are hollow. Amounts in minor units, shown in CHF.
  */
 
 type Money = (minor: number) => string;
 
-type Series = 'income' | 'expense';
+type Series = FlowSeries;
 
 interface SeriesTone {
   label: string;
@@ -86,7 +87,7 @@ function FlowPlot({ points, scale }: PlotProps) {
     <svg
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
-      className="absolute inset-0 h-full w-full overflow-visible"
+      className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
       aria-hidden
     >
       <defs>
@@ -145,23 +146,26 @@ const TOOLTIP_SIDE_CLASS: Record<LabelSide, string> = {
   end: '-ml-2 -translate-x-full',
 };
 
-/** A point's name, saying when it is still running. */
-const pointName = (point: FlowPoint): string =>
-  point.isPartial ? `${point.label} (to date)` : point.label;
+/** A figure of a point: what came in or went out (opening its column's Drill-down), or kept. */
+interface PointFigure {
+  label: string;
+  value: string;
+  href: string | null;
+}
 
 /**
  * What a point says: what came in, what went out and what was kept, through it when the
  * points are running totals.
  */
-function pointFigures(
-  point: FlowPoint,
-  money: Money,
-  isRunning: boolean,
-): { label: string; value: string }[] {
+function pointFigures(point: FlowPoint, money: Money, isRunning: boolean): PointFigure[] {
   return [
-    { label: SERIES.income.label, value: money(point.income) },
-    { label: SERIES.expense.label, value: money(point.expense) },
-    { label: isRunning ? 'Kept so far' : 'Kept', value: money(point.income - point.expense) },
+    { label: SERIES.income.label, value: money(point.income), href: point.incomeHref },
+    { label: SERIES.expense.label, value: money(point.expense), href: point.expenseHref },
+    {
+      label: isRunning ? 'Kept so far' : 'Kept',
+      value: money(point.income - point.expense),
+      href: null,
+    },
   ];
 }
 
@@ -169,14 +173,11 @@ interface ActivePointProps {
   point: FlowPoint;
   index: number;
   scale: Scale;
-  money: Money;
-  isRunning: boolean;
 }
 
-/** The active point: a crosshair, a dot on each line (hollow while partial) and its figures. */
-function ActivePoint({ point, index, scale, money, isRunning }: ActivePointProps) {
+/** The active point's marks: a crosshair and a dot on each line (hollow while partial). */
+function ActivePoint({ point, index, scale }: ActivePointProps) {
   const x = scale.x(index);
-  const side = labelSide(x);
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       <span
@@ -190,45 +191,55 @@ function ActivePoint({ point, index, scale, money, isRunning }: ActivePointProps
           style={{ left: `${x}%`, top: `${scale.y(point[series])}%` }}
         />
       ))}
-      <div
-        className={`absolute top-0 z-10 rounded-lg border border-rule bg-surface px-3 py-2 text-xs shadow-lg ${TOOLTIP_SIDE_CLASS[side]}`}
-        style={{ left: `${x}%` }}
-      >
-        <p className="font-medium whitespace-nowrap text-ink">{pointName(point)}</p>
-        <dl className="mt-1 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
-          {pointFigures(point, money, isRunning).map((figure) => (
-            <div key={figure.label} className="contents">
-              <dt className="text-muted">{figure.label}</dt>
-              <dd className="text-right text-ink tabular-nums">{figure.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
     </div>
   );
 }
 
-/** The point nearest the pointer, across the plot's width. */
-function indexAt(event: MouseEvent<HTMLElement>, count: number): number {
-  const box = event.currentTarget.getBoundingClientRect();
-  const along = box.width === 0 ? 0 : (event.clientX - box.left) / box.width;
-  return Math.min(count - 1, Math.max(0, Math.round(along * (count - 1))));
+interface PointTooltipProps extends ActivePointProps {
+  money: Money;
+  isRunning: boolean;
+  isTappable: boolean;
 }
 
-/** Where a key moves the active point: a step either way, or to either end. */
-function steppedIndex(key: string, index: number, count: number): number | null {
-  switch (key) {
-    case 'ArrowLeft':
-      return Math.max(0, index - 1);
-    case 'ArrowRight':
-      return Math.min(count - 1, index + 1);
-    case 'Home':
-      return 0;
-    case 'End':
-      return count - 1;
-    default:
-      return null;
-  }
+/**
+ * The active point's figures, on a plate beside the crosshair. They follow a mouse, which
+ * opens a column by clicking its area, so they let its clicks through; a tap or the keyboard
+ * reaches their links.
+ */
+function PointTooltip({ point, index, scale, money, isRunning, isTappable }: PointTooltipProps) {
+  const x = scale.x(index);
+  const name = intervalLabel(point);
+  return (
+    <div
+      className={`absolute top-0 z-10 rounded-lg border border-rule bg-surface px-3 py-2 text-xs shadow-lg ${TOOLTIP_SIDE_CLASS[labelSide(x)]} ${isTappable ? '' : 'pointer-events-none'}`}
+      style={{ left: `${x}%` }}
+    >
+      <p className="font-medium whitespace-nowrap text-ink">{name}</p>
+      <dl
+        {...{ [FIGURES_ATTRIBUTE]: '' }}
+        className="mt-1 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5"
+      >
+        {pointFigures(point, money, isRunning).map((figure) => (
+          <div key={figure.label} className="contents">
+            <dt className="text-muted">{figure.label}</dt>
+            <dd className="text-right text-ink tabular-nums">
+              {figure.href ? (
+                <Link
+                  href={figure.href}
+                  aria-label={`${figure.label}, ${name}: ${figure.value}`}
+                  className="rounded-sm hover:underline"
+                >
+                  {figure.value}
+                </Link>
+              ) : (
+                figure.value
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
 }
 
 /** The first and last point under the plot, and a swatch per series. */
@@ -236,8 +247,8 @@ function FlowLegend({ points }: { points: FlowPoint[] }) {
   return (
     <>
       <div className="mt-3 flex justify-between text-xs text-muted" aria-hidden>
-        <span>{points[0]!.label}</span>
-        {points.length > 1 && <span>{pointName(points.at(-1)!)}</span>}
+        <span>{intervalLabel(points[0]!)}</span>
+        {points.length > 1 && <span>{intervalLabel(points.at(-1)!)}</span>}
       </div>
       <figcaption className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
         {SERIES_ORDER.map((series) => (
@@ -253,91 +264,59 @@ function FlowLegend({ points }: { points: FlowPoint[] }) {
 
 interface FlowAreasProps {
   points: FlowPoint[];
-  /** Each point is a running total from the first: its Drill-down covers the rows through it. */
+  /** Each point is a running total from the first: its Drill-downs cover the rows through it. */
   isRunning: boolean;
 }
 
 /**
  * Income and expense as two overlapping areas. The plot is one focusable control: the pointer
- * or the arrow keys pick a point, which shows its figures; a click or Enter opens its
- * Drill-down (both columns, so it sums to what was kept). A touch has no hover, so its first
- * tap on a point shows the figures and a second one opens them.
+ * or the arrow keys pick a point, which shows its figures; a click opens the Drill-down of the
+ * area under the pointer, and Enter moves to the figures' links, one per column, each summing
+ * to its point (`useFlowPointer`).
  */
 export function FlowAreas({ points, isRunning }: FlowAreasProps) {
-  const router = useRouter();
-  const fmt = useFormatter();
-  const money: Money = (minor) => fmt.amount(minor, { currency: 'CHF', isWhole: true });
-  const [active, setActive] = useState<number | null>(null);
-  const pointerType = useRef('mouse');
-  if (points.length === 0) return null;
+  const money = useMoney();
   const scale = scaleOf(
     points.length,
     points.flatMap((point) => [point.income, point.expense]),
   );
+  const pointer = useFlowPointer(points, scale);
+  if (points.length === 0) return null;
+  const { active } = pointer;
   const point = active === null ? null : (points[active] ?? null);
-
-  const onClick = (event: MouseEvent<HTMLDivElement>) => {
-    const index = indexAt(event, points.length);
-    if (pointerType.current !== 'mouse' && index !== active) {
-      setActive(index);
-      return;
-    }
-    router.push(points[index]!.href);
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' && point) {
-      router.push(point.href);
-      return;
-    }
-    const next = steppedIndex(event.key, active ?? points.length - 1, points.length);
-    if (next === null) return;
-    event.preventDefault();
-    setActive(next);
-  };
+  const first = intervalLabel(points[0]!);
+  const last = intervalLabel(points.at(-1)!);
 
   return (
     // From `lg` up the card's height is set, and the plot takes what its facts leave.
     <figure className="flex flex-col lg:flex-1">
-      <div className="relative mx-2 mt-2 h-40 lg:h-auto lg:min-h-24 lg:flex-1">
+      <div
+        className="relative mx-2 mt-2 h-40 lg:h-auto lg:min-h-24 lg:flex-1"
+        onBlur={pointer.onBlur}
+      >
         <FlowPlot points={points} scale={scale} />
+        {point && <ActivePoint point={point} index={active!} scale={scale} />}
+        <div
+          role="group"
+          tabIndex={0}
+          aria-roledescription="chart"
+          aria-label={`Income and expense, ${points.length} points from ${first} to ${last}. Arrow keys pick a point, Enter moves to its Income and Expense Transactions.`}
+          className="absolute inset-0 cursor-pointer rounded-md"
+          {...pointer.controlProps}
+        />
         {point && (
-          <ActivePoint
+          <PointTooltip
             point={point}
             index={active!}
             scale={scale}
             money={money}
             isRunning={isRunning}
+            isTappable={pointer.isTappable}
           />
         )}
-        <div
-          role="group"
-          tabIndex={0}
-          aria-roledescription="chart"
-          aria-label={`Income and expense, ${points.length} points from ${points[0]!.label} to ${pointName(points.at(-1)!)}. Arrow keys pick a point, Enter opens its Transactions.`}
-          className="absolute inset-0 cursor-pointer rounded-md"
-          onPointerDown={(event) => {
-            pointerType.current = event.pointerType;
-          }}
-          onPointerMove={(event) => {
-            if (event.pointerType === 'mouse') setActive(indexAt(event, points.length));
-          }}
-          onPointerLeave={(event) => {
-            if (event.pointerType === 'mouse') setActive(null);
-          }}
-          onClick={onClick}
-          onFocus={(event) => {
-            // Focus from the keyboard picks the latest point; a pointer picks its own.
-            if (event.currentTarget.matches(':focus-visible')) {
-              setActive((current) => current ?? points.length - 1);
-            }
-          }}
-          onBlur={() => setActive(null)}
-          onKeyDown={onKeyDown}
-        />
         <p className="sr-only" aria-live="polite">
           {point &&
-            `${pointName(point)}: ${pointFigures(point, money, isRunning)
+            `${intervalLabel(point)}: ${pointFigures(point, money, isRunning)
               .map((figure) => `${figure.label} ${figure.value}`)
               .join(', ')}`}
         </p>

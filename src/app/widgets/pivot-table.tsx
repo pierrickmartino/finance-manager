@@ -14,8 +14,6 @@ export type PivotData = ChartSource;
 const CELL = 'px-3 py-1.5 text-right tabular-nums whitespace-nowrap';
 const HEAD = 'px-3 py-1.5 font-medium whitespace-nowrap';
 
-const headerLabel = intervalLabel;
-
 /**
  * The table visualisation and its full-screen pivot view (spec 105). Every value is a link to
  * the Transactions behind it (spec 107).
@@ -104,7 +102,7 @@ export function PivotTable({
                 <th className={`${HEAD} text-left`}></th>
                 {data.columns.map((column) => (
                   <th key={column.key ?? 'none'} scope="col" className={`${HEAD} text-right`}>
-                    {headerLabel(column)}
+                    {intervalLabel(column)}
                   </th>
                 ))}
                 {data.columns.length > 1 && (
@@ -119,10 +117,10 @@ export function PivotTable({
                 <tr key={row.key ?? 'none'}>
                   <th
                     scope="row"
-                    title={headerLabel(row)}
+                    title={intervalLabel(row)}
                     className={`${HEAD} text-left ${isCompact && !isFullScreen ? 'max-w-56 truncate' : ''}`}
                   >
-                    {headerLabel(row)}
+                    {intervalLabel(row)}
                   </th>
                   {data.columns.map((column, c) => (
                     <Fragment key={column.key ?? 'none'}>

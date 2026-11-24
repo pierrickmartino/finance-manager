@@ -271,7 +271,11 @@ function SpendingChart({ months, period, money }: SpendingChartProps) {
           />
         ))}
       </div>
-      <div aria-hidden className="mt-1.5 flex gap-1.5 text-[10px] text-on-ramp/60">
+      {/* Contained, so many labels (a day's each) truncate rather than widen the card. */}
+      <div
+        aria-hidden
+        className="mt-1.5 flex gap-1.5 text-[10px] text-on-ramp/60 contain-inline-size"
+      >
         {bars.map((bar) => (
           <span
             key={bar.label}
