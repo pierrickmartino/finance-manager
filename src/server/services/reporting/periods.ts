@@ -1,4 +1,4 @@
-import { addDays } from '@/lib/dates';
+import { addDays, daysBetween } from '@/lib/dates';
 import type { DateRange, TimeAxis } from './query';
 
 /** Inclusive ISO date span. */
@@ -86,9 +86,7 @@ export function periodsIn(span: DateSpan, unit: TimeAxis): string[] {
 
 /** Every day of the span, oldest first. */
 function daysIn({ from, to }: DateSpan): string[] {
-  const days: string[] = [];
-  for (let day = from; day <= to; day = addDays(day, 1)) days.push(day);
-  return days;
+  return Array.from({ length: daysBetween(from, to) + 1 }, (_, i) => addDays(from, i));
 }
 
 /** How many periods of `unit` overlap the span (0 for none): what an `average` divides by. */

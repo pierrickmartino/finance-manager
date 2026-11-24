@@ -4,9 +4,18 @@ import { divideRounded } from './average';
 import type { Size } from './board';
 import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
 import { averaged, drillUrl } from './drill-link';
+import { isDayKey } from './interval-label';
+import {
+  areasMark,
+  asExpense,
+  runningFlowSentences,
+  type AreasMark,
+  type FlowSlots,
+} from './line-flow';
 import { readNetWorth, type NetWorthLineMark } from './net-worth-card';
 import { periodValues, type PeriodValue } from './period-values';
 
+export type { FlowPoint } from './line-flow';
 export type { LineMarker, NetWorthBand } from './net-worth-card';
 export type { PeriodValue } from './period-values';
 
@@ -177,25 +186,6 @@ export interface TickItem {
   href: string | null;
 }
 
-/**
- * One point of a line flow's two areas: its row's income and expense (both positive while
- * money came in and went out), or, drawn as running totals, what came in and went out from
- * the first row through this one. Each link opens the Drill-down whose working gives it:
- * `href` both columns together (the gap between the areas), the others one column each.
- */
-export interface FlowPoint {
-  label: string;
-  /** The row's key: its date or Interval (`2025-03-14`, `2025-03`, `2025-Q1`, `2025`). */
-  key: string | null;
-  /** The row is still running (its numbers will still change). */
-  isPartial: boolean;
-  income: number;
-  expense: number;
-  href: string;
-  incomeHref: string;
-  expenseHref: string;
-}
-
 /** The income and expense of a Widget that holds both, and where its figures drill down. */
 export interface CardFlow {
   months: MonthFlow[];
@@ -221,12 +211,8 @@ export type CardMark =
   | { type: 'ring'; data: ChartSource }
   | { type: 'grid'; data: ChartSource }
   | { type: 'dots'; months: MonthFlow[] }
-  /**
-   * A line flow: two overlapping areas, income and expense, whose gap is its Profit. Running:
-   * each point is the total from the first row through its own, so the last gap is the Profit
-   * of the whole stretch.
-   */
-  | { type: 'areas'; isRunning: boolean; points: FlowPoint[] }
+  /** A line flow: two overlapping areas, income and expense, whose gap is its Profit. */
+  | AreasMark
   | { type: 'bars'; periods: PeriodValue[] }
   | NetWorthLineMark;
 
@@ -268,12 +254,6 @@ function splitPath(label: string): [group: string, name: string] {
   return rest.length > 0 ? [group!, rest.join(' › ')] : [label, label];
 }
 
-/** Which column holds the income and which the expense. */
-interface FlowSlots {
-  incomeSlot: number;
-  expenseSlot: number;
-}
-
 /**
  * The income and expense columns, when the source has one positive and one negative column
  * (an income-vs-expense Widget): the one with the larger total is the income, so a refund
@@ -294,58 +274,8 @@ function flowSlotsOf(data: ChartSource): FlowSlots | null {
 function monthsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): MonthFlow[] {
   return data.rows.map((row, r) => {
     const income = data.cells[r]?.[incomeSlot] ?? 0;
-    const expense = 0 - (data.cells[r]?.[expenseSlot] ?? 0);
+    const expense = asExpense(data.cells[r]?.[expenseSlot]);
     return { label: row.label, isPartial: row.isPartial, income, expense, net: income - expense };
-  });
-}
-
-/** A line flow's points: each row's own income and expense, and its Drill-downs. */
-function flowPointsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): FlowPoint[] {
-  return data.rows.map((row, r) => ({
-    label: row.label,
-    key: row.key,
-    isPartial: row.isPartial,
-    income: data.cells[r]?.[incomeSlot] ?? 0,
-    expense: 0 - (data.cells[r]?.[expenseSlot] ?? 0),
-    href: data.hrefs.rowTotals[r] ?? data.hrefs.total,
-    incomeHref: data.hrefs.cells[r]?.[incomeSlot] ?? data.hrefs.total,
-    expenseHref: data.hrefs.cells[r]?.[expenseSlot] ?? data.hrefs.total,
-  }));
-}
-
-/**
- * The Drill-down of every row from the first through `key` (one column, or both without one):
- * what a running point adds up. Without a query to drill into, the whole range.
- */
-function throughHref(data: ChartSource, key: string | null, column?: string | null): string {
-  if (!data.drill || key === null) return data.hrefs.total;
-  return drillUrl(data.drill, {
-    row: { through: key },
-    ...(column === undefined ? {} : { column }),
-  });
-}
-
-/**
- * A line flow's points as running totals: each what came in and went out from the first row
- * through its own, its Drill-downs those rows for its column.
- */
-function runningPointsOf(data: ChartSource, slots: FlowSlots): FlowPoint[] {
-  const own = flowPointsOf(data, slots);
-  const income = data.columns[slots.incomeSlot]!.key;
-  const expense = data.columns[slots.expenseSlot]!.key;
-  let incomeSoFar = 0;
-  let expenseSoFar = 0;
-  return own.map((point) => {
-    incomeSoFar += point.income;
-    expenseSoFar += point.expense;
-    return {
-      ...point,
-      income: incomeSoFar,
-      expense: expenseSoFar,
-      href: throughHref(data, point.key),
-      incomeHref: throughHref(data, point.key, income),
-      expenseHref: throughHref(data, point.key, expense),
-    };
   });
 }
 
@@ -356,9 +286,7 @@ const isRunningFlow = (kind: CardKind, data: ChartSource): boolean =>
 /** How a flow is drawn: a line as two areas, bars as dots. */
 function flowMark(kind: CardKind, data: ChartSource, slots: FlowSlots): CardMark {
   if (kind !== 'trend') return { type: 'dots', months: monthsOf(data, slots) };
-  return isRunningFlow(kind, data)
-    ? { type: 'areas', isRunning: true, points: runningPointsOf(data, slots) }
-    : { type: 'areas', isRunning: false, points: flowPointsOf(data, slots) };
+  return areasMark(data, slots, isRunningFlow(kind, data));
 }
 
 /**
@@ -521,7 +449,7 @@ function periodWords(data: ChartSource): PeriodWords {
   if (keys.length === 0) return PERIOD_WORDS.month;
   if (keys.every((key) => /^\d{4}$/.test(key))) return PERIOD_WORDS.year;
   if (keys.every((key) => /^\d{4}-Q[1-4]$/.test(key))) return PERIOD_WORDS.quarter;
-  if (keys.every((key) => /^\d{4}-\d{2}-\d{2}$/.test(key))) return PERIOD_WORDS.day;
+  if (keys.every(isDayKey)) return PERIOD_WORDS.day;
   return PERIOD_WORDS.month;
 }
 
@@ -534,7 +462,7 @@ function flowSentences(
   const { noun } = periodWords(data);
   const chart = toSeriesChart(data);
   const income = data.rows.map((_, r) => data.cells[r]?.[incomeSlot] ?? 0);
-  const expense = data.rows.map((_, r) => -(data.cells[r]?.[expenseSlot] ?? 0));
+  const expense = data.rows.map((_, r) => asExpense(data.cells[r]?.[expenseSlot]));
   const most = (values: number[]) => values.indexOf(Math.max(...values));
   const [inMost, outMost] = [most(income), most(expense)];
   const month = (index: number) => chart.points[index]!.label;
@@ -557,34 +485,6 @@ function flowSentences(
         label: `Kept per ${noun}, on average`,
         value: averageText(kept.value, money),
         href: kept.href,
-      },
-    ],
-  };
-}
-
-/**
- * A running flow: what was kept over the whole stretch (its last gap), and the two column
- * totals it is the difference of, each opening its Drill-down.
- */
-function runningFlowSentences(
-  data: ChartSource,
-  { incomeSlot, expenseSlot }: FlowSlots,
-  money: Money,
-): CardSentences {
-  const income = data.columnTotals[incomeSlot] ?? 0;
-  const expense = 0 - (data.columnTotals[expenseSlot] ?? 0);
-  return {
-    lead: { headline: 'Kept so far', detail: money(income - expense), href: data.hrefs.total },
-    facts: [
-      {
-        label: 'Came in',
-        value: money(income),
-        href: data.hrefs.columnTotals[incomeSlot] ?? data.hrefs.total,
-      },
-      {
-        label: 'Went out',
-        value: money(expense),
-        href: data.hrefs.columnTotals[expenseSlot] ?? data.hrefs.total,
       },
     ],
   };

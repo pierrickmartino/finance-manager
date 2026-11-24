@@ -137,8 +137,6 @@ export interface SeriesChart {
   totalHrefs: Record<string, string | null>;
 }
 
-const headerLabel = intervalLabel;
-
 function sumOrNull(values: (number | null)[]): number | null {
   const present = values.filter((value): value is number => value !== null);
   return present.length === 0 ? null : present.reduce((sum, value) => sum + value, 0);
@@ -161,7 +159,11 @@ export function toSeriesChart(data: ChartSource): SeriesChart {
       ...(isFolded ? [[keyOf(kept), otherValue()] as const] : []),
     ]);
   const series: ChartSeries[] = [
-    ...keptColumns.map((column, slot) => ({ key: keyOf(slot), label: headerLabel(column), slot })),
+    ...keptColumns.map((column, slot) => ({
+      key: keyOf(slot),
+      label: intervalLabel(column),
+      slot,
+    })),
     ...(isFolded ? [{ key: keyOf(kept), label: OTHER_LABEL, slot: kept }] : []),
   ];
   const totalHrefs = bySeries(
@@ -171,7 +173,7 @@ export function toSeriesChart(data: ChartSource): SeriesChart {
   const points = data.rows.map((row, r) => {
     const cells = data.cells[r] ?? [];
     return {
-      label: headerLabel(row),
+      label: intervalLabel(row),
       values: bySeries(
         keptColumns.map((_, c) => cells[c] ?? null),
         () => sumOrNull(cells.slice(kept)),
@@ -207,7 +209,7 @@ export function toDonutSlices(data: ChartSource): DonutSlice[] {
   const parts = headers
     .map((header, index) => ({
       header,
-      label: headerLabel(header),
+      label: intervalLabel(header),
       signedValue: totals[index] ?? 0,
       href: hrefs[index] ?? null,
     }))
