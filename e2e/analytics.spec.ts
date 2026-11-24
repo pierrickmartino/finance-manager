@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { DEFAULT_PERIOD, periodDates, periodPhrase } from '../src/lib/analytics/period';
+import { DEFAULT_PERIOD, periodPhrase } from '../src/lib/analytics/period';
 import { formatPeriod } from '../src/lib/format';
 import { createAccount, listAccounts } from '../src/server/services/accounts';
 import { createBank } from '../src/server/services/banks';
@@ -27,15 +27,13 @@ import {
   seedOldPurchase,
   seedPurchase,
   seedSalary,
-  STARTS,
   TODAY,
   YEAR,
 } from './support/analytics';
 
 /**
  * Analytics (spec #170, #204): the Period control, and each section drawn as the Dashboard's own
- * card: Net worth, Spending Insights, Recent transactions, Income vs. expense, Account balances
- * in CHF, Spending by Category, Net cash flow, and the Profit per interval and Categories per
+ * card: Spending Insights, Recent transactions, Income vs. expense, Account balances in CHF, Spending by Category, Net cash flow, and the Profit per interval and Categories per
  * interval heatmaps.
  * Each Card's own Period is card-period.spec.ts.
  */
@@ -244,47 +242,14 @@ test('on a phone the Period control stays at the top and the heatmap scrolls ins
   }
 });
 
-test("Net worth reads today, with a point at the Period's start, each interval end and today, and its change since the start", async ({
-  page,
-}) => {
-  const suffix = Date.now();
-  await seedSalary(suffix);
-  // An expense beside the income, so the tile draws its flow (Came in, Went out, Profit).
-  await seedGrocery(suffix);
-  await seedOldPurchase(suffix);
-  const netWorth = region(page, 'Your net worth today');
-
-  for (const [period, intervals, current] of [
-    ['rolling-12-months', ROLLING_MONTHS, CURRENT_MONTH],
-    ['this-year-and-last-1', QUARTERS, formatPeriod(QUARTER)],
-    ['this-year-and-last-4', 5, YEAR],
-  ] as const) {
-    // Labelled with the Period's first day: it stands at its start.
-    const startLabel = periodDates({ from: STARTS[period], to: STARTS[period] });
-    await page.goto(`/analytics?period=${period}`);
-    const trend = netWorth.getByRole('group', {
-      name: `Net worth, ${periodDates({ from: STARTS[period], to: TODAY })}`,
-    });
-    // The start (Net worth at the end of the day before the Period's first), then a point per interval.
-    await expect(trend.getByRole('link')).toHaveCount(intervals + 1);
-    await expect(trend.getByRole('link').first()).toHaveAccessibleName(
-      new RegExp(`^${startLabel}: `),
-    );
-    await expect(trend.getByRole('link').last()).toHaveAccessibleName(new RegExp(`^${current}: `));
-    await expect(
-      netWorth.getByRole('list', { name: 'Change in Net worth' }).getByRole('link').first(),
-    ).toHaveAccessibleName(new RegExp(`^Period: .* since the start of ${startLabel}$`));
-    await expect(netWorth.getByText('Came in')).toBeVisible();
-    // Income minus expense is Profit (GLOSSARY), and its share of Income the Profit margin.
-    await expect(netWorth.getByText('Profit', { exact: true })).toBeVisible();
-    await expect(netWorth.getByText('Profit margin', { exact: true })).toBeVisible();
-    await expect(netWorth.getByText(/profit over \d+ /)).toBeVisible();
-    await expect(netWorth.getByText(/Kept|Savings rate/)).toHaveCount(0);
-  }
-
-  // Today's amount opens the Accounts.
-  await netWorth.getByRole('link', { name: /^CHF / }).first().click();
-  await expect(page).toHaveURL(/\/accounts$/);
+test("draws no Net worth card: Net worth is the Key figures' tile alone", async ({ page }) => {
+  await seedSalary(Date.now());
+  await page.goto('/analytics');
+  await expect(region(page, 'Recent transactions')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Your net worth today' })).toHaveCount(0);
+  await expect(
+    region(page, 'Key figures').getByRole('region', { name: 'Net worth', exact: true }),
+  ).toBeVisible();
 });
 
 test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2 on a narrow one', async ({
@@ -323,7 +288,7 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   }
   // Above the overview row, all four in one row of equal tiles.
   const wide = await boxes();
-  const overview = (await region(page, 'Your net worth today').boundingBox())!;
+  const overview = (await region(page, 'Recent transactions').boundingBox())!;
   for (const box of wide) {
     expect(box.y).toBe(wide[0]!.y);
     expect(Math.round(box.width)).toBe(Math.round(wide[0]!.width));
@@ -701,33 +666,29 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   expect(await drillTotal()).toBe(kept);
 });
 
-test('on a wide screen Net worth, Spending Insights and Recent transactions share the first row', async ({
+test('on a wide screen Spending Insights and Recent transactions share the first row', async ({
   page,
 }) => {
   await seedSalary(Date.now());
-  // The overview row's three cards, once each has loaded.
+  // The overview row's two cards, once each has loaded.
   const recent = region(page, 'Recent transactions');
   const cards = recent.locator('xpath=..').locator(':scope > section');
   const boxes = async () => {
-    await expect(cards).toHaveCount(3);
+    await expect(cards).toHaveCount(2);
     await expect(cards.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
-    return Promise.all([0, 1, 2].map(async (i) => (await cards.nth(i).boundingBox())!));
+    return Promise.all([0, 1].map(async (i) => (await cards.nth(i).boundingBox())!));
   };
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
-  await expect(cards.first()).toHaveAccessibleName('Your net worth today');
-  const [netWorth, insights, recentBox] = await boxes();
-  expect(insights!.y).toBe(netWorth!.y);
-  expect(recentBox!.y).toBe(netWorth!.y);
-  expect(netWorth!.x + netWorth!.width).toBeLessThan(insights!.x);
+  const [insights, recentBox] = await boxes();
+  expect(recentBox!.y).toBe(insights!.y);
   expect(insights!.x + insights!.width).toBeLessThan(recentBox!.x);
 
   // One column on a phone, in the same order.
   await page.setViewportSize({ width: 390, height: 900 });
-  const [narrowWorth, narrowInsights, narrowRecent] = await boxes();
-  expect(narrowWorth!.x).toBe(narrowInsights!.x);
-  expect(narrowWorth!.y + narrowWorth!.height).toBeLessThan(narrowInsights!.y);
+  const [narrowInsights, narrowRecent] = await boxes();
+  expect(narrowInsights!.x).toBe(narrowRecent!.x);
   expect(narrowInsights!.y + narrowInsights!.height).toBeLessThan(narrowRecent!.y);
 });
 
@@ -773,7 +734,6 @@ test('every section with figures left out for want of an FX rate says so', async
   }
   await expect(keyFigureNote('Income')).toHaveCount(0);
   for (const name of [
-    'Your net worth today',
     'Income vs. expense',
     'Net cash flow',
     'Account balances in CHF',
@@ -794,7 +754,7 @@ test('every section with figures left out for want of an FX rate says so', async
   }
   // Spending Insights too, whether it draws its insight or says why it can't yet.
   // And the three Key figures and three Profit and loss rows it weighs on.
-  await expect(notes).toHaveCount(8 + 3 + 3);
+  await expect(notes).toHaveCount(7 + 3 + 3);
 });
 
 test('on a wide screen the third-width sections draw their lead a size down, from their own width', async ({

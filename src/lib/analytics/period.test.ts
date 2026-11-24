@@ -169,7 +169,6 @@ describe('the Card Periods in the URL', () => {
 
   it('reserves one parameter per pinnable section, named after it', () => {
     expect(PINNABLE_SECTIONS).toEqual([
-      'net-worth',
       'income-vs-expense',
       'spending-by-category',
       'profit-and-loss',
@@ -191,12 +190,12 @@ describe('the Card Periods in the URL', () => {
   it('round-trips the page Period and its pins through an Analytics link', () => {
     const pins = {
       'spending-by-category': 'this-year-and-last-2',
-      'net-worth': 'year-to-date',
+      'income-vs-expense': 'year-to-date',
     } as const;
     const href = analyticsHref({ period: preset('rolling-90-days'), cardPeriods: pins });
 
     expect(href).toBe(
-      '/analytics?period=rolling-90-days&net-worth=year-to-date&spending-by-category=this-year-and-last-2',
+      '/analytics?period=rolling-90-days&income-vs-expense=year-to-date&spending-by-category=this-year-and-last-2',
     );
     const params = paramsOf(href);
     expect(periodFromParams(params)).toEqual(preset('rolling-90-days'));

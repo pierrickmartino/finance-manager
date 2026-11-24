@@ -111,7 +111,7 @@ describe('Drill-down origin', () => {
         period: presetPeriod('rolling-90-days'),
         cardPeriods: {
           'spending-by-category': 'this-year-and-last-2',
-          'net-worth': 'year-to-date',
+          'income-vs-expense': 'year-to-date',
         },
       },
     };
@@ -120,12 +120,12 @@ describe('Drill-down origin', () => {
     expect(params).toEqual({
       origin: 'analytics',
       originPeriod: 'rolling-90-days',
-      originNetWorth: 'year-to-date',
+      originIncomeVsExpense: 'year-to-date',
       originSpendingByCategory: 'this-year-and-last-2',
     });
     expect(originFromParams(params)).toEqual(origin);
     expect(backLink(originFromParams(params))).toEqual({
-      href: '/analytics?period=rolling-90-days&net-worth=year-to-date&spending-by-category=this-year-and-last-2',
+      href: '/analytics?period=rolling-90-days&income-vs-expense=year-to-date&spending-by-category=this-year-and-last-2',
       label: 'Back to Analytics',
     });
   });

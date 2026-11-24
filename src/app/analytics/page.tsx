@@ -28,7 +28,6 @@ import {
 } from '@/server/services/analytics';
 import { CardSection } from './card-section';
 import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
-import { NET_WORTH, NetWorthSection } from './net-worth';
 import { ProfitAndLossSection } from './profit-and-loss';
 import { RECENT_TRANSACTIONS, RecentTransactionsSection } from './recent-transactions';
 import { StreamedSection } from './section';
@@ -46,7 +45,7 @@ const INCOME_VS_EXPENSE_FRAME = cardFrame(INCOME_VS_EXPENSE_WIDGET);
  * in the URL's `period` (Last 12 months when missing or unknown); a former Period view's `period`
  * link, a former Span's `span` link, or a former custom start date's `from` link, redirects to its
  * nearest Period, keeping any pins. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
- * parameter each beside the Period (`net-worth=<slug>`, `income-vs-expense=<slug>`,
+ * parameter each beside the Period (`income-vs-expense=<slug>`,
  * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `net-cash-flow=<slug>`,
  * `profit-per-interval=<slug>`, `categories-per-interval=<slug>`); a bare visit has none, and a former link carries none. The
  * shell and the Period control render at once; each section streams in behind its own placeholder and error boundary
@@ -100,11 +99,8 @@ export default async function AnalyticsPage({
         >
           <KeyFiguresSection keyFigures={sections.keyFigures} fmt={fmt} />
         </StreamedSection>
-        {/* The overview: three side by side on wide screens, one after the other below. */}
-        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          <StreamedSection name={NET_WORTH} retryHref={retryHref}>
-            <NetWorthSection netWorth={sections.netWorth} />
-          </StreamedSection>
+        {/* The overview: side by side on wide screens, one after the other below. */}
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
           <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
             <SpendingInsightsSection flow={sections.spendingInsights} />
           </StreamedSection>
