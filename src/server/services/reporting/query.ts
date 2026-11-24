@@ -49,7 +49,7 @@ export const MEASURE_LABELS: Record<Measure, string> = {
   average: 'Average per period',
 };
 
-/** The longest live range, in periods. */
+/** The longest live range of months, quarters or years, in periods. Days are not capped. */
 export const MAX_LIVE_PERIODS = 120;
 /** The longest fixed range, in days (about 50 years). */
 const MAX_FIXED_DAYS = 18_300;
@@ -75,17 +75,25 @@ const fixedRange = z
     'The date range must be at most 50 years',
   );
 
-/** The last N complete days, months, quarters or years; optionally followed by the current one. */
-const lastPeriodsRange = z.object({
-  kind: z.literal('last'),
-  count: z
-    .number()
-    .int()
-    .min(1, 'Show at least one period')
-    .max(MAX_LIVE_PERIODS, `Show at most ${MAX_LIVE_PERIODS} periods`),
-  unit: z.enum(TIME_AXES, { error: 'Period must be day, month, quarter or year' }),
-  includeCurrent: z.boolean().default(false),
-});
+/**
+ * The last N complete days, months, quarters or years; optionally followed by the current one.
+ * Days are not capped (ADR-0020), beyond the bound every range has: about 50 years.
+ */
+const lastPeriodsRange = z
+  .object({
+    kind: z.literal('last'),
+    count: z
+      .number()
+      .int()
+      .min(1, 'Show at least one period')
+      .max(MAX_FIXED_DAYS, 'The date range must be at most 50 years'),
+    unit: z.enum(TIME_AXES, { error: 'Period must be day, month, quarter or year' }),
+    includeCurrent: z.boolean().default(false),
+  })
+  .refine((range) => range.unit === 'day' || range.count <= MAX_LIVE_PERIODS, {
+    message: `Show at most ${MAX_LIVE_PERIODS} periods`,
+    path: ['count'],
+  });
 
 /** January to the last complete month of this year; optionally with the current month. */
 const yearToDateRange = z.object({
