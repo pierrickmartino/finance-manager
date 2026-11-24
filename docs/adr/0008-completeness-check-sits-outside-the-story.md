@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0019 (the Completeness check shows as Attention items in the notifications bell; no page shows a notice)
 ---
 
 # The Completeness check sits above the Story, not in it

@@ -183,7 +183,6 @@ const PAGES: DesignPage[] = [
       expected: (page) => [keyFigureTile(page), page.locator(OVERVIEW_TILES[1]!)],
       // Four Key figures, the insight and Recent transactions, then a section per Card.
       atLeast: async () => 6,
-      cards: { 'Completeness check': 'a working card above the tiles, not a tile' },
     },
   },
   {

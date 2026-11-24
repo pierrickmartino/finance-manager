@@ -94,7 +94,7 @@ export async function listDashboards(ctx: ServiceContext): Promise<Dashboard[]> 
 
 /**
  * The home Dashboard among `dashboards` (in the user's order, as `listDashboards` gives them):
- * the one the home page opens, and the only one showing the Completeness check (ADR-0008).
+ * the one the home page opens.
  */
 export function homeDashboard(dashboards: readonly Dashboard[]): Dashboard | undefined {
   return dashboards[0];

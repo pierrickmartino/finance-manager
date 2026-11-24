@@ -28,7 +28,6 @@ import {
   SPENDING_INSIGHTS,
 } from '@/server/services/analytics';
 import { CardSection } from './card-section';
-import { StreamedCompleteness } from './completeness/streamed-completeness';
 import { KeyFiguresPlaceholder, KeyFiguresSection } from './key-figures';
 import { NET_WORTH, NetWorthSection } from './net-worth';
 import { ProfitAndLossSection } from './profit-and-loss';
@@ -90,7 +89,6 @@ export default async function AnalyticsPage({
         <h1 className={PAGE_TITLE_CLASS}>Analytics</h1>
         <p className="text-muted">Your finances over the Period you choose, up to today.</p>
       </header>
-      <StreamedCompleteness ctx={ctx} fmt={fmt} today={today} />
       <PeriodControl
         key={analyticsHref(unpinnedPage(period))}
         period={period}

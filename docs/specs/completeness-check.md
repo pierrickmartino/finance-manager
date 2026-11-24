@@ -2,6 +2,8 @@
 
 Issue #92.
 
+> The notice this spec describes was later removed: the Completeness check's problems show as Attention items in the notifications bell (ADR-0019). The check itself (`checkCompleteness`) stands as specified.
+
 ## Problem Statement
 
 Every Import is reconciled when I preview it, but nothing tells me later that my data has gone wrong. I can forget a month's bank file, let an Account fall weeks behind, or break a balance that once reconciled by editing a Manual transaction, undoing an Import or changing an opening balance. Reports are only as good as their data, so a missing file goes unnoticed and quietly misstates every Widget built on it.
