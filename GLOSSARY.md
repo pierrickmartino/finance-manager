@@ -198,7 +198,7 @@ How one Widget is drawn on the Dashboard Story, or one section of Analytics: a s
 _Avoid_: Chapter, tile
 
 **Analytics**:
-The landing page: a single fixed page of reports, read over one Period at a time, which some Cards may replace with their own Card Period: the Key figures (Net worth today; Income, Expense and Profit over the Period) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, Net cash flow and Profit figures per Interval of the Period, and Income vs. expense day by day, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
+The landing page: a single fixed page of reports, read over one Period at a time, which some Cards may replace with their own Card Period: the Key figures (Net worth today; Income, Expense and Profit over the Period) and the Profit and loss, which stand on their own; then Net worth, the spending insight, the most recent Transactions, Account balances today, and Category, spending, Income and expense, Net cash flow and Profit figures per Interval of the Period, and Income vs. expense day by day, each drawn as a Card. It has no Edit mode. Each figure opens its Drill-down, and each balance opens its Account.
 _Avoid_: Analysis page, reports page, dashboard
 
 **Period**:
