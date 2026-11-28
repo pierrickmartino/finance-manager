@@ -111,9 +111,17 @@ export function DashboardChrome({
   );
 }
 
-/** The overview row's band: its cards side by side from `md` up. */
+/**
+ * The overview row's band: its cards side by side from `md` up. Below it, one explicit column
+ * (`grid-cols-1`, at most the page's width) rather than an implicit one, which would grow to its
+ * widest card's text, a long Transaction name kept on one line, and scroll the page sideways.
+ */
 export function OverviewRow({ children }: { children: ReactNode }) {
-  return <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">{children}</div>;
+  return (
+    <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
+      {children}
+    </div>
+  );
 }
 
 /** The overview row's cards, every card already loaded: net worth, insight, recent activity. */
