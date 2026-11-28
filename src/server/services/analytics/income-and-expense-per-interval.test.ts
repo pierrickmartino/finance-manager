@@ -218,6 +218,57 @@ describe('Income and expense per interval', () => {
     expect(card.unconvertedCount).toBe(1);
   });
 
+  it('draws an Income and an Expense bar for every Interval when the Period has expense but no income', async () => {
+    fixToday('2025-03-20');
+    const food = await createCategoryGroup(t.ctx, { name: 'Food', type: 'expense' });
+    const groceries = await createCategory(t.ctx, { groupId: food.id, name: 'Groceries' });
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedEarlyStart(t.ctx, ubs);
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2025-01-05', amountMinor: -80_000, classify: { categoryId: groceries.id } },
+      { bookingDate: '2025-02-05', amountMinor: -40_000, classify: { categoryId: groceries.id } },
+    ]);
+
+    const card = await loadSection(t.ctx, MONTHLY, 'incomeAndExpensePerInterval');
+    const pairs = pairsOf(readCard(card, money).mark);
+
+    expect(pairs).toHaveLength(13);
+    expect(figures(pairs.slice(-3))).toEqual([
+      ['2025-01', false, 0, 80_000],
+      ['2025-02', false, 0, 40_000],
+      ['2025-03', true, 0, 0],
+    ]);
+    // The empty Income bars open the Income Drill-down of their month: nothing.
+    for (const pair of pairs.slice(-3)) {
+      expect((await openDrill(t.ctx, pair.incomeHref)).value ?? 0).toBe(0);
+      expect(0 - ((await openDrill(t.ctx, pair.expenseHref)).value ?? 0)).toBe(pair.expense);
+    }
+  });
+
+  it('keeps Income and Expense apart when a refund turns a month of expense positive', async () => {
+    fixToday('2025-03-20');
+    const income = await createCategoryGroup(t.ctx, { name: 'Income', type: 'income' });
+    const food = await createCategoryGroup(t.ctx, { name: 'Food', type: 'expense' });
+    const salary = await createCategory(t.ctx, { groupId: income.id, name: 'Salary' });
+    const groceries = await createCategory(t.ctx, { groupId: food.id, name: 'Groceries' });
+    const ubs = await seedAccount(t.ctx, 'UBS');
+    await seedEarlyStart(t.ctx, ubs);
+    await seedClassified(t.ctx, ubs, [
+      { bookingDate: '2025-01-25', amountMinor: 10_000, classify: { categoryId: salary.id } },
+      { bookingDate: '2025-02-08', amountMinor: 30_000, classify: { categoryId: groceries.id } },
+    ]);
+
+    const card = await loadSection(t.ctx, MONTHLY, 'incomeAndExpensePerInterval');
+    const pairs = pairsOf(readCard(card, money).mark);
+
+    // The refund reads as expense netting the wrong way, never as income.
+    expect(figures(pairs.slice(-3))).toEqual([
+      ['2025-01', false, 10_000, 0],
+      ['2025-02', false, 0, -30_000],
+      ['2025-03', true, 0, 0],
+    ]);
+  });
+
   it('is empty when the Period has no income or expense, Capital and Unclassified aside', async () => {
     fixToday('2025-03-20');
     const group = await createCategoryGroup(t.ctx, { name: 'Capital', type: 'capital' });

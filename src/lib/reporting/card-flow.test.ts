@@ -127,6 +127,84 @@ describe('readCard: income vs. expense', () => {
     ]);
   });
 
+  it('by Category group type, draws an Income and an Expense bar every Interval though no income came in', () => {
+    const data = drillable(
+      source(['2025-01', '2025-02'], ['expense'], [[-600_00], [-900_00]]),
+      'month',
+      'categoryGroupType',
+    );
+
+    const { mark, flow } = read(
+      widget({
+        visualisation: 'stacked_bar',
+        query: { rows: 'month', columns: 'categoryGroupType' },
+        data,
+      }),
+    );
+
+    if (mark.type !== 'groupedBars') throw new Error(`expected grouped bars, got ${mark.type}`);
+    expect(mark.intervals.map(({ key, income, expense }) => ({ key, income, expense }))).toEqual([
+      { key: '2025-01', income: 0, expense: 600_00 },
+      { key: '2025-02', income: 0, expense: 900_00 },
+    ]);
+    // An empty Income bar opens its own month's Income, and the Expense bar its cell.
+    expect(drillOf(mark.intervals[1]!.incomeHref).cell).toMatchObject({
+      row: '2025-02',
+      column: 'income',
+    });
+    expect(mark.intervals[1]!.expenseHref).toBe('cell:2025-02/expense');
+    expect(flow?.months.map(({ income, expense }) => [income, expense])).toEqual([
+      [0, 600_00],
+      [0, 900_00],
+    ]);
+  });
+
+  it('by Category group type, keeps each column what it is whatever its sign', () => {
+    // Refunds outweigh spending over the whole range: no sign could tell the columns apart.
+    const data = source(
+      ['2025-01', '2025-02'],
+      ['income', 'expense'],
+      [
+        [100_00, 50_00],
+        [0, 30_00],
+      ],
+    );
+
+    const { mark } = read(
+      widget({
+        visualisation: 'stacked_bar',
+        query: { rows: 'month', columns: 'categoryGroupType' },
+        data,
+      }),
+    );
+
+    expect(mark).toMatchObject({
+      type: 'groupedBars',
+      intervals: [
+        { income: 100_00, expense: -50_00 },
+        { income: 0, expense: -30_00 },
+      ],
+    });
+  });
+
+  it('by Category group type, is no flow when the Widget keeps only one side, or another type', () => {
+    const query = { rows: 'month', columns: 'categoryGroupType' } as const;
+    const incomeOnly: ChartSource = {
+      ...source(['2025-01'], ['income'], [[600_00]]),
+      drill: {
+        query: { ...DEFAULT_WIDGET_QUERY, ...query, filters: { categoryGroupTypes: ['income'] } },
+        origin: { kind: 'editor' },
+      },
+    };
+    const withCapital = source(['2025-01'], ['expense', 'capital'], [[-600_00, -100_00]]);
+
+    for (const data of [incomeOnly, withCapital]) {
+      const reading = read(widget({ visualisation: 'stacked_bar', query, data }));
+      expect(reading.mark.type).toBe('bars');
+      expect(reading.flow).toBeNull();
+    }
+  });
+
   it('reads the income from the column with the larger total, even after a refund month', () => {
     // The expense column comes first and one refund turns a month of it positive.
     const refunded = read(

@@ -9,6 +9,7 @@ import {
 } from './bars-flow';
 import type { Size } from './board';
 import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
+import type { CellRef } from '@/server/services/reporting/cell-ref';
 import { averaged, drillUrl } from './drill-link';
 import { intervalLabel, isDayKey } from './interval-label';
 import {
@@ -267,7 +268,7 @@ function splitPath(label: string): [group: string, name: string] {
  * (an income-vs-expense Widget): the one with the larger total is the income, so a refund
  * month in the expense column doesn't turn it into income.
  */
-function flowSlotsOf(data: ChartSource): FlowSlots | null {
+function slotsBySign(data: ChartSource): FlowSlots | null {
   if (data.columns.length !== 2) return null;
   const [first, second] = data.columnTotals;
   if (first == null || second == null) return null;
@@ -277,6 +278,77 @@ function flowSlotsOf(data: ChartSource): FlowSlots | null {
     return null;
   }
   return { incomeSlot, expenseSlot };
+}
+
+/** The two sides of a flow by Category group type, in the order its source holds them. */
+const FLOW_SIDES = [
+  { key: 'income', label: 'Income' },
+  { key: 'expense', label: 'Expense' },
+] as const;
+
+/** A flow's source and which of its columns is the income and which the expense. */
+interface FlowSource {
+  data: ChartSource;
+  slots: FlowSlots;
+}
+
+/** Where a side's figure drills when the source has no column for it: its own, empty, cell. */
+function absentSideHref(data: ChartSource, cell: CellRef): string {
+  return data.drill ? drillUrl(data.drill, cell) : data.hrefs.total;
+}
+
+/**
+ * A source by Category group type whose columns are income, expense or both, as Income then
+ * Expense whatever their sign: a side with no Transaction in the range is an empty column
+ * whose links open its own (empty) Drill-downs. Null when it holds any other column, or its
+ * filters leave a side out (an income-only Widget is no flow).
+ */
+function byGroupType(data: ChartSource): FlowSource | null {
+  const sides: readonly (string | null)[] = FLOW_SIDES.map((side) => side.key);
+  if (!data.columns.every((column) => sides.includes(column.key))) return null;
+  const kept: readonly string[] | undefined = data.drill?.query.filters.categoryGroupTypes;
+  if (kept && !FLOW_SIDES.every((side) => kept.includes(side.key))) return null;
+  const at = FLOW_SIDES.map(({ key }) => data.columns.findIndex((column) => column.key === key));
+  const side = <T>(values: readonly T[] | undefined, s: number, absent: () => T): T =>
+    at[s] === -1 ? absent() : values![at[s]!]!;
+  const both = <T>(of: (s: number) => T): T[] => FLOW_SIDES.map((_, s) => of(s));
+  return {
+    data: {
+      ...data,
+      columns: both((s) => side(data.columns, s, () => ({ ...FLOW_SIDES[s]!, isPartial: false }))),
+      cells: data.rows.map((_, r) => both((s) => side(data.cells[r], s, () => null))),
+      columnTotals: both((s) => side(data.columnTotals, s, () => 0)),
+      hrefs: {
+        ...data.hrefs,
+        cells: data.rows.map((row, r) =>
+          both((s) =>
+            side(data.hrefs.cells[r], s, () =>
+              absentSideHref(data, { row: row.key, column: FLOW_SIDES[s]!.key }),
+            ),
+          ),
+        ),
+        columnTotals: both((s) =>
+          side(data.hrefs.columnTotals, s, () =>
+            absentSideHref(data, { column: FLOW_SIDES[s]!.key }),
+          ),
+        ),
+      },
+    },
+    slots: { incomeSlot: 0, expenseSlot: 1 },
+  };
+}
+
+/**
+ * A Widget's flow, when its data holds one: by Category group type, each column read by what
+ * it is (ADR-0022), so a Period with no income, or a side netting the wrong way, still reads
+ * as Income and Expense; by any other axis, two columns told apart by their sign.
+ */
+function flowSourceOf(widget: CardWidget, data: ChartSource): FlowSource | null {
+  if (widget.query.columns === 'categoryGroupType' && data.columns.length > 0) {
+    return byGroupType(data);
+  }
+  const slots = slotsBySign(data);
+  return slots ? { data, slots } : null;
 }
 
 function monthsOf(data: ChartSource, slots: FlowSlots): MonthFlow[] {
@@ -623,7 +695,7 @@ function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardS
 function readRows(
   kind: CardKind,
   data: ChartSource,
-  slots: FlowSlots | null,
+  flowSource: FlowSource | null,
   money: Money,
   axis: TimeAxis | null,
 ): Pick<CardReading, 'lead' | 'facts' | 'mark'> {
@@ -650,8 +722,8 @@ function readRows(
       return readNetWorth(data, axis, money);
     case 'trend':
     case 'bars':
-      return slots
-        ? readFlow(kind, data, slots, money)
+      return flowSource
+        ? readFlow(kind, flowSource.data, flowSource.slots, money)
         : {
             ...periodSentences(kind, data, money),
             mark: { type: 'bars', periods: periodValues(data) },
@@ -675,10 +747,10 @@ export function readCard(widget: CardWidget, money: Money): CardReading {
   const { kind } = cardFrame(widget);
   const { data } = widget;
   if (!data) return { kind, lead: null, facts: [], mark: { type: 'none' }, flow: null };
-  const slots = flowSlotsOf(data);
-  const flow = slots ? flowOf(data, slots) : null;
+  const flowSource = flowSourceOf(widget, data);
+  const flow = flowSource ? flowOf(flowSource.data, flowSource.slots) : null;
   if (data.rows.length === 0) {
     return { kind, lead: null, facts: [], mark: emptyMark(widget), flow };
   }
-  return { kind, ...readRows(kind, data, slots, money, timeAxisOf(widget.query)), flow };
+  return { kind, ...readRows(kind, data, flowSource, money, timeAxisOf(widget.query)), flow };
 }
