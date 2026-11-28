@@ -121,30 +121,33 @@ export async function ProfitAndLossSection({ profitAndLoss, fmt }: ProfitAndLoss
         />
       }
     >
-      <table className="w-full max-w-2xl border-collapse text-sm">
-        <caption className="sr-only">
-          {PROFIT_AND_LOSS}, {periodWords}
-        </caption>
-        {hasComparison && (
-          <thead>
-            <tr className="text-muted">
-              <td />
-              <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
-                {periodWords}
-              </th>
-              <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
-                <span className="sr-only">Compared with </span>
-                {periodDates(comparisonPeriod(reading.period, dates))}
-              </th>
-            </tr>
-          </thead>
-        )}
-        <tbody>
-          {rows.map((row) => (
-            <StatementRow key={row.id} row={row} fmt={fmt} hasComparison={hasComparison} />
-          ))}
-        </tbody>
-      </table>
+      {/* Large amounts and changes don't wrap: on a phone the statement scrolls in its card, not the page. */}
+      <div className="min-w-0 overflow-x-auto">
+        <table className="w-full max-w-2xl border-collapse text-sm">
+          <caption className="sr-only">
+            {PROFIT_AND_LOSS}, {periodWords}
+          </caption>
+          {hasComparison && (
+            <thead>
+              <tr className="text-muted">
+                <td />
+                <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
+                  {periodWords}
+                </th>
+                <th scope="col" className="pr-2 pb-1 pl-3 text-right font-normal">
+                  <span className="sr-only">Compared with </span>
+                  {periodDates(comparisonPeriod(reading.period, dates))}
+                </th>
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {rows.map((row) => (
+              <StatementRow key={row.id} row={row} fmt={fmt} hasComparison={hasComparison} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </SectionCard>
   );
 }
