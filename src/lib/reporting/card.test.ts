@@ -222,7 +222,7 @@ describe('cardFrame', () => {
         .placeholder;
 
     expect(before('line', 'categoryGroupType')).toBe('areas');
-    // A bars flow keeps its dots, drawn where the bars stand; any other line keeps its bars.
+    // A bars flow is drawn as grouped bars, hinted at by bars; any other line keeps its bars.
     expect(before('stacked_bar', 'categoryGroupType')).toBe('bars');
     expect(before('line', 'category')).toBe('bars');
     expect(before('line', null)).toBe('bars');
@@ -244,9 +244,9 @@ describe('readCard: income vs. expense', () => {
     ]);
   });
 
-  it('draws what came in and went out per row, whichever column holds the income', () => {
+  it('draws a bars flow as grouped bars, a pair per row, whichever column holds the income', () => {
     const flow = source(
-      ['Jan', 'Feb', 'Mar'],
+      ['2025-01', '2025-02', '2025-03'],
       ['Expense', 'Income'],
       [
         [-600_00, 1000_00],
@@ -256,13 +256,87 @@ describe('readCard: income vs. expense', () => {
     );
 
     expect(read(widget({ visualisation: 'stacked_bar', data: flow })).mark).toEqual({
-      type: 'dots',
-      months: [
-        month('Jan', 1000_00, 600_00),
-        month('Feb', 1000_00, 900_00),
-        month('Mar', 1500_00, 300_00),
+      type: 'groupedBars',
+      intervals: [
+        {
+          label: '2025-01',
+          key: '2025-01',
+          isPartial: false,
+          income: 1000_00,
+          expense: 600_00,
+          incomeHref: 'cell:2025-01/Income',
+          expenseHref: 'cell:2025-01/Expense',
+        },
+        {
+          label: '2025-02',
+          key: '2025-02',
+          isPartial: false,
+          income: 1000_00,
+          expense: 900_00,
+          incomeHref: 'cell:2025-02/Income',
+          expenseHref: 'cell:2025-02/Expense',
+        },
+        {
+          label: '2025-03',
+          key: '2025-03',
+          isPartial: false,
+          income: 1500_00,
+          expense: 300_00,
+          incomeHref: 'cell:2025-03/Income',
+          expenseHref: 'cell:2025-03/Expense',
+        },
       ],
     });
+  });
+
+  it('draws a bar pair for every Interval, not the last six, the partial first and last flagged', () => {
+    const quarters = ['2023-Q4', '2024-Q1', '2024-Q2', '2024-Q3', '2024-Q4', '2025-Q1', '2025-Q2'];
+    const data = source(
+      quarters,
+      ['Income', 'Expense'],
+      quarters.map(() => [1000_00, -500_00]),
+    );
+    const cutShort = {
+      ...data,
+      rows: data.rows.map((row, r) => ({
+        ...row,
+        isPartial: r === 0 || r === quarters.length - 1,
+      })),
+    };
+
+    const { mark } = read(widget({ visualisation: 'stacked_bar', data: cutShort }));
+
+    if (mark.type !== 'groupedBars') throw new Error(`expected grouped bars, got ${mark.type}`);
+    expect(mark.intervals.map(({ key, isPartial }) => ({ key, isPartial }))).toEqual([
+      { key: '2023-Q4', isPartial: true },
+      { key: '2024-Q1', isPartial: false },
+      { key: '2024-Q2', isPartial: false },
+      { key: '2024-Q3', isPartial: false },
+      { key: '2024-Q4', isPartial: false },
+      { key: '2025-Q1', isPartial: false },
+      { key: '2025-Q2', isPartial: true },
+    ]);
+  });
+
+  it('keeps the sign of a side that nets the wrong way, never clamping it', () => {
+    const refunds = source(
+      ['2025-01', '2025-02'],
+      ['Income', 'Expense'],
+      [
+        // Refunds outweigh spending: what went out nets below zero.
+        [1000_00, 50_00],
+        // A reversed salary: what came in nets below zero.
+        [-200_00, -300_00],
+      ],
+    );
+
+    const { mark } = read(widget({ visualisation: 'stacked_bar', data: refunds }));
+
+    if (mark.type !== 'groupedBars') throw new Error(`expected grouped bars, got ${mark.type}`);
+    expect(mark.intervals.map(({ income, expense }) => ({ income, expense }))).toEqual([
+      { income: 1000_00, expense: -50_00 },
+      { income: -200_00, expense: 300_00 },
+    ]);
   });
 
   it('reads the income from the column with the larger total, even after a refund month', () => {
@@ -292,10 +366,10 @@ describe('readCard: income vs. expense', () => {
       value: 'CHF 700',
       href: 'cell:Mar/Expense',
     });
-    // The sentence and the dots read the same columns.
+    // The sentence and the bars read the same columns.
     expect(refunded.mark).toMatchObject({
-      type: 'dots',
-      months: [{ income: 1000_00 }, { income: 1000_00 }, { income: 1500_00 }],
+      type: 'groupedBars',
+      intervals: [{ income: 1000_00 }, { income: 1000_00 }, { income: 1500_00 }],
     });
   });
 
@@ -430,7 +504,7 @@ describe('readCard: income vs. expense', () => {
     ]);
   });
 
-  it('tells a bars flow by day by its days, today to date, drawn as dots', () => {
+  it('tells a bars flow by day by its days, today to date, drawn as grouped bars', () => {
     const days = source(
       ['2025-03-01', '2025-03-02', '2025-03-03'],
       ['Income', 'Expense'],
@@ -449,7 +523,19 @@ describe('readCard: income vs. expense', () => {
       'Most went out: 2025-03-03 (to date)',
       'Kept per day, on average',
     ]);
-    expect(reading.mark.type).toBe('dots');
+    expect(reading.mark.type).toBe('groupedBars');
+  });
+
+  it('says there is no data yet for a bars flow with no Interval, as any card does', () => {
+    const reading = read(
+      widget({ visualisation: 'stacked_bar', data: source([], ['Income', 'Expense'], []) }),
+    );
+
+    expect(reading).toMatchObject({
+      lead: null,
+      facts: [],
+      mark: { type: 'empty', sentence: 'No data in this date range yet.' },
+    });
   });
 
   it('counts an empty cell as nothing', () => {

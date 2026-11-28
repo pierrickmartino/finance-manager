@@ -1,6 +1,7 @@
 import { isTimeAxis, type ReportAxis, type TimeAxis } from '@/server/services/reporting/query';
 import type { ReportHeader, Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
+import { groupedBarsMark, type GroupedBarsMark } from './bars-flow';
 import type { Size } from './board';
 import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
 import { averaged, drillUrl } from './drill-link';
@@ -15,6 +16,7 @@ import {
 import { readNetWorth, type NetWorthLineMark } from './net-worth-card';
 import { periodValues, type PeriodValue } from './period-values';
 
+export type { IntervalPair } from './bars-flow';
 export type { FlowPoint } from './line-flow';
 export type { LineMarker, NetWorthBand } from './net-worth-card';
 export type { PeriodValue } from './period-values';
@@ -210,7 +212,8 @@ export type CardMark =
   | { type: 'ticks'; items: TickItem[] }
   | { type: 'ring'; data: ChartSource }
   | { type: 'grid'; data: ChartSource }
-  | { type: 'dots'; months: MonthFlow[] }
+  /** A bars flow: an Income bar and an Expense bar per Interval, on one shared scale. */
+  | GroupedBarsMark
   /** A line flow: two overlapping areas, income and expense, whose gap is its Profit. */
   | AreasMark
   | { type: 'bars'; periods: PeriodValue[] }
@@ -283,9 +286,9 @@ function monthsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): Mo
 const isRunningFlow = (kind: CardKind, data: ChartSource): boolean =>
   kind === 'trend' && periodWords(data).noun === 'day';
 
-/** How a flow is drawn: a line as two areas, bars as dots. */
+/** How a flow is drawn: a line as two areas, bars as grouped bars (ADR-0022). */
 function flowMark(kind: CardKind, data: ChartSource, slots: FlowSlots): CardMark {
-  if (kind !== 'trend') return { type: 'dots', months: monthsOf(data, slots) };
+  if (kind !== 'trend') return groupedBarsMark(data, slots);
   return areasMark(data, slots, isRunningFlow(kind, data));
 }
 
