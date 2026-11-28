@@ -645,20 +645,21 @@ test('a Widget whose query reports a problem says so in its own card; the others
   await expect(placeholders(page)).toHaveCount(0);
 });
 
-test('at phone width a long Transaction name in Recent activity is cut short, never scrolling the page', async ({
+test('at phone width the overview row stays on the page: a long Transaction name is cut short, a short Net worth sparkline ends at its edges', async ({
   page,
 }) => {
   const name = `A Transaction with a long name that runs past a phone ${Date.now()}`;
   await withServices(async (ctx) => {
     const bank = await createBank(ctx, { name: `Long name bank ${Date.now()}` });
+    // Opened lately, so Net worth has only a few points, each a wide strip.
     const account = await createAccount(ctx, {
       bankId: bank.id,
       kind: 'current',
       importFormat: null,
       name: 'Long name',
       currency: 'CHF',
-      openingBalanceMinor: 0,
-      openingDate: '2021-01-01',
+      openingBalanceMinor: 1000_00,
+      openingDate: addDays(swissToday(), -40),
     });
     // The largest lately, so it is the one in the spotlight.
     await createManualTransaction(ctx, {
@@ -673,6 +674,9 @@ test('at phone width a long Transaction name in Recent activity is cut short, ne
   await openHomeDashboard(page);
 
   await expect(page.getByRole('link', { name: /^Largest lately/ })).toContainText(name);
+  await expect(
+    page.getByRole('group', { name: 'Net worth over the last 24 months' }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
