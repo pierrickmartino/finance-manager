@@ -176,18 +176,18 @@ describe('each Story fact is what its Drill-down works out', () => {
     expect(average).toMatchObject({ measure: 'average', averagePer: 'month', periodCount: 3 });
   });
 
-  it('for income vs. expense: most in, most out and kept per month', async () => {
+  it('for income vs. expense: Profit, most in, most out and kept per month', async () => {
     await dataset();
     const flow = await widget(flowQuery, 'stacked_bar');
     const story = readCard(flow, money);
 
-    expect(story.lead!.headline).toBe('Most came in: Mar 2025');
+    expect(story.facts[0]!.label).toBe('Most came in: Mar 2025');
     expect(money((await open(story.lead!.href)).value!)).toBe(story.lead!.detail);
     for (const fact of story.facts) {
       expect(money((await open(fact.href)).value!)).toBe(fact.value);
     }
     // Kept: income and expense together, signed so they net to it, over 3 months.
-    const kept = await open(story.facts[1]!.href);
+    const kept = await open(story.facts.at(-1)!.href);
     expect(kept.periodCount).toBe(3);
     expect(kept.transactions.some((item) => item.chfMinor > 0)).toBe(true);
     expect(kept.transactions.some((item) => item.chfMinor < 0)).toBe(true);
