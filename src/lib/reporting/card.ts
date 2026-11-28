@@ -493,6 +493,46 @@ function flowSentences(
   };
 }
 
+/**
+ * A bars flow in words (ADR-0022): in how many complete Intervals income beat expense, then
+ * the running one's in and out. With no complete Interval, only the running one is told.
+ */
+function barsFlowSentence(data: ChartSource, slots: FlowSlots, money: Money): string {
+  const { noun } = periodWords(data);
+  const months = monthsOf(data, slots);
+  const complete = months.filter((month) => !month.isPartial);
+  const beat = complete.filter((month) => month.income > month.expense).length;
+  const last = months.at(-1);
+  const running = last?.isPartial ? last : null;
+  const sentence = [
+    complete.length > 0 && `Income beat expense in ${beat} of ${complete.length} complete ${noun}s`,
+    running && `this ${noun} so far: in ${money(running.income)}, out ${money(running.expense)}`,
+  ]
+    .filter(Boolean)
+    .join('; ');
+  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
+}
+
+/** A bars flow by month, quarter or year is told by its sentence; by day, as any other flow. */
+const isBarsFlowTold = (kind: CardKind, data: ChartSource): boolean =>
+  kind === 'bars' && periodWords(data).noun !== 'day';
+
+/**
+ * A bars flow: its sentence over the Profit of the whole range (income and expense net to the
+ * total), then the biggest Intervals in and out and what was kept on average.
+ */
+function barsFlowSentences(data: ChartSource, slots: FlowSlots, money: Money): CardSentences {
+  const { lead, facts } = flowSentences(data, slots, money);
+  return {
+    lead: {
+      headline: barsFlowSentence(data, slots, money),
+      detail: money(data.total ?? 0),
+      href: data.hrefs.total,
+    },
+    facts: [{ label: lead!.headline, value: lead!.detail, href: lead!.href }, ...facts],
+  };
+}
+
 /** Period by period: the best and weakest (or, for spending, heaviest and lightest) periods. */
 function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardSentences {
   const { noun, adjective } = periodWords(data);
@@ -566,7 +606,9 @@ function readRows(
         ? {
             ...(isRunningFlow(kind, data)
               ? runningFlowSentences(data, slots, money)
-              : flowSentences(data, slots, money)),
+              : isBarsFlowTold(kind, data)
+                ? barsFlowSentences(data, slots, money)
+                : flowSentences(data, slots, money)),
             mark: flowMark(kind, data, slots),
           }
         : {

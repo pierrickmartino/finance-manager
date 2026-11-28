@@ -230,15 +230,16 @@ describe('cardFrame', () => {
 });
 
 describe('readCard: income vs. expense', () => {
-  it('tells it by its biggest months in and out, not by the net', () => {
+  it('tells bars by its sentence and Profit, then its biggest months in and out', () => {
     const reading = read(incomeVsExpense);
 
     expect(reading.lead).toEqual({
-      headline: 'Most came in: Mar',
-      detail: 'CHF 1500',
-      href: 'cell:Mar/Income',
+      headline: 'Income beat expense in 3 of 3 complete months.',
+      detail: 'CHF 1300',
+      href: 'total',
     });
     expect(reading.facts).toEqual([
+      { label: 'Most came in: Mar', value: 'CHF 1500', href: 'cell:Mar/Income' },
       { label: 'Most went out: Feb', value: 'CHF 900', href: 'cell:Feb/Expense' },
       { label: 'Kept per month, on average', value: 'CHF 433.33', href: null },
     ]);
@@ -356,12 +357,12 @@ describe('readCard: income vs. expense', () => {
       }),
     );
 
-    expect(refunded.lead).toEqual({
-      headline: 'Most came in: Mar',
-      detail: 'CHF 1500',
+    expect(refunded.facts[0]).toEqual({
+      label: 'Most came in: Mar',
+      value: 'CHF 1500',
       href: 'cell:Mar/Income',
     });
-    expect(refunded.facts[0]).toEqual({
+    expect(refunded.facts[1]).toEqual({
       label: 'Most went out: Mar',
       value: 'CHF 700',
       href: 'cell:Mar/Expense',
@@ -373,13 +374,20 @@ describe('readCard: income vs. expense', () => {
     });
   });
 
-  it('tells a line of income vs. expense as a flow, as it does bars', () => {
+  it('tells a line of income vs. expense as a flow, by the figures bars give under its sentence', () => {
     const line = read(widget({ visualisation: 'line', data: incomeVsExpense.data }));
     const bars = read(incomeVsExpense);
 
     expect(line.kind).toBe('trend');
-    expect(line.lead).toEqual(bars.lead);
-    expect(line.facts).toEqual(bars.facts);
+    expect(line.lead).toEqual({
+      headline: 'Most came in: Mar',
+      detail: 'CHF 1500',
+      href: 'cell:Mar/Income',
+    });
+    expect([
+      { label: line.lead!.headline, value: line.lead!.detail, href: line.lead!.href },
+      ...line.facts,
+    ]).toEqual(bars.facts);
     expect(line.flow).toEqual(bars.flow);
   });
 
@@ -568,7 +576,7 @@ describe('readCard: income vs. expense', () => {
       'categoryGroupType',
     );
 
-    const kept = read(widget({ visualisation: 'stacked_bar', data: flow })).facts[1]!;
+    const kept = read(widget({ visualisation: 'stacked_bar', data: flow })).facts.at(-1)!;
 
     expect(kept.value).toBe('CHF 250');
     expect(drillOf(kept.href)).toMatchObject({
@@ -600,6 +608,73 @@ describe('readCard: income vs. expense', () => {
 
   it('tells monthly income vs. expense flows as months', () => {
     expect(read(incomeVsExpense).flow?.period).toBe('month');
+  });
+});
+
+describe('readCard: a bars flow sentence', () => {
+  const bars = (data: ChartSource) => read(widget({ visualisation: 'stacked_bar', data }));
+
+  it('counts the complete months income beat expense, then the running one so far', () => {
+    const reading = bars(
+      source(
+        ['2025-01', '2025-02', '2025-03', '2025-04'],
+        ['Income', 'Expense'],
+        [
+          [1000_00, -600_00],
+          [800_00, -900_00],
+          [1500_00, -700_00],
+          [3200_00, -2900_00],
+        ],
+        { lastIsPartial: true },
+      ),
+    );
+
+    expect(reading.lead?.headline).toBe(
+      'Income beat expense in 2 of 3 complete months; this month so far: in CHF 3200, out CHF 2900.',
+    );
+  });
+
+  it('speaks of quarters for a quarterly flow', () => {
+    const reading = bars(
+      source(
+        ['2025-Q1', '2025-Q2', '2025-Q3'],
+        ['Income', 'Expense'],
+        [
+          [3000_00, -2000_00],
+          [3000_00, -3500_00],
+          [1000_00, -400_00],
+        ],
+        { lastIsPartial: true },
+      ),
+    );
+
+    expect(reading.lead?.headline).toBe(
+      'Income beat expense in 1 of 2 complete quarters; this quarter so far: in CHF 1000, out CHF 400.',
+    );
+  });
+
+  it('speaks of years for a yearly flow, with no running clause when every year is complete', () => {
+    const reading = bars(
+      source(
+        ['2023', '2024', '2025'],
+        ['Income', 'Expense'],
+        [
+          [12000_00, -10000_00],
+          [12000_00, -11000_00],
+          [12000_00, -13000_00],
+        ],
+      ),
+    );
+
+    expect(reading.lead?.headline).toBe('Income beat expense in 2 of 3 complete years.');
+  });
+
+  it('gives only the running clause when no interval is complete, never "0 of 0"', () => {
+    const reading = bars(
+      source(['2025-03'], ['Income', 'Expense'], [[3200_00, -2900_00]], { lastIsPartial: true }),
+    );
+
+    expect(reading.lead?.headline).toBe('This month so far: in CHF 3200, out CHF 2900.');
   });
 });
 
