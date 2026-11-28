@@ -507,6 +507,9 @@ test('a table Widget shows its rows and columns as a heatmap whose cells open th
         dateRange: { kind: 'last', count: 6, unit: 'month' },
         rows: 'account',
         columns: 'month',
+        // Only this test's Account: another spec's income in the range would make the
+        // table mixed-sign, and its cells would then show their minus.
+        filters: { accountIds: [account.id] },
       },
     });
     return dashboard.id;
