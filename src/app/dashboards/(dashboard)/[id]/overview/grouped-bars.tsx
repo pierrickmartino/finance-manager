@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState, type MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import type { IntervalPair } from '@/lib/reporting/card';
 import { intervalLabel } from '@/lib/reporting/interval-label';
+import { CHART_TOOLTIP_CLASS, tooltipSideClass } from './chart-tooltip';
 import { FlowSwatches } from './flow-areas';
 import { shortLabel, useMoney } from './marks';
+import { useTapToShow } from './use-flow-pointer';
 
 /**
  * A bars flow's mark (docs/design-system.md, "Charts"; ADR-0022): an Income bar (`ramp-1`) and
@@ -33,12 +35,12 @@ const LABELS_WIDE = 8;
 const labelStep = (count: number, limit: number): number => Math.max(1, Math.ceil(count / limit));
 
 /** The shared scale: where the zero line sits, and how tall a value is, both in % of the plot. */
-interface Scale {
+interface BarScale {
   zeroTop: number;
   height: (value: number) => number;
 }
 
-function scaleOf(intervals: readonly IntervalPair[]): Scale {
+function barScaleOf(intervals: readonly IntervalPair[]): BarScale {
   const values = intervals.flatMap((pair) => [pair.income, pair.expense]);
   const max = Math.max(0, ...values);
   const min = Math.min(0, ...values);
@@ -49,7 +51,7 @@ function scaleOf(intervals: readonly IntervalPair[]): Scale {
 interface BarProps {
   pair: IntervalPair;
   side: Side;
-  scale: Scale;
+  scale: BarScale;
   money: (minor: number) => string;
   onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
@@ -99,11 +101,10 @@ function PairTooltip({
   money: (minor: number) => string;
 }) {
   const center = ((index + 0.5) / count) * 100;
-  const side = center < 50 ? '' : '-translate-x-full';
   return (
     <div
       aria-hidden
-      className={`pointer-events-none absolute top-0 z-10 rounded-lg border border-rule bg-surface px-3 py-2 text-xs shadow-lg ${side}`}
+      className={`pointer-events-none ${CHART_TOOLTIP_CLASS} ${tooltipSideClass(center)}`}
       style={{ left: `${center}%` }}
     >
       <p className="font-medium whitespace-nowrap text-ink">{intervalLabel(pair)}</p>
@@ -144,23 +145,19 @@ function IntervalLabels({ intervals }: { intervals: readonly IntervalPair[] }) {
 /** Income and expense per Interval as grouped bars, with a muted legend naming each side. */
 export function GroupedBars({ intervals }: { intervals: IntervalPair[] }) {
   const money = useMoney();
-  const scale = scaleOf(intervals);
-  const [active, setActive] = useState<number | null>(null);
-  const lastPointer = useRef<string>('mouse');
+  const scale = barScaleOf(intervals);
+  const { active, setActive, onPointerDown, picksOnTap } = useTapToShow();
 
   // On a touch screen the first tap on a pair shows its figures; the next one opens the bar.
   const clickOf = (index: number) => (event: MouseEvent<HTMLAnchorElement>) => {
-    if (lastPointer.current === 'touch' && active !== index) {
-      event.preventDefault();
-      setActive(index);
-    }
+    if (picksOnTap(index)) event.preventDefault();
   };
 
   return (
     <figure>
       <div
         className="relative h-52 pt-14"
-        onPointerDownCapture={(event) => (lastPointer.current = event.pointerType)}
+        onPointerDownCapture={onPointerDown}
         onMouseLeave={() => setActive(null)}
       >
         <div className="relative flex h-full gap-1 @xs:gap-2">

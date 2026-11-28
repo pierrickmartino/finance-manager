@@ -5,9 +5,10 @@ import { gradientFill, RampGradient, useRampGradientIds } from '@/components/ram
 import { RAMP_FILLS, type RampFill } from '@/lib/color/ramp-fills';
 import type { FlowPoint } from '@/lib/reporting/card';
 import { intervalLabel } from '@/lib/reporting/interval-label';
-import { labelSide, scaleOf, type LabelSide, type Scale } from '@/lib/reporting/net-worth-chart';
+import { scaleOf, type Scale } from '@/lib/reporting/net-worth-chart';
 import { flowKnots } from '@/lib/reporting/flow-knots';
 import { pathThrough, type Spot } from '@/lib/reporting/smooth-path';
+import { CHART_TOOLTIP_CLASS, tooltipSideClass } from './chart-tooltip';
 import { useMoney } from './marks';
 import { FIGURES_ATTRIBUTE, useFlowPointer, type FlowSeries } from './use-flow-pointer';
 
@@ -146,16 +147,6 @@ function FlowPlot({ points, scale }: PlotProps) {
   );
 }
 
-/**
- * Which side of the crosshair the figures hang on, so they never run past the plot's edge:
- * right of it on the plot's left half, left of it on its right half.
- */
-const TOOLTIP_SIDE_CLASS: Record<LabelSide, string> = {
-  start: 'ml-2',
-  center: 'ml-2',
-  end: '-ml-2 -translate-x-full',
-};
-
 /** A figure of a point: what came in or went out (opening its column's Drill-down), or kept. */
 interface PointFigure {
   label: string;
@@ -216,7 +207,7 @@ function PointTooltip({ point, index, scale, money, isTappable }: PointTooltipPr
   const name = intervalLabel(point);
   return (
     <div
-      className={`absolute top-0 z-10 rounded-lg border border-rule bg-surface px-3 py-2 text-xs shadow-lg ${TOOLTIP_SIDE_CLASS[labelSide(x)]} ${isTappable ? '' : 'pointer-events-none'}`}
+      className={`${CHART_TOOLTIP_CLASS} ${tooltipSideClass(x)} ${isTappable ? '' : 'pointer-events-none'}`}
       style={{ left: `${x}%` }}
     >
       <p className="font-medium whitespace-nowrap text-ink">{name}</p>
