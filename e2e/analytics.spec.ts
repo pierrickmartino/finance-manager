@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { DEFAULT_PERIOD, periodPhrase } from '../src/lib/analytics/period';
 import { formatPeriod } from '../src/lib/format';
 import { createAccount, listAccounts } from '../src/server/services/accounts';
@@ -79,8 +79,8 @@ test('picking a Period preset reads every section over it, and a Drill-down retu
       heatmap(page, name).getByRole('rowheader', { name: row, exact: true }),
     ).toBeVisible();
   }
-  // Profit and loss: the whole Period's statement, just before Profit per interval (a row's name
-  // may carry its note on what other tests' data leaves out).
+  // Profit and loss: the whole Period's statement (a row's name may carry its note on what other
+  // tests' data leaves out).
   for (const row of ['Income', 'Expense', 'Profit', 'Capital', 'Net cash flow']) {
     await expect(
       region(page, 'Profit and loss').getByRole('rowheader', { name: new RegExp(`^${row}`) }),
@@ -287,9 +287,9 @@ test('Key figures open Analytics with four tiles: one row on a wide screen, 2×2
   for (const tile of tiles.slice(1)) {
     expect(await captionBeside(tile, 'Last 12 months')).toBe(true);
   }
-  // Above the overview row, all four in one row of equal tiles.
+  // Above the first row of cards, all four in one row of equal tiles.
   const wide = await boxes();
-  const overview = (await region(page, 'Recent transactions').boundingBox())!;
+  const overview = (await region(page, 'Income vs. expense').boundingBox())!;
   for (const box of wide) {
     expect(box.y).toBe(wide[0]!.y);
     expect(Math.round(box.width)).toBe(Math.round(wide[0]!.width));
@@ -545,21 +545,20 @@ test('Net cash flow has a bar per interval, the current one partial, each openin
   // At most one bar per interval: the Period's 5 years.
   expect(await flow.getByRole('link', { name: /^\d{4}( \(partial\))?: / }).count()).toBe(5);
 
-  // On a wide screen it sits beside Profit and loss, on the right.
+  // On a wide screen it sits beside Profit per interval, on the right.
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
   // Both stream in after the page: measure them once drawn.
-  const statement = region(page, 'Profit and loss');
+  const profit = region(page, 'Profit per interval');
   await expect(partial(CURRENT_MONTH)).toBeVisible();
-  await expect(statement.getByRole('table')).toBeVisible();
+  await expect(heatmap(page, 'Profit per interval')).toBeVisible();
   const flowBox = (await flow.boundingBox())!;
-  const statementBox = (await statement.boundingBox())!;
-  // Under Income and expense per interval, which sits beside the statement's top.
-  const perIntervalBox = (await region(page, 'Income and expense per interval').boundingBox())!;
-  expect(perIntervalBox.y).toBe(statementBox.y);
-  expect(flowBox.x).toBe(perIntervalBox.x);
-  expect(perIntervalBox.y + perIntervalBox.height).toBeLessThan(flowBox.y);
-  expect(statementBox.x + statementBox.width).toBeLessThan(flowBox.x);
+  const profitBox = (await profit.boundingBox())!;
+  expect(flowBox.y).toBe(profitBox.y);
+  expect(profitBox.x + profitBox.width).toBeLessThan(flowBox.x);
+  // Under the row of Account balances, Spending by Category and Recent transactions.
+  const recentBox = (await region(page, 'Recent transactions').boundingBox())!;
+  expect(recentBox.y + recentBox.height).toBeLessThan(flowBox.y);
 
   await partial(CURRENT_MONTH).click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
@@ -591,7 +590,7 @@ async function seedFirstDayExpense(suffix: number): Promise<void> {
   });
 }
 
-test('Income and expense per interval sits before Net cash flow, a bar pair per interval, the partial ones hatched, each bar opening its Drill-down', async ({
+test('Income and expense per interval sits beside Spending Insights, a bar pair per interval, the partial ones hatched, each bar opening its Drill-down', async ({
   page,
 }) => {
   const suffix = Date.now();
@@ -625,19 +624,13 @@ test('Income and expense per interval sits before Net cash flow, a bar pair per 
     ROLLING_MONTHS === 13 ? 2 : 1,
   );
 
-  // Just before Net cash flow, in the same column.
-  const flow = region(page, 'Net cash flow');
-  await expect(flow.getByRole('link').first()).toBeVisible();
+  // Just after Spending Insights, on its right in the same row.
+  const insights = section(page, 'Spending Insights');
+  await expect(insights).not.toHaveAttribute('aria-busy', 'true');
   const cardBox = (await card.boundingBox())!;
-  const flowBox = (await flow.boundingBox())!;
-  expect(cardBox.x).toBe(flowBox.x);
-  expect(cardBox.y + cardBox.height).toBeLessThan(flowBox.y);
-  expect(
-    await card.evaluate(
-      (node, next) => node.nextElementSibling === next,
-      await flow.elementHandle(),
-    ),
-  ).toBe(true);
+  const insightsBox = (await insights.boundingBox())!;
+  expect(cardBox.y).toBe(insightsBox.y);
+  expect(insightsBox.x + insightsBox.width).toBeLessThan(cardBox.x);
 
   await running.click();
   await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
@@ -713,13 +706,13 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   const lead = card.getByTestId('card-lead').getByRole('link');
   const kept = francs(await lead.innerText());
 
-  // In the top row, on the left of Account balances.
-  const balances = region(page, 'Account balances in CHF');
-  await expect(balances).not.toHaveAttribute('aria-busy', 'true');
+  // In the top row, on the left of Profit and loss.
+  const statement = region(page, 'Profit and loss');
+  await expect(statement).not.toHaveAttribute('aria-busy', 'true');
   const cardBox = (await card.boundingBox())!;
-  const balancesBox = (await balances.boundingBox())!;
-  expect(cardBox.y).toBe(balancesBox.y);
-  expect(cardBox.x + cardBox.width).toBeLessThan(balancesBox.x);
+  const statementBox = (await statement.boundingBox())!;
+  expect(cardBox.y).toBe(statementBox.y);
+  expect(cardBox.x + cardBox.width).toBeLessThan(statementBox.x);
 
   // Hovering a day shows its running figures; clicking near the top of the plot, above the
   // lower line, opens the higher area's column through that day, which sums to its point. The
@@ -768,30 +761,67 @@ test("Income vs. expense draws the Period day by day as running totals, and a da
   expect(await drillTotal()).toBe(kept);
 });
 
-test('on a wide screen Spending Insights and Recent transactions share the first row', async ({
+/**
+ * An Analytics section by its name; Spending Insights, once it has an insight, is named by its
+ * headline instead.
+ */
+function section(page: Page, name: string): Locator {
+  return name === 'Spending Insights'
+    ? region(page, name).or(page.locator('section[aria-labelledby="overview-insight"]'))
+    : region(page, name);
+}
+
+/** Analytics' rows of cards under Key figures, top to bottom, each left to right. */
+const ANALYTICS_ROWS = [
+  ['Income vs. expense', 'Profit and loss'],
+  ['Spending Insights', 'Income and expense per interval'],
+  ['Account balances in CHF', 'Spending by Category', 'Recent transactions'],
+  ['Profit per interval', 'Net cash flow'],
+  ['Categories per interval'],
+];
+
+test('on a wide screen the cards share rows of halves and thirds; one column on a phone', async ({
   page,
 }) => {
-  await seedSalary(Date.now());
-  // The overview row's two cards, once each has loaded.
-  const recent = region(page, 'Recent transactions');
-  const cards = recent.locator('xpath=..').locator(':scope > section');
+  const suffix = Date.now();
+  await seedSalary(suffix);
+  await seedGrocery(suffix);
+  const names = ANALYTICS_ROWS.flat();
   const boxes = async () => {
-    await expect(cards).toHaveCount(2);
-    await expect(cards.and(page.locator('[aria-busy="true"]'))).toHaveCount(0);
-    return Promise.all([0, 1].map(async (i) => (await cards.nth(i).boundingBox())!));
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+    return Promise.all(names.map(async (name) => (await section(page, name).boundingBox())!));
   };
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
-  const [insights, recentBox] = await boxes();
-  expect(recentBox!.y).toBe(insights!.y);
-  expect(insights!.x + insights!.width).toBeLessThan(recentBox!.x);
+  const wide = await boxes();
+  const main = (await page.getByRole('main').boundingBox())!;
+  let index = 0;
+  let rowBottom = 0;
+  for (const row of ANALYTICS_ROWS) {
+    const cells = wide.slice(index, index + row.length);
+    index += row.length;
+    // Side by side on one line, of equal width and height, below the row above.
+    for (const [i, box] of cells.entries()) {
+      expect(box.y, row[i]).toBe(cells[0]!.y);
+      expect(Math.round(box.height), row[i]).toBe(Math.round(cells[0]!.height));
+      expect(Math.round(box.width), row[i]).toBe(Math.round(cells[0]!.width));
+      if (i > 0) expect(cells[i - 1]!.x + cells[i - 1]!.width, row[i]).toBeLessThan(box.x);
+    }
+    expect(cells[0]!.y, row[0]).toBeGreaterThan(rowBottom);
+    // Together they span the page's width: halves, thirds, or the whole.
+    expect(cells[0]!.width * row.length, row.join(' | ')).toBeLessThan(main.width + 1);
+    expect(cells[0]!.width * row.length, row.join(' | ')).toBeGreaterThan(main.width * 0.85);
+    rowBottom = Math.max(...cells.map((box) => box.y + box.height));
+  }
 
   // One column on a phone, in the same order.
   await page.setViewportSize({ width: 390, height: 900 });
-  const [narrowInsights, narrowRecent] = await boxes();
-  expect(narrowInsights!.x).toBe(narrowRecent!.x);
-  expect(narrowInsights!.y + narrowInsights!.height).toBeLessThan(narrowRecent!.y);
+  const narrow = await boxes();
+  for (const [i, box] of narrow.slice(1).entries()) {
+    expect(box.x, names[i + 1]).toBe(narrow[0]!.x);
+    expect(narrow[i]!.y + narrow[i]!.height, names[i + 1]).toBeLessThan(box.y);
+  }
 });
 
 /** An Account in a Currency the E2E database has no FX rate for, with an expense booked today. */
@@ -872,13 +902,7 @@ test('on a wide screen the third-width sections draw their lead a size down, fro
   // Measured once every section has streamed in: a placeholder draws a lead of its own.
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   // About 355px inside at 1280, under the Card's lead threshold (28rem): the smaller size.
-  for (const name of [
-    'Income vs. expense',
-    'Account balances in CHF',
-    'Spending by Category',
-    'Income and expense per interval',
-    'Net cash flow',
-  ]) {
+  for (const name of ['Account balances in CHF', 'Spending by Category']) {
     await expect(region(page, name).getByTestId('card-lead')).toBeVisible();
     expect(await leadFontSize(region(page, name))).toBe('20px');
   }
