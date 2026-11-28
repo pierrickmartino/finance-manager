@@ -114,3 +114,24 @@ test('at phone width a bars flow keeps every pair without a horizontal scroll', 
     ),
   ).toBe(false);
 });
+
+test.describe('on a touch screen', () => {
+  test.use({ hasTouch: true });
+
+  test("a bars flow's first tap on a pair shows its figures, the second opens the bar", async ({
+    page,
+  }) => {
+    const dashboardId = await seedBarsFlow(Date.now());
+
+    await page.goto(`/dashboards/${dashboardId}`);
+    const card = widgetCard(page, 'In and out per month');
+    const latest = card.getByRole('link', { name: /, Expense: CHF\s?1.700$/ });
+
+    await latest.tap();
+    await expect(card.locator('figure dl').getByText(/CHF\s?1.700/)).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/dashboards/${dashboardId}$`));
+
+    await latest.tap();
+    await expect(page.getByRole('status')).toHaveText("1 Transaction, total CHF -1'700.00");
+  });
+});

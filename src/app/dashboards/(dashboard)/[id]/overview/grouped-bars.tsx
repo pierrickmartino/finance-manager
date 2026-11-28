@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { MouseEvent } from 'react';
+import type { FocusEvent, MouseEvent, PointerEvent } from 'react';
 import type { IntervalPair } from '@/lib/reporting/card';
 import { intervalLabel } from '@/lib/reporting/interval-label';
 import { CHART_TOOLTIP_CLASS, tooltipSideClass } from './chart-tooltip';
@@ -13,9 +13,10 @@ import { useTapToShow } from './use-flow-pointer';
  * A bars flow's mark (docs/design-system.md, "Charts"; ADR-0022): an Income bar (`ramp-1`) and
  * an Expense bar (`ramp-4`) side by side per Interval, on one shared scale over a zero line. A
  * partial Interval (cut short at the Period's start, or still running) is hatched; a side that
- * nets the wrong way drops below zero in translucent `negative`, never clamped. Hovering,
- * focusing or tapping a pair shows its figures; each bar opens its Drill-down (on a touch
- * screen, the first tap shows the figures and the second opens it). Amounts in minor units.
+ * nets the wrong way drops below zero in translucent `negative`, never clamped. Hovering with
+ * a mouse, focusing from the keyboard or tapping a pair shows its figures; each bar opens its
+ * Drill-down (on a touch screen, the first tap shows the figures and the second opens it: the
+ * mouse and focus events a tap also fires pick nothing). Amounts in minor units.
  */
 
 type Side = 'income' | 'expense';
@@ -152,13 +153,21 @@ export function GroupedBars({ intervals }: { intervals: IntervalPair[] }) {
   const clickOf = (index: number) => (event: MouseEvent<HTMLAnchorElement>) => {
     if (picksOnTap(index)) event.preventDefault();
   };
+  // Only a mouse hovers: a touch's pointer events would pick the pair before its tap does.
+  const hoverOf = (index: number | null) => (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === 'mouse') setActive(index);
+  };
+  // Only focus from the keyboard picks a pair: a tap focuses its bar too.
+  const focusOf = (index: number) => (event: FocusEvent<HTMLElement>) => {
+    if (event.target.matches(':focus-visible')) setActive(index);
+  };
 
   return (
     <figure>
       <div
         className="relative h-52 pt-14"
         onPointerDownCapture={onPointerDown}
-        onMouseLeave={() => setActive(null)}
+        onPointerLeave={hoverOf(null)}
       >
         <div className="relative flex h-full gap-1 @xs:gap-2">
           <span
@@ -172,8 +181,8 @@ export function GroupedBars({ intervals }: { intervals: IntervalPair[] }) {
               role="group"
               aria-label={intervalLabel(pair)}
               className="relative flex h-full min-w-0 flex-1 gap-0.5"
-              onMouseEnter={() => setActive(i)}
-              onFocus={() => setActive(i)}
+              onPointerEnter={hoverOf(i)}
+              onFocus={focusOf(i)}
               onBlur={() => setActive(null)}
             >
               {SIDES.map((side) => (
