@@ -8,7 +8,7 @@ import type { ReportHeader } from '../reporting/headers';
 import type { AxisSelector, CellRef } from '../reporting/cell-ref';
 import type { WidgetQuery } from '../reporting/query';
 import type { Visualisation, WidgetSource } from '../reporting/widgets';
-import { isIncomplete, type AnalyticsReading } from './reading';
+import { isIncomplete, type AnalyticsInterval, type AnalyticsReading } from './reading';
 
 /**
  * The building blocks of Analytics' sections. Each section is drawn by the Dashboard's own
@@ -88,17 +88,30 @@ export function analyticsCard(spec: AnalyticsCardSpec): AnalyticsCard {
 }
 
 /**
+ * How an incomplete interval is set apart: partial, and cut short when it is partial only for
+ * starting after its first day (the to-date one, even if also cut short, is still running).
+ */
+function incompleteFlags(
+  interval: AnalyticsInterval,
+): Pick<ReportHeader, 'isPartial' | 'isCutShort'> {
+  return interval.isToDate ? { isPartial: true } : { isPartial: true, isCutShort: true };
+}
+
+/**
  * A report's headers with the reading's incomplete intervals (its partial first and its to-date
  * last) marked partial: over the reading's fixed range, the engine marks none of them.
  */
 function markIncomplete(report: ReportTable, reading: AnalyticsReading): ReportTable {
-  const incomplete = new Set(
-    reading.intervals.filter(isIncomplete).map((interval) => interval.key),
+  const incomplete = new Map(
+    reading.intervals
+      .filter(isIncomplete)
+      .map((interval) => [interval.key, incompleteFlags(interval)] as const),
   );
   const mark = (headers: readonly ReportHeader[]) =>
-    headers.map((header) =>
-      header.key !== null && incomplete.has(header.key) ? { ...header, isPartial: true } : header,
-    );
+    headers.map((header) => {
+      const flags = header.key === null ? undefined : incomplete.get(header.key);
+      return flags ? { ...header, ...flags } : header;
+    });
   return { ...report, rows: mark(report.rows), columns: mark(report.columns) };
 }
 

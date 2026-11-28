@@ -47,6 +47,7 @@ describe('readCard: income vs. expense', () => {
           label: '2025-01',
           key: '2025-01',
           isPartial: false,
+          isRunning: false,
           income: 1000_00,
           expense: 600_00,
           incomeHref: 'cell:2025-01/Income',
@@ -56,6 +57,7 @@ describe('readCard: income vs. expense', () => {
           label: '2025-02',
           key: '2025-02',
           isPartial: false,
+          isRunning: false,
           income: 1000_00,
           expense: 900_00,
           incomeHref: 'cell:2025-02/Income',
@@ -65,6 +67,7 @@ describe('readCard: income vs. expense', () => {
           label: '2025-03',
           key: '2025-03',
           isPartial: false,
+          isRunning: false,
           income: 1500_00,
           expense: 300_00,
           incomeHref: 'cell:2025-03/Income',
@@ -459,6 +462,18 @@ describe('readCard: a bars flow sentence', () => {
     );
 
     expect(reading.lead?.headline).toBe('This month so far: in CHF 3200, out CHF 2900.');
+  });
+
+  it('says "so far" only of a running interval, not of one cut short at the start of a range ending before today', () => {
+    const data = source(['2025-03'], ['Income', 'Expense'], [[3200_00, -2900_00]]);
+    const cutShort = {
+      ...data,
+      rows: data.rows.map((row) => ({ ...row, isPartial: true, isCutShort: true })),
+    };
+
+    const reading = bars(cutShort);
+
+    expect(reading.lead?.headline).toBe('2025-03 (partial): in CHF 3200, out CHF 2900.');
   });
 });
 

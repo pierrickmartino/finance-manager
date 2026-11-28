@@ -18,6 +18,11 @@ export interface ReportHeader {
    * other day is full, the range's first included.
    */
   isPartial: boolean;
+  /**
+   * A partial time period that is partial only because the range starts after its first day
+   * (Analytics' first Interval, ADR-0016), not because it is still running. Absent otherwise.
+   */
+  isCutShort?: boolean;
 }
 
 /** The single header used when a report has no axis on that side. */

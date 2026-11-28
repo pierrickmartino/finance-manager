@@ -1,11 +1,16 @@
 import { isTimeAxis, type ReportAxis, type TimeAxis } from '@/server/services/reporting/query';
 import type { ReportHeader, Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
-import { groupedBarsMark, type GroupedBarsMark } from './bars-flow';
+import {
+  groupedBarsMark,
+  intervalPairsOf,
+  type GroupedBarsMark,
+  type IntervalPair,
+} from './bars-flow';
 import type { Size } from './board';
 import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
 import { averaged, drillUrl } from './drill-link';
-import { isDayKey } from './interval-label';
+import { intervalLabel, isDayKey } from './interval-label';
 import {
   areasMark,
   asExpense,
@@ -274,22 +279,14 @@ function flowSlotsOf(data: ChartSource): FlowSlots | null {
   return { incomeSlot, expenseSlot };
 }
 
-function monthsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): MonthFlow[] {
-  return data.rows.map((row, r) => {
-    const income = data.cells[r]?.[incomeSlot] ?? 0;
-    const expense = asExpense(data.cells[r]?.[expenseSlot]);
-    return { label: row.label, isPartial: row.isPartial, income, expense, net: income - expense };
-  });
-}
-
-/** A line flow by day reads as running totals (ADR-0020); by any other Interval, its own. */
-const isRunningFlow = (kind: CardKind, data: ChartSource): boolean =>
-  kind === 'trend' && periodWords(data).noun === 'day';
-
-/** How a flow is drawn: a line as two areas, bars as grouped bars (ADR-0022). */
-function flowMark(kind: CardKind, data: ChartSource, slots: FlowSlots): CardMark {
-  if (kind !== 'trend') return groupedBarsMark(data, slots);
-  return areasMark(data, slots, isRunningFlow(kind, data));
+function monthsOf(data: ChartSource, slots: FlowSlots): MonthFlow[] {
+  return intervalPairsOf(data, slots).map(({ label, isPartial, income, expense }) => ({
+    label,
+    isPartial,
+    income,
+    expense,
+    net: income - expense,
+  }));
 }
 
 /**
@@ -456,12 +453,18 @@ function periodWords(data: ChartSource): PeriodWords {
   return PERIOD_WORDS.month;
 }
 
+/** What a flow always has to say: a lead, then its facts. */
+interface FlowSentences {
+  lead: NonNullable<CardReading['lead']>;
+  facts: CardFact[];
+}
+
 /** Income vs. expense: the biggest period in, the biggest period out, and what stayed. */
 function flowSentences(
   data: ChartSource,
   { incomeSlot, expenseSlot }: FlowSlots,
   money: Money,
-): CardSentences {
+): FlowSentences {
   const { noun } = periodWords(data);
   const chart = toSeriesChart(data);
   const income = data.rows.map((_, r) => data.cells[r]?.[incomeSlot] ?? 0);
@@ -495,42 +498,87 @@ function flowSentences(
 
 /**
  * A bars flow in words (ADR-0022): in how many complete Intervals income beat expense, then
- * the running one's in and out. With no complete Interval, only the running one is told.
+ * the running one's in and out. With no complete Interval, only the running one is told; with
+ * none running either (one Interval cut short at the start of a range ending before today), it
+ * is told as it is, without "so far".
  */
-function barsFlowSentence(data: ChartSource, slots: FlowSlots, money: Money): string {
-  const { noun } = periodWords(data);
-  const months = monthsOf(data, slots);
-  const complete = months.filter((month) => !month.isPartial);
-  const beat = complete.filter((month) => month.income > month.expense).length;
-  const last = months.at(-1);
-  const running = last?.isPartial ? last : null;
-  const sentence = [
-    complete.length > 0 && `Income beat expense in ${beat} of ${complete.length} complete ${noun}s`,
-    running && `this ${noun} so far: in ${money(running.income)}, out ${money(running.expense)}`,
-  ]
-    .filter(Boolean)
-    .join('; ');
+function barsFlowSentence(intervals: readonly IntervalPair[], noun: string, money: Money): string {
+  const complete = intervals.filter((interval) => !interval.isPartial);
+  const beat = complete.filter((interval) => interval.income > interval.expense).length;
+  const last = intervals.at(-1);
+  const inAndOut = (interval: IntervalPair) =>
+    `in ${money(interval.income)}, out ${money(interval.expense)}`;
+  const clauses: string[] = [];
+  if (complete.length > 0) {
+    clauses.push(`Income beat expense in ${beat} of ${complete.length} complete ${noun}s`);
+  }
+  if (last?.isRunning) clauses.push(`this ${noun} so far: ${inAndOut(last)}`);
+  else if (complete.length === 0 && last) clauses.push(`${intervalLabel(last)}: ${inAndOut(last)}`);
+  const sentence = clauses.join('; ');
   return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
 }
 
-/** A bars flow by month, quarter or year is told by its sentence; by day, as any other flow. */
-const isBarsFlowTold = (kind: CardKind, data: ChartSource): boolean =>
-  kind === 'bars' && periodWords(data).noun !== 'day';
-
 /**
- * A bars flow: its sentence over the Profit of the whole range (income and expense net to the
- * total), then the biggest Intervals in and out and what was kept on average.
+ * A bars flow by month, quarter or year: its sentence over the Profit of the whole range (income
+ * and expense net to the total), then the biggest Intervals in and out and what was kept on
+ * average.
  */
-function barsFlowSentences(data: ChartSource, slots: FlowSlots, money: Money): CardSentences {
+function barsFlowSentences(
+  data: ChartSource,
+  intervals: readonly IntervalPair[],
+  slots: FlowSlots,
+  money: Money,
+): FlowSentences {
   const { lead, facts } = flowSentences(data, slots, money);
   return {
     lead: {
-      headline: barsFlowSentence(data, slots, money),
+      headline: barsFlowSentence(intervals, periodWords(data).noun, money),
       detail: money(data.total ?? 0),
       href: data.hrefs.total,
     },
-    facts: [{ label: lead!.headline, value: lead!.detail, href: lead!.href }, ...facts],
+    facts: [{ label: lead.headline, value: lead.detail, href: lead.href }, ...facts],
   };
+}
+
+/**
+ * How a flow is told and drawn, its kind and Interval decided once: a line by day as running
+ * totals (ADR-0020), any other line as two areas of each row's own figures; bars always as
+ * grouped bars (ADR-0022), told by the bars flow sentence by month, quarter or year, and by
+ * their days, as a line's figures are, by day.
+ */
+type FlowReading = 'runningAreas' | 'areas' | 'barsByInterval' | 'barsByDay';
+
+function flowReadingOf(kind: 'trend' | 'bars', data: ChartSource): FlowReading {
+  const isByDay = periodWords(data).noun === 'day';
+  if (kind === 'trend') return isByDay ? 'runningAreas' : 'areas';
+  return isByDay ? 'barsByDay' : 'barsByInterval';
+}
+
+/** What a flow says and draws, as `flowReadingOf` reads it. */
+function readFlow(
+  kind: 'trend' | 'bars',
+  data: ChartSource,
+  slots: FlowSlots,
+  money: Money,
+): Pick<CardReading, 'lead' | 'facts' | 'mark'> {
+  switch (flowReadingOf(kind, data)) {
+    case 'runningAreas':
+      return { ...runningFlowSentences(data, slots, money), mark: areasMark(data, slots, true) };
+    case 'areas':
+      return { ...flowSentences(data, slots, money), mark: areasMark(data, slots, false) };
+    case 'barsByInterval': {
+      const intervals = intervalPairsOf(data, slots);
+      return {
+        ...barsFlowSentences(data, intervals, slots, money),
+        mark: groupedBarsMark(intervals),
+      };
+    }
+    case 'barsByDay':
+      return {
+        ...flowSentences(data, slots, money),
+        mark: groupedBarsMark(intervalPairsOf(data, slots)),
+      };
+  }
 }
 
 /** Period by period: the best and weakest (or, for spending, heaviest and lightest) periods. */
@@ -603,14 +651,7 @@ function readRows(
     case 'trend':
     case 'bars':
       return slots
-        ? {
-            ...(isRunningFlow(kind, data)
-              ? runningFlowSentences(data, slots, money)
-              : isBarsFlowTold(kind, data)
-                ? barsFlowSentences(data, slots, money)
-                : flowSentences(data, slots, money)),
-            mark: flowMark(kind, data, slots),
-          }
+        ? readFlow(kind, data, slots, money)
         : {
             ...periodSentences(kind, data, money),
             mark: { type: 'bars', periods: periodValues(data) },

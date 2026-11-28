@@ -94,6 +94,8 @@ describe('Income and expense per interval', () => {
       ...Array<boolean>(11).fill(false),
       true,
     ]);
+    // Only the to-date month is still running: the first is partial for being cut short.
+    expect(pairs.map((pair) => pair.isRunning)).toEqual([...Array<boolean>(12).fill(false), true]);
     // February: groceries 400.00 less a 50.00 refund. Capital, the uncategorised payment and
     // the Transfer count nowhere.
     expect(figures(pairs.slice(-3))).toEqual([
