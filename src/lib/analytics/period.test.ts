@@ -172,6 +172,7 @@ describe('the Card Periods in the URL', () => {
       'income-vs-expense',
       'spending-by-category',
       'profit-and-loss',
+      'income-and-expense-per-interval',
       'net-cash-flow',
       'profit-per-interval',
       'categories-per-interval',

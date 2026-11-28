@@ -1,10 +1,17 @@
 import { isTimeAxis, type ReportAxis, type TimeAxis } from '@/server/services/reporting/query';
 import type { ReportHeader, Visualisation, WidgetSource } from '@/server/services/reporting';
 import { divideRounded } from './average';
+import {
+  groupedBarsMark,
+  intervalPairsOf,
+  type GroupedBarsMark,
+  type IntervalPair,
+} from './bars-flow';
 import type { Size } from './board';
 import { periodSumDrill, toDonutSlices, toSeriesChart, type ChartSource } from './chart-data';
+import type { CellRef } from '@/server/services/reporting/cell-ref';
 import { averaged, drillUrl } from './drill-link';
-import { isDayKey } from './interval-label';
+import { intervalLabel, isDayKey } from './interval-label';
 import {
   areasMark,
   asExpense,
@@ -15,6 +22,7 @@ import {
 import { readNetWorth, type NetWorthLineMark } from './net-worth-card';
 import { periodValues, type PeriodValue } from './period-values';
 
+export type { IntervalPair } from './bars-flow';
 export type { FlowPoint } from './line-flow';
 export type { LineMarker, NetWorthBand } from './net-worth-card';
 export type { PeriodValue } from './period-values';
@@ -210,7 +218,8 @@ export type CardMark =
   | { type: 'ticks'; items: TickItem[] }
   | { type: 'ring'; data: ChartSource }
   | { type: 'grid'; data: ChartSource }
-  | { type: 'dots'; months: MonthFlow[] }
+  /** A bars flow: an Income bar and an Expense bar per Interval, on one shared scale. */
+  | GroupedBarsMark
   /** A line flow: two overlapping areas, income and expense, whose gap is its Profit. */
   | AreasMark
   | { type: 'bars'; periods: PeriodValue[] }
@@ -259,7 +268,7 @@ function splitPath(label: string): [group: string, name: string] {
  * (an income-vs-expense Widget): the one with the larger total is the income, so a refund
  * month in the expense column doesn't turn it into income.
  */
-function flowSlotsOf(data: ChartSource): FlowSlots | null {
+function slotsBySign(data: ChartSource): FlowSlots | null {
   if (data.columns.length !== 2) return null;
   const [first, second] = data.columnTotals;
   if (first == null || second == null) return null;
@@ -271,22 +280,85 @@ function flowSlotsOf(data: ChartSource): FlowSlots | null {
   return { incomeSlot, expenseSlot };
 }
 
-function monthsOf(data: ChartSource, { incomeSlot, expenseSlot }: FlowSlots): MonthFlow[] {
-  return data.rows.map((row, r) => {
-    const income = data.cells[r]?.[incomeSlot] ?? 0;
-    const expense = asExpense(data.cells[r]?.[expenseSlot]);
-    return { label: row.label, isPartial: row.isPartial, income, expense, net: income - expense };
-  });
+/** The two sides of a flow by Category group type, in the order its source holds them. */
+const FLOW_SIDES = [
+  { key: 'income', label: 'Income' },
+  { key: 'expense', label: 'Expense' },
+] as const;
+
+/** A flow's source and which of its columns is the income and which the expense. */
+interface FlowSource {
+  data: ChartSource;
+  slots: FlowSlots;
 }
 
-/** A line flow by day reads as running totals (ADR-0020); by any other Interval, its own. */
-const isRunningFlow = (kind: CardKind, data: ChartSource): boolean =>
-  kind === 'trend' && periodWords(data).noun === 'day';
+/** Where a side's figure drills when the source has no column for it: its own, empty, cell. */
+function absentSideHref(data: ChartSource, cell: CellRef): string {
+  return data.drill ? drillUrl(data.drill, cell) : data.hrefs.total;
+}
 
-/** How a flow is drawn: a line as two areas, bars as dots. */
-function flowMark(kind: CardKind, data: ChartSource, slots: FlowSlots): CardMark {
-  if (kind !== 'trend') return { type: 'dots', months: monthsOf(data, slots) };
-  return areasMark(data, slots, isRunningFlow(kind, data));
+/**
+ * A source by Category group type whose columns are income, expense or both, as Income then
+ * Expense whatever their sign: a side with no Transaction in the range is an empty column
+ * whose links open its own (empty) Drill-downs. Null when it holds any other column, or its
+ * filters leave a side out (an income-only Widget is no flow).
+ */
+function byGroupType(data: ChartSource): FlowSource | null {
+  const sides: readonly (string | null)[] = FLOW_SIDES.map((side) => side.key);
+  if (!data.columns.every((column) => sides.includes(column.key))) return null;
+  const kept: readonly string[] | undefined = data.drill?.query.filters.categoryGroupTypes;
+  if (kept && !FLOW_SIDES.every((side) => kept.includes(side.key))) return null;
+  const at = FLOW_SIDES.map(({ key }) => data.columns.findIndex((column) => column.key === key));
+  const side = <T>(values: readonly T[] | undefined, s: number, absent: () => T): T =>
+    at[s] === -1 ? absent() : values![at[s]!]!;
+  const both = <T>(of: (s: number) => T): T[] => FLOW_SIDES.map((_, s) => of(s));
+  return {
+    data: {
+      ...data,
+      columns: both((s) => side(data.columns, s, () => ({ ...FLOW_SIDES[s]!, isPartial: false }))),
+      cells: data.rows.map((_, r) => both((s) => side(data.cells[r], s, () => null))),
+      columnTotals: both((s) => side(data.columnTotals, s, () => 0)),
+      hrefs: {
+        ...data.hrefs,
+        cells: data.rows.map((row, r) =>
+          both((s) =>
+            side(data.hrefs.cells[r], s, () =>
+              absentSideHref(data, { row: row.key, column: FLOW_SIDES[s]!.key }),
+            ),
+          ),
+        ),
+        columnTotals: both((s) =>
+          side(data.hrefs.columnTotals, s, () =>
+            absentSideHref(data, { column: FLOW_SIDES[s]!.key }),
+          ),
+        ),
+      },
+    },
+    slots: { incomeSlot: 0, expenseSlot: 1 },
+  };
+}
+
+/**
+ * A Widget's flow, when its data holds one: by Category group type, each column read by what
+ * it is (ADR-0022), so a Period with no income, or a side netting the wrong way, still reads
+ * as Income and Expense; by any other axis, two columns told apart by their sign.
+ */
+function flowSourceOf(widget: CardWidget, data: ChartSource): FlowSource | null {
+  if (widget.query.columns === 'categoryGroupType' && data.columns.length > 0) {
+    return byGroupType(data);
+  }
+  const slots = slotsBySign(data);
+  return slots ? { data, slots } : null;
+}
+
+function monthsOf(data: ChartSource, slots: FlowSlots): MonthFlow[] {
+  return intervalPairsOf(data, slots).map(({ label, isPartial, income, expense }) => ({
+    label,
+    isPartial,
+    income,
+    expense,
+    net: income - expense,
+  }));
 }
 
 /**
@@ -453,12 +525,18 @@ function periodWords(data: ChartSource): PeriodWords {
   return PERIOD_WORDS.month;
 }
 
+/** What a flow always has to say: a lead, then its facts. */
+interface FlowSentences {
+  lead: NonNullable<CardReading['lead']>;
+  facts: CardFact[];
+}
+
 /** Income vs. expense: the biggest period in, the biggest period out, and what stayed. */
 function flowSentences(
   data: ChartSource,
   { incomeSlot, expenseSlot }: FlowSlots,
   money: Money,
-): CardSentences {
+): FlowSentences {
   const { noun } = periodWords(data);
   const chart = toSeriesChart(data);
   const income = data.rows.map((_, r) => data.cells[r]?.[incomeSlot] ?? 0);
@@ -488,6 +566,91 @@ function flowSentences(
       },
     ],
   };
+}
+
+/**
+ * A bars flow in words (ADR-0022): in how many complete Intervals income beat expense, then
+ * the running one's in and out. With no complete Interval, only the running one is told; with
+ * none running either (one Interval cut short at the start of a range ending before today), it
+ * is told as it is, without "so far".
+ */
+function barsFlowSentence(intervals: readonly IntervalPair[], noun: string, money: Money): string {
+  const complete = intervals.filter((interval) => !interval.isPartial);
+  const beat = complete.filter((interval) => interval.income > interval.expense).length;
+  const last = intervals.at(-1);
+  const inAndOut = (interval: IntervalPair) =>
+    `in ${money(interval.income)}, out ${money(interval.expense)}`;
+  const clauses: string[] = [];
+  if (complete.length > 0) {
+    clauses.push(`Income beat expense in ${beat} of ${complete.length} complete ${noun}s`);
+  }
+  if (last?.isRunning) clauses.push(`this ${noun} so far: ${inAndOut(last)}`);
+  else if (complete.length === 0 && last) clauses.push(`${intervalLabel(last)}: ${inAndOut(last)}`);
+  const sentence = clauses.join('; ');
+  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
+}
+
+/**
+ * A bars flow by month, quarter or year: its sentence over the Profit of the whole range (income
+ * and expense net to the total), then the biggest Intervals in and out and what was kept on
+ * average.
+ */
+function barsFlowSentences(
+  data: ChartSource,
+  intervals: readonly IntervalPair[],
+  slots: FlowSlots,
+  money: Money,
+): FlowSentences {
+  const { lead, facts } = flowSentences(data, slots, money);
+  return {
+    lead: {
+      headline: barsFlowSentence(intervals, periodWords(data).noun, money),
+      detail: money(data.total ?? 0),
+      href: data.hrefs.total,
+    },
+    facts: [{ label: lead.headline, value: lead.detail, href: lead.href }, ...facts],
+  };
+}
+
+/**
+ * How a flow is told and drawn, its kind and Interval decided once: a line by day as running
+ * totals (ADR-0020), any other line as two areas of each row's own figures; bars always as
+ * grouped bars (ADR-0022), told by the bars flow sentence by month, quarter or year, and by
+ * their days, as a line's figures are, by day.
+ */
+type FlowReading = 'runningAreas' | 'areas' | 'barsByInterval' | 'barsByDay';
+
+function flowReadingOf(kind: 'trend' | 'bars', data: ChartSource): FlowReading {
+  const isByDay = periodWords(data).noun === 'day';
+  if (kind === 'trend') return isByDay ? 'runningAreas' : 'areas';
+  return isByDay ? 'barsByDay' : 'barsByInterval';
+}
+
+/** What a flow says and draws, as `flowReadingOf` reads it. */
+function readFlow(
+  kind: 'trend' | 'bars',
+  data: ChartSource,
+  slots: FlowSlots,
+  money: Money,
+): Pick<CardReading, 'lead' | 'facts' | 'mark'> {
+  switch (flowReadingOf(kind, data)) {
+    case 'runningAreas':
+      return { ...runningFlowSentences(data, slots, money), mark: areasMark(data, slots, true) };
+    case 'areas':
+      return { ...flowSentences(data, slots, money), mark: areasMark(data, slots, false) };
+    case 'barsByInterval': {
+      const intervals = intervalPairsOf(data, slots);
+      return {
+        ...barsFlowSentences(data, intervals, slots, money),
+        mark: groupedBarsMark(intervals),
+      };
+    }
+    case 'barsByDay':
+      return {
+        ...flowSentences(data, slots, money),
+        mark: groupedBarsMark(intervalPairsOf(data, slots)),
+      };
+  }
 }
 
 /** Period by period: the best and weakest (or, for spending, heaviest and lightest) periods. */
@@ -532,7 +695,7 @@ function periodSentences(kind: CardKind, data: ChartSource, money: Money): CardS
 function readRows(
   kind: CardKind,
   data: ChartSource,
-  slots: FlowSlots | null,
+  flowSource: FlowSource | null,
   money: Money,
   axis: TimeAxis | null,
 ): Pick<CardReading, 'lead' | 'facts' | 'mark'> {
@@ -559,13 +722,8 @@ function readRows(
       return readNetWorth(data, axis, money);
     case 'trend':
     case 'bars':
-      return slots
-        ? {
-            ...(isRunningFlow(kind, data)
-              ? runningFlowSentences(data, slots, money)
-              : flowSentences(data, slots, money)),
-            mark: flowMark(kind, data, slots),
-          }
+      return flowSource
+        ? readFlow(kind, flowSource.data, flowSource.slots, money)
         : {
             ...periodSentences(kind, data, money),
             mark: { type: 'bars', periods: periodValues(data) },
@@ -589,10 +747,10 @@ export function readCard(widget: CardWidget, money: Money): CardReading {
   const { kind } = cardFrame(widget);
   const { data } = widget;
   if (!data) return { kind, lead: null, facts: [], mark: { type: 'none' }, flow: null };
-  const slots = flowSlotsOf(data);
-  const flow = slots ? flowOf(data, slots) : null;
+  const flowSource = flowSourceOf(widget, data);
+  const flow = flowSource ? flowOf(flowSource.data, flowSource.slots) : null;
   if (data.rows.length === 0) {
     return { kind, lead: null, facts: [], mark: emptyMark(widget), flow };
   }
-  return { kind, ...readRows(kind, data, slots, money, timeAxisOf(widget.query)), flow };
+  return { kind, ...readRows(kind, data, flowSource, money, timeAxisOf(widget.query)), flow };
 }

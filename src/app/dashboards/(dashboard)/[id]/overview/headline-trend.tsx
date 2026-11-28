@@ -40,21 +40,28 @@ export function NetWorthSparkline({
       className="relative mr-1.5 mb-1.5 h-12 min-w-32 grow basis-32 max-sm:basis-full"
     >
       <SparklineSvg area={shape.area} line={shape.line} />
-      {points.map((point, i) => (
-        <Link
-          key={point.label}
-          href={point.href}
-          aria-label={`${point.label}: ${money(point.value)}`}
-          title={`${point.label}: ${money(point.value)}`}
-          className="group absolute inset-y-0"
-          style={{ left: `${shape.spots[i]!.x - strip / 2}%`, width: `${strip}%` }}
-        >
-          <span
-            className="absolute left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ramp-1 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-            style={{ top: `${shape.spots[i]!.y}%` }}
-          />
-        </Link>
-      ))}
+      {points.map((point, i) => {
+        const spot = shape.spots[i]!;
+        // The strip is cut at the sparkline's ends, so the first and last never reach past it
+        // (and past a phone's edge); its dot stays on the point.
+        const from = Math.max(0, spot.x - strip / 2);
+        const width = Math.min(100, spot.x + strip / 2) - from;
+        return (
+          <Link
+            key={point.label}
+            href={point.href}
+            aria-label={`${point.label}: ${money(point.value)}`}
+            title={`${point.label}: ${money(point.value)}`}
+            className="group absolute inset-y-0"
+            style={{ left: `${from}%`, width: `${width}%` }}
+          >
+            <span
+              className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ramp-1 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+              style={{ left: `${((spot.x - from) / width) * 100}%`, top: `${spot.y}%` }}
+            />
+          </Link>
+        );
+      })}
       <SparklineDot {...latest} isPartial={points.at(-1)!.isPartial} />
     </div>
   );

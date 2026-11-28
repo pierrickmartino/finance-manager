@@ -11,14 +11,15 @@ import { FigureLink } from '../figure-link';
 import { CARD_LEAD_SIZE_CLASS } from './card-layout';
 import { FlowAreas, FlowSwatches } from './flow-areas';
 import { HeatmapGrid } from './heatmap-grid';
-import { DotMatrix, EmptyChart, MonthBars, TickList } from './marks';
+import { GroupedBars } from './grouped-bars';
+import { EmptyChart, MonthBars, TickList } from './marks';
 import { NetWorthLine } from './net-worth-mark';
 import { DonutRing } from './ring';
 
 type Money = (minor: number) => string;
 
 /**
- * The card's mark, as its reading chose it: dots or two areas for in and out, bars per period,
+ * The card's mark, as its reading chose it: grouped bars or two areas for in and out, bars per period,
  * ticks for parts.
  */
 function CardBody({
@@ -51,15 +52,10 @@ function CardBody({
       return <DonutRing data={mark.data} money={money} />;
     case 'grid':
       return <HeatmapGrid data={mark.data} />;
-    case 'dots':
-      return <DotMatrix months={mark.months} />;
+    case 'groupedBars':
+      return <GroupedBars intervals={mark.intervals} />;
     case 'areas':
-      return (
-        <FlowAreas
-          points={mark.points}
-          hasLegendElsewhere={hasLegendInHeader}
-        />
-      );
+      return <FlowAreas points={mark.points} hasLegendElsewhere={hasLegendInHeader} />;
     case 'bars':
       return <MonthBars periods={mark.periods} />;
     case 'netWorthLine':

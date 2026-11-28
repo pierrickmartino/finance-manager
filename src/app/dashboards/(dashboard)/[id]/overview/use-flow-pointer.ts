@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation';
 import {
   useState,
+  type Dispatch,
   type FocusEvent,
+  type SetStateAction,
   type HTMLAttributes,
   type KeyboardEvent,
   type MouseEvent,
@@ -81,18 +83,51 @@ export interface FlowPointer {
   onBlur: (event: FocusEvent<HTMLElement>) => void;
 }
 
-export function useFlowPointer(points: readonly FlowPoint[], scale: Scale): FlowPointer {
-  const router = useRouter();
+/** Which point of a chart is picked, and how a touch picks one before opening it. */
+export interface TapToShow {
+  /** The picked point's index, or null. */
+  active: number | null;
+  setActive: Dispatch<SetStateAction<number | null>>;
+  /** The last pointer was a touch or a pen, not a mouse: the picked figures take taps. */
+  isTappable: boolean;
+  /** On the chart (or its capture phase): which kind of pointer is acting. */
+  onPointerDown: (event: PointerEvent<HTMLElement>) => void;
+  /**
+   * For a click on point `index`: a touch with no hover shows it first, so this picks it and
+   * says the click is spent (true); a second tap on the picked point, or a mouse, opens it.
+   */
+  picksOnTap: (index: number) => boolean;
+}
+
+/**
+ * A chart's picked point, shared by the line flow's plot and the bars flow's pairs: hovering or
+ * focusing picks one, and a touch's first tap on a point shows its figures, its second opens it.
+ */
+export function useTapToShow(): TapToShow {
   const [active, setActive] = useState<number | null>(null);
   const [pointerType, setPointerType] = useState('mouse');
+  const isTappable = pointerType !== 'mouse';
+  return {
+    active,
+    setActive,
+    isTappable,
+    onPointerDown: (event) => setPointerType(event.pointerType),
+    picksOnTap: (index) => {
+      if (!isTappable || index === active) return false;
+      setActive(index);
+      return true;
+    },
+  };
+}
+
+export function useFlowPointer(points: readonly FlowPoint[], scale: Scale): FlowPointer {
+  const router = useRouter();
+  const { active, setActive, isTappable, onPointerDown, picksOnTap } = useTapToShow();
   const count = points.length;
 
   const onClick = (event: MouseEvent<HTMLDivElement>) => {
     const index = indexAt(event, count);
-    if (pointerType !== 'mouse' && index !== active) {
-      setActive(index);
-      return;
-    }
+    if (picksOnTap(index)) return;
     // The point shown: a click's whole-pixel position can land on a dense plot's neighbour.
     const point = points[active ?? index]!;
     router.push(HREF_OF[seriesAt(heightAt(event), point, scale)](point));
@@ -119,12 +154,12 @@ export function useFlowPointer(points: readonly FlowPoint[], scale: Scale): Flow
 
   return {
     active,
-    isTappable: pointerType !== 'mouse',
+    isTappable,
     onBlur: (event) => {
       if (!event.currentTarget.contains(event.relatedTarget)) setActive(null);
     },
     controlProps: {
-      onPointerDown: (event) => setPointerType(event.pointerType),
+      onPointerDown,
       onPointerMove: (event) => onMouse(event, indexAt(event, count)),
       onPointerLeave: (event) => onMouse(event, null),
       onClick,

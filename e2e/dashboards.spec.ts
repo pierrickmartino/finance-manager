@@ -507,6 +507,9 @@ test('a table Widget shows its rows and columns as a heatmap whose cells open th
         dateRange: { kind: 'last', count: 6, unit: 'month' },
         rows: 'account',
         columns: 'month',
+        // Only this test's Account: another spec's income in the range would make the
+        // table mixed-sign, and its cells would then show their minus.
+        filters: { accountIds: [account.id] },
       },
     });
     return dashboard.id;
@@ -643,4 +646,43 @@ test('a Widget whose query reports a problem says so in its own card; the others
   await expect(widgetCard(page, 'Gone wrong')).toContainText('From must not be after To');
   await expect(cardTitles(page)).toHaveText(['Still fine', 'Gone wrong']);
   await expect(placeholders(page)).toHaveCount(0);
+});
+
+test('at phone width the overview row stays on the page: a long Transaction name is cut short, a short Net worth sparkline ends at its edges', async ({
+  page,
+}) => {
+  const name = `A Transaction with a long name that runs past a phone ${Date.now()}`;
+  await withServices(async (ctx) => {
+    const bank = await createBank(ctx, { name: `Long name bank ${Date.now()}` });
+    // Opened lately, so Net worth has only a few points, each a wide strip.
+    const account = await createAccount(ctx, {
+      bankId: bank.id,
+      kind: 'current',
+      importFormat: null,
+      name: 'Long name',
+      currency: 'CHF',
+      openingBalanceMinor: 1000_00,
+      openingDate: addDays(swissToday(), -40),
+    });
+    // The largest lately, so it is the one in the spotlight.
+    await createManualTransaction(ctx, {
+      accountId: account.id,
+      bookingDate: swissToday(),
+      amountMinor: 987_654_321_00,
+      description: name,
+    });
+  });
+
+  await page.setViewportSize({ width: 390, height: 900 });
+  await openHomeDashboard(page);
+
+  await expect(page.getByRole('link', { name: /^Largest lately/ })).toContainText(name);
+  await expect(
+    page.getByRole('group', { name: 'Net worth over the last 24 months' }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
 });

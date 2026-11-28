@@ -16,6 +16,7 @@ import { getFormatter } from '@/server/formatter';
 import {
   ACCOUNT_BALANCES,
   CATEGORIES_PER_INTERVAL,
+  INCOME_AND_EXPENSE_PER_INTERVAL,
   INCOME_VS_EXPENSE,
   INCOME_VS_EXPENSE_WIDGET,
   KEY_FIGURES,
@@ -46,7 +47,8 @@ const INCOME_VS_EXPENSE_FRAME = cardFrame(INCOME_VS_EXPENSE_WIDGET);
  * link, a former Span's `span` link, or a former custom start date's `from` link, redirects to its
  * nearest Period, keeping any pins. Some Cards may be pinned to their own Card Period (GLOSSARY, ADR-0018), one
  * parameter each beside the Period (`income-vs-expense=<slug>`,
- * `spending-by-category=<slug>`, `profit-and-loss=<slug>`, `net-cash-flow=<slug>`,
+ * `spending-by-category=<slug>`, `profit-and-loss=<slug>`,
+ * `income-and-expense-per-interval=<slug>`, `net-cash-flow=<slug>`,
  * `profit-per-interval=<slug>`, `categories-per-interval=<slug>`); a bare visit has none, and a former link carries none. The
  * shell and the Period control render at once; each section streams in behind its own placeholder and error boundary
  * (./section), and is drawn by the Dashboard's own cards (GLOSSARY: Card).
@@ -140,14 +142,21 @@ export default async function AnalyticsPage({
             />
           </StreamedSection>
         </div>
-        {/* The whole Period's statement beside its Net cash flow on wide screens, then its
-            intervals. */}
+        {/* The whole Period's statement on wide screens beside what came in and went out per
+            interval, then the net, one above the other; then its intervals. */}
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="grid min-w-0 lg:col-span-2">
+          <div className="grid min-w-0 lg:col-span-2 lg:row-span-2">
             <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
               <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
             </StreamedSection>
           </div>
+          <StreamedSection name={INCOME_AND_EXPENSE_PER_INTERVAL} retryHref={retryHref} isCard>
+            <CardSection
+              card={sections.incomeAndExpensePerInterval}
+              section="income-and-expense-per-interval"
+              empty="no income or expense"
+            />
+          </StreamedSection>
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
             <CardSection
               card={sections.netCashFlow}

@@ -12,6 +12,7 @@ import { categoriesPerInterval } from './categories-per-interval';
 import { loadDataStart, type DataStart } from './data-start';
 import type { AnalyticsCard, SharedSections } from './figures';
 import { profitPerInterval } from './profit-per-interval';
+import { incomeAndExpensePerInterval } from './income-and-expense-per-interval';
 import { incomeVsExpense } from './income-vs-expense';
 import { loadComparison, type Comparison } from './key-figure-change';
 import { netCashFlow } from './net-cash-flow';
@@ -60,6 +61,7 @@ export interface AnalyticsSections {
   spendingInsights: Promise<AnalyticsCard>;
   recentTransactions: Promise<RecentTransactions>;
   incomeVsExpense: Promise<Pinnable<AnalyticsCard>>;
+  incomeAndExpensePerInterval: Promise<Pinnable<AnalyticsCard>>;
   netCashFlow: Promise<Pinnable<AnalyticsCard>>;
   accountBalances: Promise<AnalyticsCard>;
   spendingByCategory: Promise<Pinnable<AnalyticsCard>>;
@@ -111,6 +113,7 @@ async function pinnable<Result>(
 type PinnableSections = Pick<
   AnalyticsSections,
   | 'incomeVsExpense'
+  | 'incomeAndExpensePerInterval'
   | 'netCashFlow'
   | 'spendingByCategory'
   | 'profitAndLoss'
@@ -136,6 +139,10 @@ function loadPinnableSections(
   return {
     incomeVsExpense: pinnable(readingFor('income-vs-expense'), ({ reading }) =>
       incomeVsExpense(ctx, reading),
+    ),
+    incomeAndExpensePerInterval: pinnable(
+      readingFor('income-and-expense-per-interval'),
+      ({ reading }) => incomeAndExpensePerInterval(ctx, reading),
     ),
     netCashFlow: pinnable(readingFor('net-cash-flow'), ({ reading }) => netCashFlow(ctx, reading)),
     spendingByCategory: pinnable(readingFor('spending-by-category'), ({ reading }) =>
@@ -218,6 +225,7 @@ export type {
 export type { RecentTransactions } from './recent-transactions';
 export { ACCOUNT_BALANCES } from './account-balances';
 export { CATEGORIES_PER_INTERVAL } from './categories-per-interval';
+export { INCOME_AND_EXPENSE_PER_INTERVAL } from './income-and-expense-per-interval';
 export { INCOME_VS_EXPENSE, INCOME_VS_EXPENSE_WIDGET } from './income-vs-expense';
 export { KEY_FIGURES } from './key-figures';
 export { NET_CASH_FLOW } from './net-cash-flow';

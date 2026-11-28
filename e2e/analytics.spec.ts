@@ -33,7 +33,8 @@ import {
 
 /**
  * Analytics (spec #170, #204): the Period control, and each section drawn as the Dashboard's own
- * card: Spending Insights, Recent transactions, Income vs. expense, Account balances in CHF, Spending by Category, Net cash flow, and the Profit per interval and Categories per
+ * card: Spending Insights, Recent transactions, Income vs. expense, Account balances in CHF, Spending by Category, Income and expense per
+ * interval, Net cash flow, and the Profit per interval and Categories per
  * interval heatmaps.
  * Each Card's own Period is card-period.spec.ts.
  */
@@ -553,7 +554,11 @@ test('Net cash flow has a bar per interval, the current one partial, each openin
   await expect(statement.getByRole('table')).toBeVisible();
   const flowBox = (await flow.boundingBox())!;
   const statementBox = (await statement.boundingBox())!;
-  expect(flowBox.y).toBe(statementBox.y);
+  // Under Income and expense per interval, which sits beside the statement's top.
+  const perIntervalBox = (await region(page, 'Income and expense per interval').boundingBox())!;
+  expect(perIntervalBox.y).toBe(statementBox.y);
+  expect(flowBox.x).toBe(perIntervalBox.x);
+  expect(perIntervalBox.y + perIntervalBox.height).toBeLessThan(flowBox.y);
   expect(statementBox.x + statementBox.width).toBeLessThan(flowBox.x);
 
   await partial(CURRENT_MONTH).click();
@@ -563,6 +568,95 @@ test('Net cash flow has a bar per interval, the current one partial, each openin
   ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Analytics' }).click();
   await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
+});
+
+/**
+ * An expense on seedSalary's Account on the first day of Last 12 months, so the Period's first
+ * month, cut short when it starts after the 1st, has a bar to hatch.
+ */
+async function seedFirstDayExpense(suffix: number): Promise<void> {
+  await withServices(async (ctx) => {
+    const account = (await listAccounts(ctx)).find(
+      (item) => item.name === `Analytics account ${suffix}`,
+    );
+    const group = await createCategoryGroup(ctx, { name: `Early ${suffix}`, type: 'expense' });
+    const rent = await createCategory(ctx, { groupId: group.id, name: 'Rent' });
+    const transaction = await createManualTransaction(ctx, {
+      accountId: account!.id,
+      bookingDate: ROLLING_START,
+      amountMinor: -500_00,
+      description: `Analytics first day ${suffix}`,
+    });
+    await editClassification(ctx, transaction.id, { categoryId: rent.id });
+  });
+}
+
+test('Income and expense per interval sits before Net cash flow, a bar pair per interval, the partial ones hatched, each bar opening its Drill-down', async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const { description } = await seedSalary(suffix);
+  await seedGrocery(suffix);
+  await seedOldPurchase(suffix);
+  await seedFirstDayExpense(suffix);
+  const card = region(page, 'Income and expense per interval');
+  const bar = (label: string, side: 'Income' | 'Expense') =>
+    card.getByRole('link', { name: new RegExp(`^${label} \\(partial\\), ${side}: `) });
+  const running = bar(CURRENT_MONTH, 'Income');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/analytics');
+  await expect(running).toBeVisible();
+  await expect(
+    card.getByText(/^Income beat expense in \d+ of \d+ complete months; /),
+  ).toBeVisible();
+  // A pair for every month of the Period, Income and Expense named in its legend.
+  await expect(card.getByRole('link', { name: /, Income: / })).toHaveCount(ROLLING_MONTHS);
+  await expect(card.getByRole('link', { name: /, Expense: / })).toHaveCount(ROLLING_MONTHS);
+  await expect(card.getByRole('figure').getByText('Income', { exact: true })).toBeVisible();
+  // The running month is hatched, and so is the first when the Period cuts it short.
+  await expect(running.locator('.bg-hatch')).toBeAttached();
+  if (ROLLING_MONTHS === 13) {
+    await expect(
+      bar(formatPeriod(ROLLING_START.slice(0, 7)), 'Expense').locator('.bg-hatch'),
+    ).toBeAttached();
+  }
+  await expect(card.getByRole('link', { name: /\(partial\), Income: / })).toHaveCount(
+    ROLLING_MONTHS === 13 ? 2 : 1,
+  );
+
+  // Just before Net cash flow, in the same column.
+  const flow = region(page, 'Net cash flow');
+  await expect(flow.getByRole('link').first()).toBeVisible();
+  const cardBox = (await card.boundingBox())!;
+  const flowBox = (await flow.boundingBox())!;
+  expect(cardBox.x).toBe(flowBox.x);
+  expect(cardBox.y + cardBox.height).toBeLessThan(flowBox.y);
+  expect(
+    await card.evaluate(
+      (node, next) => node.nextElementSibling === next,
+      await flow.elementHandle(),
+    ),
+  ).toBe(true);
+
+  await running.click();
+  await expect(page).toHaveURL(/\/widgets\/drill\?.*origin=analytics/);
+  await expect(
+    page.getByRole('table', { name: 'Drill-down Transactions' }).getByText(description),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Analytics' }).click();
+  await expect(page).toHaveURL(/\/analytics\?period=rolling-12-months$/);
+
+  // At phone width every pair stays, with no horizontal page scroll.
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto('/analytics');
+  await expect(running).toBeVisible();
+  await expect(card.getByRole('link', { name: /, Income: / })).toHaveCount(ROLLING_MONTHS);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
 });
 
 /** An amount as the page writes it ("CHF 4'234", "CHF -87.00") as a number of francs. */
@@ -743,6 +837,7 @@ test('every section with figures left out for want of an FX rate says so', async
   await expect(keyFigureNote('Income')).toHaveCount(0);
   for (const name of [
     'Income vs. expense',
+    'Income and expense per interval',
     'Net cash flow',
     'Account balances in CHF',
     'Spending by Category',
@@ -762,7 +857,7 @@ test('every section with figures left out for want of an FX rate says so', async
   }
   // Spending Insights too, whether it draws its insight or says why it can't yet.
   // And the three Key figures and three Profit and loss rows it weighs on.
-  await expect(notes).toHaveCount(7 + 3 + 3);
+  await expect(notes).toHaveCount(8 + 3 + 3);
 });
 
 test('on a wide screen the third-width sections draw their lead a size down, from their own width', async ({
@@ -774,11 +869,14 @@ test('on a wide screen the third-width sections draw their lead a size down, fro
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/analytics');
+  // Measured once every section has streamed in: a placeholder draws a lead of its own.
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   // About 355px inside at 1280, under the Card's lead threshold (28rem): the smaller size.
   for (const name of [
     'Income vs. expense',
     'Account balances in CHF',
     'Spending by Category',
+    'Income and expense per interval',
     'Net cash flow',
   ]) {
     await expect(region(page, name).getByTestId('card-lead')).toBeVisible();
