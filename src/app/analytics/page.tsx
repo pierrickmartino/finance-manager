@@ -42,6 +42,13 @@ export const metadata: Metadata = { title: 'Analytics · Finance Manager' };
 const INCOME_VS_EXPENSE_FRAME = cardFrame(INCOME_VS_EXPENSE_WIDGET);
 
 /**
+ * A row of sections: side by side on wide screens, one after the other below. Each takes one
+ * grid row: the Dashboard's insight and recent activity cards span two there, which would leave
+ * an empty row here.
+ */
+const ROW_CLASS = 'grid min-w-0 grid-cols-1 gap-5 lg:*:row-span-1';
+
+/**
  * Analytics (GLOSSARY, ADR-0016, ADR-0021): one fixed page of reports read over the Period preset
  * in the URL's `period` (Last 12 months when missing or unknown); a former Period view's `period`
  * link, a former Span's `span` link, or a former custom start date's `from` link, redirects to its
@@ -101,18 +108,8 @@ export default async function AnalyticsPage({
         >
           <KeyFiguresSection keyFigures={sections.keyFigures} fmt={fmt} />
         </StreamedSection>
-        {/* The overview: side by side on wide screens, one after the other below. */}
-        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
-          <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
-            <SpendingInsightsSection flow={sections.spendingInsights} />
-          </StreamedSection>
-          <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
-            <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
-          </StreamedSection>
-        </div>
-        {/* Income vs. expense, Account balances and Spending by Category side by side on wide
-            screens, one after the other below. */}
-        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
+        {/* Income vs. expense beside the whole Period's statement. */}
+        <div className={`${ROW_CLASS} lg:grid-cols-2`}>
           <StreamedSection
             name={INCOME_VS_EXPENSE}
             retryHref={retryHref}
@@ -131,6 +128,25 @@ export default async function AnalyticsPage({
               empty="no income or expense"
             />
           </StreamedSection>
+          <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
+            <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
+          </StreamedSection>
+        </div>
+        {/* Spending insights beside what came in and went out per interval. */}
+        <div className={`${ROW_CLASS} lg:grid-cols-2`}>
+          <StreamedSection name={SPENDING_INSIGHTS} retryHref={retryHref}>
+            <SpendingInsightsSection flow={sections.spendingInsights} />
+          </StreamedSection>
+          <StreamedSection name={INCOME_AND_EXPENSE_PER_INTERVAL} retryHref={retryHref} isCard>
+            <CardSection
+              card={sections.incomeAndExpensePerInterval}
+              section="income-and-expense-per-interval"
+              empty="no income or expense"
+            />
+          </StreamedSection>
+        </div>
+        {/* Account balances, Spending by Category and the latest Transactions. */}
+        <div className={`${ROW_CLASS} lg:grid-cols-3`}>
           <StreamedSection name={ACCOUNT_BALANCES} retryHref={retryHref} isCard>
             <CardSection card={sections.accountBalances} empty="no Accounts" />
           </StreamedSection>
@@ -141,20 +157,17 @@ export default async function AnalyticsPage({
               empty="no expense"
             />
           </StreamedSection>
+          <StreamedSection name={RECENT_TRANSACTIONS} retryHref={retryHref}>
+            <RecentTransactionsSection recent={sections.recentTransactions} today={today} />
+          </StreamedSection>
         </div>
-        {/* The whole Period's statement on wide screens beside what came in and went out per
-            interval, then the net, one above the other; then its intervals. */}
-        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="grid min-w-0 lg:col-span-2 lg:row-span-2">
-            <StreamedSection name={PROFIT_AND_LOSS} retryHref={retryHref}>
-              <ProfitAndLossSection profitAndLoss={sections.profitAndLoss} fmt={fmt} />
-            </StreamedSection>
-          </div>
-          <StreamedSection name={INCOME_AND_EXPENSE_PER_INTERVAL} retryHref={retryHref} isCard>
+        {/* Profit per interval beside the net per interval. */}
+        <div className={`${ROW_CLASS} lg:grid-cols-2`}>
+          <StreamedSection name={PROFIT_PER_INTERVAL} retryHref={retryHref} isCard>
             <CardSection
-              card={sections.incomeAndExpensePerInterval}
-              section="income-and-expense-per-interval"
-              empty="no income or expense"
+              card={sections.profitPerInterval}
+              section="profit-per-interval"
+              empty="no income, expense or Capital"
             />
           </StreamedSection>
           <StreamedSection name={NET_CASH_FLOW} retryHref={retryHref} isCard>
@@ -165,13 +178,7 @@ export default async function AnalyticsPage({
             />
           </StreamedSection>
         </div>
-        <StreamedSection name={PROFIT_PER_INTERVAL} retryHref={retryHref} isCard>
-          <CardSection
-            card={sections.profitPerInterval}
-            section="profit-per-interval"
-            empty="no income, expense or Capital"
-          />
-        </StreamedSection>
+        {/* Categories per interval, full width. */}
         <StreamedSection name={CATEGORIES_PER_INTERVAL} retryHref={retryHref} isCard>
           <CardSection
             card={sections.categoriesPerInterval}
